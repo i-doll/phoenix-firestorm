@@ -342,6 +342,7 @@ public:
     enum eBlendType : U8
     {
         BT_ALPHA = 0,
+        BT_ALPHA_PREMULT,
         BT_ADD,
         BT_ADD_WITH_ALPHA,  // Additive blend modulated by the fragment's alpha.
         BT_MULT,

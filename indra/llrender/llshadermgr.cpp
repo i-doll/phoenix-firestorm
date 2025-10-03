@@ -744,6 +744,15 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     // Master definition can be found in deferredUtil.glsl
     extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
 
+    // Weighted blended OIT constants shared across fragment shaders
+    extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_NONE 0\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_ACCUM 1\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_REVEAL 2\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_ALPHA_MAX 0.9999\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_WEIGHT_MIN 1e-2\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_WEIGHT_ALPHA_BIAS 1e-2\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_WEIGHT_DEPTH_SCALE 2.0\n");
+
     //copy file into memory
     enum {
           flag_write_to_out_of_extra_block_area = 0x01
@@ -1508,6 +1517,9 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("origin");
     mReservedUniforms.push_back("display_gamma");
+    mReservedUniforms.push_back("uOITPass");
+    mReservedUniforms.push_back("uPremultAlpha");
+    mReservedUniforms.push_back("uOITUseMRT");
 
     mReservedUniforms.push_back("inscatter");
     mReservedUniforms.push_back("sun_size");

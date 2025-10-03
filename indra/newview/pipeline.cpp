@@ -44,6 +44,7 @@
 #include "v3color.h"
 #include "llui.h"
 #include "llglheaders.h"
+#include "llglfunctiondecls.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -237,6 +238,13 @@ S32 LLPipeline::RenderBufferVisualization;
 bool LLPipeline::RenderMirrors;
 S32 LLPipeline::RenderHeroProbeUpdateRate;
 S32 LLPipeline::RenderHeroProbeConservativeUpdateMultiplier;
+bool LLPipeline::RenderUsePremultAlpha = false;
+bool LLPipeline::RenderOITWeighted = false;
+bool LLPipeline::RenderOITRiggedOnly = false;
+bool LLPipeline::sRenderRiggedAlpha = true;
+bool LLPipeline::sRenderNonRiggedAlpha = true;
+U32 LLPipeline::sOITPass = 0;
+bool LLPipeline::sOITUseMRT = false;
 LLTrace::EventStatHandle<S64> LLPipeline::sStatBatchSize("renderbatchsize");
 
 // const U32 LLPipeline::MAX_PREVIEW_WIDTH = 512;
@@ -610,6 +618,9 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderGlowWarmthAmount");
     connectRefreshCachedSettingsSafe("RenderGlowLumWeights");
     connectRefreshCachedSettingsSafe("RenderGlowWarmthWeights");
+    connectRefreshCachedSettingsSafe("RenderUsePremultAlpha");
+    connectRefreshCachedSettingsSafe("RenderOITWeighted");
+    connectRefreshCachedSettingsSafe("RenderOITRiggedOnly");
     connectRefreshCachedSettingsSafe("RenderGlowResolutionPow");
     connectRefreshCachedSettingsSafe("RenderGlowIterations");
     connectRefreshCachedSettingsSafe("RenderGlowWidth");
@@ -1014,6 +1025,21 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
         mWaterDis.allocate(resX, resY, screenFormat, true);
 
+        if (RenderOITWeighted)
+        {
+            if (!mOITBuffer.allocate(resX, resY, GL_RGBA16F)) return false;
+            if (mOITBuffer.getNumTextures() < 2)
+            {
+                if (!mOITBuffer.addColorAttachment(GL_R16F)) return false;
+            }
+            mRT->deferredScreen.shareDepthBuffer(mOITBuffer);
+        }
+        else
+        {
+            mOITBuffer.release();
+            mOITDepthShared = false;
+        }
+
         if(RenderScreenSpaceReflections)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("SSRBuffer"); // <FS:Beq/> improve Tracy scoping 
@@ -1231,6 +1257,9 @@ void LLPipeline::refreshCachedSettings()
     FSFocusPointLocked = gSavedSettings.getBOOL("FSFocusPointLocked");
     FSFocusPointFollowsPointer = gSavedSettings.getBOOL("FSFocusPointFollowsPointer");
     // </FS:Beq>
+    RenderUsePremultAlpha = gSavedSettings.getBOOL("RenderUsePremultAlpha");
+    RenderOITWeighted = gSavedSettings.getBOOL("RenderOITWeighted");
+    RenderOITRiggedOnly = gSavedSettings.getBOOL("RenderOITRiggedOnly");
     CameraFocusTransitionTime = gSavedSettings.getF32("CameraFocusTransitionTime");
     CameraFNumber = gSavedSettings.getF32("CameraFNumber");
     CameraFocalLength = gSavedSettings.getF32("CameraFocalLength");
@@ -1386,6 +1415,7 @@ void LLPipeline::releaseScreenBuffers()
     mHeroProbeRT.deferredLight.release();
 
     mPreviewScreen.release(); // <FS:Beq/> dedicated preview target
+    mOITBuffer.release();
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
@@ -4375,6 +4405,113 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     done_atmospherics = done_atmospherics || low_detail_probe;
     done_water_haze   = done_water_haze || low_detail_probe;
 
+    sOITPass = 0;
+    const bool use_wboit = RenderOITWeighted && !LLPipeline::sRenderingHUDs && !gCubeSnapshot;
+    const bool has_composite_shader = gOITCompositeProgram.mProgramObject != 0;
+    const bool has_screen_triangle = mScreenTriangleVB.notNull();
+    bool oit_targets_ready = mOITBuffer.isComplete() && mOITBuffer.getNumTextures() >= 2;
+    const bool can_use_wboit = use_wboit && has_composite_shader && has_screen_triangle;
+
+    if (use_wboit && !oit_targets_ready)
+    {
+        const U32 w = mRT->screen.getWidth();
+        const U32 h = mRT->screen.getHeight();
+        if (!mOITBuffer.isComplete())
+        {
+            if (!mOITBuffer.allocate(w, h, GL_RGBA16F))
+            {
+                oit_targets_ready = false;
+            }
+            mOITDepthShared = false;
+        }
+        if (mOITBuffer.isComplete() && mOITBuffer.getNumTextures() < 2)
+        {
+            if (!mOITBuffer.addColorAttachment(GL_R16F))
+            {
+                mOITBuffer.release();
+                mOITDepthShared = false;
+            }
+        }
+        // NOTE: If deferred rendering ever runs with MSAA enabled, this shared depth path will
+        // need to ensure mOITBuffer matches the sample count of mRT->deferredScreen (or disable
+        // weighted OIT entirely) since depth attachments must agree on sample count to share.
+        if (!mOITDepthShared && mRT->deferredScreen.isComplete() && mOITBuffer.isComplete())
+        {
+            mRT->deferredScreen.shareDepthBuffer(mOITBuffer);
+            mOITDepthShared = true;
+        }
+        oit_targets_ready = mOITBuffer.isComplete() && mOITBuffer.getNumTextures() >= 2;
+        if (!oit_targets_ready)
+        {
+            static bool sWarnedAllocate = false;
+            if (!sWarnedAllocate)
+            {
+                LL_WARNS("RenderOIT") << "Failed to prepare weighted OIT render targets; falling back to legacy alpha blend" << LL_ENDL;
+                sWarnedAllocate = true;
+            }
+        }
+    }
+    bool oit_started = false;
+    bool oit_drew = false;
+
+    auto composite_and_reset_oit = [&](const char* label)
+    {
+        if (!(oit_started && oit_drew && can_use_wboit && mOITBuffer.isComplete() && mOITBuffer.getNumTextures() >= 2))
+        {
+            return;
+        }
+
+        LL_DEBUGS("RenderOIT") << "Compositing OIT pass: " << label << LL_ENDL;
+
+        sOITPass = 0;
+        {
+            LLGLEnable blend(GL_BLEND);
+            LLGLDepthTest depth(GL_FALSE);
+            gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
+            gGL.setColorMask(true, false);
+
+            if (has_composite_shader && has_screen_triangle)
+            {
+                gOITCompositeProgram.bind();
+                {
+                    static LLStaticHashedString sAccum("uAccum");
+                    static LLStaticHashedString sReveal("uReveal");
+                    gOITCompositeProgram.uniform1i(sAccum, 0);
+                    gOITCompositeProgram.uniform1i(sReveal, 1);
+                    mOITBuffer.bindTexture(0, 0);
+                    mOITBuffer.bindTexture(1, 1);
+                    mScreenTriangleVB->setBuffer();
+                    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+                }
+                gOITCompositeProgram.unbind();
+            }
+
+            gGL.setColorMask(true, true);
+        }
+
+        if (LLDrawPoolAlpha* pool = static_cast<LLDrawPoolAlpha*>(getPool(LLDrawPool::POOL_ALPHA_PRE_WATER)))
+        {
+            pool->flushDeferredEmissives();
+        }
+
+        if (LLDrawPoolAlpha* pool = static_cast<LLDrawPoolAlpha*>(getPool(LLDrawPool::POOL_ALPHA_POST_WATER)))
+        {
+            pool->flushDeferredEmissives();
+        }
+
+        mOITBuffer.bindTarget();
+        const GLfloat accum_clear[4] = { 0.f, 0.f, 0.f, 0.f };
+        const GLfloat reveal_clear[4] = { 1.f, 1.f, 1.f, 1.f };
+        glClearBufferfv(GL_COLOR, 0, accum_clear);
+        glClearBufferfv(GL_COLOR, 1, reveal_clear);
+        mOITBuffer.flush();
+
+        oit_started = false;
+        oit_drew = false;
+    };
+
+    sRenderRiggedAlpha = true;
+    sRenderNonRiggedAlpha = true;
 
     while ( iter1 != mPools.end() )
     {
@@ -4408,26 +4545,150 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
             gGLLastMatrix = NULL;
             gGL.loadMatrix(gGLModelView);
 
-            for( S32 i = 0; i < poolp->getNumPostDeferredPasses(); i++ )
+            const S32 num_passes = poolp->getNumPostDeferredPasses();
+            const bool is_transparent_pool = (poolp->getType() == LLDrawPool::POOL_ALPHA_PRE_WATER) ||
+                                             (poolp->getType() == LLDrawPool::POOL_ALPHA_POST_WATER);
+
+            if (can_use_wboit && oit_targets_ready && is_transparent_pool)
             {
-                LLVertexBuffer::unbind();
-                poolp->beginPostDeferredPass(i);
-                for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+                const bool rigged_only_wboit = RenderOITRiggedOnly;
+                const bool supports_dual_blend = gGLFunc_glBlendFunci && gGLFunc_glEnablei && gGLFunc_glDisablei;
+
+                if (!oit_started)
                 {
-                    LLDrawPool *p = *iter2;
-                    if (p->getType() != cur_type)
+                    mOITBuffer.bindTarget();
+                    const GLfloat accum_clear[4] = { 0.f, 0.f, 0.f, 0.f };
+                    const GLfloat reveal_clear[4] = { 1.f, 1.f, 1.f, 1.f };
+                    glClearBufferfv(GL_COLOR, 0, accum_clear);
+                    glClearBufferfv(GL_COLOR, 1, reveal_clear);
+                    mOITBuffer.flush();
+                    oit_started = true;
+                }
+
+                auto render_alpha_pass = [&](S32 oit_pass)
+                {
+                    sOITPass = oit_pass;
+                    for (S32 i = 0; i < num_passes; ++i)
                     {
-                        break;
+                        LLVertexBuffer::unbind();
+                        poolp->beginPostDeferredPass(i);
+                        for (iter2 = iter1; iter2 != mPools.end(); ++iter2)
+                        {
+                            LLDrawPool* p = *iter2;
+                            if (p->getType() != cur_type)
+                            {
+                                break;
+                            }
+                            p->renderPostDeferred(i);
+                        }
+                        poolp->endPostDeferredPass(i);
+                        LLVertexBuffer::unbind();
+
+                        if (gDebugGL || gDebugPipeline)
+                        {
+                            LLGLState::checkStates(GL_FALSE);
+                        }
+                    }
+                    sOITPass = 0;
+                };
+
+                sRenderRiggedAlpha = true;
+                sRenderNonRiggedAlpha = !rigged_only_wboit;
+
+                if (supports_dual_blend)
+                {
+                    sOITUseMRT = true;
+                    mOITBuffer.bindTarget();
+                    const GLenum draw_targets[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+                    glDrawBuffers(2, draw_targets);
+                    render_alpha_pass(1);
+                    mOITBuffer.flush();
+                    glDisablei(GL_BLEND, 1);
+                    sOITUseMRT = false;
+                }
+                else
+                {
+                    mOITBuffer.bindTarget();
+                    const GLenum accum_target = GL_COLOR_ATTACHMENT0;
+                    glDrawBuffers(1, &accum_target);
+                    render_alpha_pass(1);
+                    mOITBuffer.flush();
+
+                    mOITBuffer.bindTarget();
+                    const GLenum reveal_target = GL_COLOR_ATTACHMENT1;
+                    glDrawBuffers(1, &reveal_target);
+                    render_alpha_pass(2);
+                    mOITBuffer.flush();
+                }
+
+                oit_drew = true;
+
+                const bool is_pre_water_alpha = (cur_type == LLDrawPool::POOL_ALPHA_PRE_WATER);
+                const char* const composite_label = is_pre_water_alpha ? "alpha pre-water" : "alpha post-water";
+
+                if (rigged_only_wboit)
+                {
+                    composite_and_reset_oit(composite_label);
+
+                    sRenderRiggedAlpha = false;
+                    sRenderNonRiggedAlpha = true;
+
+                    for (S32 i = 0; i < num_passes; ++i)
+                    {
+                        LLVertexBuffer::unbind();
+                        poolp->beginPostDeferredPass(i);
+                        for (pool_set_t::iterator legacy_iter = iter1; legacy_iter != mPools.end(); ++legacy_iter)
+                        {
+                            LLDrawPool* p = *legacy_iter;
+                            if (p->getType() != cur_type)
+                            {
+                                break;
+                            }
+
+                            p->renderPostDeferred(i);
+                        }
+                        poolp->endPostDeferredPass(i);
+                        LLVertexBuffer::unbind();
+
+                        if (gDebugGL || gDebugPipeline)
+                        {
+                            LLGLState::checkStates(GL_FALSE);
+                        }
                     }
 
-                    p->renderPostDeferred(i);
+                    sRenderRiggedAlpha = true;
+                    sRenderNonRiggedAlpha = true;
                 }
-                poolp->endPostDeferredPass(i);
-                LLVertexBuffer::unbind();
-
-                if (gDebugGL || gDebugPipeline)
+                else
                 {
-                    LLGLState::checkStates(GL_FALSE);
+                    composite_and_reset_oit(composite_label);
+                }
+            }
+            else
+            {
+                sRenderRiggedAlpha = true;
+                sRenderNonRiggedAlpha = true;
+                for (S32 i = 0; i < num_passes; ++i)
+                {
+                    LLVertexBuffer::unbind();
+                    poolp->beginPostDeferredPass(i);
+                    for (iter2 = iter1; iter2 != mPools.end(); ++iter2)
+                    {
+                        LLDrawPool* p = *iter2;
+                        if (p->getType() != cur_type)
+                        {
+                            break;
+                        }
+
+                        p->renderPostDeferred(i);
+                    }
+                    poolp->endPostDeferredPass(i);
+                    LLVertexBuffer::unbind();
+
+                    if (gDebugGL || gDebugPipeline)
+                    {
+                        LLGLState::checkStates(GL_FALSE);
+                    }
                 }
             }
         }
@@ -4450,6 +4711,8 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     gGLLastMatrix = NULL;
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.loadMatrix(gGLModelView);
+
+    composite_and_reset_oit("final fallback");
 
     if (!gCubeSnapshot)
     {
@@ -9118,6 +9381,25 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     }
 }
 
+void LLPipeline::applyCommonOITUniforms(LLGLSLShader& shader)
+{
+    if (shader.getUniformLocation(LLShaderMgr::OIT_PASS_UNIFORM) >= 0)
+    {
+        shader.uniform1i(LLShaderMgr::OIT_PASS_UNIFORM, sOITPass);
+    }
+
+    if (shader.getUniformLocation(LLShaderMgr::PREMULT_ALPHA_UNIFORM) >= 0)
+    {
+        const bool premult_enabled = RenderUsePremultAlpha && !sRenderingHUDs && !sImpostorRender;
+        shader.uniform1i(LLShaderMgr::PREMULT_ALPHA_UNIFORM, premult_enabled ? 1 : 0);
+    }
+
+    if (shader.getUniformLocation(LLShaderMgr::OIT_USE_MRT_UNIFORM) >= 0)
+    {
+        shader.uniform1i(LLShaderMgr::OIT_USE_MRT_UNIFORM, sOITUseMRT ? 1 : 0);
+    }
+}
+
 void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
 {
     if (shader.mCanBindFast)
@@ -9132,6 +9414,8 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
         bindDeferredShader(shader);
         shader.mCanBindFast = true;
     }
+
+    applyCommonOITUniforms(shader);
 }
 
 void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_target, LLRenderTarget* depth_target)
@@ -9379,6 +9663,8 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mMoonDiffuse.mV);
 
     shader.uniform1f(LLShaderMgr::REFLECTION_PROBE_MAX_LOD, mReflectionMapManager.mMaxProbeLOD);
+
+    applyCommonOITUniforms(shader);
 }
 
 

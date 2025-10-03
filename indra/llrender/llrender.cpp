@@ -1403,6 +1403,10 @@ void LLRender::setSceneBlendType(eBlendType type)
         case BT_ALPHA:
             blendFunc(BF_SOURCE_ALPHA, BF_ONE_MINUS_SOURCE_ALPHA);
             break;
+        case BT_ALPHA_PREMULT:
+            // Preserve legacy glow packing by leaving destination alpha untouched while using premultiplied color blending.
+            blendFunc(BF_ONE, BF_ONE_MINUS_SOURCE_ALPHA, BF_ZERO, BF_ONE_MINUS_SOURCE_ALPHA);
+            break;
         case BT_ADD:
             blendFunc(BF_ONE, BF_ONE);
             break;
