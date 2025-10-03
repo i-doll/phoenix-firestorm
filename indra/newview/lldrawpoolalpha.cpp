@@ -29,6 +29,7 @@
 #include "lldrawpoolalpha.h"
 
 #include "llglheaders.h"
+#include "llglfunctiondecls.h"
 #include "llviewercontrol.h"
 #include "llcriticaldamp.h"
 #include "llfasttimer.h"
@@ -91,6 +92,20 @@ static bool gltf_has_transparency(const LLFetchedGLTFMaterial* mat)
     return (alpha < 0.999f) || has_alpha_tex;
 }
 
+static inline void ensure_mrt_oit_blend_state()
+{
+    if (!LLPipeline::sOITUseMRT)
+    {
+        return;
+    }
+
+    glEnable(GL_BLEND);
+    glEnablei(GL_BLEND, 0);
+    glBlendFunci(0, GL_ONE, GL_ONE);
+    glEnablei(GL_BLEND, 1);
+    glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+}
+
 LLDrawPoolAlpha::LLDrawPoolAlpha(U32 type) :
         LLRenderPass(type), target_shader(NULL),
         mColorSFactor(LLRender::BF_UNDEF), mColorDFactor(LLRender::BF_UNDEF),
@@ -133,6 +148,11 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
 
     shader->bind();
     shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, (gamma > 0.1f) ? 1.0f / gamma : (1.0f / 2.2f));
+
+    if (shader->getUniformLocation(LLShaderMgr::OIT_USE_MRT_UNIFORM) >= 0)
+    {
+        shader->uniform1i(LLShaderMgr::OIT_USE_MRT_UNIFORM, LLPipeline::sOITUseMRT ? 1 : 0);
+    }
 
     if (LLPipeline::sRenderingHUDs)
     { // for HUD attachments, only the pre-water pass is executed and we never want to clip anything
@@ -224,17 +244,23 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
     // already being setup for rendering
     LLGLSLShader::unbind();
 
-    if (!LLPipeline::sRenderingHUDs)
+    const bool render_rigged_pass = !LLPipeline::sRenderingHUDs && LLPipeline::sRenderRiggedAlpha;
+    const bool render_non_rigged_pass = LLPipeline::sRenderNonRiggedAlpha;
+
+    if (render_rigged_pass)
     {
         // first pass, render rigged objects only and render to depth buffer
         forwardRender(true);
     }
 
     // second pass, regular forward alpha rendering
-    forwardRender();
+    if (render_non_rigged_pass)
+    {
+        forwardRender();
+    }
 
     // final pass, render to depth for depth of field effects
-    if (!LLPipeline::sImpostorRender && LLPipeline::RenderDepthOfField && !gCubeSnapshot && !LLPipeline::sRenderingHUDs && getType() == LLDrawPool::POOL_ALPHA_POST_WATER)
+    if (render_non_rigged_pass && !LLPipeline::sImpostorRender && LLPipeline::RenderDepthOfField && !gCubeSnapshot && !LLPipeline::sRenderingHUDs && getType() == LLDrawPool::POOL_ALPHA_POST_WATER)
     {
         //update depth buffer sampler
         simple_shader = fullbright_shader = &gDeferredFullbrightAlphaMaskProgram;
@@ -270,14 +296,48 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
         || LLPipeline::sImpostorRenderAlphaDepthPass
         || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER; // needed for accurate water fog
 
+    if (LLPipeline::RenderOITWeighted && LLPipeline::sOITPass != 0)
+    {
+        write_depth = false;
+    }
 
     LLGLDepthTest depth(GL_TRUE, write_depth ? GL_TRUE : GL_FALSE);
 
-    mColorSFactor = LLRender::BF_SOURCE_ALPHA;           // } regular alpha blend
-    mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA; // }
-    mAlphaSFactor = LLRender::BF_ZERO;                         // } glow suppression
-    mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;       // }
+    const bool pref_premult_blend = LLPipeline::RenderUsePremultAlpha && !LLPipeline::sRenderingHUDs && !LLPipeline::sImpostorRender;
+    const bool force_premult_for_wboit = LLPipeline::RenderOITWeighted && LLPipeline::sOITPass == 1;
+    mUsePremultBlend = pref_premult_blend || force_premult_for_wboit;
+
+    if (LLPipeline::sOITPass == 1)
+    {
+        mColorSFactor = mUsePremultBlend ? LLRender::BF_ONE : LLRender::BF_SOURCE_ALPHA;
+        mColorDFactor = LLRender::BF_ONE;
+        mAlphaSFactor = LLRender::BF_ONE;
+        mAlphaDFactor = LLRender::BF_ONE;
+    }
+    else if (LLPipeline::sOITPass == 2)
+    {
+        mColorSFactor = LLRender::BF_ZERO;
+        mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+        mAlphaSFactor = LLRender::BF_ZERO;
+        mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+    }
+    else if (mUsePremultBlend)
+    {
+        mColorSFactor = LLRender::BF_ONE;
+        mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+        mAlphaSFactor = LLRender::BF_ZERO;
+        mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+    }
+    else
+    {
+        mColorSFactor = LLRender::BF_SOURCE_ALPHA;
+        mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+        mAlphaSFactor = LLRender::BF_ZERO;
+        mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+    }
+
     gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
+    ensure_mrt_oit_blend_state();
 
     if (rigged && mType == LLDrawPool::POOL_ALPHA_POST_WATER)
     { // draw GLTF scene to depth buffer before rigged alpha
@@ -627,6 +687,17 @@ void LLDrawPoolAlpha::RestoreTexSetup(bool tex_setup)
     }
 }
 
+void LLDrawPoolAlpha::enqueueDeferredEmissives(const std::vector<LLDrawInfo*>& emissives,
+                                              const std::vector<LLDrawInfo*>& rigged_emissives,
+                                              const std::vector<LLDrawInfo*>& pbr_emissives,
+                                              const std::vector<LLDrawInfo*>& pbr_rigged_emissives)
+{
+    mDeferredEmissives.insert(mDeferredEmissives.end(), emissives.begin(), emissives.end());
+    mDeferredRiggedEmissives.insert(mDeferredRiggedEmissives.end(), rigged_emissives.begin(), rigged_emissives.end());
+    mDeferredPbrEmissives.insert(mDeferredPbrEmissives.end(), pbr_emissives.begin(), pbr_emissives.end());
+    mDeferredPbrRiggedEmissives.insert(mDeferredPbrRiggedEmissives.end(), pbr_rigged_emissives.begin(), pbr_rigged_emissives.end());
+}
+
 void LLDrawPoolAlpha::drawEmissive(LLDrawInfo* draw)
 {
     LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, 1.f);
@@ -928,7 +999,36 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                 bool tex_setup = TexSetup(&params, (mat != nullptr));
 
                 {
-                    gGL.blendFunc((LLRender::eBlendFactor) params.mBlendFuncSrc, (LLRender::eBlendFactor) params.mBlendFuncDst, mAlphaSFactor, mAlphaDFactor);
+                    LLRender::eBlendFactor src_factor = static_cast<LLRender::eBlendFactor>(params.mBlendFuncSrc);
+                    LLRender::eBlendFactor dst_factor = static_cast<LLRender::eBlendFactor>(params.mBlendFuncDst);
+
+                    const bool batch_uses_premult = mUsePremultBlend && !params.mFullbright;
+
+                    if (current_shader)
+                    {
+                        const S32 premult_loc = current_shader->getUniformLocation(LLShaderMgr::PREMULT_ALPHA_UNIFORM);
+                        if (premult_loc >= 0)
+                        {
+                            current_shader->uniform1i(premult_loc, batch_uses_premult ? 1 : 0);
+                        }
+                    }
+
+                    if (batch_uses_premult &&
+                        src_factor == LLRender::BF_SOURCE_ALPHA &&
+                        dst_factor == LLRender::BF_ONE_MINUS_SOURCE_ALPHA)
+                    {
+                        src_factor = LLRender::BF_ONE;
+                    }
+
+                    if (LLPipeline::RenderOITWeighted && LLPipeline::sOITPass != 0)
+                    {
+                        gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
+                    }
+                    else
+                    {
+                        gGL.blendFunc(src_factor, dst_factor, mAlphaSFactor, mAlphaDFactor);
+                    }
+                    ensure_mrt_oit_blend_state();
 
                     bool reset_minimum_alpha = false;
                     if (!LLPipeline::sImpostorRender &&
@@ -989,54 +1089,66 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
             // render emissive faces into alpha channel for bloom effects
             if (!depth_only)
             {
-                gPipeline.enableLightsDynamic();
+                const bool is_wboit_accum_pass = LLPipeline::RenderOITWeighted && (LLPipeline::sOITPass == 1);
+                const bool is_wboit_active = LLPipeline::RenderOITWeighted && (LLPipeline::sOITPass != 0);
 
-                // install glow-accumulating blend mode
-                // don't touch color, add to alpha (glow)
-                gGL.blendFunc(LLRender::BF_ZERO, LLRender::BF_ONE, LLRender::BF_ONE, LLRender::BF_ONE);
-
-                bool rebind = false;
-                LLGLSLShader* lastShader = current_shader;
-                if (!emissives.empty())
+                if (is_wboit_accum_pass)
                 {
-                    light_enabled = true;
-                    renderEmissives(emissives);
-                    rebind = true;
+                    enqueueDeferredEmissives(emissives, rigged_emissives, pbr_emissives, pbr_rigged_emissives);
                 }
-
-                if (!pbr_emissives.empty())
+                else if (!is_wboit_active)
                 {
-                    light_enabled = true;
-                    renderPbrEmissives(pbr_emissives);
-                    rebind = true;
-                }
+                    gPipeline.enableLightsDynamic();
 
-                if (!rigged_emissives.empty())
-                {
-                    light_enabled = true;
-                    renderRiggedEmissives(rigged_emissives);
-                    rebind = true;
-                }
+                    // install glow-accumulating blend mode
+                    // don't touch color, add to alpha (glow)
+                    gGL.blendFunc(LLRender::BF_ZERO, LLRender::BF_ONE, LLRender::BF_ONE, LLRender::BF_ONE);
+                    ensure_mrt_oit_blend_state();
 
-                if (!pbr_rigged_emissives.empty())
-                {
-                    light_enabled = true;
-                    renderRiggedPbrEmissives(pbr_rigged_emissives);
-                    rebind = true;
-                }
+                    bool rebind = false;
+                    LLGLSLShader* lastShader = current_shader;
+                    if (!emissives.empty())
+                    {
+                        light_enabled = true;
+                        renderEmissives(emissives);
+                        rebind = true;
+                    }
 
-                // restore our alpha blend mode
-                gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
+                    if (!pbr_emissives.empty())
+                    {
+                        light_enabled = true;
+                        renderPbrEmissives(pbr_emissives);
+                        rebind = true;
+                    }
 
-                if (lastShader && rebind)
-                {
-                    lastShader->bind();
+                    if (!rigged_emissives.empty())
+                    {
+                        light_enabled = true;
+                        renderRiggedEmissives(rigged_emissives);
+                        rebind = true;
+                    }
+
+                    if (!pbr_rigged_emissives.empty())
+                    {
+                        light_enabled = true;
+                        renderRiggedPbrEmissives(pbr_rigged_emissives);
+                        rebind = true;
+                    }
+
+                    // restore our alpha blend mode
+                    gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
+                    ensure_mrt_oit_blend_state();
+
+                    if (lastShader && rebind)
+                    {
+                        lastShader->bind();
+                    }
                 }
             }
         }
     }
 
-    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    gGL.setSceneBlendType(mUsePremultBlend ? LLRender::BT_ALPHA_PREMULT : LLRender::BT_ALPHA);
 
     LLVertexBuffer::unbind();
 
@@ -1044,4 +1156,60 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
     {
         gPipeline.enableLightsDynamic();
     }
+}
+
+void LLDrawPoolAlpha::flushDeferredEmissives()
+{
+    if (mDeferredEmissives.empty() &&
+        mDeferredRiggedEmissives.empty() &&
+        mDeferredPbrEmissives.empty() &&
+        mDeferredPbrRiggedEmissives.empty())
+    {
+        return;
+    }
+
+    gPipeline.enableLightsDynamic();
+
+    LLGLSLShader* restore_shader = LLGLSLShader::sCurBoundShaderPtr;
+
+    LLGLEnable blend(GL_BLEND);
+    LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+    gGL.setColorMask(false, true);
+    gGL.blendFunc(LLRender::BF_ZERO, LLRender::BF_ONE, LLRender::BF_ONE, LLRender::BF_ONE);
+    ensure_mrt_oit_blend_state();
+
+    if (!mDeferredEmissives.empty())
+    {
+        renderEmissives(mDeferredEmissives);
+    }
+
+    if (!mDeferredPbrEmissives.empty())
+    {
+        renderPbrEmissives(mDeferredPbrEmissives);
+    }
+
+    if (!mDeferredRiggedEmissives.empty())
+    {
+        renderRiggedEmissives(mDeferredRiggedEmissives);
+    }
+
+    if (!mDeferredPbrRiggedEmissives.empty())
+    {
+        renderRiggedPbrEmissives(mDeferredPbrRiggedEmissives);
+    }
+
+    gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
+    ensure_mrt_oit_blend_state();
+    gGL.setColorMask(true, true);
+
+    LLGLSLShader::unbind();
+    if (restore_shader)
+    {
+        restore_shader->bind();
+    }
+
+    mDeferredEmissives.clear();
+    mDeferredRiggedEmissives.clear();
+    mDeferredPbrEmissives.clear();
+    mDeferredPbrRiggedEmissives.clear();
 }

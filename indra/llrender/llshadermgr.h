@@ -313,6 +313,9 @@ public:
 
         SHINY_ORIGIN,                       //  "origin"
         DISPLAY_GAMMA,                      //  "display_gamma"
+        OIT_PASS_UNIFORM,                   //  "uOITPass"
+        PREMULT_ALPHA_UNIFORM,              //  "uPremultAlpha"
+        OIT_USE_MRT_UNIFORM,                //  "uOITUseMRT"
 
         INSCATTER_RT,                       //  "inscatter"
         SUN_SIZE,                           //  "sun_size"
