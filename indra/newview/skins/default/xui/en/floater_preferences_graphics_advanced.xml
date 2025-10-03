@@ -733,6 +733,21 @@
           function="Pref.RenderOptionUpdate" />
     </check_box>
     
+  <check_box
+    control_name="RenderOITWeighted"
+    height="16"
+    label="Improved Transparency (WBOIT)"
+    layout="topleft"
+    left="420"
+    name="UseOITWeighted"
+    top_delta="20"
+    enabled_control="RenderDeferred"
+  tool_tip="Renders overlapping transparent objects more accurately without cut-through or sorting issues. Requires Advanced Lighting."
+    width="240">
+    <check_box.commit_callback
+      function="Pref.RenderOptionUpdate" />
+  </check_box>
+
   <text
     type="string"
     length="1"

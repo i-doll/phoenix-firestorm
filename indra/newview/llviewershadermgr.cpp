@@ -99,6 +99,7 @@ LLGLSLShader    gBenchmarkProgram;
 LLGLSLShader    gReflectionProbeDisplayProgram;
 LLGLSLShader    gCopyProgram;
 LLGLSLShader    gCopyDepthProgram;
+LLGLSLShader    gOITCompositeProgram;
 LLGLSLShader    gPBRTerrainBakeProgram;
 LLGLSLShader    gDrawColorProgram;
 
@@ -3466,6 +3467,16 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gCopyDepthProgram.addPermutation("COPY_DEPTH", "1");
         gCopyDepthProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gCopyDepthProgram.createShader();
+
+        if (success)
+        {
+            gOITCompositeProgram.mName = "OIT Composite";
+            gOITCompositeProgram.mShaderFiles.clear();
+            gOITCompositeProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+            gOITCompositeProgram.mShaderFiles.push_back(make_pair("interface/oitCompositeF.glsl", GL_FRAGMENT_SHADER));
+            gOITCompositeProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+            success = gOITCompositeProgram.createShader();
+        }
     }
 
     if (success)
@@ -3608,4 +3619,3 @@ LLViewerShaderMgr::shader_iter LLViewerShaderMgr::endShaders() const
 {
     return mShaderList.end();
 }
-

@@ -37,6 +37,9 @@
 uniform float emissive_brightness;  // fullbright flag, 1.0 == fullbright, 0.0 otherwise
 uniform int sun_up_factor;
 uniform int classic_mode;
+uniform int uOITPass;
+uniform int uPremultAlpha;
+uniform int uOITUseMRT;
 
 vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 vec3 scaleSoftClipFragLinear(vec3 l);
@@ -56,7 +59,8 @@ vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 
-out vec4 frag_color;
+layout(location = 0) out vec4 frag_color;
+layout(location = 1) out vec4 frag_reveal;
 
 #ifdef HAS_SUN_SHADOW
 float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
@@ -424,7 +428,38 @@ void main()
     float final_scale = 1;
     if (classic_mode > 0)
         final_scale = 1.1;
-    frag_color = max(vec4(color * final_scale, al), vec4(0));
+
+    vec4 out_color = max(vec4(color * final_scale, al), vec4(0));
+
+    if (uOITPass == OIT_PASS_ACCUM)
+    {
+        float alpha = clamp(out_color.a, 0.0, OIT_ALPHA_MAX);
+        float weight = max(OIT_WEIGHT_MIN, exp(-OIT_WEIGHT_DEPTH_SCALE * gl_FragCoord.z) * (alpha + OIT_WEIGHT_ALPHA_BIAS));
+        vec3 premult = out_color.rgb * alpha;
+        frag_color = vec4(premult * weight, alpha * weight);
+        frag_reveal = (uOITUseMRT != 0) ? vec4(alpha) : vec4(0.0);
+    }
+    else if (uOITPass == OIT_PASS_REVEAL)
+    {
+        float alpha = clamp(out_color.a, 0.0, OIT_ALPHA_MAX);
+        // Non-MRT reveal pass: write alpha into the reveal output (location 1).
+        frag_reveal = vec4(alpha);
+        // The other output is inactive in this pass; write zeros for clarity.
+        frag_color = vec4(0.0);
+    }
+    else
+    {
+        if (uPremultAlpha != 0)
+        {
+            float alpha = out_color.a;
+            frag_color = vec4(out_color.rgb * alpha, alpha);
+        }
+        else
+        {
+            frag_color = out_color;
+        }
+        frag_reveal = vec4(0.0);
+    }
 
 #else // mode is not DIFFUSE_ALPHA_MODE_BLEND, encode to gbuffer
     // deferred path               // See: C++: addDeferredAttachment(), shader: softenLightF.glsl

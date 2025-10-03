@@ -11946,11 +11946,47 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>Comment</key>
     <string>Draw a small crosshair where the DoF focus is</string>
     <key>Persist</key>
+    <integer>0</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
+
+  <key>RenderUsePremultAlpha</key>
+  <map>
+    <key>Comment</key>
+    <string>Use premultiplied alpha blending for transparent geometry. Required for WBOIT and recommended for premultiplied content.</string>
+    <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
     <integer>0</integer>
+  </map>
+
+  <key>RenderOITWeighted</key>
+  <map>
+    <key>Comment</key>
+    <string>Enable weighted blended order independent transparency for rigged and optionally non-rigged alpha objects (requires Advanced Lighting).</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
+
+  <key>RenderOITRiggedOnly</key>
+  <map>
+    <key>Comment</key>
+    <string>Limit OIT to rigged meshes only, other meshes will use standard alpha sorting.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
   </map>
 
   <key>CameraDoFResScale</key>
