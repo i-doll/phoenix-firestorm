@@ -7,6 +7,7 @@
 
 ## GL Driver Options
 export mesa_glthread=true
+export SDL_VIDEODRIVER=x11
 
 ## Everything below this line is just for advanced troubleshooters.
 ##-------------------------------------------------------------------
@@ -16,6 +17,7 @@ export mesa_glthread=true
 ##   you're building your own viewer, bear in mind that the executable
 ##   in the bin directory will be stripped: you should replace it with
 ##   an unstripped binary before you run.
+#export LL_WRAPPER='lldb'
 #export LL_WRAPPER='gdb --args'
 #export LL_WRAPPER='valgrind --smc-check=all --error-limit=no --log-file=secondlife.vg --leak-check=full --suppressions=/usr/lib/valgrind/glibc-2.5.supp --suppressions=secondlife-i686.supp'
 #export ASAN_OPTIONS="halt_on_error=0 detect_leaks=1 symbolize=1"
