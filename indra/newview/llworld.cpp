@@ -1642,6 +1642,35 @@ void process_enable_simulator(LLMessageSystem *msg, void **user_data)
     LLWorld::getInstance()->addRegion(handle, sim, region_size_x, region_size_y);
 // </FS:CR> Aurora Sim
 
+//<FS:Trish> Remove region if it wasnt a neighbor
+    static LLCachedControl<bool> fSTrishNeighboringRegionLoadAdjacentsFix(gSavedSettings, "FSTrishNeighboringRegionLoadAdjacentsFix");
+    if (fSTrishNeighboringRegionLoadAdjacentsFix)
+    {
+        LLViewerRegion* current_region = gAgent.getRegion();
+        std::vector<LLViewerRegion*> uniqueRegions;
+        current_region->getNeighboringRegions(uniqueRegions);
+
+        bool found = false;
+        for (LLViewerRegion* r : uniqueRegions)
+        {
+            if (r && r->getHandle() == handle)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromHandle(handle);
+            if (regionp) {
+                LLWorld::getInstance()->removeRegion(regionp->getHost());
+                LL_INFOS() << "Region is not a neighbor, connection aborted." << LL_ENDL;
+                return;
+            }
+        }
+    }
+//<FS:Trish>
+
     // give the simulator a message it can use to get ip and port
     LL_INFOS() << "simulator_enable() Enabling " << sim << " with code " << msg->getOurCircuitCode() << LL_ENDL;
     msg->newMessageFast(_PREHASH_UseCircuitCode);
