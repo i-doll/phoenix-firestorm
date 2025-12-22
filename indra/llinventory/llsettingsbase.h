@@ -32,6 +32,7 @@
 #include <map>
 #include <vector>
 #include <boost/signals2.hpp>
+#include <cmath>
 
 #include "llsd.h"
 #include "llsdutil.h"
