@@ -15,6 +15,9 @@ exportMutliArchDRIPath() {
 	fi
 }
 
+## GL Driver Options
+export mesa_glthread=true
+
 
 ## Here are some configuration options for Linux Client Testers.
 ## These options are for self-assisted troubleshooting during this beta
