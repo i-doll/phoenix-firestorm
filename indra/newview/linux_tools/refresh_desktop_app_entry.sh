@@ -12,7 +12,7 @@ function install_desktop_entry()
 
     local desktop_entry="\
 [Desktop Entry]\n\
-Name=Firestorm Viewer\n\
+Name=Firestorm Viewer - Compiled\n\
 GenericName=Firestorm Viewer\n\
 Comment=Client for accessing 3D virtual worlds\n\
 Path=${installation_prefix}\n\

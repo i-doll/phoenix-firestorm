@@ -836,7 +836,7 @@ void LLMarketplaceData::getMerchantStatusCoro()
 
 void LLMarketplaceData::setDataFetchedSignal(const status_updated_signal_t::slot_type& cb)
 {
-    if (mDataFetchedSignal == NULL)
+    if (mDataFetchedSignal == nullptr)
     {
         mDataFetchedSignal = std::make_unique<status_updated_signal_t>();
     }
