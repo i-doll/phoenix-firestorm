@@ -585,6 +585,7 @@ void LLViewerShaderMgr::setShaders()
 
     LLPipeline::sRenderGlow = gSavedSettings.getBOOL("RenderGlow");
     LLPipeline::RenderAvatarCloth = gSavedSettings.getBOOL("RenderAvatarCloth");
+    LLPipeline::sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
 
     if (gViewerWindow)
     {
@@ -1007,7 +1008,10 @@ bool LLViewerShaderMgr::loadShadersWater()
         return loadShadersWater();
     }
 
-    LLWorld::getInstance()->updateWaterObjects();
+    if (LLWorld::instanceExists())
+    {
+        LLWorld::getInstance()->updateWaterObjects();
+    }
 
     return true;
 }
