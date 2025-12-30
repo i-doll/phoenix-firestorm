@@ -1,5 +1,43 @@
 <llsd>
     <map>
+    <key>IDSenderHighlightEnabled</key>
+    <map>
+        <key>Comment</key>
+        <string>Enable sender-based chat highlighting</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
+    <key>IDSenderHighlightNames</key>
+    <map>
+        <key>Comment</key>
+        <string>Comma-separated list of sender names to highlight</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>String</string>
+        <key>Value</key>
+        <string></string>
+    </map>
+    <key>IDSenderHighlightColor</key>
+    <map>
+        <key>Comment</key>
+        <string>Color for highlighted sender messages</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Color4</string>
+        <key>Value</key>
+        <array>
+            <real>1.0</real>
+            <real>1.0</real>
+            <real>0.0</real>
+            <real>1.0</real>
+        </array>
+    </map>
     <key>AvatarHoverOffsetZ</key>
     <map>
       <key>Comment</key>
