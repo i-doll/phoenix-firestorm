@@ -86,6 +86,7 @@ endif ()
 
 set(viewer_SOURCE_FILES
 # <Add FS includes below this line>
+    idsenderhighlight.cpp  # <ID> Sender-based chat highlighting
     alfloaterregiontracker.cpp
     animationexplorer.cpp
     ao.cpp
@@ -929,6 +930,7 @@ set(viewer_HEADER_FILES
     ViewerInstall.cmake
 
 # <Add FS includes below this line>
+    idsenderhighlight.h  # <ID> Sender-based chat highlighting
     alfloaterregiontracker.h
     animationexplorer.h
     ao.h
