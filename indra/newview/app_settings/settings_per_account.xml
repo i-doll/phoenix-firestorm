@@ -38,6 +38,28 @@
             <real>1.0</real>
         </array>
     </map>
+    <key>IDKeywordHighlightEnabled</key>
+    <map>
+        <key>Comment</key>
+        <string>Enable keyword-based chat highlighting with per-keyword colors</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
+    <key>IDKeywordColorMap</key>
+    <map>
+        <key>Comment</key>
+        <string>Map of keywords to highlight colors</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>LLSD</string>
+        <key>Value</key>
+        <array/>
+    </map>
     <key>AvatarHoverOffsetZ</key>
     <map>
       <key>Comment</key>
