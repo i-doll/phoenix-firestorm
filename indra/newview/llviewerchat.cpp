@@ -44,6 +44,7 @@
 #include "lfsimfeaturehandler.h"    // <FS:CR> Opensim
 
 #include "idsenderhighlight.h" // <ID> Sender-based chat highlighting
+#include "idkeywordhighlight.h" // <ID> Keyword-based chat highlighting
 
 
 // LLViewerChat
@@ -148,6 +149,13 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLUIColor& r_color, F32& r_c
         if (IDSenderHighlight::getInstance()->shouldHighlightSender(chat))
         {
             r_color = sIDSenderHighlightColor();
+        }
+        // </ID>
+
+        // <ID> Keyword-based chat highlighting with per-keyword colors
+        if (auto kwColor = IDKeywordHighlight::getInstance()->getMatchingKeywordColor(chat))
+        {
+            r_color = *kwColor;
         }
         // </ID>
 
