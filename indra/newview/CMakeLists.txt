@@ -92,6 +92,8 @@ configure_file(llversioninfovars.h.in llversioninfovars.h @ONLY)
 set(viewer_SOURCE_FILES
 # <Add FS includes below this line>
     idsenderhighlight.cpp  # <ID> Sender-based chat highlighting
+    idkeywordhighlight.cpp  # <ID> Keyword-based chat highlighting
+    idfloaterkeywordcolors.cpp  # <ID> Keyword color settings floater
     alfloaterregiontracker.cpp
     animationexplorer.cpp
     ao.cpp
@@ -961,6 +963,8 @@ set(viewer_HEADER_FILES
 
 # <Add FS includes below this line>
     idsenderhighlight.h  # <ID> Sender-based chat highlighting
+    idkeywordhighlight.h  # <ID> Keyword-based chat highlighting
+    idfloaterkeywordcolors.h  # <ID> Keyword color settings floater
     alfloaterregiontracker.h
     animationexplorer.h
     ao.h
