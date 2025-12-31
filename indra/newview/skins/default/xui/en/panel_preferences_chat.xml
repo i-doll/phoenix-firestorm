@@ -1913,11 +1913,26 @@
 	 label="Keyword Alerts"
 	 name="ChatKeywordAlerts">
 
+		<button
+		 layout="topleft"
+		 follows="left|top"
+		 top="5"
+		 left="20"
+		 width="180"
+		 height="23"
+		 name="id_keyword_colors_btn"
+		 label="Keyword Colors..."
+		 tool_tip="Open the per-keyword color highlights settings">
+			<button.commit_callback
+			 function="Floater.Show"
+			 parameter="id_keyword_colors"/>
+		</button>
+
 		<check_box
 		 enabled="false"
 		 layout="topleft"
 		 follows="left|top"
-		 top="5"
+		 top_pad="10"
 		 left="20"
 		 width="50"
 		 height="20"

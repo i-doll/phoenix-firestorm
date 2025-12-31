@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ border="true"
+ can_close="true"
+ can_minimize="true"
+ save_rect="true"
+ can_resize="true"
+ height="420"
+ min_height="380"
+ width="480"
+ min_width="440"
+ name="floater_id_keyword_colors"
+ title="Keyword Color Highlights">
+
+    <check_box
+     top="10"
+     left="15"
+     height="16"
+     width="300"
+     follows="left|top"
+     control_name="IDKeywordHighlightEnabled"
+     label="Enable keyword color highlighting"
+     name="enable_checkbox" />
+
+    <text
+     top_pad="15"
+     left="15"
+     height="16"
+     width="200"
+     follows="left|top"
+     name="keywords_label">
+        Keywords and Colors:
+    </text>
+
+    <scroll_list
+     top_pad="5"
+     left="15"
+     right="-15"
+     height="180"
+     follows="all"
+     background_visible="true"
+     column_padding="5"
+     draw_border="true"
+     draw_heading="true"
+     multi_select="false"
+     name="keyword_list">
+        <column label="Keyword" name="keyword" width="200" />
+        <column label="Match Name" name="match_name" width="75" />
+        <column label="Color" name="color" width="80" />
+    </scroll_list>
+
+    <button
+     top_pad="10"
+     left="15"
+     height="23"
+     width="80"
+     follows="left|bottom"
+     label="Remove"
+     name="remove_btn"
+     enabled="false" />
+
+    <view_border
+     top_pad="15"
+     left="15"
+     right="-15"
+     height="0"
+     follows="left|right|bottom"
+     bevel_style="none"
+     border_thickness="1"
+     name="divider" />
+
+    <text
+     top_pad="15"
+     left="15"
+     height="16"
+     width="65"
+     follows="left|bottom"
+     name="keyword_input_label">
+        Keyword:
+    </text>
+
+    <line_editor
+     layout="topleft"
+     top_delta="0"
+     left="80"
+     width="180"
+     height="22"
+     follows="left|bottom"
+     max_length_chars="128"
+     name="keyword_input"
+     tool_tip="Enter keyword to highlight" />
+
+    <check_box
+     layout="topleft"
+     top_delta="3"
+     left_pad="15"
+     height="16"
+     width="120"
+     follows="left|bottom"
+     label="Match sender name"
+     name="match_name_checkbox"
+     tool_tip="When enabled, matches this keyword against the sender's name instead of the message text" />
+
+    <color_swatch
+     layout="topleft"
+     top_delta="15"
+     left_pad="-75"
+     height="22"
+     width="60"
+     label_height="0"
+     follows="right|bottom"
+     can_apply_immediately="true"
+     color="1 1 0 1"
+     name="color_swatch"
+     tool_tip="Click to choose highlight color" />
+
+    <button
+     top_pad="10"
+     left="15"
+     height="23"
+     width="100"
+     follows="left|bottom"
+     label="Add Keyword"
+     name="add_btn" />
+
+    <button
+     top_delta="0"
+     left_pad="10"
+     height="23"
+     width="120"
+     follows="left|bottom"
+     label="Update Selected"
+     name="update_btn"
+     enabled="false" />
+
+</floater>
