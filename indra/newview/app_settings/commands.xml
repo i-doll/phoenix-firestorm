@@ -389,6 +389,8 @@
            tooltip_ref="Command_Areasearch_Tooltip"
            execute_function="Floater.Toggle"
            execute_parameters="area_search"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showareasearch"
            is_running_function="Floater.IsOpen"
            is_running_parameters="area_search"
            />

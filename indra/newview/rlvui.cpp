@@ -63,6 +63,7 @@ RlvUIEnabler::RlvUIEnabler()
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWLOC, boost::bind(&RlvUIEnabler::onToggleShowLoc, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWMINIMAP, boost::bind(&RlvUIEnabler::onToggleShowMinimap, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWPEOPLE, boost::bind(&RlvUIEnabler::onToggleShowPeople, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWAREASEARCH, boost::bind(&RlvUIEnabler::onToggleShowAreaSearch, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWWORLDMAP, boost::bind(&RlvUIEnabler::onToggleShowWorldMap, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_UNSIT, boost::bind(&RlvUIEnabler::onToggleUnsit, this)));
 
@@ -262,6 +263,26 @@ void RlvUIEnabler::onToggleShowWorldMap()
     else
     {
         RLV_VERIFY(removeGenericFloaterFilter("world_map"));
+    }
+}
+
+// Handles: @showareasearch=n|y toggles
+void RlvUIEnabler::onToggleShowAreaSearch()
+{
+    bool fEnable = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWAREASEARCH);
+
+    // Hide the area search floater if it's currently visible
+    if ( (!fEnable) && (LLFloaterReg::instanceVisible("area_search")) )
+        LLFloaterReg::hideInstance("area_search");
+
+    // Start or stop filtering opening the area search floater
+    if (!fEnable)
+    {
+        RLV_VERIFY(addGenericFloaterFilter("area_search"));
+    }
+    else
+    {
+        RLV_VERIFY(removeGenericFloaterFilter("area_search"));
     }
 }
 
