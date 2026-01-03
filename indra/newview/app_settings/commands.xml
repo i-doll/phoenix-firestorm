@@ -175,6 +175,8 @@
            tooltip_ref="Command_People_Tooltip"
            execute_function="Floater.Toggle"
            execute_parameters="people"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showpeople"
            is_running_function="Floater.IsOpen"
            is_running_parameters="people"
            />
