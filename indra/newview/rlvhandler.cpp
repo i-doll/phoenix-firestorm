@@ -2532,6 +2532,35 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SETENV>::onCommandToggle(ERlvBehaviour e
     }
 }
 
+// [RLVa:ID] - Handles: @lockenv=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_LOCKENV>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    const std::string strEnvFloaters[] = { "env_adjust_snapshot", "env_edit_extdaycycle", "env_fixed_environmentent_sky", "env_fixed_environmentent_water", "my_environments" };
+    for (int idxFloater = 0, cntFloater = sizeof(strEnvFloaters) / sizeof(std::string); idxFloater < cntFloater; idxFloater++)
+    {
+        if (fHasBhvr)
+        {
+            // Hide the floater if it's currently visible
+            LLFloaterReg::const_instance_list_t envFloaters = LLFloaterReg::getFloaterList(strEnvFloaters[idxFloater]);
+            for (LLFloater* pFloater : envFloaters)
+                pFloater->closeFloater();
+            RLV_VERIFY(RlvUIEnabler::instance().addGenericFloaterFilter(strEnvFloaters[idxFloater]));
+        }
+        else
+        {
+            RLV_VERIFY(RlvUIEnabler::instance().removeGenericFloaterFilter(strEnvFloaters[idxFloater]));
+        }
+    }
+
+    if (fHasBhvr)
+    {
+        // Force the use of shared (parcel/region) environment
+        LLEnvironment::instance().setSharedEnvironment();
+    }
+}
+// [/RLVa:ID]
+
 // Handles: @showhovertext:<uuid>=n|y
 template<> template<>
 ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SHOWHOVERTEXT>::onCommand(const RlvCommand& rlvCmd, bool& fRefCount)

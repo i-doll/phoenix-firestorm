@@ -190,6 +190,7 @@ enum ERlvBehaviour {
     RLV_BHVR_STANDTP,               // "standtp"
     RLV_BHVR_SETDEBUG,              // "setdebug"
     RLV_BHVR_SETENV,                // "setenv"
+    RLV_BHVR_LOCKENV,               // "lockenv"
     RLV_BHVR_ALWAYSRUN,             // "alwaysrun"
     RLV_BHVR_TEMPRUN,               // "temprun"
     RLV_BHVR_DETACHME,              // "detachme"
