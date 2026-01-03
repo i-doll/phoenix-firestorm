@@ -202,7 +202,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_avdistmin", RLV_BHVR_SETCAM_AVDISTMIN, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addModifier(RLV_BHVR_SETCAM_AVDISTMIN, RLV_MODIFIER_SETCAM_AVDISTMIN, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMIN>("Camera - Avatar Distance (Min)", 0.0f, false, new RlvBehaviourModifierCompMax()));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_avdistmax", RLV_BHVR_SETCAM_AVDISTMAX, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
-    addModifier(RLV_BHVR_SETCAM_AVDISTMAX, RLV_MODIFIER_SETCAM_AVDISTMAX, new RlvBehaviourModifier("Camera - Avatar Distance (Max)", F32_MAX, false, new RlvBehaviourModifierCompMin));
+    addModifier(RLV_BHVR_SETCAM_AVDISTMAX, RLV_MODIFIER_SETCAM_AVDISTMAX, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMAX>("Camera - Avatar Distance (Max)", F32_MAX, false, new RlvBehaviourModifierCompMin));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_origindistmin", RLV_BHVR_SETCAM_ORIGINDISTMIN, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addModifier(RLV_BHVR_SETCAM_ORIGINDISTMIN, RLV_MODIFIER_SETCAM_ORIGINDISTMIN, new RlvBehaviourModifier("Camera - Focus Distance (Min)", 0.0f, true, new RlvBehaviourModifierCompMax));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_origindistmax", RLV_BHVR_SETCAM_ORIGINDISTMAX, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
