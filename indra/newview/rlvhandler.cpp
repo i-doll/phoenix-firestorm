@@ -2289,6 +2289,14 @@ void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMIN>::onValueChange()
         gAgentCamera.changeCameraToThirdPerson();
 }
 
+// Handles: @setcam_avdistmax:<distance>=n|y changes (force mouselook when distance is 0)
+template<>
+void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMAX>::onValueChange() const
+{
+    if ( (!RlvActions::canExitMouselook()) && (!gAgentCamera.cameraMouselook()) )
+        gAgentCamera.changeCameraToMouselook();
+}
+
 // Handles: @setcam_eyeoffset:<vector3>=n|y, @setcam_eyeoffsetscale:<float>=n|y and @setcam_focusoffset:<vector3>=n|y toggles
 template<> template<>
 void RlvBehaviourCamEyeFocusOffsetHandler::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
