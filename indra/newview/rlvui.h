@@ -49,6 +49,7 @@ protected:
     void onToggleShowNames();                                           // shownames
     void onToggleShowMinimap();                                         // showminimap
     void onToggleShowPeople();                                          // showpeople
+    void onToggleShowAreaSearch();                                      // showareasearch
     void onToggleShowWorldMap();                                        // showworldmap
     void onToggleTp();                                                  // tploc and tplm
     void onToggleUnsit();                                               // unsit
