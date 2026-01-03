@@ -57,6 +57,14 @@ bool RlvActions::canChangeToMouselook()
         ( (!pCamDistMinModifier->hasValue()) || (pCamDistMinModifier->getValue<float>() == 0.f) );
 }
 
+bool RlvActions::canExitMouselook()
+{
+    // User can exit mouselook if:
+    //   - there is no maximum camera distance defined, or it's greater than 0m
+    const RlvBehaviourModifier* pCamDistMaxModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_AVDISTMAX);
+    return (!pCamDistMaxModifier->hasValue()) || (pCamDistMaxModifier->getValue<float>() != 0.f);
+}
+
 bool RlvActions::isCameraDistanceClamped()
 {
     return
