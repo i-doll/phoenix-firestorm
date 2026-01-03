@@ -347,6 +347,13 @@ void LLAgentCamera::resetView(bool reset_camera, bool change_camera, bool moveme
 
     if (change_camera && !gSavedSettings.getBOOL("FreezeTime"))
     {
+// [RLVa:ID] - @setcam_avdistmax - don't reset view if we can't exit mouselook
+        if ( (RlvActions::isRlvEnabled()) && (mCameraMode == CAMERA_MODE_MOUSELOOK) && (!RlvActions::canExitMouselook()) )
+        {
+            return;
+        }
+// [/RLVa:ID]
+
         changeCameraToDefault();
 
         if (LLViewerJoystick::getInstance()->getOverrideCamera())
@@ -2520,6 +2527,13 @@ void LLAgentCamera::changeCameraToDefault()
         return;
     }
 
+// [RLVa:ID] - @setcam_avdistmax - force mouselook when camera distance max is 0
+    if ( (RlvActions::isRlvEnabled()) && (mCameraMode == CAMERA_MODE_MOUSELOOK) && (!RlvActions::canExitMouselook()) )
+    {
+        return;
+    }
+// [/RLVa:ID]
+
     if (LLFollowCamMgr::getInstance()->getActiveFollowCamParams())
     {
         changeCameraToFollow();
@@ -2545,6 +2559,13 @@ void LLAgentCamera::changeCameraToFollow(bool animate)
     {
         return;
     }
+
+// [RLVa:ID] - @setcam_avdistmax - force mouselook when camera distance max is 0
+    if ( (RlvActions::isRlvEnabled()) && (mCameraMode == CAMERA_MODE_MOUSELOOK) && (!RlvActions::canExitMouselook()) )
+    {
+        return;
+    }
+// [/RLVa:ID]
 
     if(mCameraMode != CAMERA_MODE_FOLLOW)
     {
@@ -2602,6 +2623,13 @@ void LLAgentCamera::changeCameraToThirdPerson(bool animate)
     {
         return;
     }
+
+// [RLVa:ID] - @setcam_avdistmax - force mouselook when camera distance max is 0
+    if ( (RlvActions::isRlvEnabled()) && (mCameraMode == CAMERA_MODE_MOUSELOOK) && (!RlvActions::canExitMouselook()) )
+    {
+        return;
+    }
+// [/RLVa:ID]
 
     gViewerWindow->getWindow()->resetBusyCount();
 
@@ -2681,6 +2709,13 @@ void LLAgentCamera::changeCameraToCustomizeAvatar()
         return;
     }
 // [/RLVa:KB]
+
+// [RLVa:ID] - @setcam_avdistmax - force mouselook when camera distance max is 0
+    if ( (RlvActions::isRlvEnabled()) && (mCameraMode == CAMERA_MODE_MOUSELOOK) && (!RlvActions::canExitMouselook()) )
+    {
+        return;
+    }
+// [/RLVa:ID]
 
     gAgent.standUp(); // force stand up
     gViewerWindow->getWindow()->resetBusyCount();

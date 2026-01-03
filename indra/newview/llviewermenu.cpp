@@ -5867,6 +5867,12 @@ class LLViewMouselook : public view_listener_t
         {
             gAgentCamera.changeCameraToMouselook();
         }
+// [RLVa:ID] - @setcam_avdistmax - force mouselook when camera distance max is 0
+        else if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canExitMouselook()) )
+        {
+            return true; // Cannot exit mouselook when camera max distance is 0
+        }
+// [/RLVa:ID]
         else
         {
             // NaCl - Rightclick-mousewheel zoom
