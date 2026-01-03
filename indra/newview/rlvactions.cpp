@@ -400,6 +400,16 @@ bool RlvActions::canChangeEnvironment(const LLUUID& idRlvObject)
     return (idRlvObject.isNull()) ? !gRlvHandler.hasBehaviour(RLV_BHVR_SETENV) : !gRlvHandler.hasBehaviourExcept(RLV_BHVR_SETENV, idRlvObject);
 }
 
+bool RlvActions::canOverrideEnvironment(const LLUUID& idRlvObject)
+{
+    // User can override the shared environment with local settings if:
+    //   - not restricted by @setenv (which gives full control to an object)
+    //   - not restricted by @lockenv (which forces shared environment)
+    if (!canChangeEnvironment(idRlvObject))
+        return false;
+    return (idRlvObject.isNull()) ? !gRlvHandler.hasBehaviour(RLV_BHVR_LOCKENV) : !gRlvHandler.hasBehaviourExcept(RLV_BHVR_LOCKENV, idRlvObject);
+}
+
 bool RlvActions::hasPostProcess()
 {
     return LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere);

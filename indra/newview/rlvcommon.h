@@ -237,6 +237,7 @@ bool rlvMenuMainToggleVisible(LLUICtrl* pMenuItem);
 void rlvMenuToggleVisible();
 bool rlvMenuCanShowName();
 bool rlvMenuEnableIfNot(const LLSD& sdParam);
+bool rlvMenuCanOverrideEnv();
 
 // ============================================================================
 // Selection functors
