@@ -238,6 +238,11 @@ public:
     static bool canChangeEnvironment(const LLUUID& idRlvObject = LLUUID::null);
 
     /*
+     * Returns true if the user can override the shared environment with local settings
+     */
+    static bool canOverrideEnvironment(const LLUUID& idRlvObject = LLUUID::null);
+
+    /*
      * Returns true if a postprocessing shader is currently active
      */
     static bool hasPostProcess();
