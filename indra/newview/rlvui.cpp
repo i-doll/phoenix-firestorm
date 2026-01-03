@@ -64,6 +64,7 @@ RlvUIEnabler::RlvUIEnabler()
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWLOC, boost::bind(&RlvUIEnabler::onToggleShowLoc, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWNAMES, boost::bind(&RlvUIEnabler::onToggleShowNames, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWMINIMAP, boost::bind(&RlvUIEnabler::onToggleShowMinimap, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWPEOPLE, boost::bind(&RlvUIEnabler::onToggleShowPeople, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWWORLDMAP, boost::bind(&RlvUIEnabler::onToggleShowWorldMap, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_UNSIT, boost::bind(&RlvUIEnabler::onToggleUnsit, this)));
 
@@ -233,6 +234,26 @@ void RlvUIEnabler::onToggleShowMinimap()
         // Reestablishing the visiblity connection will show the panel if needed so we only need to take care of hiding it when needed
         if ( (!fEnable) && (pRadarNetMapPanel->getVisible()) )
             pRadarNetMapPanel->setVisible(false);
+    }
+}
+
+// Handles: @showpeople=n|y toggles
+void RlvUIEnabler::onToggleShowPeople()
+{
+    bool fEnable = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWPEOPLE);
+
+    // Hide the people floater if it's currently visible
+    if ( (!fEnable) && (LLFloaterReg::instanceVisible("people")) )
+        LLFloaterReg::hideInstance("people");
+
+    // Start or stop filtering opening the people floater
+    if (!fEnable)
+    {
+        RLV_VERIFY(addGenericFloaterFilter("people"));
+    }
+    else
+    {
+        RLV_VERIFY(removeGenericFloaterFilter("people"));
     }
 }
 
