@@ -8838,6 +8838,10 @@ void LLSettingsBridge::performAction(LLInventoryModel* model, std::string action
 {
     if ("apply_settings_local" == action)
     {
+// [RLVa:ID] - @lockenv
+        if (!RlvActions::canOverrideEnvironment())
+            return;
+// [/RLVa:ID]
         // Single item only
         LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(getItem());
         if (!item)
@@ -8927,6 +8931,10 @@ void LLSettingsBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 
         items.push_back("Settings Separator");
         items.push_back("Settings Apply Local");
+// [RLVa:ID] - @lockenv
+        if (!RlvActions::canOverrideEnvironment())
+            disabled_items.push_back("Settings Apply Local");
+// [/RLVa:ID]
 
         items.push_back("Settings Apply Parcel");
         if (!canUpdateParcel())
