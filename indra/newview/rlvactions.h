@@ -58,6 +58,11 @@ public:
     static bool canChangeToMouselook();
 
     /*
+     * Returns true if the user can exit mouselook (false when camera max distance is 0)
+     */
+    static bool canExitMouselook();
+
+    /*
      * Returns true if the camera's distance (from either the avatar of the focus) is currently restricted/clamped
      */
     static bool isCameraDistanceClamped();
