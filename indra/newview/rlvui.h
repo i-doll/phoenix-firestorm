@@ -47,6 +47,7 @@ protected:
     void onToggleMovement();                                            // fly, alwaysrun and temprun
     void onToggleShowLoc();                                             // showloc
     void onToggleShowMinimap();                                         // showminimap
+    void onToggleShowPeople();                                          // showpeople
     void onToggleShowWorldMap();                                        // showworldmap
     void onToggleTp();                                                  // tploc and tplm
     void onToggleUnsit();                                               // unsit
