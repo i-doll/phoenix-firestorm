@@ -1216,6 +1216,14 @@ void LLEnvironment::setSelectedEnvironment(LLEnvironment::EnvSelection_t env, LL
         return;
     }
 // [/RLVa:KB]
+// [RLVa:ID] - @lockenv
+    // Block selecting ENV_LOCAL only if there's an actual local environment set
+    // (selecting empty ENV_LOCAL falls through to shared environment, which is allowed)
+    if ( (!RlvActions::canOverrideEnvironment()) && (LLEnvironment::ENV_LOCAL == env) && (mEnvironments[ENV_LOCAL]) )
+    {
+        return;
+    }
+// [/RLVa:ID]
 
     mSelectedEnvironment = env;
     updateEnvironment(transition, forced);
@@ -1267,6 +1275,13 @@ void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, const LLSe
         return;
     }
 
+// [RLVa:ID] - @lockenv
+    if ( (!RlvActions::canOverrideEnvironment()) && (LLEnvironment::ENV_LOCAL == env) )
+    {
+        return;
+    }
+// [/RLVa:ID]
+
     logEnvironment(env, pday, env_version);
 
     DayInstance::ptr_t environment = getEnvironmentInstance(env, true);
@@ -1294,6 +1309,13 @@ void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, LLEnvironm
         LL_WARNS("ENVIRONMENT") << "Attempt to change invalid environment selection (" << env_selection_to_string(env) << ")." << LL_ENDL;
         return;
     }
+
+// [RLVa:ID] - @lockenv
+    if ( (!RlvActions::canOverrideEnvironment()) && (LLEnvironment::ENV_LOCAL == env) )
+    {
+        return;
+    }
+// [/RLVa:ID]
 
     bool reset_probes = false;
 
@@ -1451,6 +1473,13 @@ void LLEnvironment::setEnvironment(EnvSelection_t env,
                                    LLSettingsBase::Seconds transition,
                                    S32 env_version)
 {
+// [RLVa:ID] - @lockenv
+    if ( (!RlvActions::canOverrideEnvironment()) && (LLEnvironment::ENV_LOCAL == env) )
+    {
+        return;
+    }
+// [/RLVa:ID]
+
     LLSettingsVOBase::getSettingsAsset(assetId,
         [this, env, env_version, transition](LLUUID asset_id, LLSettingsBase::ptr_t settings, S32 status, LLExtStat)
         {

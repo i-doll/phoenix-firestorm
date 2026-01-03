@@ -11937,6 +11937,12 @@ class LLWorldEnvSettings : public view_listener_t
 // [/RLVa:KB]
 
         std::string event_name = userdata.asString();
+
+// [RLVa:ID] - @lockenv
+        // When lockenv is active, only allow "region" (Use Shared Environment), block all presets
+        if (!RlvActions::canOverrideEnvironment() && event_name != "region")
+            return true;
+// [/RLVa:ID]
 // <FS:Beq> FIRE-29785 fix daytime shortcuts for non-EEP
 #ifdef OPENSIM
         static std::map<std::string, std::string> sky_presets = {
@@ -13252,6 +13258,7 @@ void initialize_menus()
     enable.add("RLV.MainToggleVisible", boost::bind(&rlvMenuMainToggleVisible, _1));
     enable.add("RLV.CanShowName", boost::bind(&rlvMenuCanShowName));
     enable.add("RLV.EnableIfNot", boost::bind(&rlvMenuEnableIfNot, _2));
+    enable.add("RLV.CanOverrideEnv", boost::bind(&rlvMenuCanOverrideEnv));
 // [/RLVa:KB]
 
     // <FS:Ansariel> Toggle internal web browser

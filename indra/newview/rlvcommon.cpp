@@ -780,6 +780,13 @@ bool rlvMenuEnableIfNot(const LLSD& sdParam)
     return fEnable;
 }
 
+bool rlvMenuCanOverrideEnv()
+{
+    // Returns true if the user can override the shared environment with local settings
+    // (i.e., neither @setenv nor @lockenv is active)
+    return !rlv_handler_t::isEnabled() || RlvActions::canOverrideEnvironment();
+}
+
 // ============================================================================
 // Selection functors
 //
