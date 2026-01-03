@@ -2530,6 +2530,7 @@ void LLViewerWindow::initWorldUI()
         gToolBarView->setVisible(true);
     }
 
+    // <ID> Optional CEF preloading
     // Don't preload cef instances on low end hardware
     const F32Gigabytes MIN_PHYSICAL_MEMORY(8);
     F32Gigabytes physical_mem = LLMemory::getMaxMemKB();
@@ -2539,7 +2540,8 @@ void LLViewerWindow::initWorldUI()
         physical_mem = LLMemory::getMaxMemKB();
     }
 
-    if (!gNonInteractive && physical_mem > MIN_PHYSICAL_MEMORY)
+    if (!gNonInteractive && physical_mem > MIN_PHYSICAL_MEMORY
+        && gSavedSettings.getBOOL("IDPreloadWebBrowserFloaters"))
     {
         LL_INFOS() << "Preloading cef instances" << LL_ENDL;
 
@@ -2548,6 +2550,7 @@ void LLViewerWindow::initWorldUI()
         LLFloaterReg::getInstance("search");
         LLFloaterReg::getInstance("marketplace");
     }
+    // </ID>
 
     // <FS:Zi> Autohide main chat bar if applicable
     bool visible = !gSavedSettings.getBOOL("AutohideChatBar");
