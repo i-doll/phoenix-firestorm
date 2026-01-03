@@ -142,6 +142,7 @@ enum ERlvBehaviour {
     RLV_BHVR_SHOWNAMETAGS,          // "shownametags"
     RLV_BHVR_SHOWNEARBY,
     RLV_BHVR_SHOWPEOPLE,            // "showpeople"
+    RLV_BHVR_SHOWAREASEARCH,        // "showareasearch"
     RLV_BHVR_SHOWHOVERTEXT,         // "showhovertext"
     RLV_BHVR_SHOWHOVERTEXTHUD,      // "showhovertexthud"
     RLV_BHVR_SHOWHOVERTEXTWORLD,    // "showhovertextworld"
