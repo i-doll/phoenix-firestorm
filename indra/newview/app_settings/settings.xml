@@ -13,6 +13,19 @@
     <key>Value</key>
     <integer>1</integer>
   </map>
+  <!-- <ID> -->
+  <key>IDMouselookRequireAltForDrag</key>
+  <map>
+    <key>Comment</key>
+    <string>If true, clicking and dragging in mouselook requires holding Alt to initiate object grab/drag.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
+  <!-- </ID> -->
   <key>FSTrishMouseLookFix</key>
   <map>
     <key>Comment</key>
