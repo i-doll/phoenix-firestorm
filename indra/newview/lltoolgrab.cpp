@@ -197,6 +197,16 @@ void LLToolGrabBase::pickCallback(const LLPickInfo& pick_info)
         LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
         LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
     }
+    // <ID> Block drag in mouselook unless ALT is held
+    else if (gAgentCamera.cameraMouselook() &&
+             gSavedSettings.getBOOL("IDMouselookRequireAltForDrag") &&
+             !(pick_info.mKeyMask & MASK_ALT))
+    {
+        LLToolGrab::getInstance()->setMouseCapture(true);
+        LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
+        LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
+    }
+    // </ID>
     else
     {
         LLToolGrab::getInstance()->handleObjectHit(LLToolGrab::getInstance()->mGrabPick);
