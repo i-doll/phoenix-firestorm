@@ -771,6 +771,14 @@ bool LLToolCompGun::handleMouseDown(S32 x, S32 y, MASK mask)
         return false;
     }
 
+    // <ID> Block drag in mouselook unless ALT is held
+    if (gSavedSettings.getBOOL("IDMouselookRequireAltForDrag") &&
+        !(mask & MASK_ALT))
+    {
+        return true;
+    }
+    // </ID>
+
     // On mousedown, start grabbing
     gGrabTransientTool = this;
     LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
@@ -787,6 +795,14 @@ bool LLToolCompGun::handleDoubleClick(S32 x, S32 y, MASK mask)
         gAgent.setControlFlags(AGENT_CONTROL_ML_LBUTTON_DOWN);
         return false;
     }
+
+    // <ID> Block drag in mouselook unless ALT is held
+    if (gSavedSettings.getBOOL("IDMouselookRequireAltForDrag") &&
+        !(mask & MASK_ALT))
+    {
+        return true;
+    }
+    // </ID>
 
     // On mousedown, start grabbing
     gGrabTransientTool = this;
