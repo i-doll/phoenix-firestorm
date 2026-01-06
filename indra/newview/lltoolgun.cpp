@@ -82,6 +82,14 @@ void LLToolGun::handleDeselect()
 
 bool LLToolGun::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    // <ID> Block drag in mouselook unless ALT is held
+    if (gSavedSettings.getBOOL("IDMouselookRequireAltForDrag") &&
+        !(mask & MASK_ALT))
+    {
+        return true;
+    }
+    // </ID>
+
     gGrabTransientTool = this;
     LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolGrab::getInstance() );
 
