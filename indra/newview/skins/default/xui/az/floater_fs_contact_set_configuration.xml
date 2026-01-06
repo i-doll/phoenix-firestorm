@@ -31,5 +31,6 @@
 		<check_box label="Kontakt dəstinə əsaslanan ad etiketinin rəngi" name="FSContactSetsColorizeNameTag" />
 		<check_box label="Kontaktlar dəstinə əsaslanan radara qeyd rəngi" name="FSContactSetsColorizeRadar" />
 		<check_box label="Kontaktlar dəstinə əsaslanan ümumi söhbətdə rəng" name="FSContactSetsColorizeChat" />
+		<check_box label="Kontaktlar dəstinə əsaslanan dostlar siyahısında rəng" name="FSContactSetsColorizeFriendsList" />
 	</panel>
 </floater>
