@@ -117,6 +117,7 @@ public:
     void showLastInteractionTime(bool show);
     void setAvatarIconVisible(bool visible);
     void setShowCompleteName(bool show, bool force = false) { mShowCompleteName = show; mForceCompleteName = force;};
+    void applyContactSetColor();
 // [RLVa:KB] - Checked: RLVa-1.2.0
     void setRlvCheckShowNames(bool fRlvCheckShowNames);
     void updateRlvRestrictions();

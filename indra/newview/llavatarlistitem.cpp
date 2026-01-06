@@ -52,6 +52,7 @@
 
 #include "lfsimfeaturehandler.h"    // <FS:CR> Opensim
 #include "llavatarlist.h"
+#include "lggcontactsets.h"
 
 bool LLAvatarListItem::sStaticInitialized = false;
 S32 LLAvatarListItem::sLeftPadding = 0;
@@ -573,10 +574,30 @@ void LLAvatarListItem::updateAvatarName()
     fetchAvatarName();
 }
 
+void LLAvatarListItem::applyContactSetColor()
+{
+    if (mAvatarId.isNull())
+    {
+        return;
+    }
+
+    // Re-set the name with updated contact set color
+    setNameInternal(mAvatarName->getText(), mHighlihtSubstring);
+}
+
 //== PRIVATE SECITON ==========================================================
 
 void LLAvatarListItem::setNameInternal(const std::string& name, const std::string& highlight)
 {
+    // Get a copy of the style and apply contact set color if applicable
+    LLStyle::Params style = mAvatarNameStyle;
+    LLColor4 cs_color;
+    if (!mAvatarId.isNull() &&
+        LGGContactSets::getInstance()->hasFriendColorThatShouldShow(mAvatarId, ContactSetType::FRIENDSLIST, cs_color))
+    {
+        style.color = cs_color;
+    }
+
     // <FS:Ansariel> Commented out because horrible LL implementation - we control it via global display name settings!
     //if(mShowCompleteName && highlight.empty())
     //{
@@ -586,7 +607,7 @@ void LLAvatarListItem::setNameInternal(const std::string& name, const std::strin
     //{
     //    LLTextUtil::textboxSetHighlightedVal(mAvatarName, mAvatarNameStyle, name, highlight);
     //}
-    LLTextUtil::textboxSetHighlightedVal(mAvatarName, mAvatarNameStyle, name, highlight);
+    LLTextUtil::textboxSetHighlightedVal(mAvatarName, style, name, highlight);
     // </FS:Ansariel>
 }
 

@@ -53,6 +53,8 @@
 // [RLVa:KB] - @pay
 #include "rlvactions.h"
 // [/RLVa:KB]
+#include "lggcontactsets.h"
+#include "llscrolllistcell.h"
 
 //Maximum number of people you can select to do an operation on at once.
 constexpr U32 MAX_FRIEND_SELECT = 20;
@@ -84,6 +86,11 @@ FSFloaterContacts::~FSFloaterContacts()
     if (mRlvBehaviorCallbackConnection.connected())
     {
         mRlvBehaviorCallbackConnection.disconnect();
+    }
+
+    if (mContactSetChangedConnection.connected())
+    {
+        mContactSetChangedConnection.disconnect();
     }
 
     for (avatar_name_cb_t::iterator it = mAvatarNameCacheConnections.begin(); it != mAvatarNameCacheConnections.end(); ++it)
@@ -184,6 +191,14 @@ bool FSFloaterContacts::postBuild()
     onColumnDisplayModeChanged();
 
     LLAvatarNameCache::getInstance()->addUseDisplayNamesCallback(boost::bind(&FSFloaterContacts::onDisplayNameChanged, this));
+
+    // Contact set color updates
+    mContactSetChangedConnection = LGGContactSets::getInstance()->setContactSetChangeCallback(
+        boost::bind(&FSFloaterContacts::onContactSetsChanged, this, _1));
+
+    // Refresh colors when the colorization setting changes
+    gSavedSettings.getControl("FSContactSetsColorizeFriendsList")->getSignal()->connect(
+        boost::bind(&FSFloaterContacts::onContactSetsChanged, this, LGGContactSets::UPDATED_MEMBERS));
 
     return true;
 }
@@ -773,6 +788,15 @@ void FSFloaterContacts::updateFriendItem(const LLUUID& agent_id, const LLRelatio
     ((LLScrollListText*)itemp->getColumn(LIST_FRIEND_DISPLAY_NAME))->setFontStyle(font_style);
     ((LLScrollListText*)itemp->getColumn(LIST_FRIEND_NAME))->setFontStyle(font_style);
 
+    // Apply contact set colors
+    LLColor4 cs_color;
+    if (LGGContactSets::getInstance()->hasFriendColorThatShouldShow(agent_id, ContactSetType::FRIENDSLIST, cs_color))
+    {
+        static_cast<LLScrollListText*>(itemp->getColumn(LIST_FRIEND_USER_NAME))->setColor(cs_color);
+        static_cast<LLScrollListText*>(itemp->getColumn(LIST_FRIEND_DISPLAY_NAME))->setColor(cs_color);
+        static_cast<LLScrollListText*>(itemp->getColumn(LIST_FRIEND_NAME))->setColor(cs_color);
+    }
+
     itemp->getColumn(LIST_VISIBLE_ONLINE)->setValue(info->isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
     itemp->getColumn(LIST_VISIBLE_MAP)->setValue(info->isRightGrantedTo(LLRelationship::GRANT_MAP_LOCATION));
     itemp->getColumn(LIST_EDIT_MINE)->setValue(info->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS));
@@ -1263,6 +1287,18 @@ void FSFloaterContacts::onDisplayNameChanged()
         }
     }
     mFriendsList->setNeedsSort();
+}
+
+void FSFloaterContacts::onContactSetsChanged(LGGContactSets::EContactSetUpdate type)
+{
+    for (auto item : mFriendsList->getAllData())
+    {
+        const LLRelationship* info = LLAvatarTracker::instance().getBuddyInfo(item->getUUID());
+        if (info)
+        {
+            updateFriendItem(item->getUUID(), info);
+        }
+    }
 }
 
 std::string FSFloaterContacts::getFullName(const LLAvatarName& av_name)
