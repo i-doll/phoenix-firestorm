@@ -213,6 +213,14 @@ LLAvatarList::LLAvatarList(const Params& p)
 
     // <FS:Ansariel> Update voice volume slider on RLVa shownames restriction update
     mRlvBehaviorCallbackConnection = gRlvHandler.setBehaviourCallback(boost::bind(&LLAvatarList::updateRlvRestrictions, this, _1, _2));
+
+    // Contact set color updates
+    mContactSetChangedConnection = LGGContactSets::getInstance()->setContactSetChangeCallback(
+        boost::bind(&LLAvatarList::onContactSetsChanged, this, _1));
+
+    // Refresh colors when the colorization setting changes
+    gSavedSettings.getControl("FSContactSetsColorizeFriendsList")->getSignal()->connect(
+        boost::bind(&LLAvatarList::onContactSetsChanged, this, LGGContactSets::UPDATED_MEMBERS));
 }
 
 
@@ -245,6 +253,11 @@ LLAvatarList::~LLAvatarList()
         mRlvBehaviorCallbackConnection.disconnect();
     }
     // </FS:Ansariel>
+
+    if (mContactSetChangedConnection.connected())
+    {
+        mContactSetChangedConnection.disconnect();
+    }
 }
 
 void LLAvatarList::setShowIcons(std::string param_name)
@@ -273,6 +286,17 @@ void LLAvatarList::updateRlvRestrictions(ERlvBehaviour behavior, ERlvParamType t
     }
 }
 // </FS:Ansariel>
+
+void LLAvatarList::onContactSetsChanged(LGGContactSets::EContactSetUpdate type)
+{
+    std::vector<LLPanel*> items;
+    getItems(items);
+    for (auto panel : items)
+    {
+        LLAvatarListItem* item = static_cast<LLAvatarListItem*>(panel);
+        item->applyContactSetColor();
+    }
+}
 
 // virtual
 void LLAvatarList::draw()
