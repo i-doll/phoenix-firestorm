@@ -365,6 +365,7 @@ set(viewer_SOURCE_FILES
     llfloaterfixedenvironment.cpp
     llfloaterfonttest.cpp
     llfloaterforgetuser.cpp
+    llfloaterbulkgestureedit.cpp
     llfloatergesture.cpp
     llfloatergltfasseteditor.cpp
     llfloatergodtools.cpp
@@ -1232,6 +1233,7 @@ set(viewer_HEADER_FILES
     llfloaterfixedenvironment.h
     llfloaterfonttest.h
     llfloaterforgetuser.h
+    llfloaterbulkgestureedit.h
     llfloatergesture.h
     llfloatergltfasseteditor.h
     llfloatergodtools.h

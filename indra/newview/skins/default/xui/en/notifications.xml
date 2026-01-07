@@ -1806,6 +1806,13 @@ Gesture save failed.  Please try again in a minute.
 
   <notification
    icon="alertmodal.tga"
+   name="GestureBulkEditNoChanges"
+   type="alertmodal">
+No changes were made to apply to the selected gestures.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="GestureSaveFailedObjectNotFound"
    type="alertmodal">
 Could not save gesture because the object or the associated object inventory could not be found.
