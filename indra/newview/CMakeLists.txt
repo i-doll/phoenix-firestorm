@@ -367,6 +367,7 @@ set(viewer_SOURCE_FILES
     llfloaterfixedenvironment.cpp
     llfloaterfonttest.cpp
     llfloaterforgetuser.cpp
+    llfloaterbulkgestureedit.cpp
     llfloatergesture.cpp
     llfloatergestureautocompletepicker.cpp
     llfloatergltfasseteditor.cpp
@@ -1245,6 +1246,7 @@ set(viewer_HEADER_FILES
     llfloaterfixedenvironment.h
     llfloaterfonttest.h
     llfloaterforgetuser.h
+    llfloaterbulkgestureedit.h
     llfloatergesture.h
     llfloatergestureautocompletepicker.h
     llfloatergltfasseteditor.h
