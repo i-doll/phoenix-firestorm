@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- ID: Bulk gesture editing feature -->
+<floater
+ legacy_header_height="18"
+ height="220"
+ layout="topleft"
+ name="bulk_gesture_edit"
+ help_topic="bulk_gesture_edit"
+ positioning="centered"
+ save_rect="true"
+ title="Bulk Edit Gestures"
+ width="320">
+    <floater.string name="mixed_label">-- Mixed --</floater.string>
+
+    <text
+     type="string"
+     length="1"
+     follows="top|left"
+     font="SansSerifSmall"
+     height="10"
+     layout="topleft"
+     left="10"
+     font.style="BOLD"
+     name="trigger_label"
+     top_pad="25"
+     width="100">
+        Trigger:
+    </text>
+    <line_editor
+     follows="left|top|right"
+     height="20"
+     layout="topleft"
+     left_delta="90"
+     max_length_bytes="31"
+     name="trigger_editor"
+     top_delta="-4"
+     width="210" />
+
+    <text
+     type="string"
+     length="1"
+     follows="top|left"
+     font="SansSerifSmall"
+     height="10"
+     layout="topleft"
+     left="10"
+     font.style="BOLD"
+     name="replace_label"
+     tool_tip="Replace the trigger word(s) with these words."
+     top_pad="10"
+     width="100">
+        Replace with:
+    </text>
+    <line_editor
+     follows="left|top|right"
+     height="20"
+     layout="topleft"
+     left_delta="90"
+     max_length_bytes="63"
+     name="replace_editor"
+     tool_tip="Replace the trigger word(s) with these words."
+     top_delta="-4"
+     width="210" />
+
+    <text
+     type="string"
+     length="1"
+     follows="top|left"
+     font="SansSerifSmall"
+     height="10"
+     layout="topleft"
+     left="10"
+     font.style="BOLD"
+     name="key_label"
+     top_pad="10"
+     width="100">
+        Shortcut Key:
+    </text>
+    <combo_box
+     height="20"
+     label="None"
+     layout="topleft"
+     left_delta="90"
+     name="modifier_combo"
+     top_delta="-4"
+     width="70" />
+    <combo_box
+     height="20"
+     label="None"
+     layout="topleft"
+     left_pad="5"
+     name="key_combo"
+     top_delta="0"
+     width="70" />
+
+    <text
+     type="string"
+     follows="left|bottom"
+     font="SansSerifSmall"
+     height="15"
+     layout="topleft"
+     left="10"
+     name="status_text"
+     text_color="White"
+     top_pad="15"
+     width="300">
+        Select gestures to edit...
+    </text>
+
+    <text
+     type="string"
+     follows="left|bottom"
+     font="SansSerifSmall"
+     height="25"
+     layout="topleft"
+     left="10"
+     name="help_text"
+     text_color="LtGray"
+     top_pad="5"
+     word_wrap="true"
+     width="300">
+        Only fields you modify will be applied to all selected gestures.
+    </text>
+
+    <button
+     follows="bottom|left"
+     height="23"
+     label="Save"
+     layout="topleft"
+     left="10"
+     name="save_btn"
+     top_pad="10"
+     width="90" />
+    <button
+     follows="bottom|right"
+     height="23"
+     label="Cancel"
+     layout="topleft"
+     right="-10"
+     name="cancel_btn"
+     top_delta="0"
+     width="90" />
+</floater>
+
