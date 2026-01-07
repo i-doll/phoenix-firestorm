@@ -46,6 +46,7 @@
 #include "llfloaterbanduration.h"
 #include "llfloaterbeacons.h"
 #include "llfloaterbuildoptions.h"
+#include "llfloaterbulkgestureedit.h"
 #include "llfloaterbulkpermission.h"
 #include "llfloaterbulkupload.h"
 #include "llfloaterbump.h"
@@ -412,6 +413,7 @@ void LLViewerFloaterReg::registerFloaters()
 
     LLFloaterReg::add("ban_duration", "floater_ban_duration.xml", &LLFloaterReg::build<LLFloaterBanDuration>);
     LLFloaterReg::add("beacons", "floater_beacons.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBeacons>);
+    LLFloaterReg::add("bulk_gesture_edit", "floater_bulk_gesture_edit.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBulkGestureEdit>);
     LLFloaterReg::add("bulk_perms", "floater_bulk_perms.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBulkPermission>);
     LLFloaterReg::add("buy_currency", "floater_buy_currency.xml", &LLFloaterBuyCurrency::buildFloater);
     LLFloaterReg::add("buy_currency_html", "floater_buy_currency_html.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBuyCurrencyHTML>);
