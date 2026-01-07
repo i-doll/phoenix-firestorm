@@ -28,6 +28,7 @@
 
 #include "llfloatergesture.h"
 
+#include "llfloaterbulkgestureedit.h"
 #include "llinventory.h"
 #include "llinventorybridge.h"
 #include "llinventoryfunctions.h"
@@ -710,16 +711,34 @@ void LLFloaterGesture::onClickEdit()
 {
     if (!are_gestures_enabled()) return; // <FS:PP> FIRE-36169 Gestures enable/disable switch
 
-    const LLUUID& item_id = mGestureList->getCurrentID();
+    // <ID> Bulk gesture editing - route to bulk editor when multiple gestures selected
+    uuid_vec_t ids;
+    getSelectedIds(ids);
 
-    LLInventoryItem* item = gInventory.getItem(item_id);
-    if (!item) return;
-
-    LLPreviewGesture* previewp = LLPreviewGesture::show(item_id, LLUUID::null);
-    if (!previewp->getHost())
+    if (ids.empty())
     {
-        previewp->setRect(gFloaterView->findNeighboringPosition(this, previewp));
+        return;
     }
+
+    if (ids.size() == 1)
+    {
+        // Single gesture - use existing preview/editor
+        const LLUUID& item_id = ids[0];
+        LLInventoryItem* item = gInventory.getItem(item_id);
+        if (!item) return;
+
+        LLPreviewGesture* previewp = LLPreviewGesture::show(item_id, LLUUID::null);
+        if (!previewp->getHost())
+        {
+            previewp->setRect(gFloaterView->findNeighboringPosition(this, previewp));
+        }
+    }
+    else
+    {
+        // Multiple gestures - open bulk editor
+        LLFloaterBulkGestureEdit::show(ids);
+    }
+    // </ID>
 }
 
 void LLFloaterGesture::onCommitList()
