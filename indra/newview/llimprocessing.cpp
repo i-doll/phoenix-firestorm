@@ -297,6 +297,16 @@ void inventory_offer_handler(LLOfferInfo* info)
         // and possibly open them on receipt depending upon "ShowNewInventory".
         bAutoAccept = true;
     }
+// [RLVa:ID] - Auto-accept give-to-RLV offers
+    else if ( (rlv_handler_t::isEnabled()) && (RlvSettings::getAutoAcceptGiveToRLV()) &&
+              (!RlvSettings::getForbidGiveToRLV()) && (RlvInventory::instance().isGiveToRLVOffer(*info)) )
+    {
+        // Use forceResponse to go through the proper callback path in llviewermessage.cpp
+        // which already has all the RLV folder parsing and creation logic
+        info->forceResponse(IOR_ACCEPT);
+        return;
+    }
+// [/RLVa:ID]
 
     // Strip any SLURL from the message display. (DEV-2754)
     std::string msg = info->mDesc;
