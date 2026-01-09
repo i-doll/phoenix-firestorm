@@ -8883,25 +8883,56 @@ void LLOfferInfo::forceResponse(InventoryOfferResponse response)
     //LLNotification::Params params("UserGiveItem");
     //params.functor.function(boost::bind(&LLOfferInfo::inventory_offer_callback, this, _1, _2));
     //LLNotifications::instance().forceResponse(params, response);
-    S32 element_index;
-    switch (response)
+
+// [RLVa:ID] - Route to proper callback based on IM type
+    // Element indices are different between notification types:
+    // - ObjectGiveItem: 0=Accept, 1=Discard, 2=Mute
+    // - UserGiveItem:   0=Show, 1=Accept, 2=Discard, 3=Mute
+    if (IM_TASK_INVENTORY_OFFERED == mIM)
     {
-        case IOR_ACCEPT:
-            element_index = 1;
-            break;
-        case IOR_DECLINE:
-            element_index = 2;
-            break;
-        case IOR_MUTE:
-            element_index = 3;
-            break;
-        default:
-            element_index = -1;
-            break;
+        S32 element_index;
+        switch (response)
+        {
+            case IOR_ACCEPT:
+                element_index = 0;  // Accept is element 0 for ObjectGiveItem
+                break;
+            case IOR_DECLINE:
+                element_index = 1;  // Discard is element 1
+                break;
+            case IOR_MUTE:
+                element_index = 2;  // Mute is element 2
+                break;
+            default:
+                element_index = -1;
+                break;
+        }
+        LLNotification::Params params("ObjectGiveItem");
+        params.functor.function(boost::bind(&LLOfferInfo::inventory_task_offer_callback, this, _1, _2));
+        LLNotifications::instance().forceResponse(params, element_index);
     }
-    LLNotification::Params params("UserGiveItem");
-    params.functor.function(boost::bind(&LLOfferInfo::inventory_offer_callback, this, _1, _2));
-    LLNotifications::instance().forceResponse(params, element_index);
+    else
+    {
+        S32 element_index;
+        switch (response)
+        {
+            case IOR_ACCEPT:
+                element_index = 1;  // Accept is element 1 for UserGiveItem (after Show)
+                break;
+            case IOR_DECLINE:
+                element_index = 2;  // Discard is element 2
+                break;
+            case IOR_MUTE:
+                element_index = 3;  // Mute is element 3
+                break;
+            default:
+                element_index = -1;
+                break;
+        }
+        LLNotification::Params params("UserGiveItem");
+        params.functor.function(boost::bind(&LLOfferInfo::inventory_offer_callback, this, _1, _2));
+        LLNotifications::instance().forceResponse(params, element_index);
+    }
+// [/RLVa:ID]
     // </FS:Ansariel>
 }
 
