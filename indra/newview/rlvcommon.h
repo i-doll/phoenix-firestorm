@@ -90,6 +90,7 @@ public:
     static bool getDebug()                      { return rlvGetSetting<bool>(RlvSettingNames::Debug, false); }
     static bool getCanOOC()                     { return s_fCanOOC; }
     static bool getForbidGiveToRLV()            { return rlvGetSetting<bool>(RlvSettingNames::ForbidGiveToRlv, true); }
+    static bool getAutoAcceptGiveToRLV()        { return rlvGetSetting<bool>(RlvSettingNames::AutoAcceptGiveToRlv, false); } // [ID]
     static bool getNoSetEnv()                   { return s_fNoSetEnv; }
 
     static std::string getWearAddPrefix()       { return rlvGetSetting<std::string>(RlvSettingNames::WearAddPrefix, LLStringUtil::null); }

@@ -409,6 +409,7 @@ namespace RlvSettingNames
     /*inline*/ constexpr std::string_view Debug = make_string_view("RestrainedLoveDebug");
     /*inline*/ constexpr std::string_view CanOoc = make_string_view("RestrainedLoveCanOOC");
     /*inline*/ constexpr std::string_view ForbidGiveToRlv = make_string_view("RestrainedLoveForbidGiveToRLV");
+    /*inline*/ constexpr std::string_view AutoAcceptGiveToRlv = make_string_view("RestrainedLoveAutoAcceptGiveToRLV"); // [ID]
     /*inline*/ constexpr std::string_view NoSetEnv = make_string_view("RestrainedLoveNoSetEnv");
     /*inline*/ constexpr std::string_view ShowEllipsis = make_string_view("RestrainedLoveShowEllipsis");
     /*inline*/ constexpr std::string_view WearAddPrefix = make_string_view("RestrainedLoveStackWhenFolderBeginsWith");
@@ -434,6 +435,7 @@ namespace RlvSettingNames
     constexpr const char Debug[] = "RestrainedLoveDebug";
     constexpr const char CanOoc[] = "RestrainedLoveCanOOC";
     constexpr const char ForbidGiveToRlv[] = "RestrainedLoveForbidGiveToRLV";
+    constexpr const char AutoAcceptGiveToRlv[] = "RestrainedLoveAutoAcceptGiveToRLV"; // [ID]
     constexpr const char NoSetEnv[] = "RestrainedLoveNoSetEnv";
     constexpr const char ShowEllipsis[] = "RestrainedLoveShowEllipsis";
     constexpr const char WearAddPrefix[] = "RestrainedLoveStackWhenFolderBeginsWith";
