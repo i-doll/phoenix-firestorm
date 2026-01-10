@@ -85,6 +85,7 @@
 #include "fsdata.h"
 #include "fsradar.h"        // <FS:Zi> Update notes in radar when edited
 #include "llviewermenu.h"
+#include "rlvactions.h"     // [RLVa:ID] For RlvActions::canEditProfile()
 
 static LLPanelInjector<LLPanelProfileSecondLife> t_panel_profile_secondlife("panel_profile_secondlife");
 static LLPanelInjector<LLPanelProfileWeb> t_panel_web("panel_profile_web");
@@ -925,7 +926,9 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
     getChild<LLUICtrl>("user_key")->setValue(avatar_id.asString());
 
     // <FS:Zi> Allow proper texture swatch handling
-    mSecondLifePic->setEnabled(own_profile);
+    // [RLVa:ID] - @editprofile support
+    mSecondLifePic->setEnabled(own_profile && RlvActions::canEditProfile());
+    // [/RLVa:ID]
 
     mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(), boost::bind(&LLPanelProfileSecondLife::onAvatarNameCache, this, _1, _2));
 }
@@ -1797,7 +1800,9 @@ void LLPanelProfileSecondLife::setLoaded()
             mHideAgeCheckbox->setEnabled(true);
         // </FS:Ansariel>
         }
-        mDescriptionEdit->setEnabled(true);
+        // [RLVa:ID] - @editprofile support
+        mDescriptionEdit->setEnabled(RlvActions::canEditProfile());
+        // [/RLVa:ID]
     }
 }
 
@@ -1812,7 +1817,9 @@ void LLPanelProfileSecondLife::updateButtons()
         mPreviewButton->setVisible(true);
         mPreviewButton->setEnabled(true);
 // </AS:Chanayane>
-        mDescriptionEdit->setEnabled(true);
+        // [RLVa:ID] - @editprofile support
+        mDescriptionEdit->setEnabled(RlvActions::canEditProfile());
+        // [/RLVa:ID]
     }
     else
     {
@@ -2563,6 +2570,19 @@ void LLPanelProfileSecondLife::updateRlvRestrictions(ERlvBehaviour behavior)
     {
         updateButtons();
     }
+    // [RLVa:ID] - @editprofile support
+    if (behavior == RLV_BHVR_EDITPROFILE && getSelfProfile())
+    {
+        bool can_edit = RlvActions::canEditProfile();
+        mDescriptionEdit->setEnabled(can_edit);
+        mSecondLifePic->setEnabled(can_edit);
+        if (!can_edit && mHasUnsavedDescriptionChanges)
+        {
+            mSaveDescriptionChanges->setEnabled(false);
+            mDiscardDescriptionChanges->setEnabled(false);
+        }
+    }
+    // [/RLVa:ID]
 }
 // </FS:Ansariel>
 
@@ -2734,6 +2754,12 @@ LLPanelProfileFirstLife::LLPanelProfileFirstLife()
 
 LLPanelProfileFirstLife::~LLPanelProfileFirstLife()
 {
+    // [RLVa:ID] - @editprofile support
+    if (mRlvBehaviorCallbackConnection.connected())
+    {
+        mRlvBehaviorCallbackConnection.disconnect();
+    }
+    // [/RLVa:ID]
 }
 
 bool LLPanelProfileFirstLife::postBuild()
@@ -2762,6 +2788,10 @@ bool LLPanelProfileFirstLife::postBuild()
     mDescriptionEdit->setKeystrokeCallback([this](LLTextEditor* caller) { onSetDescriptionDirty(); });
     mPicture->setCommitCallback(boost::bind(&LLPanelProfileFirstLife::onFirstLifePicChanged, this));    // <FS:Zi> Allow proper texture swatch handling
 
+    // [RLVa:ID] - @editprofile support
+    mRlvBehaviorCallbackConnection = gRlvHandler.setBehaviourCallback(boost::bind(&LLPanelProfileFirstLife::updateRlvRestrictions, this, _1));
+    // [/RLVa:ID]
+
     return true;
 }
 
@@ -2778,7 +2808,9 @@ void LLPanelProfileFirstLife::onOpen(const LLSD& key)
     mDescriptionEdit->setParseHTML(!getSelfProfile()); // <AS:Chanayane> Fix FIRE-35185 (disables link rendering while editing picks or 1st life)
 
     // <FS:Zi> Allow proper texture swatch handling
-    mPicture->setEnabled(getSelfProfile());
+    // [RLVa:ID] - @editprofile support
+    mPicture->setEnabled(getSelfProfile() && RlvActions::canEditProfile());
+    // [/RLVa:ID]
 
     resetData();
 }
@@ -3125,12 +3157,35 @@ void LLPanelProfileFirstLife::setLoaded()
 
     if (getSelfProfile())
     {
-        mDescriptionEdit->setEnabled(true);
-        mPicture->setEnabled(true);
-        mRemovePhoto->setEnabled(mImageId.notNull());
+        // [RLVa:ID] - @editprofile support
+        bool can_edit = RlvActions::canEditProfile();
+        mDescriptionEdit->setEnabled(can_edit);
+        mPicture->setEnabled(can_edit);
+        mRemovePhoto->setEnabled(can_edit && mImageId.notNull());
+        // [/RLVa:ID]
         mPreviewButton->setEnabled(true);
     }
 }
+
+// [RLVa:ID] - @editprofile support
+void LLPanelProfileFirstLife::updateRlvRestrictions(ERlvBehaviour behavior)
+{
+    if (behavior == RLV_BHVR_EDITPROFILE && getSelfProfile())
+    {
+        bool can_edit = RlvActions::canEditProfile();
+        mDescriptionEdit->setEnabled(can_edit);
+        mPicture->setEnabled(can_edit);
+        mUploadPhoto->setEnabled(can_edit);
+        mChangePhoto->setEnabled(can_edit);
+        mRemovePhoto->setEnabled(can_edit && mImageId.notNull());
+        if (!can_edit && mHasUnsavedChanges)
+        {
+            mSaveChanges->setEnabled(false);
+            mDiscardChanges->setEnabled(false);
+        }
+    }
+}
+// [/RLVa:ID]
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
