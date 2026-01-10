@@ -409,6 +409,11 @@ protected:
     bool            mPreview;
     std::string     mOriginalDescription;
 // </AS:Chanayane>
+
+    // [RLVa:ID] - @editprofile support
+    boost::signals2::connection mRlvBehaviorCallbackConnection;
+    void updateRlvRestrictions(ERlvBehaviour behavior);
+    // [/RLVa:ID]
 };
 
 /**
