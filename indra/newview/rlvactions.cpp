@@ -424,6 +424,21 @@ bool RlvActions::hasPostProcess()
 }
 
 // ============================================================================
+// Profile
+// [RLVa:ID]
+
+bool RlvActions::canEditProfile()
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITPROFILE);
+}
+
+bool RlvActions::canEditPicks()
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITPICKS);
+}
+
+// [/RLVa:ID]
+// ============================================================================
 // World interaction
 //
 
