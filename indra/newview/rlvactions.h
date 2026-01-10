@@ -335,6 +335,22 @@ public:
      */
     static bool canTouch(const LLViewerObject* pObj, const LLVector3& posOffset = LLVector3::zero);
 
+    // =======
+    // Profile
+    // =======
+    // [RLVa:ID]
+public:
+    /*
+     * Returns true if the user is allowed to edit their profile content (about text, first life bio, images)
+     */
+    static bool canEditProfile();
+
+    /*
+     * Returns true if the user is allowed to create/edit/delete picks
+     */
+    static bool canEditPicks();
+    // [/RLVa:ID]
+
     // ===============
     // World (General)
     // ===============

@@ -274,6 +274,11 @@ protected:
 // </AS:Chanayane>
 
     void onDescriptionFocusReceived();
+
+    // [RLVa:ID] - @editpicks support
+    boost::signals2::connection mRlvBehaviorCallbackConnection;
+    void updateRlvRestrictions(ERlvBehaviour behavior, ERlvParamType type);
+    // [/RLVa:ID]
 };
 
 #endif // LL_LLPANELPICKS_H
