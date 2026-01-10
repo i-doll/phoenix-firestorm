@@ -35,6 +35,7 @@
 // Command specific includes
 #include "llagentcamera.h"              // @setcam and related
 #include "llavataractions.h"            // @stopim IM query
+#include "llavatariconctrl.h"           // @setprofileimage - [RLVa:ID]
 #include "llavatarnamecache.h"          // @shownames
 #include "llavatarlist.h"               // @shownames
 #include "llfloatercamera.h"            // @setcam family
@@ -3332,6 +3333,59 @@ ERlvCmdRet RlvForceHandler<RLV_BHVR_SETGROUP>::onCommand(const RlvCommand& rlvCm
 
     return (fValid) ? RLV_RET_SUCCESS : RLV_RET_FAILED_OPTION;
 }
+
+// [RLVa:ID] - Handles: @setprofileimage:<texture-uuid>=force
+static void rlvSetProfileImageCoro(std::string cap_url, LLUUID idAgent, LLUUID idTexture)
+{
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("rlvSetProfileImageCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpHeaders::ptr_t httpHeaders;
+
+    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    httpOpts->setFollowRedirects(true);
+
+    std::string finalUrl = cap_url + "/" + idAgent.asString();
+    LLSD data;
+    data["sl_image_id"] = idTexture;
+
+    LLSD result = httpAdapter->putAndSuspend(httpRequest, finalUrl, data, httpOpts, httpHeaders);
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    if (status)
+    {
+        LLAvatarIconIDCache::getInstance()->add(idAgent, idTexture);
+        RLV_DEBUGS << "Profile image updated to " << idTexture << RLV_ENDL;
+    }
+    else
+    {
+        RLV_WARNS << "Failed to update profile image: " << status.toString() << RLV_ENDL;
+    }
+}
+
+template<> template<>
+ERlvCmdRet RlvForceHandler<RLV_BHVR_SETPROFILEIMAGE>::onCommand(const RlvCommand& rlvCmd)
+{
+    LLUUID idTexture;
+    if (!RlvCommandOptionHelper::parseOption(rlvCmd.getOption(), idTexture) || idTexture.isNull())
+        return RLV_RET_FAILED_OPTION;
+
+    std::string cap_url = gAgent.getRegionCapability("AgentProfile");
+    if (cap_url.empty())
+    {
+        RLV_WARNS << "setprofileimage failed - AgentProfile capability not available" << RLV_ENDL;
+        return RLV_RET_FAILED;
+    }
+
+    LLCoros::instance().launch("rlvSetProfileImageCoro",
+        boost::bind(&rlvSetProfileImageCoro, cap_url, gAgent.getID(), idTexture));
+
+    return RLV_RET_SUCCESS;
+}
+// [/RLVa:ID]
 
 // Handles: @sitground=force
 template<> template<>
