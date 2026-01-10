@@ -53,6 +53,7 @@
 #include "llviewergenericmessage.h" // send_generic_message
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+#include "rlvactions.h"     // [RLVa:ID] For RlvActions::canEditPicks()
 
 static LLPanelInjector<LLPanelProfilePicks> t_panel_profile_picks("panel_profile_picks");
 static LLPanelInjector<LLPanelProfilePick> t_panel_profile_pick("panel_profile_pick");
@@ -468,9 +469,12 @@ void LLPanelProfilePicks::updateButtons()
     {
         // <FS:Ansariel> RLVa support
         //mNewButton->setEnabled(canAddNewPick());
-        mNewButton->setEnabled(canAddNewPick() && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+        // [RLVa:ID] - @editpicks support
+        bool can_edit_picks = RlvActions::canEditPicks();
+        mNewButton->setEnabled(canAddNewPick() && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC) && can_edit_picks);
+        mDeleteButton->setEnabled(canDeletePick() && can_edit_picks);
+        // [/RLVa:ID]
         // </FS:Ansariel>
-        mDeleteButton->setEnabled(canDeletePick());
     }
 }
 
@@ -540,7 +544,9 @@ void LLPanelProfilePicks::commitUnsavedChanges()
 // <FS:Ansariel> FIRE-15556: Picks can circumvent RLVa @showloc restriction
 void LLPanelProfilePicks::updateRlvRestrictions(ERlvBehaviour behavior, ERlvParamType type)
 {
-    if (behavior == RLV_BHVR_SHOWLOC)
+    // [RLVa:ID] - @editpicks support
+    if (behavior == RLV_BHVR_SHOWLOC || behavior == RLV_BHVR_EDITPICKS)
+    // [/RLVa:ID]
     {
         updateButtons();
     }
@@ -607,7 +613,31 @@ LLPanelProfilePick::~LLPanelProfilePick()
     {
         mParcelCallbackConnection.disconnect();
     }
+    // [RLVa:ID] - @editpicks support
+    if (mRlvBehaviorCallbackConnection.connected())
+    {
+        mRlvBehaviorCallbackConnection.disconnect();
+    }
+    // [/RLVa:ID]
 }
+
+// [RLVa:ID] - @editpicks support
+void LLPanelProfilePick::updateRlvRestrictions(ERlvBehaviour behavior, ERlvParamType type)
+{
+    if (behavior == RLV_BHVR_EDITPICKS && getSelfProfile())
+    {
+        bool can_edit = RlvActions::canEditPicks();
+        mPickName->setEnabled(can_edit);
+        mPickDescription->setEnabled(can_edit);
+        mSnapshotCtrl->setEnabled(can_edit);
+        mSetCurrentLocationButton->setVisible(can_edit);
+        if (!can_edit)
+        {
+            enableSaveButton(false);
+        }
+    }
+}
+// [/RLVa:ID]
 
 void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
 {
@@ -667,9 +697,13 @@ void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
 
     if (getSelfProfile())
     {
-        mPickName->setEnabled(true);
-        mPickDescription->setEnabled(true);
-        mSetCurrentLocationButton->setVisible(true);
+        // [RLVa:ID] - @editpicks support
+        bool can_edit = RlvActions::canEditPicks();
+        mPickName->setEnabled(can_edit);
+        mPickDescription->setEnabled(can_edit);
+        mSnapshotCtrl->setEnabled(can_edit);
+        mSetCurrentLocationButton->setVisible(can_edit);
+        // [/RLVa:ID]
     }
     else
     {
@@ -713,6 +747,10 @@ bool LLPanelProfilePick::postBuild()
     mPickDescription->setFocusReceivedCallback(boost::bind(&LLPanelProfilePick::onDescriptionFocusReceived, this));
 
     getChild<LLUICtrl>("pick_location")->setEnabled(false);
+
+    // [RLVa:ID] - @editpicks support
+    mRlvBehaviorCallbackConnection = gRlvHandler.setBehaviourCallback(boost::bind(&LLPanelProfilePick::updateRlvRestrictions, this, _1, _2));
+    // [/RLVa:ID]
 
     return true;
 }
