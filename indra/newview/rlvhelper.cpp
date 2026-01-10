@@ -194,6 +194,8 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("viewnote", RLV_BHVR_VIEWNOTE));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("viewscript", RLV_BHVR_VIEWSCRIPT));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("viewtexture", RLV_BHVR_VIEWTEXTURE));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editprofile", RLV_BHVR_EDITPROFILE)); // [RLVa:ID]
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editpicks", RLV_BHVR_EDITPICKS));     // [RLVa:ID]
 
     // Camera
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETCAM, RLV_OPTION_NONE>("setcam"));

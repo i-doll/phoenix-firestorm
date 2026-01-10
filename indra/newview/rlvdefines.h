@@ -194,6 +194,8 @@ enum ERlvBehaviour {
     RLV_BHVR_SETDEBUG,              // "setdebug"
     RLV_BHVR_SETENV,                // "setenv"
     RLV_BHVR_SETPROFILEIMAGE,       // "setprofileimage" // [RLVa:ID]
+    RLV_BHVR_EDITPROFILE,           // "editprofile" // [RLVa:ID]
+    RLV_BHVR_EDITPICKS,             // "editpicks" // [RLVa:ID]
     RLV_BHVR_LOCKENV,               // "lockenv"
     RLV_BHVR_ALWAYSRUN,             // "alwaysrun"
     RLV_BHVR_TEMPRUN,               // "temprun"

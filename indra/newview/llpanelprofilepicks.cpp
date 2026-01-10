@@ -55,6 +55,7 @@
 #include "llviewernetwork.h" // <FS/> Access to GridManager
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+#include "rlvactions.h"     // [RLVa:ID] For RlvActions::canEditPicks()
 
 static LLPanelInjector<LLPanelProfilePicks> t_panel_profile_picks("panel_profile_picks");
 static LLPanelInjector<LLPanelProfilePick> t_panel_profile_pick("panel_profile_pick");
@@ -470,9 +471,12 @@ void LLPanelProfilePicks::updateButtons()
     {
         // <FS:Ansariel> RLVa support
         //mNewButton->setEnabled(canAddNewPick());
-        mNewButton->setEnabled(canAddNewPick() && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+        // [RLVa:ID] - @editpicks support
+        bool can_edit_picks = RlvActions::canEditPicks();
+        mNewButton->setEnabled(canAddNewPick() && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC) && can_edit_picks);
+        mDeleteButton->setEnabled(canDeletePick() && can_edit_picks);
+        // [/RLVa:ID]
         // </FS:Ansariel>
-        mDeleteButton->setEnabled(canDeletePick());
     }
 }
 
@@ -542,7 +546,9 @@ void LLPanelProfilePicks::commitUnsavedChanges()
 // <FS:Ansariel> FIRE-15556: Picks can circumvent RLVa @showloc restriction
 void LLPanelProfilePicks::updateRlvRestrictions(ERlvBehaviour behavior)
 {
-    if (behavior == RLV_BHVR_SHOWLOC)
+    // [RLVa:ID] - @editpicks support
+    if (behavior == RLV_BHVR_SHOWLOC || behavior == RLV_BHVR_EDITPICKS)
+    // [/RLVa:ID]
     {
         updateButtons();
     }
@@ -676,8 +682,13 @@ void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
 
     if (getSelfProfile())
     {
-        mPickName->setEnabled(true);
-        mPickDescription->setEnabled(true);
+        // [RLVa:ID] - @editpicks support
+        bool can_edit = RlvActions::canEditPicks();
+        mPickName->setEnabled(can_edit);
+        mPickDescription->setEnabled(can_edit);
+        mSnapshotCtrl->setEnabled(can_edit);
+        mSetCurrentLocationButton->setVisible(can_edit);
+        // [/RLVa:ID]
         //<FS:Trish> RLVa showloc
         updateButtons();
         //</FS:Trish>
@@ -1096,6 +1107,20 @@ void LLPanelProfilePick::updateRlvRestrictions(ERlvBehaviour behavior)
     {
         updateButtons();
     }
+    // [RLVa:ID] - @editpicks support
+    else if (behavior == RLV_BHVR_EDITPICKS && getSelfProfile())
+    {
+        bool can_edit = RlvActions::canEditPicks();
+        mPickName->setEnabled(can_edit);
+        mPickDescription->setEnabled(can_edit);
+        mSnapshotCtrl->setEnabled(can_edit);
+        mSetCurrentLocationButton->setVisible(can_edit);
+        if (!can_edit)
+        {
+            enableSaveButton(false);
+        }
+    }
+    // [/RLVa:ID]
 }
 //</FS:Trish> RLVa showloc
 
