@@ -909,6 +909,9 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
     {
         mImageActionMenuButton->setVisible(true);
         mImageActionMenuButton->setMenu("menu_fs_profile_image_actions.xml", LLMenuButton::MP_BOTTOM_RIGHT);
+        // [RLVa:ID] - @editpfp support
+        mImageActionMenuButton->setEnabled(RlvActions::canEditProfileImage());
+        // [/RLVa:ID]
     }
     else
     {
@@ -933,8 +936,8 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
     getChild<LLUICtrl>("user_key")->setValue(avatar_id.asString());
 
     // <FS:Zi> Allow proper texture swatch handling
-    // [RLVa:ID] - @editprofile support
-    mSecondLifePic->setEnabled(own_profile && RlvActions::canEditProfile());
+    // [RLVa:ID] - @editpfp support
+    mSecondLifePic->setEnabled(own_profile && RlvActions::canEditProfileImage());
     // [/RLVa:ID]
 
     mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(), boost::bind(&LLPanelProfileSecondLife::onAvatarNameCache, this, _1, _2));
@@ -2662,12 +2665,19 @@ void LLPanelProfileSecondLife::updateRlvRestrictions(ERlvBehaviour behavior)
     {
         bool can_edit = RlvActions::canEditProfile();
         mDescriptionEdit->setEnabled(can_edit);
-        mSecondLifePic->setEnabled(can_edit);
         if (!can_edit && mHasUnsavedDescriptionChanges)
         {
             mSaveDescriptionChanges->setEnabled(false);
             mDiscardDescriptionChanges->setEnabled(false);
         }
+    }
+    // [/RLVa:ID]
+    // [RLVa:ID] - @editpfp support
+    if (behavior == RLV_BHVR_EDITPFP && getSelfProfile())
+    {
+        bool can_edit_pfp = RlvActions::canEditProfileImage();
+        mSecondLifePic->setEnabled(can_edit_pfp);
+        mImageActionMenuButton->setEnabled(can_edit_pfp);
     }
     // [/RLVa:ID]
     // [RLVa:ID] - @editdisplayname support
@@ -2901,8 +2911,8 @@ void LLPanelProfileFirstLife::onOpen(const LLSD& key)
     mDescriptionEdit->setParseHTML(!getSelfProfile()); // <AS:Chanayane> Fix FIRE-35185 (disables link rendering while editing picks or 1st life)
 
     // <FS:Zi> Allow proper texture swatch handling
-    // [RLVa:ID] - @editprofile support
-    mPicture->setEnabled(getSelfProfile() && RlvActions::canEditProfile());
+    // [RLVa:ID] - @editpfp support
+    mPicture->setEnabled(getSelfProfile() && RlvActions::canEditProfileImage());
     // [/RLVa:ID]
 
     resetData();
@@ -3258,10 +3268,12 @@ void LLPanelProfileFirstLife::setLoaded()
     if (getSelfProfile())
     {
         // [RLVa:ID] - @editprofile support
-        bool can_edit = RlvActions::canEditProfile();
-        mDescriptionEdit->setEnabled(can_edit);
-        mPicture->setEnabled(can_edit);
-        mRemovePhoto->setEnabled(can_edit && mImageId.notNull());
+        mDescriptionEdit->setEnabled(RlvActions::canEditProfile());
+        // [/RLVa:ID]
+        // [RLVa:ID] - @editpfp support
+        bool can_edit_pfp = RlvActions::canEditProfileImage();
+        mPicture->setEnabled(can_edit_pfp);
+        mRemovePhoto->setEnabled(can_edit_pfp && mImageId.notNull());
         // [/RLVa:ID]
         mPreviewButton->setEnabled(true);
     }
@@ -3274,16 +3286,22 @@ void LLPanelProfileFirstLife::updateRlvRestrictions(ERlvBehaviour behavior)
     {
         bool can_edit = RlvActions::canEditProfile();
         mDescriptionEdit->setEnabled(can_edit);
-        mPicture->setEnabled(can_edit);
-        mUploadPhoto->setEnabled(can_edit);
-        mChangePhoto->setEnabled(can_edit);
-        mRemovePhoto->setEnabled(can_edit && mImageId.notNull());
         if (!can_edit && mHasUnsavedChanges)
         {
             mSaveChanges->setEnabled(false);
             mDiscardChanges->setEnabled(false);
         }
     }
+    // [RLVa:ID] - @editpfp support
+    if (behavior == RLV_BHVR_EDITPFP && getSelfProfile())
+    {
+        bool can_edit_pfp = RlvActions::canEditProfileImage();
+        mPicture->setEnabled(can_edit_pfp);
+        mUploadPhoto->setEnabled(can_edit_pfp);
+        mChangePhoto->setEnabled(can_edit_pfp);
+        mRemovePhoto->setEnabled(can_edit_pfp && mImageId.notNull());
+    }
+    // [/RLVa:ID]
 }
 // [/RLVa:ID]
 
