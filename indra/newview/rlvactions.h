@@ -354,6 +354,11 @@ public:
      * Returns true if the user is allowed to change their display name
      */
     static bool canEditDisplayName();
+
+    /*
+     * Returns true if the user is allowed to change their profile picture
+     */
+    static bool canEditProfileImage();
     // [/RLVa:ID]
 
     // ===============
