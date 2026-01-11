@@ -437,6 +437,11 @@ bool RlvActions::canEditPicks()
     return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITPICKS);
 }
 
+bool RlvActions::canEditDisplayName()
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITDISPLAYNAME);
+}
+
 // [/RLVa:ID]
 // ============================================================================
 // World interaction

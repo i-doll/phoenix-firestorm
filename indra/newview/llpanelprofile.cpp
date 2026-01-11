@@ -2124,6 +2124,12 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     }
     else if (item_name == "edit_display_name")
     {
+        // [RLVa:ID] - @editdisplayname support
+        if (!RlvActions::canEditDisplayName())
+        {
+            return;
+        }
+        // [/RLVa:ID]
         mMenuNameCacheConnection = LLAvatarNameCache::get(getAvatarId(), boost::bind(&LLPanelProfileSecondLife::onAvatarNameCacheSetName, this, _1, _2));
         LLFirstUse::setDisplayName(false);
     }
@@ -2662,6 +2668,12 @@ void LLPanelProfileSecondLife::updateRlvRestrictions(ERlvBehaviour behavior)
             mSaveDescriptionChanges->setEnabled(false);
             mDiscardDescriptionChanges->setEnabled(false);
         }
+    }
+    // [/RLVa:ID]
+    // [RLVa:ID] - @editdisplayname support
+    if (behavior == RLV_BHVR_EDITDISPLAYNAME && getSelfProfile())
+    {
+        mDisplayNameButton->setEnabled(RlvActions::canEditDisplayName());
     }
     // [/RLVa:ID]
 }
