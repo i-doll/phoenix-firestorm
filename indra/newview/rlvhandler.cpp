@@ -2101,6 +2101,23 @@ void RlvBehaviourToggleHandler<RLV_BHVR_PAY>::onCommandToggle(ERlvBehaviour eBhv
     }
 }
 
+// [RLVa:ID] - Handles: @editdisplayname=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_EDITDISPLAYNAME>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (fHasBhvr)
+    {
+        // Close the floater if currently open
+        LLFloaterReg::hideInstance("display_name");
+        RLV_VERIFY(RlvUIEnabler::instance().addGenericFloaterFilter("display_name"));
+    }
+    else
+    {
+        RLV_VERIFY(RlvUIEnabler::instance().removeGenericFloaterFilter("display_name"));
+    }
+}
+// [/RLVa:ID]
+
 // Handles: @setoverlay=n|y
 template<> template<>
 ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETOVERLAY>::onCommand(const RlvCommand& rlvCmd, bool& fRefCount)

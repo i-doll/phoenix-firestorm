@@ -196,6 +196,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("viewtexture", RLV_BHVR_VIEWTEXTURE));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editprofile", RLV_BHVR_EDITPROFILE)); // [RLVa:ID]
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editpicks", RLV_BHVR_EDITPICKS));     // [RLVa:ID]
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_EDITDISPLAYNAME, RLV_OPTION_NONE>("editdisplayname")); // [RLVa:ID]
 
     // Camera
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETCAM, RLV_OPTION_NONE>("setcam"));
