@@ -349,6 +349,11 @@ public:
      * Returns true if the user is allowed to create/edit/delete picks
      */
     static bool canEditPicks();
+
+    /*
+     * Returns true if the user is allowed to change their display name
+     */
+    static bool canEditDisplayName();
     // [/RLVa:ID]
 
     // ===============
