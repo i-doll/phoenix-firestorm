@@ -593,9 +593,39 @@ void LLFloaterTools::refresh()
     S32 prim_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
     if (prim_count == 1 && LLToolMgr::getInstance()->getCurrentTool() == LLToolFace::getInstance())
     {
-        desc_string = getString("selected_faces");
-
+        // <ID> Calculate and prepend link number
         LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+        if (!objectp)
+            objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
+
+        if (objectp && objectp->getRootEdit())
+        {
+            S32 link_num = 0;
+            LLViewerObject::child_list_t children = objectp->getRootEdit()->getChildren();
+            if (children.empty())
+                link_num = 0;
+            else if (objectp->getRootEdit()->isSelected())
+                link_num = 1;
+            else
+            {
+                S32 index = 1;
+                for (LLViewerObject::child_list_t::iterator iter = children.begin(); iter != children.end(); ++iter)
+                {
+                    index++;
+                    if ((*iter)->isSelected())
+                    {
+                        link_num = index;
+                        break;
+                    }
+                }
+            }
+            desc_string = llformat("Link %d, ", link_num);
+        }
+        // </ID>
+
+        desc_string += getString("selected_faces");
+
+        objectp = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
         LLSelectNode* nodep = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
         if(!objectp || !nodep)
         {
