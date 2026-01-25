@@ -8,6 +8,9 @@
 ## GL Driver Options
 export mesa_glthread=true
 export SDL_VIDEODRIVER=x11
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __VK_LAYER_NV_optimus=NVIDIA_only
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
 
 ## Everything below this line is just for advanced troubleshooters.
 ##-------------------------------------------------------------------
