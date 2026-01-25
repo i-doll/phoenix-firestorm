@@ -4169,6 +4169,19 @@ void LLViewerWindow::updateUI()
             }
         }
 
+        // In mouselook mode, if a UI element handled the hover (e.g., after dragging
+        // a floater), we still need to let the mouselook tool re-center the cursor.
+        // This is especially important on Linux/SDL where setMouseClipping() is a no-op
+        // and mouselook relies entirely on moveCursorToCenter() being called repeatedly.
+        if (handled && !mouse_captor && gAgentCamera.cameraMouselook())
+        {
+            LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
+            if (mMouseInWindow && tool)
+            {
+                tool->handleHover(x, y, mask);
+            }
+        }
+
         // Show a new tool tip (or update one that is already shown)
         bool tool_tip_handled = false;
         std::string tool_tip_msg;
