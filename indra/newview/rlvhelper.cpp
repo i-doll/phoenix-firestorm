@@ -307,6 +307,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvForceProcessor<RLV_BHVR_SITGROUND>("sitground"));
     addEntry(new RlvForceProcessor<RLV_BHVR_TPTO>("tpto"));
     addEntry(new RlvBehaviourInfo("unsit",                  RLV_BHVR_UNSIT,                 RLV_TYPE_FORCE));
+    addEntry(new RlvForceProcessor<RLV_BHVR_BLOCKEDIMMSG>("blockedimmsg"));
 
     //
     // Reply-only

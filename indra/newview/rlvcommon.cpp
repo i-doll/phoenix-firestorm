@@ -253,6 +253,10 @@ bool RlvSettings::isAllowedExperience(const LLUUID& idExperience, U8 nMaturity)
 //
 
 std::vector<std::string> RlvStrings::m_Anonyms;
+std::vector<std::string> RlvStrings::m_BlockedSendImMessages;
+std::vector<std::string> RlvStrings::m_BlockedSendImMessagesDefault;
+bool RlvStrings::m_BlockedSendImMessagesCustomized = false;
+std::map<LLUUID, std::string> RlvStrings::m_ScriptBlockedSendImMessages;
 RlvStrings::string_map_t RlvStrings::m_StringMap;
 std::string RlvStrings::m_StringMapPath;
 
@@ -323,6 +327,29 @@ void RlvStrings::loadFromFile(const std::string& strFilePath, bool fUserOverride
             m_Anonyms.push_back((*itAnonym).asString());
         }
     }
+    if (sdFileData.has("blocked_sendim_messages"))
+    {
+        const LLSD& sdMessages = sdFileData["blocked_sendim_messages"];
+        if (!fUserOverride)
+        {
+            // Loading from default file - store as both current and default
+            for (LLSD::array_const_iterator itMsg = sdMessages.beginArray(); itMsg != sdMessages.endArray(); ++itMsg)
+            {
+                m_BlockedSendImMessages.push_back((*itMsg).asString());
+                m_BlockedSendImMessagesDefault.push_back((*itMsg).asString());
+            }
+        }
+        else
+        {
+            // Loading from user override file - replace the current list entirely
+            m_BlockedSendImMessages.clear();
+            for (LLSD::array_const_iterator itMsg = sdMessages.beginArray(); itMsg != sdMessages.endArray(); ++itMsg)
+            {
+                m_BlockedSendImMessages.push_back((*itMsg).asString());
+            }
+            m_BlockedSendImMessagesCustomized = true;
+        }
+    }
 }
 
 // Checked: 2011-11-08 (RLVa-1.5.0)
@@ -336,6 +363,16 @@ void RlvStrings::saveToFile(const std::string& strFilePath)
         const std::list<std::string>& listValues = itString->second;
         if (listValues.size() > 1)
             sdStrings[itString->first]["value"] = listValues.back();
+    }
+
+    // Save customized blocked sendim messages
+    if (m_BlockedSendImMessagesCustomized)
+    {
+        LLSD& sdMessages = sdFileData["blocked_sendim_messages"];
+        for (const std::string& strMsg : m_BlockedSendImMessages)
+        {
+            sdMessages.append(strMsg);
+        }
     }
 
     llofstream fileStream(strFilePath.c_str());
@@ -474,6 +511,66 @@ void RlvStrings::setCustomString(const std::string& strStringName, const std::st
         listValues.pop_back();
     if (!strStringValue.empty())
         listValues.push_back(strStringValue);
+}
+
+// Returns a blocked sendim message - script-set message takes priority, otherwise random from list
+const std::string& RlvStrings::getBlockedSendImString()
+{
+    // Check if any script has set a custom message
+    if (!m_ScriptBlockedSendImMessages.empty())
+    {
+        // Return the first script-set message (arbitrary choice when multiple scripts set messages)
+        return m_ScriptBlockedSendImMessages.begin()->second;
+    }
+
+    // Pick a random message from the list
+    if (!m_BlockedSendImMessages.empty())
+    {
+        return m_BlockedSendImMessages[ll_rand(m_BlockedSendImMessages.size())];
+    }
+
+    // Fallback to the original static string
+    return getString(RlvStringKeys::Blocked::SendIm);
+}
+
+void RlvStrings::setScriptBlockedSendImString(const LLUUID& idObj, const std::string& strMsg)
+{
+    m_ScriptBlockedSendImMessages[idObj] = strMsg;
+}
+
+void RlvStrings::clearScriptBlockedSendImString(const LLUUID& idObj)
+{
+    m_ScriptBlockedSendImMessages.erase(idObj);
+}
+
+void RlvStrings::addBlockedSendImMessage(const std::string& strMsg)
+{
+    if (!strMsg.empty())
+    {
+        m_BlockedSendImMessages.push_back(strMsg);
+        m_BlockedSendImMessagesCustomized = true;
+    }
+}
+
+void RlvStrings::removeBlockedSendImMessage(size_t index)
+{
+    if (index < m_BlockedSendImMessages.size())
+    {
+        m_BlockedSendImMessages.erase(m_BlockedSendImMessages.begin() + index);
+        m_BlockedSendImMessagesCustomized = true;
+    }
+}
+
+void RlvStrings::setBlockedSendImMessages(const std::vector<std::string>& messages)
+{
+    m_BlockedSendImMessages = messages;
+    m_BlockedSendImMessagesCustomized = true;
+}
+
+void RlvStrings::resetBlockedSendImMessagesToDefault()
+{
+    m_BlockedSendImMessages = m_BlockedSendImMessagesDefault;
+    m_BlockedSendImMessagesCustomized = false;
 }
 
 // ============================================================================

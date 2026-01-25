@@ -207,6 +207,15 @@
 		</map>
 	</map>
 
+	<!-- Randomized messages used when @sendim restricted -->
+	<key>blocked_sendim_messages</key>
+	<array>
+		<string>*** IM blocked by sender's viewer</string>
+		<string>*** Cannot send message right now</string>
+		<string>*** Message not delivered</string>
+		<string>*** Unable to send at this time</string>
+	</array>
+
 	<!-- Generic names used to replace resident names when @shownames restricted -->
 	<key>anonyms</key>
 	<array>

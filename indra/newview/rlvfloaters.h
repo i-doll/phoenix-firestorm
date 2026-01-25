@@ -107,6 +107,9 @@ protected:
 // RlvFloaterStrings class declaration
 //
 
+class LLLineEditor;
+class LLScrollListCtrl;
+
 class RlvFloaterStrings : public LLFloater
 {
     friend class LLFloaterReg;
@@ -124,6 +127,12 @@ protected:
     void checkDirty(bool fRefresh);
     void refresh();
 
+    // Blocked IM messages tab
+    void onBlockedImAdd();
+    void onBlockedImRemove();
+    void onBlockedImResetDefault();
+    void refreshBlockedImList();
+
     // Member variables
 protected:
     bool        m_fDirty;
@@ -132,6 +141,10 @@ protected:
     LLSD        m_sdStringsInfo;
     LLSD        m_sdCustomStrings;
     LLSD        m_sdPendingStrings;
+
+    // Blocked IM messages
+    LLScrollListCtrl* m_pBlockedImList;
+    LLLineEditor*     m_pBlockedImInput;
 };
 
 // ============================================================================

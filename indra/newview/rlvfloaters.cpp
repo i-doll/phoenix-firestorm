@@ -23,6 +23,7 @@
 #include "llclipboard.h"
 #include "llcombobox.h"
 #include "llinventoryfunctions.h"
+#include "lllineeditor.h"
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
 #include "llsdserialize.h"
@@ -628,13 +629,15 @@ RlvFloaterStrings::RlvFloaterStrings(const LLSD& sdKey)
     : LLFloater(sdKey)
     , m_fDirty(false)
     , m_pStringList(NULL)
+    , m_pBlockedImList(NULL)
+    , m_pBlockedImInput(NULL)
 {
 }
 
 // Checked: 2011-11-08 (RLVa-1.5.0)
 bool RlvFloaterStrings::postBuild()
 {
-    // Set up the UI controls
+    // Set up the UI controls for Strings tab
     m_pStringList = findChild<LLComboBox>("string_list");
     m_pStringList->setCommitCallback(boost::bind(&RlvFloaterStrings::checkDirty, this, true));
 
@@ -669,7 +672,24 @@ bool RlvFloaterStrings::postBuild()
         m_pStringList->add( (sdStringInfo.has("label")) ? sdStringInfo["label"].asString() : itString->first, itString->first);
     }
 
+    // Set up the UI controls for Blocked IM Messages tab
+    m_pBlockedImList = findChild<LLScrollListCtrl>("blocked_im_list");
+    m_pBlockedImInput = findChild<LLLineEditor>("blocked_im_input");
+
+    LLUICtrl* pAddBtn = findChild<LLUICtrl>("blocked_im_add_btn");
+    if (pAddBtn)
+        pAddBtn->setCommitCallback(boost::bind(&RlvFloaterStrings::onBlockedImAdd, this));
+
+    LLUICtrl* pRemoveBtn = findChild<LLUICtrl>("blocked_im_remove_btn");
+    if (pRemoveBtn)
+        pRemoveBtn->setCommitCallback(boost::bind(&RlvFloaterStrings::onBlockedImRemove, this));
+
+    LLUICtrl* pResetBtn = findChild<LLUICtrl>("blocked_im_reset_btn");
+    if (pResetBtn)
+        pResetBtn->setCommitCallback(boost::bind(&RlvFloaterStrings::onBlockedImResetDefault, this));
+
     refresh();
+    refreshBlockedImList();
 
     return true;
 }
@@ -784,6 +804,63 @@ void RlvFloaterStrings::refresh()
     }
 
     findChild<LLUICtrl>("default_btn")->setEnabled(!m_strStringCurrent.empty());
+}
+
+void RlvFloaterStrings::onBlockedImAdd()
+{
+    if (!m_pBlockedImInput)
+        return;
+
+    std::string strMsg = m_pBlockedImInput->getText();
+    LLStringUtil::trim(strMsg);
+
+    if (!strMsg.empty())
+    {
+        RlvStrings::addBlockedSendImMessage(strMsg);
+        m_pBlockedImInput->clear();
+        m_fDirty = true;
+        refreshBlockedImList();
+    }
+}
+
+void RlvFloaterStrings::onBlockedImRemove()
+{
+    if (!m_pBlockedImList)
+        return;
+
+    LLScrollListItem* pItem = m_pBlockedImList->getFirstSelected();
+    if (pItem)
+    {
+        size_t index = static_cast<size_t>(m_pBlockedImList->getItemIndex(pItem));
+        RlvStrings::removeBlockedSendImMessage(index);
+        m_fDirty = true;
+        refreshBlockedImList();
+    }
+}
+
+void RlvFloaterStrings::onBlockedImResetDefault()
+{
+    // Reset to default messages
+    RlvStrings::resetBlockedSendImMessagesToDefault();
+    m_fDirty = true;
+    refreshBlockedImList();
+}
+
+void RlvFloaterStrings::refreshBlockedImList()
+{
+    if (!m_pBlockedImList)
+        return;
+
+    m_pBlockedImList->clearRows();
+
+    const std::vector<std::string>& messages = RlvStrings::getBlockedSendImMessages();
+    for (const std::string& strMsg : messages)
+    {
+        LLSD row;
+        row["columns"][0]["column"] = "message";
+        row["columns"][0]["value"] = strMsg;
+        m_pBlockedImList->addElement(row, ADD_BOTTOM);
+    }
 }
 
 // ============================================================================

@@ -267,6 +267,9 @@ enum ERlvBehaviour {
     RLV_BHVR_SETOVERLAY_TOUCH,      // Determines whether the overlay texture's alpha channel will be used to allow/block world interaction
     RLV_BHVR_SETOVERLAY_TWEEN,      // Animate between the current overlay settings and the supplied values
 
+    // IM message customization (force only)
+    RLV_BHVR_BLOCKEDIMMSG,          // "blockedimmsg" - temporarily override blocked sendim message
+
     RLV_BHVR_COUNT,
     RLV_BHVR_UNKNOWN
 };
