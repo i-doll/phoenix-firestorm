@@ -169,8 +169,25 @@ public:
     static bool               hasString(const std::string& strStringName, bool fCheckCustom = false);
     static void               setCustomString(const std::string& strStringName, const std::string& strStringValue);
 
+    // Blocked sendim message support
+    static const std::string& getBlockedSendImString();
+    static void               setScriptBlockedSendImString(const LLUUID& idObj, const std::string& strMsg);
+    static void               clearScriptBlockedSendImString(const LLUUID& idObj);
+
+    // Blocked sendim message list management (for UI editing)
+    static const std::vector<std::string>& getBlockedSendImMessages() { return m_BlockedSendImMessages; }
+    static const std::vector<std::string>& getBlockedSendImMessagesDefault() { return m_BlockedSendImMessagesDefault; }
+    static void               addBlockedSendImMessage(const std::string& strMsg);
+    static void               removeBlockedSendImMessage(size_t index);
+    static void               setBlockedSendImMessages(const std::vector<std::string>& messages);
+    static void               resetBlockedSendImMessagesToDefault();
+
 protected:
     static std::vector<std::string> m_Anonyms;
+    static std::vector<std::string> m_BlockedSendImMessages;
+    static std::vector<std::string> m_BlockedSendImMessagesDefault;
+    static bool                     m_BlockedSendImMessagesCustomized;
+    static std::map<LLUUID, std::string> m_ScriptBlockedSendImMessages;
     typedef std::map<std::string, std::list<std::string>, std::less<>> string_map_t;
     static string_map_t m_StringMap;
     static std::string  m_StringMapPath;

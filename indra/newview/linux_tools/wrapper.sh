@@ -17,7 +17,9 @@ exportMutliArchDRIPath() {
 
 ## GL Driver Options
 export mesa_glthread=true
-
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __VK_LAYER_NV_optimus=NVIDIA_only
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
 
 ## Here are some configuration options for Linux Client Testers.
 ## These options are for self-assisted troubleshooting during this beta

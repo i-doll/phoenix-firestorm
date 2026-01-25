@@ -530,6 +530,7 @@ ERlvCmdRet RlvHandler::processCommand(std::reference_wrapper<const RlvCommand> r
                         if (itObj->second.m_Commands.empty())
                         {
                             RLV_DEBUGS << "\t- command list empty => removing " << idCurObj << RLV_ENDL;
+                            RlvStrings::clearScriptBlockedSendImString(idCurObj);
                             m_Objects.erase(itObj);
                         }
                     }
@@ -558,6 +559,7 @@ ERlvCmdRet RlvHandler::processCommand(std::reference_wrapper<const RlvCommand> r
                     {
                         RLV_DEBUGS << "\t- command list empty => removing " << idCurObj << RLV_ENDL;
                         RlvBehaviourDictionary::instance().clearModifiers(idCurObj);
+                        RlvStrings::clearScriptBlockedSendImString(idCurObj);
                         m_Objects.erase(itObj);
                     }
                 }
@@ -3403,6 +3405,23 @@ ERlvCmdRet RlvForceHandler<RLV_BHVR_SETPROFILEIMAGE>::onCommand(const RlvCommand
     return RLV_RET_SUCCESS;
 }
 // [/RLVa:ID]
+
+// Handles: @blockedimmsg[:message]=force
+template<> template<>
+ERlvCmdRet RlvForceHandler<RLV_BHVR_BLOCKEDIMMSG>::onCommand(const RlvCommand& rlvCmd)
+{
+    if (rlvCmd.hasOption())
+    {
+        // @blockedimmsg:message=force - set custom message for this object
+        RlvStrings::setScriptBlockedSendImString(rlvCmd.getObjectID(), rlvCmd.getOption());
+    }
+    else
+    {
+        // @blockedimmsg=force - clear custom message for this object
+        RlvStrings::clearScriptBlockedSendImString(rlvCmd.getObjectID());
+    }
+    return RLV_RET_SUCCESS;
+}
 
 // Handles: @sitground=force
 template<> template<>
