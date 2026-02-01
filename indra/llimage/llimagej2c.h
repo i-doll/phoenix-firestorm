@@ -82,6 +82,7 @@ protected:
     friend class LLImageJ2CImpl;
     friend class LLImageJ2COJ;
     friend class LLImageJ2CKDU;
+    friend class LLImageJ2CNVJPEG;
     friend class LLImageCompressionTester;
     void decodeFailed();
     void updateRawDiscardLevel();
@@ -127,6 +128,7 @@ protected:
     virtual std::string getEngineInfo() const = 0;
 
     friend class LLImageJ2C;
+    friend class LLImageJ2CNVJPEG;
 };
 
 #define LINDEN_J2C_COMMENT_PREFIX "LL_" // Used by LLAppearanceUtility

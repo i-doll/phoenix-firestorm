@@ -11,6 +11,7 @@ include(ZLIBNG)
 include(LLAddBuildTest)
 include(bugsplat)
 include(Tut)
+include(NVJPEG2000)
 
 set(llimage_SOURCE_FILES
     llimagebmp.cpp
@@ -54,6 +55,11 @@ if (USE_KDU)
 else (USE_KDU)
     target_link_libraries(llimage llimagej2coj)
 endif (USE_KDU)
+
+# nvJPEG2000 CUDA decoder (optional, decode-only, uses OpenJPEG for encoding)
+if (USE_NVJPEG2000)
+    target_link_libraries(llimage llimagej2cnvjpeg ll::nvjpeg2k)
+endif (USE_NVJPEG2000)
 
 target_link_libraries(llimage
         llfilesystem
