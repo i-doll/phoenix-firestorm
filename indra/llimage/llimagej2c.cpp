@@ -32,11 +32,33 @@
 #include "llmemory.h"
 #include "llsd.h"
 
+#if LL_NVJPEG2K
+#include "llimagej2cnvjpeg.h"
+#include "llcudacontext.h"
+#endif
+
 // Declare the prototype for this factory function here. It is implemented in
 // other files which define a LLImageJ2CImpl subclass, but only ONE static
 // library which has the implementation for this function should ever be
 // linked.
 LLImageJ2CImpl* fallbackCreateLLImageJ2CImpl();
+
+#if LL_NVJPEG2K
+// Factory function for nvJPEG2000 implementation
+extern LLImageJ2CImpl* createLLImageJ2CNVJPEG();
+#endif
+
+// Wrapper that selects the best available implementation
+static LLImageJ2CImpl* createLLImageJ2CImpl()
+{
+#if LL_NVJPEG2K
+    if (LLCUDAContext::isCUDAAvailable())
+    {
+        return createLLImageJ2CNVJPEG();
+    }
+#endif
+    return fallbackCreateLLImageJ2CImpl();
+}
 
 // Test data gathering handle
 LLImageCompressionTester* LLImageJ2C::sTesterp = NULL ;
@@ -47,7 +69,7 @@ std::string LLImageJ2C::getEngineInfo()
 {
     // All known LLImageJ2CImpl implementation subclasses are cheap to
     // construct.
-    std::unique_ptr<LLImageJ2CImpl> impl(fallbackCreateLLImageJ2CImpl());
+    std::unique_ptr<LLImageJ2CImpl> impl(createLLImageJ2CImpl());
     return impl->getEngineInfo();
 }
 
@@ -58,7 +80,7 @@ LLImageJ2C::LLImageJ2C() :  LLImageFormatted(IMG_CODEC_J2C),
                             mReversible(false),
                             mAreaUsedForDataSizeCalcs(0)
 {
-    mImpl.reset(fallbackCreateLLImageJ2CImpl());
+    mImpl.reset(createLLImageJ2CImpl());
 
     // Clear data size table
     for( S32 i = 0; i <= MAX_DISCARD_LEVEL; i++)

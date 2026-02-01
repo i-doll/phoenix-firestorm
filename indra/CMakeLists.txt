@@ -97,6 +97,10 @@ else (FS_PF_USER_AGENT)
 endif (FS_PF_USER_AGENT)
 # </Beq>
 
+# <FS:Thea> nvJPEG2000 CUDA decoder
+option(USE_NVJPEG2000 "Use NVIDIA nvJPEG2000 CUDA decoder (Linux only)" OFF)
+# </FS:Thea>
+
 # <FS:Ansariel> [AVX Optimization]
 option(USE_AVX_OPTIMIZATION "AVX optimization support" OFF)
 option(USE_AVX2_OPTIMIZATION "AVX2 optimization support" OFF)
@@ -125,6 +129,10 @@ else (USE_LTO)
 endif (USE_LTO)
 # </FS:PP> LTO indicator
 
+# <FS:Thea> nvJPEG2000 CUDA decoder
+include(NVJPEG2000)
+# </FS:Thea>
+
 # <FS:Beq> Tracy Profiler support
 if (USE_TRACY)
   message(STATUS "Compiling with Tracy profiler")
@@ -141,6 +149,9 @@ add_subdirectory(${LIBS_OPEN_PREFIX}llcorehttp)
 add_subdirectory(${LIBS_OPEN_PREFIX}llimage)
 add_subdirectory(${LIBS_OPEN_PREFIX}llkdu)
 add_subdirectory(${LIBS_OPEN_PREFIX}llimagej2coj)
+if (USE_NVJPEG2000)
+    add_subdirectory(${LIBS_OPEN_PREFIX}llimagej2cnvjpeg)
+endif (USE_NVJPEG2000)
 add_subdirectory(${LIBS_OPEN_PREFIX}llinventory)
 add_subdirectory(${LIBS_OPEN_PREFIX}llmath)
 add_subdirectory(${LIBS_OPEN_PREFIX}llmeshoptimizer)
