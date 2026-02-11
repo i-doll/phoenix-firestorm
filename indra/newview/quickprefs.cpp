@@ -105,6 +105,10 @@ FloaterQuickPrefs::QuickPrefsXMLEntry::QuickPrefsXMLEntry()
 FloaterQuickPrefs::FloaterQuickPrefs(const LLSD& key)
 :   LLTransientDockableFloater(nullptr, false, key),
     mAvatarZOffsetSlider(nullptr),
+    mFpsBtn30(nullptr),
+    mFpsBtn60(nullptr),
+    mFpsBtn90(nullptr),
+    mFpsBtnOff(nullptr),
     mRlvBehaviorCallbackConnection(),
     mEnvChangedConnection(),
     mRegionChangedSlot()
@@ -160,6 +164,7 @@ void FloaterQuickPrefs::onOpen(const LLSD& key)
     LLAvatarComplexityControls::setText(gSavedSettings.getU32("RenderAvatarMaxComplexity"), mMaxComplexityLabel);
 
     gSavedSettings.setBOOL("QuickPrefsEditMode", false);
+    updateFpsButtons();
 
     // Scan widgets and reapply control variables because some control types
     // (LLSliderCtrl for example) don't update their GUI when hidden
@@ -251,6 +256,9 @@ void FloaterQuickPrefs::initCallbacks()
     {
         getChild<LLButton>("Restore_Btn")->setCommitCallback(boost::bind(&FloaterQuickPrefs::onClickRestoreDefaults, this));
         gSavedSettings.getControl("QuickPrefsEditMode")->getSignal()->connect(boost::bind(&FloaterQuickPrefs::onEditModeChanged, this));    // <FS:Zi> Dynamic Quickprefs
+
+        gSavedSettings.getControl("FSLimitFramerate")->getSignal()->connect(boost::bind(&FloaterQuickPrefs::updateFpsButtons, this));
+        gSavedSettings.getControl("FramePerSecondLimit")->getSignal()->connect(boost::bind(&FloaterQuickPrefs::updateFpsButtons, this));
 
         mAvatarZOffsetSlider->setSliderMouseUpCallback(boost::bind(&FloaterQuickPrefs::onAvatarZOffsetFinalCommit, this));
         mAvatarZOffsetSlider->setSliderEditorCommitCallback(boost::bind(&FloaterQuickPrefs::onAvatarZOffsetFinalCommit, this));
@@ -612,6 +620,15 @@ bool FloaterQuickPrefs::postBuild()
     {
         mBtnResetDefaults = getChild<LLButton>("Restore_Btn");
 
+        mFpsBtn30 = getChild<LLButton>("fps_btn_30");
+        mFpsBtn60 = getChild<LLButton>("fps_btn_60");
+        mFpsBtn90 = getChild<LLButton>("fps_btn_90");
+        mFpsBtnOff = getChild<LLButton>("fps_btn_off");
+        mFpsBtn30->setCommitCallback(boost::bind(&FloaterQuickPrefs::onClickFpsPreset, this, 30));
+        mFpsBtn60->setCommitCallback(boost::bind(&FloaterQuickPrefs::onClickFpsPreset, this, 60));
+        mFpsBtn90->setCommitCallback(boost::bind(&FloaterQuickPrefs::onClickFpsPreset, this, 90));
+        mFpsBtnOff->setCommitCallback(boost::bind(&FloaterQuickPrefs::onClickFpsPreset, this, 0));
+
         mAvatarZOffsetSlider = getChild<LLSliderCtrl>("HoverHeightSlider");
         mAvatarZOffsetSlider->setMinValue(MIN_HOVER_Z);
         mAvatarZOffsetSlider->setMaxValue(MAX_HOVER_Z);
@@ -695,6 +712,7 @@ bool FloaterQuickPrefs::postBuild()
 
     updateAvatarZOffsetEditEnabled();
     onRegionChanged();
+    updateFpsButtons();
 
     return LLTransientDockableFloater::postBuild();
 }
@@ -1013,6 +1031,36 @@ void FloaterQuickPrefs::onClickResetToRegionDefault()
     mWLPresetsCombo->setValue(LLSD(PRESET_NAME_REGION_DEFAULT));
     mWaterPresetsCombo->setValue(LLSD(PRESET_NAME_REGION_DEFAULT));
     LLEnvironment::instance().setSharedEnvironment();
+}
+
+void FloaterQuickPrefs::onClickFpsPreset(U32 fps)
+{
+    if (fps == 0)
+    {
+        gSavedSettings.setBOOL("FSLimitFramerate", FALSE);
+    }
+    else
+    {
+        gSavedSettings.setBOOL("FSLimitFramerate", TRUE);
+        gSavedSettings.setU32("FramePerSecondLimit", fps);
+    }
+    updateFpsButtons();
+}
+
+void FloaterQuickPrefs::updateFpsButtons()
+{
+    if (!mFpsBtn30)
+    {
+        return;
+    }
+
+    bool limited = gSavedSettings.getBOOL("FSLimitFramerate");
+    U32 fps = gSavedSettings.getU32("FramePerSecondLimit");
+
+    mFpsBtn30->setToggleState(limited && fps == 30);
+    mFpsBtn60->setToggleState(limited && fps == 60);
+    mFpsBtn90->setToggleState(limited && fps == 90);
+    mFpsBtnOff->setToggleState(!limited);
 }
 
 void FloaterQuickPrefs::setSelectedSky(const std::string& preset_name)
