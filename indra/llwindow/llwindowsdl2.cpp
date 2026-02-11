@@ -73,309 +73,12 @@ static bool ATIbug = false;
 // LLWindowSDL
 //
 
-#if LL_X11
-# include <X11/Xutil.h>
-#endif //LL_X11
-
 // TOFU HACK -- (*exactly* the same hack as LLWindowMacOSX for a similar
 // set of reasons): Stash a pointer to the LLWindowSDL object here and
 // maintain in the constructor and destructor.  This assumes that there will
 // be only one object of this class at any time.  Currently this is true.
 static LLWindowSDL *gWindowImplementation = NULL;
 
-// extern "C" Bool XineramaIsActive (Display *dpy)
-// {
-//  return 0;
-// }
-void maybe_lock_display(void)
-{
-    if (gWindowImplementation && gWindowImplementation->Lock_Display) {
-        gWindowImplementation->Lock_Display();
-    }
-}
-
-
-void maybe_unlock_display(void)
-{
-    if (gWindowImplementation && gWindowImplementation->Unlock_Display) {
-        gWindowImplementation->Unlock_Display();
-    }
-}
-
-
-#if LL_X11
-// static
-Window LLWindowSDL::get_SDL_XWindowID(void)
-{
-    if (gWindowImplementation) {
-        return gWindowImplementation->mSDL_XWindowID;
-    }
-    return None;
-}
-
-//static
-Display* LLWindowSDL::get_SDL_Display(void)
-{
-    if (gWindowImplementation) {
-        return gWindowImplementation->mSDL_Display;
-    }
-    return NULL;
-}
-#endif // LL_X11
-
-#if LL_X11
-
-// Clipboard handing via native X11, base on the implementation in Cool VL by Henri Beauchamp
-
-namespace
-{
-    std::array<Atom, 3> gSupportedAtoms;
-
-    Atom XA_CLIPBOARD;
-    Atom XA_TARGETS;
-    Atom PVT_PASTE_BUFFER;
-    // Unused in the current clipboard implementation -Zi
-    // long const MAX_PASTE_BUFFER_SIZE = 16383;
-
-    void filterSelectionRequest( XEvent aEvent )
-    {
-        auto *display = LLWindowSDL::getSDLDisplay();
-        auto &request = aEvent.xselectionrequest;
-
-        XSelectionEvent reply { SelectionNotify, aEvent.xany.serial, aEvent.xany.send_event, display,
-                                request.requestor, request.selection, request.target,
-                                request.property,request.time };
-
-        if (request.target == XA_TARGETS)
-        {
-            XChangeProperty(display, request.requestor, request.property,
-                            XA_ATOM, 32, PropModeReplace,
-                            (unsigned char *) &gSupportedAtoms.front(), gSupportedAtoms.size());
-        }
-        else if (std::find(gSupportedAtoms.begin(), gSupportedAtoms.end(), request.target) !=
-                 gSupportedAtoms.end())
-        {
-            std::string utf8;
-            if (request.selection == XA_PRIMARY)
-                utf8 = wstring_to_utf8str(gWindowImplementation->getPrimaryText());
-            else
-                utf8 = wstring_to_utf8str(gWindowImplementation->getSecondaryText());
-
-            XChangeProperty(display, request.requestor, request.property,
-                            request.target, 8, PropModeReplace,
-                            (unsigned char *) utf8.c_str(), utf8.length());
-        }
-        else if (request.selection == XA_CLIPBOARD)
-        {
-            // Did not have what they wanted, so no property set
-            reply.property = None;
-        }
-        else
-            return;
-
-        XSendEvent(request.display, request.requestor, False, NoEventMask, (XEvent *) &reply);
-        XSync(display, False);
-    }
-
-    void filterSelectionClearRequest( XEvent aEvent )
-    {
-        auto &request = aEvent.xselectionrequest;
-        if (request.selection == XA_PRIMARY)
-            gWindowImplementation->clearPrimaryText();
-        else if (request.selection == XA_CLIPBOARD)
-            gWindowImplementation->clearSecondaryText();
-    }
-
-    int x11_clipboard_filter(void*, SDL_Event *evt)
-    {
-        Display *display = LLWindowSDL::getSDLDisplay();
-        if (!display)
-            return 1;
-
-        if (evt->type != SDL_SYSWMEVENT)
-            return 1;
-
-        auto xevent = evt->syswm.msg->msg.x11.event;
-
-        if (xevent.type == SelectionRequest)
-            filterSelectionRequest( xevent );
-        else if (xevent.type == SelectionClear)
-            filterSelectionClearRequest( xevent );
-        return 1;
-    }
-
-    bool grab_property(Display* display, Window window, Atom selection, Atom target)
-    {
-        if( !display )
-            return false;
-
-        maybe_lock_display();
-
-        XDeleteProperty(display, window, PVT_PASTE_BUFFER);
-        XFlush(display);
-
-        XConvertSelection(display, selection, target, PVT_PASTE_BUFFER, window,  CurrentTime);
-
-        // Unlock the connection so that the SDL event loop may function
-        maybe_unlock_display();
-
-        const auto start{ SDL_GetTicks() };
-        const auto end{ start + 1000 };
-
-        XEvent xevent {};
-        bool response = false;
-
-        do
-        {
-            SDL_Event event {};
-
-            // Wait for an event
-            SDL_WaitEvent(&event);
-
-            // If the event is a window manager event
-            if (event.type == SDL_SYSWMEVENT)
-            {
-                xevent = event.syswm.msg->msg.x11.event;
-
-                if (xevent.type == SelectionNotify && xevent.xselection.requestor == window)
-                    response = true;
-            }
-        } while (!response && SDL_GetTicks() < end );
-
-        return response && xevent.xselection.property != None;
-    }
-}
-
-void LLWindowSDL::initialiseX11Clipboard()
-{
-    if (!mSDL_Display)
-        return;
-
-    SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
-    SDL_SetEventFilter(x11_clipboard_filter, nullptr);
-
-    maybe_lock_display();
-
-    XA_CLIPBOARD = XInternAtom(mSDL_Display, "CLIPBOARD", False);
-
-    gSupportedAtoms[0] = XInternAtom(mSDL_Display, "UTF8_STRING", False);
-    gSupportedAtoms[1] = XInternAtom(mSDL_Display, "COMPOUND_TEXT", False);
-    gSupportedAtoms[2] = XA_STRING;
-
-    // TARGETS atom
-    XA_TARGETS = XInternAtom(mSDL_Display, "TARGETS", False);
-
-    // SL_PASTE_BUFFER atom
-    PVT_PASTE_BUFFER = XInternAtom(mSDL_Display, "FS_PASTE_BUFFER", False);
-
-    maybe_unlock_display();
-}
-
-bool LLWindowSDL::getSelectionText( Atom aSelection, Atom aType, LLWString &text )
-{
-    if( !mSDL_Display )
-        return false;
-
-    if( !grab_property(mSDL_Display, mSDL_XWindowID, aSelection,aType ) )
-        return false;
-
-    maybe_lock_display();
-
-    Atom type;
-    int format {};
-    unsigned long len {}, size {};
-    unsigned char* data = nullptr;
-
-    // get type and size of the clipboard contents first
-    XGetWindowProperty( mSDL_Display, mSDL_XWindowID,
-                        PVT_PASTE_BUFFER, 0, 0, False,
-                        AnyPropertyType, &type, &format, &len,
-                        &size, &data);
-    XFree(data);
-
-    // now get the real data, we don't really have a size limit here, but we need
-    // to tell the X11 clipboard how much space we have, which happens to be exactly
-    // the size of the current clipboard contents
-    unsigned long remaining {};
-    int res = XGetWindowProperty(mSDL_Display, mSDL_XWindowID,
-                                 PVT_PASTE_BUFFER, 0, size, False,
-                                 AnyPropertyType, &type, &format, &len,
-                                 &remaining, &data);
-    if (data && len)
-    {
-        text = LLWString(
-                utf8str_to_wstring(reinterpret_cast< char const *>( data ) )
-                );
-        XFree(data);
-    }
-
-    maybe_unlock_display();
-    return res == Success;
-}
-
-bool LLWindowSDL::getSelectionText(Atom selection, LLWString& text)
-{
-    if (!mSDL_Display)
-        return false;
-
-    maybe_lock_display();
-
-    Window owner = XGetSelectionOwner(mSDL_Display, selection);
-    if (owner == None)
-    {
-        if (selection == XA_PRIMARY)
-        {
-            owner = DefaultRootWindow(mSDL_Display);
-            selection = XA_CUT_BUFFER0;
-        }
-        else
-        {
-            maybe_unlock_display();
-            return false;
-        }
-    }
-
-    maybe_unlock_display();
-
-    for( Atom atom : gSupportedAtoms )
-    {
-        if(getSelectionText(selection, atom, text ) )
-            return true;
-    }
-
-    return false;
-}
-
-bool LLWindowSDL::setSelectionText(Atom selection, const LLWString& text)
-{
-    maybe_lock_display();
-
-    if (selection == XA_PRIMARY)
-    {
-        std::string utf8 = wstring_to_utf8str(text);
-        XStoreBytes(mSDL_Display, utf8.c_str(), utf8.length() + 1);
-        mPrimaryClipboard = text;
-    }
-    else
-        mSecondaryClipboard = text;
-
-    XSetSelectionOwner(mSDL_Display, selection, mSDL_XWindowID, CurrentTime);
-
-    auto owner = XGetSelectionOwner(mSDL_Display, selection);
-
-    maybe_unlock_display();
-
-    return owner == mSDL_XWindowID;
-}
-
-Display* LLWindowSDL::getSDLDisplay()
-{
-    if (gWindowImplementation)
-        return gWindowImplementation->mSDL_Display;
-    return nullptr;
-}
-
-#endif
 
 
 LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
@@ -387,9 +90,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
              //bool ignore_pixel_depth, U32 fsaa_samples,)
              bool ignore_pixel_depth, U32 fsaa_samples, bool useLegacyCursors)
     : LLWindow(callbacks, fullscreen, flags),
-      Lock_Display(NULL),
-      //Unlock_Display(NULL), mGamma(1.0f)
-      Unlock_Display(NULL), mGamma(1.0f),
+      mGamma(1.0f),
       mUseLegacyCursors(useLegacyCursors) // </FS:LO>
 {
     // Initialize the keyboard
@@ -412,11 +113,6 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     // Preeditor means here the actual XUI input field currently in use
     mIMEEnabled = false;
     mPreeditor = nullptr;
-
-#if LL_X11
-    mSDL_XWindowID = None;
-    mSDL_Display = NULL;
-#endif // LL_X11
 
     // Assume 4:3 aspect ratio until we know better
     mOriginalAspectRatio = 1024.0 / 768.0;
@@ -441,11 +137,6 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     // Stash an object pointer for OSMessageBox()
     gWindowImplementation = this;
 
-#if LL_X11
-    mFlashing = false;
-    initialiseX11Clipboard();
-#endif // LL_X11
-
     mKeyVirtualKey = 0;
     mKeyModifiers = KMOD_NONE;
 }
@@ -466,144 +157,24 @@ static SDL_Surface *Load_BMP_Resource(const char *basename)
     return SDL_LoadBMP(path_buffer);
 }
 
-#if LL_X11
-// This is an XFree86/XOrg-specific hack for detecting the amount of Video RAM
-// on this machine.  It works by searching /var/log/var/log/Xorg.?.log or
-// /var/log/XFree86.?.log for a ': (VideoRAM ?|Memory): (%d+) kB' regex, where
-// '?' is the X11 display number derived from $DISPLAY
-static int x11_detect_VRAM_kb_fp(FILE *fp, const char *prefix_str)
+// Detect VRAM via DRM sysfs (works on Wayland without X11)
+static int drm_detect_VRAM_kb()
 {
-    const int line_buf_size = 1000;
-    char line_buf[line_buf_size];
-    while (fgets(line_buf, line_buf_size, fp))
-    {
-        //LL_DEBUGS() << "XLOG: " << line_buf << LL_ENDL;
-
-        // Why the ad-hoc parser instead of using a regex?  Our
-        // favourite regex implementation - libboost_regex - is
-        // quite a heavy and troublesome dependency for the client, so
-        // it seems a shame to introduce it for such a simple task.
-        // *FIXME: libboost_regex is a dependency now anyway, so we may
-        // as well use it instead of this hand-rolled nonsense.
-        const char *part1_template = prefix_str;
-        const char part2_template[] = " kB";
-        char *part1 = strstr(line_buf, part1_template);
-        if (part1) // found start of matching line
-        {
-            part1 = &part1[strlen(part1_template)]; // -> after
-            char *part2 = strstr(part1, part2_template);
-            if (part2) // found end of matching line
-            {
-                // now everything between part1 and part2 is
-                // supposed to be numeric, describing the
-                // number of kB of Video RAM supported
-                int rtn = 0;
-                for (; part1 < part2; ++part1)
-                {
-                    if (*part1 < '0' || *part1 > '9')
-                    {
-                        // unexpected char, abort parse
-                        rtn = 0;
-                        break;
-                    }
-                    rtn *= 10;
-                    rtn += (*part1) - '0';
-                }
-                if (rtn > 0)
-                {
-                    // got the kB number.  return it now.
-                    return rtn;
-                }
-            }
-        }
-    }
-    return 0; // 'could not detect'
-}
-
-static int x11_detect_VRAM_kb()
-{
-    std::string x_log_location("/var/log/");
-    std::string fname;
-    int rtn = 0; // 'could not detect'
-    int display_num = 0;
-    FILE *fp;
-    char *display_env = getenv("DISPLAY"); // e.g. :0 or :0.0 or :1.0 etc
-    // parse DISPLAY number so we can go grab the right log file
-    if (display_env[0] == ':' &&
-        display_env[1] >= '0' && display_env[1] <= '9')
-    {
-        display_num = display_env[1] - '0';
-    }
-
-    // *TODO: we could be smarter and see which of Xorg/XFree86 has the
-    // freshest time-stamp.
-
-    // Try Xorg log first
-    fname = x_log_location;
-    fname += "Xorg.";
-    fname += ('0' + display_num);
-    fname += ".log";
-    fp = fopen(fname.c_str(), "r");
+    // Try AMD: /sys/class/drm/card0/device/mem_info_vram_total (reports bytes)
+    FILE *fp = fopen("/sys/class/drm/card0/device/mem_info_vram_total", "r");
     if (fp)
     {
-        LL_INFOS() << "Looking in " << fname
-            << " for VRAM info..." << LL_ENDL;
-        rtn = x11_detect_VRAM_kb_fp(fp, ": VideoRAM: ");
-        fclose(fp);
-        if (0 == rtn)
+        unsigned long long vram_bytes = 0;
+        if (fscanf(fp, "%llu", &vram_bytes) == 1 && vram_bytes > 0)
         {
-            fp = fopen(fname.c_str(), "r");
-            if (fp)
-            {
-                rtn = x11_detect_VRAM_kb_fp(fp, ": Video RAM: ");
-                fclose(fp);
-                if (0 == rtn)
-                {
-                    fp = fopen(fname.c_str(), "r");
-                    if (fp)
-                    {
-                        rtn = x11_detect_VRAM_kb_fp(fp, ": Memory: ");
-                        fclose(fp);
-                    }
-                }
-            }
-        }
-    }
-    else
-    {
-        LL_INFOS() << "Could not open " << fname
-            << " - skipped." << LL_ENDL;
-        // Try old XFree86 log otherwise
-        fname = x_log_location;
-        fname += "XFree86.";
-        fname += ('0' + display_num);
-        fname += ".log";
-        fp = fopen(fname.c_str(), "r");
-        if (fp)
-        {
-            LL_INFOS() << "Looking in " << fname
-                << " for VRAM info..." << LL_ENDL;
-            rtn = x11_detect_VRAM_kb_fp(fp, ": VideoRAM: ");
             fclose(fp);
-            if (0 == rtn)
-            {
-                fp = fopen(fname.c_str(), "r");
-                if (fp)
-                {
-                    rtn = x11_detect_VRAM_kb_fp(fp, ": Memory: ");
-                    fclose(fp);
-                }
-            }
+            return (int)(vram_bytes / 1024); // convert bytes to kB
         }
-        else
-        {
-            LL_INFOS() << "Could not open " << fname
-                << " - skipped." << LL_ENDL;
-        }
+        fclose(fp);
     }
-    return rtn;
+
+    return 0; // could not detect, let GL-based detection handle it
 }
-#endif // LL_X11
 
 void LLWindowSDL::setTitle(const std::string &title)
 {
@@ -674,7 +245,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     mGrabbyKeyFlags = 0;
     mReallyCapturedCount = 0;
 
-    SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
+    SDL_SetHint(SDL_HINT_VIDEODRIVER, "wayland");
     SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 
     // IME - International input compositing, i.e. for Japanese / Chinese text input
@@ -819,23 +390,11 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         bmpsurface = NULL;
     }
 
-    // Detect video memory size.
-# if LL_X11
-    gGLManager.mVRAM = x11_detect_VRAM_kb() / 1024;
+    // Detect video memory size via DRM sysfs.
+    gGLManager.mVRAM = drm_detect_VRAM_kb() / 1024;
     if (gGLManager.mVRAM != 0)
     {
-        LL_INFOS() << "X11 log-parser detected " << gGLManager.mVRAM << "MB VRAM." << LL_ENDL;
-    } else
-# endif // LL_X11
-    {
-        // fallback to letting SDL detect VRAM.
-        // note: I've not seen SDL's detection ever actually find
-        // VRAM != 0, but if SDL *does* detect it then that's a bonus.
-        gGLManager.mVRAM = 0;
-        if (gGLManager.mVRAM != 0)
-        {
-            LL_INFOS() << "SDL detected " << gGLManager.mVRAM << "MB VRAM." << LL_ENDL;
-        }
+        LL_INFOS() << "DRM sysfs detected " << gGLManager.mVRAM << "MB VRAM." << LL_ENDL;
     }
     // If VRAM is not detected, that is handled later
 
@@ -876,30 +435,12 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         return false;
     }
 
-#if LL_X11
-    /* Grab the window manager specific information */
-    SDL_SysWMinfo info;
-    SDL_VERSION(&info.version);
-    if ( SDL_GetWindowWMInfo(mWindow, &info) )
+    // Log the video driver in use
+    const char *video_driver = SDL_GetCurrentVideoDriver();
+    if (video_driver)
     {
-        /* Save the information for later use */
-        if ( info.subsystem == SDL_SYSWM_X11 )
-        {
-            mSDL_Display = info.info.x11.display;
-            mSDL_XWindowID = info.info.x11.window;
-        }
-        else
-        {
-            LL_WARNS() << "We're not running under X11?  Wild."
-                << LL_ENDL;
-        }
+        LL_INFOS() << "SDL video driver: " << video_driver << LL_ENDL;
     }
-    else
-    {
-        LL_WARNS() << "We're not running under any known WM.  Wild."
-            << LL_ENDL;
-    }
-#endif // LL_X11
 
     // clear screen to black right at the start so it doesn't look like a crash
     glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
@@ -952,12 +493,6 @@ void LLWindowSDL::destroyContext()
     LL_INFOS() << "destroyContext begins" << LL_ENDL;
 
     SDL_StopTextInput();
-#if LL_X11
-    mSDL_Display = NULL;
-    mSDL_XWindowID = None;
-    Lock_Display = NULL;
-    Unlock_Display = NULL;
-#endif // LL_X11
 
     // Clean up remaining GL state before blowing away window
     LL_INFOS() << "shutdownGL begins" << LL_ENDL;
@@ -1214,18 +749,10 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
 {
     LLWindow::setMinSize(min_width, min_height, enforce_immediately);
 
-#if LL_X11
-    // Set the minimum size limits for X11 window
-    // so the window manager doesn't allow resizing below those limits.
-    XSizeHints* hints = XAllocSizeHints();
-    hints->flags |= PMinSize;
-    hints->min_width = mMinWindowWidth;
-    hints->min_height = mMinWindowHeight;
-
-    XSetWMNormalHints(mSDL_Display, mSDL_XWindowID, hints);
-
-    XFree(hints);
-#endif
+    if (mWindow)
+    {
+        SDL_SetWindowMinimumSize(mWindow, mMinWindowWidth, mMinWindowHeight);
+    }
 }
 
 bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
@@ -1311,142 +838,75 @@ F32 LLWindowSDL::getPixelAspectRatio()
 // dialogs are still usable in fullscreen.
 void LLWindowSDL::beforeDialog()
 {
-    bool running_x11 = false;
-#if LL_X11
-    running_x11 = (mSDL_XWindowID != None);
-#endif //LL_X11
-
     LL_INFOS() << "LLWindowSDL::beforeDialog()" << LL_ENDL;
 
     if (SDLReallyCaptureInput(false)) // must ungrab input so popup works!
     {
-        if (mFullscreen)
-        {
-            // need to temporarily go non-fullscreen; bless SDL
-            // for providing a SDL_WM_ToggleFullScreen() - though
-            // it only works in X11
-            if (running_x11 && mWindow)
-            {
-                SDL_SetWindowFullscreen( mWindow, 0 );
-            }
-        }
-    }
-
-#if LL_X11
-    if (mSDL_Display)
-    {
-        // Everything that we/SDL asked for should happen before we
-        // potentially hand control over to GTK.
-        maybe_lock_display();
-        XSync(mSDL_Display, False);
-        maybe_unlock_display();
-    }
-#endif // LL_X11
-
-    maybe_lock_display();
-}
-
-void LLWindowSDL::afterDialog()
-{
-    bool running_x11 = false;
-#if LL_X11
-    running_x11 = (mSDL_XWindowID != None);
-#endif //LL_X11
-
-    LL_INFOS() << "LLWindowSDL::afterDialog()" << LL_ENDL;
-
-    maybe_unlock_display();
-
-    if (mFullscreen)
-    {
-        // need to restore fullscreen mode after dialog - only works
-        // in X11
-        if (running_x11 && mWindow)
+        if (mFullscreen && mWindow)
         {
             SDL_SetWindowFullscreen( mWindow, 0 );
         }
     }
 }
 
-
-#if LL_X11
-// set/reset the XWMHints flag for 'urgency' that usually makes the icon flash
-void LLWindowSDL::x11_set_urgent(bool urgent)
+void LLWindowSDL::afterDialog()
 {
-    if (mSDL_Display && !mFullscreen)
+    LL_INFOS() << "LLWindowSDL::afterDialog()" << LL_ENDL;
+
+    if (mFullscreen && mWindow)
     {
-        XWMHints *wm_hints;
-
-        LL_INFOS() << "X11 hint for urgency, " << urgent << LL_ENDL;
-
-        maybe_lock_display();
-        wm_hints = XGetWMHints(mSDL_Display, mSDL_XWindowID);
-        if (!wm_hints)
-            wm_hints = XAllocWMHints();
-
-        if (urgent)
-            wm_hints->flags |= XUrgencyHint;
-        else
-            wm_hints->flags &= ~XUrgencyHint;
-
-        XSetWMHints(mSDL_Display, mSDL_XWindowID, wm_hints);
-        XFree(wm_hints);
-        XSync(mSDL_Display, False);
-        maybe_unlock_display();
+        SDL_SetWindowFullscreen( mWindow, SDL_WINDOW_FULLSCREEN );
     }
 }
-#endif // LL_X11
+
 
 void LLWindowSDL::flashIcon(F32 seconds)
 {
-    if (getMinimized()) // <FS:CR> Moved this here from llviewermessage.cpp
+    if (getMinimized() && mWindow)
     {
-#if !LL_X11
-        LL_INFOS() << "Stub LLWindowSDL::flashIcon(" << seconds << ")" << LL_ENDL;
-#else
-        LL_INFOS() << "X11 LLWindowSDL::flashIcon(" << seconds << ")" << LL_ENDL;
-
-        F32 remaining_time = mFlashTimer.getRemainingTimeF32();
-        if (remaining_time < seconds)
-            remaining_time = seconds;
-        mFlashTimer.reset();
-        mFlashTimer.setTimerExpirySec(remaining_time);
-
-        x11_set_urgent(true);
-        mFlashing = true;
-#endif // LL_X11
+        SDL_FlashWindow(mWindow, SDL_FLASH_UNTIL_FOCUSED);
     }
 }
 
 bool LLWindowSDL::isClipboardTextAvailable()
 {
-    return mSDL_Display && XGetSelectionOwner(mSDL_Display, XA_CLIPBOARD) != None;
+    return SDL_HasClipboardText() == SDL_TRUE;
 }
 
 bool LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
 {
-    return getSelectionText(XA_CLIPBOARD, dst);
+    char *text = SDL_GetClipboardText();
+    if (text && *text)
+    {
+        dst = utf8str_to_wstring(text);
+        SDL_free(text);
+        return true;
+    }
+    SDL_free(text);
+    return false;
 }
 
-bool LLWindowSDL::copyTextToClipboard(const LLWString &s)
+bool LLWindowSDL::copyTextToClipboard(const LLWString &src)
 {
-    return setSelectionText(XA_CLIPBOARD, s);
+    std::string utf8 = wstring_to_utf8str(src);
+    return SDL_SetClipboardText(utf8.c_str()) == 0;
 }
 
 bool LLWindowSDL::isPrimaryTextAvailable()
 {
-    LLWString text;
-    return getSelectionText(XA_PRIMARY, text) && !text.empty();
+    // Wayland doesn't have X11's PRIMARY selection concept;
+    // map to clipboard
+    return SDL_HasClipboardText() == SDL_TRUE;
 }
 
 bool LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
 {
-    return getSelectionText(XA_PRIMARY, dst);
+    return pasteTextFromClipboard(dst);
 }
 
-bool LLWindowSDL::copyTextToPrimary(const LLWString &s)
+bool LLWindowSDL::copyTextToPrimary(const LLWString &src)
 {
-    return setSelectionText(XA_PRIMARY, s);
+    return copyTextToClipboard(src);
 }
 
 LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_resolutions)
@@ -1584,47 +1044,11 @@ bool LLWindowSDL::SDLReallyCaptureInput(bool capture)
 
     bool newGrab = wantGrab;
 
-#if LL_X11
-    if (!mFullscreen) /* only bother if we're windowed anyway */
+    if (mWindow)
     {
-        if (mSDL_Display)
-        {
-            /* we dirtily mix raw X11 with SDL so that our pointer
-               isn't (as often) constrained to the limits of the
-               window while grabbed, which feels nicer and
-               hopefully eliminates some reported 'sticky pointer'
-               problems.  We use raw X11 instead of
-               SDL_WM_GrabInput() because the latter constrains
-               the pointer to the window and also steals all
-               *keyboard* input from the window manager, which was
-               frustrating users. */
-            int result;
-            if (wantGrab == true)
-            {
-                maybe_lock_display();
-                result = XGrabPointer(mSDL_Display, mSDL_XWindowID,
-                              True, 0, GrabModeAsync,
-                              GrabModeAsync,
-                              None, None, CurrentTime);
-                maybe_unlock_display();
-                if (GrabSuccess == result)
-                    newGrab = true;
-                else
-                    newGrab = false;
-            }
-            else
-            {
-                newGrab = false;
-
-                maybe_lock_display();
-                XUngrabPointer(mSDL_Display, CurrentTime);
-                // Make sure the ungrab happens RIGHT NOW.
-                XSync(mSDL_Display, False);
-                maybe_unlock_display();
-            }
-        }
+        SDL_SetWindowGrab(mWindow, wantGrab ? SDL_TRUE : SDL_FALSE);
+        newGrab = wantGrab;
     }
-#endif // LL_X11
     // return boolean success for whether we ended up in the desired state
     return capture == newGrab;
 }
@@ -1806,32 +1230,6 @@ void LLWindowSDL::gatherInput()
     {
         switch (event.type)
         {
-            case SDL_SYSWMEVENT:
-            {
-                XEvent e = event.syswm.msg->msg.x11.event;
-                if (e.type == KeyPress || e.type == KeyRelease)
-                {
-                    // XLookupKeysym doesn't work here because of the weird way the "index" is
-                    // tied to the e->state and we don't get the necessary information at this
-                    // point, so we use the more expensive XLookupString which apparently knows
-                    // all of the secrets inside XKeyEvent. -Zi
-
-                    KeySym ks;
-                    static char str[256+1];
-                    XLookupString((XKeyEvent *) &e, str, 256, &ks, nullptr);
-
-                    if (ks == XK_ISO_Level3_Shift)
-                    {
-                        altGrMask = KMOD_RALT;
-                    }
-                    else if (ks == XK_Alt_R)
-                    {
-                        altGrMask = 0x00;
-                    }
-                }
-                break;
-            }
-
             case SDL_MOUSEWHEEL:
                 if( event.wheel.y != 0 )
                     mCallbacks->handleScrollWheel(this, -event.wheel.y);
@@ -1876,6 +1274,20 @@ void LLWindowSDL::gatherInput()
                 mKeyModifiers = event.key.keysym.mod & (~altGrMask);
                 mInputType = "keydown";
 
+                // Detect AltGr via SDL2 scancode.
+                // On keyboards with AltGr, RALT acts as Level3 Shift.
+                // SDL2's Wayland backend handles the actual text input correctly,
+                // but we need to track the modifier mask for the TEXTINPUT handler.
+                if (event.key.keysym.scancode == SDL_SCANCODE_RALT)
+                {
+                    // If RALT + LCTRL are both pressed, this is likely AltGr
+                    // (many keyboard layouts send LCTRL+RALT for AltGr)
+                    if (event.key.keysym.mod & KMOD_LCTRL)
+                    {
+                        altGrMask = KMOD_RALT;
+                    }
+                }
+
                 // treat all possible Enter/Return keys the same
                 if (mKeyVirtualKey == SDLK_RETURN2 || mKeyVirtualKey == SDLK_KP_ENTER)
                 {
@@ -1917,6 +1329,12 @@ void LLWindowSDL::gatherInput()
                 mKeyVirtualKey = event.key.keysym.sym;
                 mKeyModifiers = event.key.keysym.mod & (~altGrMask);
                 mInputType = "keyup";
+
+                // Clear AltGr mask when RALT is released
+                if (event.key.keysym.scancode == SDL_SCANCODE_RALT)
+                {
+                    altGrMask = 0x00;
+                }
 
                 // treat all possible Enter/Return keys the same
                 if (mKeyVirtualKey == SDLK_RETURN2 || mKeyVirtualKey == SDLK_KP_ENTER)
@@ -2077,16 +1495,6 @@ void LLWindowSDL::gatherInput()
     }
 
     updateCursor();
-
-#if LL_X11
-    // This is a good time to stop flashing the icon if our mFlashTimer has
-    // expired.
-    if (mFlashing && mFlashTimer.hasExpired())
-    {
-        x11_set_urgent(false);
-        mFlashing = false;
-    }
-#endif // LL_X11
 }
 
 static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)
@@ -2528,16 +1936,6 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
     LL_INFOS() << "spawn_web_browser: " << escaped_url << LL_ENDL;
 
 #if LL_LINUX
-# if LL_X11
-    if (mSDL_Display)
-    {
-        maybe_lock_display();
-        // Just in case - before forking.
-        XSync(mSDL_Display, False);
-        maybe_unlock_display();
-    }
-# endif // LL_X11
-
     std::string cmd, arg;
     cmd  = gDirUtilp->getAppRODataDir();
     cmd += gDirUtilp->getDirDelimiter();
@@ -2563,18 +1961,11 @@ void *LLWindowSDL::getPlatformWindow()
 
 void LLWindowSDL::bringToFront()
 {
-    // This is currently used when we are 'launched' to a specific
-    // map position externally.
     LL_INFOS() << "bringToFront" << LL_ENDL;
-#if LL_X11
-    if (mSDL_Display && !mFullscreen)
+    if (mWindow)
     {
-        maybe_lock_display();
-        XRaiseWindow(mSDL_Display, mSDL_XWindowID);
-        XSync(mSDL_Display, False);
-        maybe_unlock_display();
+        SDL_RaiseWindow(mWindow);
     }
-#endif // LL_X11
 }
 
 //static
