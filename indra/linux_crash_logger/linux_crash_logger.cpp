@@ -26,8 +26,9 @@
 
 #include <iostream>
 #include <string>
+#include <cstdlib>
+#include <sys/wait.h>
 #include <curl/curl.h>
-#include <FL/fl_ask.H>
 
 /* Called via
         execl( gCrashLogger.c_str(), gCrashLogger.c_str(), descriptor.path(), gVersion.c_str(), gBugsplatDB.c_str(), nullptr );
@@ -53,10 +54,12 @@ int main(int argc, char **argv)
 
     if( strAsk == "ask" )
     {
-        auto choice = fl_choice( "Firestorm has crashed, submit the minidump?", "No", "Yes", nullptr );
-        if( choice == 0 )
+        int ret = system("zenity --question --title='Firestorm Crash' "
+                         "--text='Firestorm has crashed. Submit the minidump?' "
+                         "--ok-label='Yes' --cancel-label='No' 2>/dev/null");
+        if (WIFEXITED(ret) && WEXITSTATUS(ret) != 0)
         {
-            std::cerr << "Abort send due to users choice" << std::endl;
+            std::cerr << "Abort send due to user's choice" << std::endl;
             return 0;
         }
     }

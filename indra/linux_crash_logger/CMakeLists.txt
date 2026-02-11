@@ -4,7 +4,6 @@ project(linux_crash_logger)
 
 include(00-Common)
 include(Linking)
-include(UI)
 include(CURL)
 include(OpenSSL)
 include(ZLIBNG)
@@ -57,8 +56,6 @@ target_link_libraries(linux-crash-logger
         llmath
         llcorehttp
         llcommon
-        ll::uilibraries
-    X11
     )
 
 add_custom_target(linux-crash-logger-target ALL

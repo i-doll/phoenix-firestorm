@@ -1908,6 +1908,9 @@ if (LINUX)
     LIST(APPEND viewer_SOURCE_FILES desktopnotifierlinux.cpp growlmanager.cpp)
 # [FS] Growl support
 
+    LIST(APPEND viewer_HEADER_FILES llportalfilechooser.h)
+    LIST(APPEND viewer_SOURCE_FILES llportalfilechooser.cpp)
+
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
 
 
