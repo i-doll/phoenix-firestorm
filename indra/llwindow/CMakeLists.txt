@@ -68,25 +68,14 @@ endif()
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 if (LINUX)
-  if (USE_SDL1)
-    list(APPEND viewer_SOURCE_FILES
-            llkeyboardsdl.cpp
-            llwindowsdl.cpp
-            )
-    list(APPEND viewer_HEADER_FILES
-            llkeyboardsdl.h
-            llwindowsdl.h
-            )
-  else()
-    list(APPEND viewer_SOURCE_FILES
-            llkeyboardsdl2.cpp
-            llwindowsdl2.cpp
-            )
-    list(APPEND viewer_HEADER_FILES
-            llkeyboardsdl2.h
-            llwindowsdl2.h
-            )
-  endif()
+  list(APPEND viewer_SOURCE_FILES
+          llkeyboardsdl2.cpp
+          llwindowsdl2.cpp
+          )
+  list(APPEND viewer_HEADER_FILES
+          llkeyboardsdl2.h
+          llwindowsdl2.h
+          )
   if (BUILD_HEADLESS)
     set(llwindowheadless_LINK_LIBRARIES
         ${LLCOMMON_LIBRARIES}
