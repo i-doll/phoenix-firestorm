@@ -920,6 +920,33 @@ void LLWearableHoldingPattern::onAllComplete()
         LL_INFOS("Avatar") << self_av_string() << "HP " << index() << " updating agent wearables with "
                            << mResolved << " wearable items " << LL_ENDL;
         LLAppearanceMgr::instance().updateAgentWearables(this);
+
+        if (!LLAppearanceMgr::instance().validateClothingOrderingInfo())
+        {
+            LLPointer<LLInventoryCallback> cb =
+                new LLBoostFuncInventoryCallback(no_op_inventory_func,
+                []()
+                {
+                    LLOutfitObserver::instance().notifyCOFChanged();
+                    if (isAgentAvatarValid())
+                    {
+                        const bool editing = gAgentAvatarp->isEditingAppearance();
+                        if (editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                        if (gAgentAvatarp->isUsingServerBakes())
+                        {
+                            LLAppearanceMgr::instance().requestServerAppearanceUpdate();
+                        }
+                        else if (!editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                    }
+                });
+            LLAppearanceMgr::instance().updateClothingOrderingInfo(LLUUID::null, cb);
+        }
     }
 
     if (isFetchCompleted() && isMissingCompleted())
@@ -2747,11 +2774,30 @@ void LLAppearanceMgr::updateAppearanceFromCOF(bool enforce_item_restrictions,
         //checking integrity of the COF in terms of ordering of wearables,
         //checking and updating links' descriptions of wearables in the COF (before analyzed for "dirty" state)
 
-        // As with enforce_item_restrictions handling above, we want
-        // to wait for the update callbacks, then (finally!) call
-        // updateAppearanceFromCOF() with no additional COF munging needed.
-        LLPointer<LLInventoryCallback> cb(
-            new LLUpdateAppearanceOnDestroy(false, false, post_update_func));
+        // Wait for inventory updates before updating appearance and requesting a bake.
+        LLPointer<LLInventoryCallback> cb =
+            new LLUpdateAppearanceOnDestroy(false, false,
+                [post_update_func]()
+                {
+                    LLOutfitObserver::instance().notifyCOFChanged();
+                    if (isAgentAvatarValid())
+                    {
+                        const bool editing = gAgentAvatarp->isEditingAppearance();
+                        if (editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                        if (gAgentAvatarp->isUsingServerBakes())
+                        {
+                            LLAppearanceMgr::instance().requestServerAppearanceUpdate();
+                        }
+                        else if (!editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                    }
+                    post_update_func();
+                });
         updateClothingOrderingInfo(LLUUID::null, cb);
         return;
     }
@@ -4155,6 +4201,12 @@ void LLAppearanceMgr::requestServerAppearanceUpdate()
 {
     // Workaround: we shouldn't request update from server prior to uploading all attachments, but it is
     // complicated to check for pending attachment uploads, so we are just waiting for uploads to complete
+    if (isAgentAvatarValid() && gAgentAvatarp->isEditingAppearance())
+    {
+        // Defer server bake until the user exits edit appearance mode.
+        mRerequestAppearanceBake = true;
+        return;
+    }
     if (!mOutstandingAppearanceBakeRequest && gAssetStorage->getNumPendingUploads() == 0)
     {
         mRerequestAppearanceBake = false;
@@ -4781,6 +4833,7 @@ bool LLAppearanceMgr::moveWearable(LLViewerInventoryItem* item, bool closer_to_b
 
     //*TODO do we need to notify observers here in such a way?
     gInventory.notifyObservers();
+    LLOutfitObserver::instance().notifyCOFChanged();
 
     return result;
 }
