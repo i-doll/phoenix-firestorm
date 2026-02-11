@@ -146,6 +146,14 @@ private:
 
     LLButton*           mBtnResetDefaults;
 
+    // FPS limit preset buttons
+    LLButton*           mFpsBtn30;
+    LLButton*           mFpsBtn60;
+    LLButton*           mFpsBtn90;
+    LLButton*           mFpsBtnOff;
+    void onClickFpsPreset(U32 fps);
+    void updateFpsButtons();
+
     LLSliderCtrl*       mMaxComplexitySlider;
     LLTextBox*          mMaxComplexityLabel;
 
