@@ -490,6 +490,9 @@ bool LLWindowSDL::switchContext(bool fullscreen, const LLCoordScreen &size, bool
 
 void LLWindowSDL::destroyContext()
 {
+    if (!mWindow)
+        return;
+
     LL_INFOS() << "destroyContext begins" << LL_ENDL;
 
     SDL_StopTextInput();
