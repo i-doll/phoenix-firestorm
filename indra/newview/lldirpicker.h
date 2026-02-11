@@ -75,12 +75,8 @@ private:
     void buildDirname( void );
     bool check_local_file_access_enabled();
 
-#if LL_LINUX || LL_DARWIN
-    // On Linux we just implement LLDirPicker on top of LLFilePicker
-    // <FS:ND> Seems like on OSX too ... Unless FLTK is used, then nope
-#ifndef LL_FLTK
+#if LL_DARWIN
     LLFilePicker *mFilePicker;
-#endif
 #endif
 
 
