@@ -3298,6 +3298,8 @@ void LLVOAvatarSelf::onCustomizeStart(bool disable_camera_switch)
             gAgentAvatarp->mEndCustomizeCallback = new LLUpdateAppearanceOnDestroy;
         }
 
+        LLAppearanceMgr::instance().updateAppearanceFromCOF(false, true);
+        
         gAgentAvatarp->mIsEditingAppearance = true;
         gAgentAvatarp->mUseLocalAppearance = true;
         if (gSavedSettings.getBOOL("AppearanceCameraMovement") && !disable_camera_switch)

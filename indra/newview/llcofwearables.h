@@ -32,6 +32,7 @@
 #include "llpanel.h"
 
 #include "llappearancemgr.h"
+#include "llinventoryobserver.h"
 #include "llinventorymodel.h"
 
 class LLAccordionCtrl;
@@ -93,6 +94,7 @@ public:
     void selectClothing(LLWearableType::EType clothing_type);
 
     void setAttachmentsTitle();
+    void onCOFInventoryChanged();
 
 protected:
 
@@ -158,6 +160,9 @@ protected:
 
     /* a refresh arrived mid-drag and was skipped; re-run it when the drag ends */
     bool mRefreshPending;
+
+    LLInventoryObserver* mCOFObserver;
+    bool mRefreshQueued;
 };
 
 
