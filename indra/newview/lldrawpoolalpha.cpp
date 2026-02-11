@@ -66,6 +66,31 @@ static const F32 MINIMUM_ALPHA = 0.004f; // ~ 1/255
 // minimum alpha before discarding a fragment when rendering impostors
 static const F32 MINIMUM_IMPOSTOR_ALPHA = 0.1f;
 
+static bool gltf_has_transparency(const LLFetchedGLTFMaterial* mat)
+{
+    if (!mat)
+    {
+        return false;
+    }
+
+    if (mat->mAlphaMode != LLGLTFMaterial::ALPHA_MODE_BLEND &&
+        mat->mAlphaMode != LLGLTFMaterial::ALPHA_MODE_MASK)
+    {
+        return false;
+    }
+
+    const F32 alpha = mat->mBaseColor.mV[3];
+    bool has_alpha_tex = false;
+
+    if (mat->mBaseColorTexture.notNull())
+    {
+        const S32 comps = mat->mBaseColorTexture->getComponents();
+        has_alpha_tex = (comps == 4 || comps == 2);
+    }
+
+    return (alpha < 0.999f) || has_alpha_tex;
+}
+
 LLDrawPoolAlpha::LLDrawPoolAlpha(U32 type) :
         LLRenderPass(type), target_shader(NULL),
         mColorSFactor(LLRender::BF_UNDEF), mColorDFactor(LLRender::BF_UNDEF),
@@ -281,9 +306,15 @@ void LLDrawPoolAlpha::renderDebugAlpha()
 {
     if (sShowDebugAlpha)
     {
+        LLViewerFetchedTexture* smoke_tex = LLViewerFetchedTexture::getSmokeImage();
+        LLViewerFetchedTexture* white_tex = LLViewerFetchedTexture::sWhiteImagep;
+
         gHighlightProgram.bind();
         gGL.diffuseColor4f(1, 0, 0, 1);
-        gGL.getTexUnit(0)->bindFast(LLViewerFetchedTexture::getSmokeImage());
+        if (smoke_tex)
+        {
+            gGL.getTexUnit(0)->bindFast(smoke_tex);
+        }
 
 
         renderAlphaHighlight();
@@ -298,7 +329,32 @@ void LLDrawPoolAlpha::renderDebugAlpha()
         pushUntexturedBatches(LLRenderPass::PASS_SPECMAP_MASK);
         pushUntexturedBatches(LLRenderPass::PASS_NORMSPEC_MASK);
         pushUntexturedBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK);
-        pushUntexturedBatches(LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK);
+        if (white_tex)
+        {
+            gGL.getTexUnit(0)->bindFast(white_tex);
+        }
+        gGL.diffuseColor4f(0, 0, 1, 0.5f);
+        {
+            auto* begin = gPipeline.beginRenderMap(LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK);
+            auto* end = gPipeline.endRenderMap(LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK);
+            for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+            {
+                LLDrawInfo* pparams = *i;
+                LLCullResult::increment_iterator(i, end);
+
+                if (!pparams || !gltf_has_transparency(pparams->mGLTFMaterial))
+                {
+                    continue;
+                }
+
+                LLRenderPass::pushUntexturedGLTFBatch(*pparams);
+            }
+        }
+        gGL.diffuseColor4f(0, 0, 1, 1);
+        if (smoke_tex)
+        {
+            gGL.getTexUnit(0)->bindFast(smoke_tex);
+        }
 
         gGL.diffuseColor4f(0, 1, 0, 1);
         pushUntexturedBatches(LLRenderPass::PASS_INVISIBLE);
@@ -318,7 +374,36 @@ void LLDrawPoolAlpha::renderDebugAlpha()
         pushRiggedBatches(LLRenderPass::PASS_SPECMAP_MASK_RIGGED, false);
         pushRiggedBatches(LLRenderPass::PASS_NORMSPEC_MASK_RIGGED, false);
         pushRiggedBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK_RIGGED, false);
-        pushRiggedBatches(LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK_RIGGED, false);
+        if (white_tex)
+        {
+            gGL.getTexUnit(0)->bindFast(white_tex);
+        }
+        gGL.diffuseColor4f(0, 1, 1, 0.5f);
+        {
+            const LLVOAvatar* lastAvatar = nullptr;
+            U64 lastMeshId = 0;
+            bool skipLastSkin = false;
+
+            auto* begin = gPipeline.beginRenderMap(LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK_RIGGED);
+            auto* end = gPipeline.endRenderMap(LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK_RIGGED);
+            for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+            {
+                LLDrawInfo* pparams = *i;
+                LLCullResult::increment_iterator(i, end);
+
+                if (!pparams || !gltf_has_transparency(pparams->mGLTFMaterial))
+                {
+                    continue;
+                }
+
+                LLRenderPass::pushUntexturedRiggedGLTFBatch(*pparams, lastAvatar, lastMeshId, skipLastSkin);
+            }
+        }
+        gGL.diffuseColor4f(0, 1, 1, 1);
+        if (smoke_tex)
+        {
+            gGL.getTexUnit(0)->bindFast(smoke_tex);
+        }
 
         gGL.diffuseColor4f(0, 1, 0, 1);
         pushRiggedBatches(LLRenderPass::PASS_INVISIBLE_RIGGED, false);
@@ -331,6 +416,16 @@ void LLDrawPoolAlpha::renderDebugAlpha()
 
 void LLDrawPoolAlpha::renderAlphaHighlight()
 {
+    LLViewerFetchedTexture* smoke_tex = LLViewerFetchedTexture::getSmokeImage();
+    LLViewerFetchedTexture* white_tex = LLViewerFetchedTexture::sWhiteImagep;
+    static const F32 GLTF_HIGHLIGHT_ALPHA = 0.5f;
+    bool using_white = false;
+
+    if (smoke_tex)
+    {
+        gGL.getTexUnit(0)->bindFast(smoke_tex);
+    }
+
     for (int pass = 0; pass < 2; ++pass)
     { //two passes, one rigged and one not
         const LLVOAvatar* lastAvatar = nullptr;
@@ -353,15 +448,8 @@ void LLDrawPoolAlpha::renderAlphaHighlight()
                     LLDrawInfo& params = **k;
 
                     bool rigged = (params.mAvatar != nullptr);
-                    gHighlightProgram.bind(rigged);
 
-                    if (rigged)
-                    {
-                        if (!uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
-                        { // failed to upload matrix palette, skip rendering
-                            continue;
-                        }
-                    }
+                    gHighlightProgram.bind(rigged);
 
                     // <FS:Beq> FIRE-32132 et al. Allow rigged mesh transparency highlights to be toggled
                     if (rigged && !sShowDebugAlphaRigged)
@@ -377,6 +465,47 @@ void LLDrawPoolAlpha::renderAlphaHighlight()
                     else // NB dangling else to drop through to "normal behaviour"
                     // </FS:Beq>
                     gGL.diffuseColor4f(1, 0, 0, 1);
+
+                    if (params.mGLTFMaterial)
+                    {
+                        if (!gltf_has_transparency(params.mGLTFMaterial))
+                        {
+                            continue;
+                        }
+
+                        if (!using_white && white_tex)
+                        {
+                            gGL.getTexUnit(0)->bindFast(white_tex);
+                            using_white = true;
+                        }
+
+                        if (rigged)
+                        {
+                            gGL.diffuseColor4f(1, 0.5, 0, GLTF_HIGHLIGHT_ALPHA);
+                            LLRenderPass::pushUntexturedRiggedGLTFBatch(params, lastAvatar, lastMeshId, skipLastSkin);
+                        }
+                        else
+                        {
+                            gGL.diffuseColor4f(1, 0, 0, GLTF_HIGHLIGHT_ALPHA);
+                            LLRenderPass::pushUntexturedGLTFBatch(params);
+                        }
+
+                        continue;
+                    }
+                    else if (using_white && smoke_tex)
+                    {
+                        gGL.getTexUnit(0)->bindFast(smoke_tex);
+                        using_white = false;
+                    }
+
+                    if (rigged)
+                    {
+                        if (!uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+                        { // failed to upload matrix palette, skip rendering
+                            continue;
+                        }
+                    }
+
                     LLRenderPass::applyModelMatrix(params);
                     params.mVertexBuffer->setBuffer();
                     params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
