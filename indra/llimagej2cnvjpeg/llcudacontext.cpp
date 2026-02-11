@@ -239,7 +239,7 @@ std::string LLCUDAContext::getVersionString()
     int cudaMajor = cudaRuntimeVersion / 1000;
     int cudaMinor = (cudaRuntimeVersion % 1000) / 10;
 
-    return llformat("nvJPEG2000 %u.%u.%u, CUDA Runtime %d.%d",
+    return llformat("nvJPEG2K %u.%u.%u CUDA %d.%d",
                     major, minor, patch, cudaMajor, cudaMinor);
 }
 
