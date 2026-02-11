@@ -607,6 +607,8 @@ void LLPanelOutfitEdit::onOpen(const LLSD& key)
         displayCurrentOutfit();
         mInitialized = true;
     }
+
+    update();
 }
 
 void LLPanelOutfitEdit::moveWearable(bool closer_to_body)
