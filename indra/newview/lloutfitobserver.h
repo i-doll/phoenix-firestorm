@@ -43,6 +43,7 @@ public:
     virtual void changed(U32 mask) override;
 
     void notifyOutfitLockChanged() { mOutfitLockChanged();  }
+    void notifyCOFChanged();
 
     typedef boost::signals2::signal<void (void)> signal_t;
 

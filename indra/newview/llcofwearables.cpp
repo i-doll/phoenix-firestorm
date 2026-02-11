@@ -289,6 +289,26 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////
 
+class LLCOFWearablesObserver : public LLInventoryObserver
+{
+public:
+    explicit LLCOFWearablesObserver(LLCOFWearables* panel)
+        : mPanel(panel)
+    {
+    }
+
+    void changed(U32 mask) override
+    {
+        if (mPanel)
+        {
+            mPanel->onCOFInventoryChanged();
+        }
+    }
+
+private:
+    LLCOFWearables* mPanel;
+};
+
 LLCOFWearables::LLCOFWearables() : LLPanel(),
     mAttachments(NULL),
     mClothing(NULL),
@@ -299,7 +319,9 @@ LLCOFWearables::LLCOFWearables() : LLPanel(),
     mBodyPartsTab(NULL),
     mLastSelectedTab(NULL),
     mAccordionCtrl(NULL),
-    mCOFVersion(-1)
+    mCOFVersion(-1),
+    mCOFObserver(nullptr),
+    mRefreshQueued(false)
 {
     mClothingMenu = new CofClothingContextMenu(this);
     mAttachmentMenu = new CofAttachmentContextMenu(this);
@@ -308,6 +330,12 @@ LLCOFWearables::LLCOFWearables() : LLPanel(),
 
 LLCOFWearables::~LLCOFWearables()
 {
+    if (mCOFObserver)
+    {
+        gInventory.removeObserver(mCOFObserver);
+        delete mCOFObserver;
+        mCOFObserver = nullptr;
+    }
     delete mClothingMenu;
     delete mAttachmentMenu;
     delete mBodyPartMenu;
@@ -361,6 +389,12 @@ bool LLCOFWearables::postBuild()
     mAccordionCtrl = getChild<LLTabContainer>("wearable_accordion");
     mAccordionCtrl->setCommitCallback(boost::bind(&LLCOFWearables::onSelectedTabChanged, this, _2));
     // </FS:Ansariel>
+
+    if (!mCOFObserver)
+    {
+        mCOFObserver = new LLCOFWearablesObserver(this);
+    }
+    gInventory.addObserver(mCOFObserver);
 
     return LLPanel::postBuild();
 }
@@ -423,6 +457,46 @@ void LLCOFWearables::onSelectedTabChanged(const LLSD& param)
         //sending commit signal to indicate selection changes
         onCommit();
     }
+}
+
+void LLCOFWearables::onCOFInventoryChanged()
+{
+    if (mRefreshQueued)
+    {
+        return;
+    }
+
+    const LLUUID cof_id = LLAppearanceMgr::instance().getCOF();
+    if (cof_id.isNull())
+    {
+        return;
+    }
+
+    const uuid_set_t& changed_ids = gInventory.getChangedIDs();
+    bool affects_cof = false;
+    for (const LLUUID& id : changed_ids)
+    {
+        if (id == cof_id || gInventory.isObjectDescendentOf(id, cof_id))
+        {
+            affects_cof = true;
+            break;
+        }
+    }
+
+    if (!affects_cof)
+    {
+        return;
+    }
+
+    mRefreshQueued = true;
+    doOnIdleOneTime([this]()
+        {
+            mRefreshQueued = false;
+            if (getVisible())
+            {
+                refresh();
+            }
+        });
 }
 
 void LLCOFWearables::refresh()
@@ -517,6 +591,29 @@ void LLCOFWearables::refresh()
         LLRect scroll_pos = it->second;
 
         list->scrollToShowRect(scroll_pos);
+    }
+
+    LLFlatListView* selected_list = nullptr;
+    if (mClothing->numSelected())
+    {
+        selected_list = mClothing;
+    }
+    else if (mAttachments->numSelected())
+    {
+        selected_list = mAttachments;
+    }
+    else if (mBodyParts->numSelected())
+    {
+        selected_list = mBodyParts;
+    }
+
+    if (selected_list)
+    {
+        mLastSelectedList = selected_list;
+        onCommit();
+    }
+    else
+    {
     }
 }
 
@@ -686,7 +783,10 @@ void LLCOFWearables::addClothingTypesDummies(const LLAppearanceMgr::wearables_by
 
 LLUUID LLCOFWearables::getSelectedUUID()
 {
-    if (!mLastSelectedList) return LLUUID::null;
+    if (!mLastSelectedList)
+    {
+        return LLUUID::null;
+    }
 
     return mLastSelectedList->getSelectedUUID();
 }
