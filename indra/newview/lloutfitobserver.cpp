@@ -55,6 +55,17 @@ void LLOutfitObserver::changed(U32 mask)
     checkBaseOutfit();
 }
 
+void LLOutfitObserver::notifyCOFChanged()
+{
+    if (!gInventory.isInventoryUsable())
+    {
+        return;
+    }
+
+    LLAppearanceMgr::getInstance()->updateIsDirty();
+    mCOFChanged();
+}
+
 // static
 S32 LLOutfitObserver::getCategoryVersion(const LLUUID& cat_id)
 {
