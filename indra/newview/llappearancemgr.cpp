@@ -959,6 +959,33 @@ void LLWearableHoldingPattern::onAllComplete()
                            << mResolved << " wearable items " << LL_ENDL;
         LLAppearanceMgr::instance().updateAgentWearables(this);
 
+        if (!LLAppearanceMgr::instance().validateClothingOrderingInfo())
+        {
+            LLPointer<LLInventoryCallback> cb =
+                new LLBoostFuncInventoryCallback(no_op_inventory_func,
+                []()
+                {
+                    LLOutfitObserver::instance().notifyCOFChanged();
+                    if (isAgentAvatarValid())
+                    {
+                        const bool editing = gAgentAvatarp->isEditingAppearance();
+                        if (editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                        if (gAgentAvatarp->isUsingServerBakes())
+                        {
+                            LLAppearanceMgr::instance().requestServerAppearanceUpdate();
+                        }
+                        else if (!editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                    }
+                });
+            LLAppearanceMgr::instance().updateClothingOrderingInfo(LLUUID::null, cb);
+        }
+
 //        // Restore attachment pos overrides for the attachments that
 //        // are remaining in the outfit.
 //        for (LLAgentWearables::llvo_vec_t::iterator it = objects_to_retain.begin();
@@ -2828,7 +2855,29 @@ void LLAppearanceMgr::updateAppearanceFromCOF(bool enforce_item_restrictions,
         //checking and updating links' descriptions of wearables in the COF (before analyzed for "dirty" state)
 // [SL:KB] - Patch: Appearance-AISFilter | Checked: 2015-03-01 (Catznip-3.7)
         // Ordering information is pre-applied locally so no reason to reason to wait on the inventory backend
-        updateClothingOrderingInfo(LLUUID::null);
+        LLPointer<LLInventoryCallback> cb =
+            new LLBoostFuncInventoryCallback(no_op_inventory_func,
+                []()
+                {
+                    LLOutfitObserver::instance().notifyCOFChanged();
+                    if (isAgentAvatarValid())
+                    {
+                        const bool editing = gAgentAvatarp->isEditingAppearance();
+                        if (editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                        if (gAgentAvatarp->isUsingServerBakes())
+                        {
+                            LLAppearanceMgr::instance().requestServerAppearanceUpdate();
+                        }
+                        else if (!editing)
+                        {
+                            gAgentAvatarp->forceBakeAllTextures(true);
+                        }
+                    }
+                });
+        updateClothingOrderingInfo(LLUUID::null, cb);
 // [/SL:KB]
 
 //      // As with enforce_item_restrictions handling above, we want
@@ -4244,6 +4293,12 @@ void LLAppearanceMgr::requestServerAppearanceUpdate()
 {
     // Workaround: we shouldn't request update from server prior to uploading all attachments, but it is
     // complicated to check for pending attachment uploads, so we are just waiting for uploads to complete
+    if (isAgentAvatarValid() && gAgentAvatarp->isEditingAppearance())
+    {
+        // Defer server bake until the user exits edit appearance mode.
+        mRerequestAppearanceBake = true;
+        return;
+    }
     if (!mOutstandingAppearanceBakeRequest && gAssetStorage->getNumPendingUploads() == 0)
     {
         mRerequestAppearanceBake = false;
@@ -4882,6 +4937,7 @@ bool LLAppearanceMgr::moveWearable(LLViewerInventoryItem* item, bool closer_to_b
 
     //*TODO do we need to notify observers here in such a way?
     gInventory.notifyObservers();
+    LLOutfitObserver::instance().notifyCOFChanged();
 
     return result;
 }
