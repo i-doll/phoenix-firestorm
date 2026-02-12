@@ -54,6 +54,7 @@
 #include "llslider.h"
 #include "lltooldraganddrop.h"
 #include "llfilesystem.h"
+#include "llpanelobjectinventory.h"
 
 #include "llagent.h"
 #include "llmenugl.h"
@@ -3349,6 +3350,28 @@ bool LLLiveLSLEditor::canClose()
     return mScriptEd->canClose();
 }
 
+void LLLiveLSLEditor::onClose(bool app_quitting)
+{
+    LLCheckBoxCtrl* runningCheckbox = getChild<LLCheckBoxCtrl>("running");
+    if (runningCheckbox)
+    {
+        LLPanelObjectInventory::handleScriptRunningReply(mObjectUUID, mItemUUID, runningCheckbox->get());
+    }
+
+    if (LLViewerObject* object = gObjectList.findObject(mObjectUUID))
+    {
+        if (LLViewerRegion* region = object->getRegion())
+        {
+            LLMessageSystem* msg = gMessageSystem;
+            msg->newMessageFast(_PREHASH_GetScriptRunning);
+            msg->nextBlockFast(_PREHASH_Script);
+            msg->addUUIDFast(_PREHASH_ObjectID, mObjectUUID);
+            msg->addUUIDFast(_PREHASH_ItemID, mItemUUID);
+            msg->sendReliable(region->getHost());
+        }
+    }
+}
+
 void LLLiveLSLEditor::closeIfNeeded()
 {
     getWindow()->decBusyCount();
@@ -3392,14 +3415,15 @@ void LLLiveLSLEditor::processScriptRunningReply(LLMessageSystem* msg, void**)
     msg->getUUIDFast(_PREHASH_Script, _PREHASH_ObjectID, object_id);
     msg->getUUIDFast(_PREHASH_Script, _PREHASH_ItemID, item_id);
 
+    bool running = false;
+    msg->getBOOLFast(_PREHASH_Script, _PREHASH_Running, running);
+
     LLSD floater_key;
     floater_key["taskid"] = object_id;
     floater_key["itemid"] = item_id;
     if (LLLiveLSLEditor* instance = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key))
     {
         instance->mHaveRunningInfo = true;
-        bool running;
-        msg->getBOOLFast(_PREHASH_Script, _PREHASH_Running, running);
         LLCheckBoxCtrl* runningCheckbox = instance->getChild<LLCheckBoxCtrl>("running");
         runningCheckbox->set(running);
         bool mono;
@@ -3426,6 +3450,8 @@ void LLLiveLSLEditor::processScriptRunningReply(LLMessageSystem* msg, void**)
         instance->mScriptEd->processKeywords();
         instance->mScriptEd->getChildView("compile_target")->setEnabled(instance->getIsModifiable() && have_script_upload_cap(object_id));
     }
+
+    LLPanelObjectInventory::handleScriptRunningReply(object_id, item_id, running);
 }
 
 void LLLiveLSLEditor::setAssociatedExperience(LLHandle<LLLiveLSLEditor> editor, const LLSD& experience)
