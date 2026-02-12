@@ -422,6 +422,7 @@ public:
 
 private:
     bool canClose() override;
+    void onClose(bool app_quitting) override;
     void closeIfNeeded();
     void draw() override;
 
