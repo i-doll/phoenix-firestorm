@@ -137,6 +137,9 @@
 #include "lldiriterator.h"
 #include "llexperiencecache.h"
 #include "llimagej2c.h"
+#if LL_NVJPEG2K
+#include "llcudacontext.h"
+#endif
 #include "llmemory.h"
 #include "llprimitive.h"
 #include "llurlaction.h"
@@ -2422,6 +2425,15 @@ bool LLAppViewer::cleanup()
     // Delete workers first
     // shotdown all worker threads before deleting them in case of co-dependencies
     mAppCoreHttp.requestStop();
+
+#if LL_NVJPEG2K
+    // Mark CUDA as unavailable before shutting down worker threads.
+    // Thread-local CUDA contexts are destroyed when worker threads exit
+    // during shutdown() below; they must see sCUDAAvailable==0 so they
+    // skip nvJPEG2K cleanup (which throws nvjpeg2k::ExceptionJPEG).
+    LLCUDAContext::cleanupAll();
+#endif
+
     sTextureFetch->shutdown();
     sTextureCache->shutdown();
     sImageDecodeThread->shutdown();
@@ -5010,6 +5022,13 @@ void LLAppViewer::removeDumpDir()
 
 void LLAppViewer::forceQuit()
 {
+#if LL_NVJPEG2K
+    // Mark CUDA as unavailable BEFORE setQuitting().  Worker threads exit
+    // when they see the QUITTING state; their thread-local CUDA context
+    // destructors must see sCUDAAvailable==0 so they skip nvJPEG2K cleanup
+    // (which throws nvjpeg2k::ExceptionJPEG from internal library threads).
+    LLCUDAContext::cleanupAll();
+#endif
     LLApp::setQuitting();
 }
 
