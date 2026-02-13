@@ -67,6 +67,7 @@
 // </FS:Ansariel> [FS Communication UI]
 #include "llspeakers.h"
 #include "llnotificationsutil.h"
+#include "llviewerdisplay.h"
 // <FS:Zi> We don't use the mini location panel in Firestorm
 // #include "llpaneltopinfobar.h"
 #include "llparcel.h"
@@ -97,6 +98,7 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewerstats.h"
+#include "llviewerthrottle.h"
 #include "llviewerwindow.h"
 #include "llvoavatarself.h"
 #include "llwindow.h"
@@ -5010,9 +5012,75 @@ void LLAgent::handleTeleportFinished()
     LLPerfStats::tunables.autoTuneTimeout = true;
 }
 
+static bool tryRecoverTeleportFailure()
+{
+    if (!isAgentAvatarValid())
+    {
+        return false;
+    }
+
+    static LLCachedControl<F32> recovery_window(gSavedSettings, "FSDebugDcThreshold", 120.f);
+    const F32 max_window = recovery_window;
+    if (gTeleportDisplay && max_window > 0.f && gTeleportDisplayTimer.getElapsedTimeF32() > max_window)
+    {
+        LL_WARNS("Teleport") << "Skipping teleport failure recovery after "
+                             << gTeleportDisplayTimer.getElapsedTimeF32()
+                             << "s (exceeds " << max_window << "s window)" << LL_ENDL;
+        return false;
+    }
+
+    LLViewerRegion* old_region = gAgent.getRegion();
+    LLViewerRegion* candidate = gAgentAvatarp->getRegion();
+    if (!candidate || candidate == old_region || !candidate->isAlive())
+    {
+        LLViewerRegion* pos_region = LLWorld::getInstance()->getRegionFromPosGlobal(gAgentAvatarp->getPositionGlobal());
+        if (pos_region && pos_region != old_region && pos_region->isAlive())
+        {
+            candidate = pos_region;
+        }
+    }
+
+    if (!candidate || candidate == old_region || !candidate->isAlive())
+    {
+        return false;
+    }
+
+    LL_INFOS("Teleport") << "Teleport failed but agent appears in new region; recovering to "
+                         << candidate->getHost() << LL_ENDL;
+
+    LLVector3 shift_vector(0.f, 0.f, 0.f);
+    if (old_region)
+    {
+        shift_vector = candidate->getPosRegionFromGlobal(old_region->getOriginGlobal());
+    }
+
+    gAgent.setRegion(candidate);
+    gObjectList.shiftObjects(shift_vector);
+    gAgentAvatarp->updateRegion(candidate);
+
+    if (gAssetStorage)
+    {
+        gAssetStorage->setUpstream(candidate->getHost());
+    }
+    if (gCacheName)
+    {
+        gCacheName->setUpstream(candidate->getHost());
+    }
+    gViewerThrottle.sendToSim();
+    gViewerWindow->sendShapeToSim();
+
+    return true;
+}
+
 void LLAgent::handleTeleportFailed()
 {
     LL_WARNS("Teleport") << "Agent handling teleport failure!" << LL_ENDL;
+    if (tryRecoverTeleportFailure())
+    {
+        setTeleportState(LLAgent::TELEPORT_NONE);
+        handleTeleportFinished();
+        return;
+    }
     if(LLVoiceClient::instanceExists())
     {
         LLVoiceClient::getInstance()->setHidden(false);
