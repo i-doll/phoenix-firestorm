@@ -150,6 +150,7 @@ public:
     // Region state
     //--------------------------------------------------------------------
     void            resetRegionCrossingTimer()  { mRegionCrossingTimer.reset(); }
+    F32             getRegionCrossingElapsedTimeF32() const { return mRegionCrossingTimer.getElapsedTimeF32(); }
     // <FS:Ansariel> FIRE-12004: Attachments getting lost on TP
     void            setIsCrossingRegion(bool is_crossing) { mIsCrossingRegion = is_crossing; }
     bool            isCrossingRegion() const { return mIsCrossingRegion; }
