@@ -38,7 +38,9 @@
 #include "llfindlocale.h"
 #include "llversioninfo.h"
 
+#include <cstdlib>
 #include <exception>
+#include <unistd.h>
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -294,6 +296,12 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
     delete gViewerAppPtr;
     gViewerAppPtr = nullptr;
+
+    // nvJPEG2K can throw from its internal threads during static destruction, causing abort().
+    // Exit right after SDL finishes its own shutdown, before static destructors run.
+    static int exit_code;
+    exit_code = (result == SDL_APP_FAILURE) ? 1 : 0;
+    std::atexit([] { _exit(exit_code); });
 }
 
 LLAppViewerLinux::LLAppViewerLinux()
