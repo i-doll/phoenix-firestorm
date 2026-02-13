@@ -101,6 +101,7 @@ F32 LLWorld::mWidthInMeters = mWidth * mScale;
 // Functions
 //
 
+
 // allocate the stack
 LLWorld::LLWorld() :
     mLandFarClip(DEFAULT_FAR_PLANE),
@@ -1613,6 +1614,37 @@ void process_enable_simulator(LLMessageSystem *msg, void **user_data)
         }
     }
     // </FS:PP>
+
+    // <FS:Debug> Only connect to current/adjacent regions unless teleporting
+    static LLCachedControl<bool> fsRenderNeighborAdjacentOnly(gSavedSettings, "FSRenderNeighborAdjacentOnly", false);
+    if (fsRenderNeighborAdjacentOnly)
+    {
+        LLViewerRegion* current_region = gAgent.getRegion();
+        if (current_region && current_region->getHandle() != handle)
+        {
+            F32 cur_x = 0.f;
+            F32 cur_y = 0.f;
+            F32 tgt_x = 0.f;
+            F32 tgt_y = 0.f;
+            from_region_handle(current_region->getHandle(), &cur_x, &cur_y);
+            from_region_handle(handle, &tgt_x, &tgt_y);
+            const F32 width = current_region->getWidth();
+            const F32 dx = llabs(tgt_x - cur_x);
+            const F32 dy = llabs(tgt_y - cur_y);
+
+            const bool is_adjacent = (dx <= width && dy <= width);
+            if (!is_adjacent)
+            {
+                if (gAgent.getTeleportState() == LLAgent::TELEPORT_NONE)
+                {
+                    return;
+                }
+                LL_DEBUGS("Teleport") << "Allowing non-adjacent region during teleport: "
+                                      << (dx / width) << "," << (dy / width) << LL_ENDL;
+            }
+        }
+    }
+    // </FS:Debug>
 
     // which simulator should we modify?
     LLHost sim(ip_u32, port);
