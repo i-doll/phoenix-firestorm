@@ -50,7 +50,7 @@
 class LLCUDAContext
 {
 public:
-    ~LLCUDAContext();
+    ~LLCUDAContext() noexcept;
 
     // Non-copyable, non-movable
     LLCUDAContext(const LLCUDAContext&) = delete;

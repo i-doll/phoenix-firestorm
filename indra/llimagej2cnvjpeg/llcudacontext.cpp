@@ -27,7 +27,28 @@
 #include "linden_common.h"
 #include "llcudacontext.h"
 
+#include <csignal>
+#include <cstdlib>
+#include <exception>
+#include <unistd.h>
+
 #if LL_NVJPEG2K
+
+// The nvJPEG2K library can throw nvjpeg2k::ExceptionJPEG from its own
+// internal threads when CUDA API calls fail (e.g. during resource cleanup
+// at process exit).  Since those threads are outside our control, the only
+// way to handle them is via the terminate handler and SIGABRT.
+static void nvjpeg2kTerminateHandler()
+{
+    // Just exit cleanly.  The process is either shutting down or in an
+    // unrecoverable state anyway.
+    _exit(1);
+}
+
+static void nvjpeg2kSigabrtHandler(int)
+{
+    _exit(1);
+}
 
 // Static member definitions
 thread_local std::unique_ptr<LLCUDAContext> LLCUDAContext::sThreadContext;
@@ -47,42 +68,55 @@ LLCUDAContext::LLCUDAContext()
     }
 }
 
-LLCUDAContext::~LLCUDAContext()
+LLCUDAContext::~LLCUDAContext() noexcept
 {
-    // Remove from tracking list
+    // During shutdown, cleanupAll() sets sCUDAAvailable to 0.  After that,
+    // skip all CUDA/nvJPEG2K cleanup: the nvjpeg2k library can throw
+    // nvjpeg2k::ExceptionJPEG (even from internal threads) when resources
+    // are destroyed during process teardown.  Leaking is safe here because
+    // the OS reclaims everything on exit.
+    if (sCUDAAvailable.load() != 1)
     {
-        std::lock_guard<std::mutex> lock(sContextListMutex);
-        auto it = std::find(sAllContexts.begin(), sAllContexts.end(), this);
-        if (it != sAllContexts.end())
+        return;
+    }
+
+    try
+    {
         {
-            sAllContexts.erase(it);
+            std::lock_guard<std::mutex> lock(sContextListMutex);
+            auto it = std::find(sAllContexts.begin(), sAllContexts.end(), this);
+            if (it != sAllContexts.end())
+            {
+                sAllContexts.erase(it);
+            }
+        }
+
+        if (mDecodeParams)
+        {
+            nvjpeg2kDecodeParamsDestroy(mDecodeParams);
+            mDecodeParams = nullptr;
+        }
+
+        if (mDecodeState)
+        {
+            nvjpeg2kDecodeStateDestroy(mDecodeState);
+            mDecodeState = nullptr;
+        }
+
+        if (mDecoder)
+        {
+            nvjpeg2kDestroy(mDecoder);
+            mDecoder = nullptr;
+        }
+
+        if (mStream)
+        {
+            cudaStreamDestroy(mStream);
+            mStream = nullptr;
         }
     }
-
-    // Clean up nvJPEG2000 resources
-    if (mDecodeParams)
+    catch (...)
     {
-        nvjpeg2kDecodeParamsDestroy(mDecodeParams);
-        mDecodeParams = nullptr;
-    }
-
-    if (mDecodeState)
-    {
-        nvjpeg2kDecodeStateDestroy(mDecodeState);
-        mDecodeState = nullptr;
-    }
-
-    if (mDecoder)
-    {
-        nvjpeg2kDestroy(mDecoder);
-        mDecoder = nullptr;
-    }
-
-    // Clean up CUDA resources
-    if (mStream)
-    {
-        cudaStreamDestroy(mStream);
-        mStream = nullptr;
     }
 }
 
@@ -211,14 +245,25 @@ LLCUDAContext* LLCUDAContext::getThreadContext()
 // static
 void LLCUDAContext::cleanupAll()
 {
-    // Clear the thread-local context for this thread
+    // Mark CUDA as unavailable FIRST so that all destructors (including
+    // the one triggered by sThreadContext.reset() below, and any worker
+    // thread destructors that fire later) will skip CUDA/nvJPEG2K cleanup.
+    sCUDAAvailable.store(0);
+
+    // Release the thread-local context for this thread.  The destructor
+    // will see sCUDAAvailable==0 and skip cleanup.
     sThreadContext.reset();
 
-    // Note: Other thread contexts will be cleaned up when their threads exit
-    // or when their thread_local storage is destroyed.
-    // The sAllContexts list is mainly for debugging/tracking purposes.
+    // The nvJPEG2K library has internal threads that throw
+    // nvjpeg2k::ExceptionJPEG during process teardown.  Those threads are
+    // outside our control, so install a terminate handler that exits
+    // cleanly instead of aborting.  This MUST be done here (during
+    // shutdown) rather than earlier, because the viewer's main() installs
+    // its own terminate handler that would overwrite ours.
+    std::set_terminate(nvjpeg2kTerminateHandler);
+    std::signal(SIGABRT, nvjpeg2kSigabrtHandler);
 
-    LL_INFOS("CUDA") << "CUDA context cleanup initiated" << LL_ENDL;
+    LL_INFOS("CUDA") << "CUDA context cleanup complete" << LL_ENDL;
 }
 
 // static
