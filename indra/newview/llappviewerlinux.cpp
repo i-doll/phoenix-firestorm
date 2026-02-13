@@ -39,6 +39,7 @@
 #include "llfindlocale.h"
 
 #include <exception>
+#include <unistd.h>
 
 #include <gio/gio.h>
 #include <resolv.h>
@@ -152,7 +153,11 @@ int main( int argc, char **argv )
     }
     delete viewer_app_ptr;
     viewer_app_ptr = NULL;
-    return 0;
+
+    // Use _exit() to bypass static destructors and atexit handlers.
+    // Third-party libraries (notably nvJPEG2K) can throw exceptions from
+    // internal threads during static destruction, causing abort().
+    _exit(0);
 }
 
 LLAppViewerLinux::LLAppViewerLinux()
