@@ -35,6 +35,7 @@ class LLScrollListCtrl;
 class LLGLTFMaterial;
 class LLViewerObject;
 class LLTextureEntry;
+namespace tinygltf { class Model; }
 
 class LLLocalGLTFMaterial : public LLFetchedGLTFMaterial
 {
@@ -51,9 +52,16 @@ public: /* accessors */
 
 public:
     bool updateSelf();
+    bool updateFromModel(const LLSD& new_last_modified, const tinygltf::Model& model, bool notify_on_fail);
+    LLSD getLastModified() const;
+    bool isLinkActive() const;
+    void handleMissingFile(bool notify);
+    void handleDecodeFailure(bool notify);
 
 private:
     bool loadMaterial();
+    bool loadMaterialFromModel(const tinygltf::Model& model);
+    bool applyMaterialLoaded(const LLSD& new_last_modified);
 
 private: /* private enums */
     enum ELinkStatus
@@ -116,4 +124,3 @@ private:
 };
 
 #endif // LL_LOCALGLTFMATERIALS_H
-
