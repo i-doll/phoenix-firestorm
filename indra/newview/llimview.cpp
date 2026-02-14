@@ -79,6 +79,7 @@
 #include "llviewerregion.h"
 #include "llcorehttputil.h"
 #include "lluiusage.h"
+#include "llstartup.h"
 #include "llurlregistry.h"
 // [RLVa:KB] - Checked: 2013-05-10 (RLVa-1.4.9)
 #include "rlvactions.h"
@@ -4883,7 +4884,7 @@ void LLIMMgr::processIMTypingCore(const LLUUID& from_id, const EInstantMessage i
 
     // <FS:Ansariel> Announce incoming IMs
     static LLCachedControl<bool> announceIncomingIM(gSavedSettings, "FSAnnounceIncomingIM");
-    if (typing && !gIMMgr->hasSession(session_id) && announceIncomingIM)
+    if (typing && !gIMMgr->hasSession(session_id) && announceIncomingIM && LLStartUp::getStartupState() == STATE_STARTED)
     {
         LLAvatarNameCache::get(from_id, boost::bind(&typingNameCallback, _1, _2, session_id));
     }
@@ -5299,4 +5300,3 @@ LLHTTPRegistration<LLViewerChatterBoxSessionUpdate>
 LLHTTPRegistration<LLViewerChatterBoxInvitation>
     gHTTPRegistrationMessageChatterBoxInvitation(
         "/message/ChatterBoxInvitation");
-

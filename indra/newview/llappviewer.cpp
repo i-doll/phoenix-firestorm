@@ -6741,6 +6741,22 @@ void LLAppViewer::idleNameCache()
     }
 
     LLAvatarNameCache::getInstance()->idle();
+
+    // Periodically refresh friend display names so we don't miss updates
+    // when the DisplayNameUpdate message isn't delivered.
+    static LLFrameTimer sFriendNameRefreshTimer;
+    static const F32 FRIEND_NAME_REFRESH_INTERVAL = 900.0f;
+    if (LLAvatarName::useDisplayNames() &&
+        sFriendNameRefreshTimer.getElapsedTimeF32() >= FRIEND_NAME_REFRESH_INTERVAL)
+    {
+        LLAvatarTracker::buddy_map_t buddies;
+        LLAvatarTracker::instance().copyBuddyList(buddies);
+        for (const auto& [buddy_id, relationship] : buddies)
+        {
+            LLAvatarNameCache::getInstance()->fetch(buddy_id);
+        }
+        sFriendNameRefreshTimer.reset();
+    }
 }
 
 //
