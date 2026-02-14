@@ -33,6 +33,7 @@
 /* boost: will not compile unless equivalent is undef'd, beware. */
 #include "fix_macros.h"
 #include <boost/filesystem.hpp>
+#include <unordered_map>
 
 /* time headers */
 #include <time.h>
@@ -59,6 +60,22 @@ static const S32 LL_LOCAL_UPDATE_RETRIES    = 5;
 /*=======================================*/
 /*  LLLocalGLTFMaterial: unit class            */
 /*=======================================*/
+static bool get_file_last_modified(const std::string& filename, LLSD& last_modified)
+{
+    if (!gDirUtilp->fileExists(filename))
+    {
+        return false;
+    }
+
+#ifndef LL_WINDOWS
+    const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(filename));
+#else
+    const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(ll_convert<std::wstring>(filename)));
+#endif
+    last_modified = asctime(localtime(&temp_time));
+    return true;
+}
+
 LLLocalGLTFMaterial::LLLocalGLTFMaterial(std::string filename, S32 index)
     : mFilename(filename)
     , mShortName(gDirUtilp->getBaseFileName(filename, true))
@@ -127,85 +144,22 @@ bool LLLocalGLTFMaterial::updateSelf()
     if (mLinkStatus == LS_ON)
     {
         // verifying that the file exists
-        if (gDirUtilp->fileExists(mFilename))
+        LLSD new_last_modified;
+        if (get_file_last_modified(mFilename, new_last_modified))
         {
             // verifying that the file has indeed been modified
-
-#ifndef LL_WINDOWS
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(mFilename));
-#else
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(ll_convert<std::wstring>(mFilename)));
-#endif
-            LLSD new_last_modified = asctime(localtime(&temp_time));
-
             if (mLastModified.asString() != new_last_modified.asString())
             {
                 if (loadMaterial())
                 {
-                    // decode is successful, we can safely proceed.
-                    if (mWorldID.isNull())
-                    {
-                        mWorldID.generate();
-                    }
-                    mLastModified = new_last_modified;
-
-                    // addMaterial will replace material witha a new
-                    // pointer if value already exists but we are
-                    // reusing existing pointer, so it should add only.
-                    gGLTFMaterialList.addMaterial(mWorldID, this);
-
-                    mUpdateRetries = LL_LOCAL_UPDATE_RETRIES;
-
-                    for (LLTextureEntry* entry : mTextureEntires)
-                    {
-                        // Normally a change in applied material id is supposed to
-                        // drop overrides thus reset material, but local materials
-                        // currently reuse their existing asset id, and purpose is
-                        // to preview how material will work in-world, overrides
-                        // included, so do an override to render update instead.
-                        LLGLTFMaterial* override_mat = entry->getGLTFMaterialOverride();
-                        if (override_mat)
-                        {
-                            // do not create a new material, reuse existing pointer
-                            LLFetchedGLTFMaterial* render_mat = (LLFetchedGLTFMaterial*)entry->getGLTFRenderMaterial();
-                            if (render_mat)
-                            {
-                                llassert(dynamic_cast<LLFetchedGLTFMaterial*>(entry->getGLTFRenderMaterial()) != nullptr);
-                                *render_mat = *this;
-                                render_mat->applyOverride(*override_mat);
-                            }
-                        }
-                    }
-
-                    materialBegin();
-                    materialComplete(true);
-                    updated = true;
+                    updated = applyMaterialLoaded(new_last_modified);
                 }
 
                 // if decoding failed, we get here and it will attempt to decode it in the next cycles
                 // until mUpdateRetries runs out. this is done because some software lock the material while writing to it
                 else
                 {
-                    if (mUpdateRetries)
-                    {
-                        mUpdateRetries--;
-                    }
-                    else
-                    {
-                        LL_WARNS("GLTF") << "During the update process the following file was found" << "\n"
-                            << "but could not be opened or decoded for " << LL_LOCAL_UPDATE_RETRIES << " attempts." << "\n"
-                            << "Filename: " << mFilename << "\n"
-                            << "Disabling further update attempts for this file." << LL_ENDL;
-
-                        LLSD notif_args;
-                        notif_args["FNAME"] = mFilename;
-                        notif_args["NRETRIES"] = LL_LOCAL_UPDATE_RETRIES;
-                        LLNotificationsUtil::add("LocalBitmapsUpdateFailedFinal", notif_args);
-
-                        mLinkStatus = LS_BROKEN;
-                        materialBegin();
-                        materialComplete(false);
-                    }
+                    handleDecodeFailure(true);
                 }
             }
 
@@ -213,21 +167,168 @@ bool LLLocalGLTFMaterial::updateSelf()
 
         else
         {
-            LL_WARNS("GLTF") << "During the update process, the following file was not found." << "\n"
+            handleMissingFile(true);
+        }
+    }
+
+    return updated;
+}
+
+bool LLLocalGLTFMaterial::updateFromModel(const LLSD& new_last_modified, const tinygltf::Model& model, bool notify_on_fail)
+{
+    if (mLinkStatus != LS_ON)
+    {
+        return false;
+    }
+
+    if (loadMaterialFromModel(model))
+    {
+        return applyMaterialLoaded(new_last_modified);
+    }
+
+    handleDecodeFailure(notify_on_fail);
+    return false;
+}
+
+LLSD LLLocalGLTFMaterial::getLastModified() const
+{
+    return mLastModified;
+}
+
+bool LLLocalGLTFMaterial::isLinkActive() const
+{
+    return mLinkStatus == LS_ON;
+}
+
+void LLLocalGLTFMaterial::handleMissingFile(bool notify)
+{
+    if (notify)
+    {
+        LL_WARNS("GLTF") << "During the update process, the following file was not found." << "\n"
+            << "Filename: " << mFilename << "\n"
+            << "Disabling further update attempts for this file." << LL_ENDL;
+
+        LLSD notif_args;
+        notif_args["FNAME"] = mFilename;
+        LLNotificationsUtil::add("LocalBitmapsUpdateFileNotFound", notif_args);
+    }
+
+    mLinkStatus = LS_BROKEN;
+    materialBegin();
+    materialComplete(false);
+}
+
+void LLLocalGLTFMaterial::handleDecodeFailure(bool notify)
+{
+    if (mUpdateRetries)
+    {
+        mUpdateRetries--;
+    }
+    else
+    {
+        if (notify)
+        {
+            LL_WARNS("GLTF") << "During the update process the following file was found" << "\n"
+                << "but could not be opened or decoded for " << LL_LOCAL_UPDATE_RETRIES << " attempts." << "\n"
                 << "Filename: " << mFilename << "\n"
                 << "Disabling further update attempts for this file." << LL_ENDL;
 
             LLSD notif_args;
             notif_args["FNAME"] = mFilename;
-            LLNotificationsUtil::add("LocalBitmapsUpdateFileNotFound", notif_args);
+            notif_args["NRETRIES"] = LL_LOCAL_UPDATE_RETRIES;
+            LLNotificationsUtil::add("LocalBitmapsUpdateFailedFinal", notif_args);
+        }
 
+        mLinkStatus = LS_BROKEN;
+        materialBegin();
+        materialComplete(false);
+    }
+}
+
+bool LLLocalGLTFMaterial::loadMaterialFromModel(const tinygltf::Model& model)
+{
+    bool decode_successful = false;
+
+    switch (mExtension)
+    {
+    case ET_MATERIAL_GLTF:
+    case ET_MATERIAL_GLB:
+    {
+            std::string filename_lc = mFilename;
+            LLStringUtil::toLower(filename_lc);
+            std::string material_name;
+
+            decode_successful = LLTinyGLTFHelper::getMaterialFromModel(
+                mFilename,
+                model,
+                mMaterialIndex,
+                this,
+                material_name);
+
+            if (!material_name.empty())
+            {
+                mShortName = gDirUtilp->getBaseFileName(filename_lc, true) + " (" + material_name + ")";
+            }
+
+            break;
+        }
+
+        default:
+        {
+            // separating this into -several- LL_WARNS() calls because in the extremely unlikely case that this happens
+            // accessing mFilename and any other object properties might very well crash the viewer.
+            // getting here should be impossible, or there's been a pretty serious bug.
+
+            LL_WARNS("GLTF") << "During a decode attempt, the following local material had no properly assigned extension." << LL_ENDL;
+            LL_WARNS("GLTF") << "Filename: " << mFilename << LL_ENDL;
+            LL_WARNS("GLTF") << "Disabling further update attempts for this file." << LL_ENDL;
             mLinkStatus = LS_BROKEN;
-            materialBegin();
-            materialComplete(false);
         }
     }
 
-    return updated;
+    return decode_successful;
+}
+
+bool LLLocalGLTFMaterial::applyMaterialLoaded(const LLSD& new_last_modified)
+{
+    // decode is successful, we can safely proceed.
+    if (mWorldID.isNull())
+    {
+        mWorldID.generate();
+    }
+    mLastModified = new_last_modified;
+
+    // addMaterial will replace material witha a new
+    // pointer if value already exists but we are
+    // reusing existing pointer, so it should add only.
+    gGLTFMaterialList.addMaterial(mWorldID, this);
+
+    mUpdateRetries = LL_LOCAL_UPDATE_RETRIES;
+
+    for (LLTextureEntry* entry : mTextureEntires)
+    {
+        // Normally a change in applied material id is supposed to
+        // drop overrides thus reset material, but local materials
+        // currently reuse their existing asset id, and purpose is
+        // to preview how material will work in-world, overrides
+        // included, so do an override to render update instead.
+        LLGLTFMaterial* override_mat = entry->getGLTFMaterialOverride();
+        if (override_mat)
+        {
+            // do not create a new material, reuse existing pointer
+            LLFetchedGLTFMaterial* render_mat = (LLFetchedGLTFMaterial*)entry->getGLTFRenderMaterial();
+            if (render_mat)
+            {
+                llassert(dynamic_cast<LLFetchedGLTFMaterial*>(entry->getGLTFRenderMaterial()) != nullptr);
+                *render_mat = *this;
+                render_mat->applyOverride(*override_mat);
+            }
+        }
+    }
+
+    materialBegin();
+    materialComplete(true);
+    return true;
 }
 
 bool LLLocalGLTFMaterial::loadMaterial()
@@ -344,7 +445,17 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::vector<std::string>& filenames)
 S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename)
 {
     tinygltf::Model model;
-    LLTinyGLTFHelper::loadModel(filename, model);
+    if (!LLTinyGLTFHelper::loadModel(filename, model))
+    {
+        LL_WARNS("GLTF") << "Attempted to add invalid or unreadable image file, attempt cancelled.\n"
+            << "Filename: " << filename << LL_ENDL;
+
+        LLSD notif_args;
+        notif_args["FNAME"] = filename;
+        LLNotificationsUtil::add("LocalGLTFVerifyFail", notif_args);
+
+        return 0;
+    }
 
     auto materials_in_file = model.materials.size();
     if (materials_in_file <= 0)
@@ -352,28 +463,43 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename)
         return 0;
     }
 
+    LLSD new_last_modified;
+    if (!get_file_last_modified(filename, new_last_modified))
+    {
+        LL_WARNS("GLTF") << "Attempted to add missing file, attempt cancelled.\n"
+            << "Filename: " << filename << LL_ENDL;
+
+        LLSD notif_args;
+        notif_args["FNAME"] = filename;
+        LLNotificationsUtil::add("LocalGLTFVerifyFail", notif_args);
+
+        return 0;
+    }
+
     S32 loaded_materials = 0;
+    bool notify_fail = true;
     for (size_t i = 0; i < materials_in_file; i++)
     {
-        // Todo: this is rather inefficient, files will be spammed with
-        // separate loads and date checks, find a way to improve this.
-        // May be doUpdates() should be checking individual files.
         LLPointer<LLLocalGLTFMaterial> unit = new LLLocalGLTFMaterial(filename, static_cast<S32>(i));
 
         // load material from file
-        if (unit->updateSelf())
+        if (unit->updateFromModel(new_last_modified, model, false))
         {
             mMaterialList.emplace_back(unit);
             loaded_materials++;
         }
         else
         {
-            LL_WARNS("GLTF") << "Attempted to add invalid or unreadable image file, attempt cancelled.\n"
-                << "Filename: " << filename << LL_ENDL;
+            if (notify_fail)
+            {
+                LL_WARNS("GLTF") << "Attempted to add invalid or unreadable image file, attempt cancelled.\n"
+                    << "Filename: " << filename << LL_ENDL;
 
-            LLSD notif_args;
-            notif_args["FNAME"] = filename;
-            LLNotificationsUtil::add("LocalGLTFVerifyFail", notif_args);
+                LLSD notif_args;
+                notif_args["FNAME"] = filename;
+                LLNotificationsUtil::add("LocalGLTFVerifyFail", notif_args);
+                notify_fail = false;
+            }
 
             unit = NULL;
         }
@@ -493,11 +619,57 @@ void LLLocalGLTFMaterialMgr::doUpdates()
     // preventing theoretical overlap in cases with huge number of loaded images.
     mTimer.stopTimer();
 
+    std::unordered_map<std::string, std::vector<LLLocalGLTFMaterial*> > units_by_file;
     for (local_list_iter iter = mMaterialList.begin(); iter != mMaterialList.end(); iter++)
     {
-        (*iter)->updateSelf();
+        LLLocalGLTFMaterial* unit = iter->get();
+        if (unit && unit->isLinkActive())
+        {
+            units_by_file[unit->getFilename()].push_back(unit);
+        }
+    }
+
+    for (const auto& [filename, units] : units_by_file)
+    {
+        if (units.empty())
+        {
+            continue;
+        }
+
+        LLSD new_last_modified;
+        if (!get_file_last_modified(filename, new_last_modified))
+        {
+            bool notify = true;
+            for (LLLocalGLTFMaterial* unit : units)
+            {
+                unit->handleMissingFile(notify);
+                notify = false;
+            }
+            continue;
+        }
+
+        if (units.front()->getLastModified().asString() == new_last_modified.asString())
+        {
+            continue;
+        }
+
+        tinygltf::Model model;
+        if (!LLTinyGLTFHelper::loadModel(filename, model))
+        {
+            bool notify = true;
+            for (LLLocalGLTFMaterial* unit : units)
+            {
+                unit->handleDecodeFailure(notify);
+                notify = false;
+            }
+            continue;
+        }
+
+        for (LLLocalGLTFMaterial* unit : units)
+        {
+            unit->updateFromModel(new_last_modified, model, false);
+        }
     }
 
     mTimer.startTimer();
 }
-
