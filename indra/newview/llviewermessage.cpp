@@ -72,6 +72,7 @@
 #include "llinventoryfunctions.h"
 #include "llinventoryobserver.h"
 #include "llinventorypanel.h"
+#include "llinventorymodelbackgroundfetch.h"
 // <FS:Ansariel> [FS communication UI]
 //#include "llfloaterimnearbychat.h"
 #include "fsfloaternearbychat.h"
@@ -122,6 +123,7 @@
 #include "llviewerdisplay.h"
 #include "llkeythrottle.h"
 #include "llgroupactions.h"
+#include "llaisapi.h"
 #include "llagentui.h"
 #include "llpanelblockedlist.h"
 #include "llpanelplaceprofile.h"
@@ -6522,6 +6524,51 @@ bool handle_teleport_access_blocked(LLSD& llsdBlock, const std::string & notific
     return returnValue;
 }
 
+static void try_recover_inventory_connection(const std::string& notification_id)
+{
+    static F64 s_last_recovery_time = 0.0;
+    const F64 now = LLFrameTimer::getElapsedSeconds();
+    if (now - s_last_recovery_time < 10.0)
+    {
+        return;
+    }
+    s_last_recovery_time = now;
+
+    LL_WARNS("Inventory") << "Inventory create failure (" << notification_id
+                          << "), refreshing inventory state." << LL_ENDL;
+    {
+        LLSD args;
+        args["MESSAGE"] = LLTrans::getString("InventoryRecoveryAttempt");
+        LLNotificationsUtil::add("SystemMessageTip", args);
+    }
+
+    if (LLViewerRegion* region = gAgent.getRegion())
+    {
+        const std::string seed_url = region->getCapability("Seed");
+        if (!seed_url.empty())
+        {
+            LL_WARNS("Inventory") << "Refreshing region seed capabilities for recovery." << LL_ENDL;
+            region->setSeedCapability(seed_url);
+        }
+        else
+        {
+            LL_WARNS("Inventory") << "No seed capability available for recovery." << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_WARNS("Inventory") << "No region available for recovery." << LL_ENDL;
+    }
+
+    if (AISAPI::isAvailable())
+    {
+        AISAPI::FetchCOF();
+    }
+
+    LLUUID root_id = gInventory.getRootFolderID();
+    LLInventoryModelBackgroundFetch::instance().start(root_id.isNull() ? LLUUID::null : root_id, true);
+}
+
 bool attempt_standard_notification(LLMessageSystem* msgsystem)
 {
     // if we have additional alert data
@@ -6542,6 +6589,12 @@ bool attempt_standard_notification(LLMessageSystem* msgsystem)
         if (!LLNotifications::getInstance()->templateExists(notificationID))
         {
             return false;
+        }
+
+        if (notificationID == "CantCreateRequestedInv" ||
+            notificationID == "CantCreateRequestedInvFolder")
+        {
+            try_recover_inventory_connection(notificationID);
         }
 
         // <FS:Ansariel> FIRE-12004: Attachments getting lost on TP; Not clear if these messages are actually
@@ -6846,14 +6899,24 @@ void process_alert_core(const std::string& message, bool modal)
         std::string alert_name(message.substr(ALERT_PREFIX.length()));
         if (!handle_special_alerts(alert_name))
         {
-        LLNotificationsUtil::add(alert_name);
-    }
+            if (alert_name == "CantCreateRequestedInv" ||
+                alert_name == "CantCreateRequestedInvFolder")
+            {
+                try_recover_inventory_connection(alert_name);
+            }
+            LLNotificationsUtil::add(alert_name);
+        }
     }
     else if (message.find(NOTIFY_PREFIX) == 0)
     {
         // Allow the server to spawn a named notification so that server notifications can be
         // translated out of English.
         std::string notify_name(message.substr(NOTIFY_PREFIX.length()));
+        if (notify_name == "CantCreateRequestedInv" ||
+            notify_name == "CantCreateRequestedInvFolder")
+        {
+            try_recover_inventory_connection(notify_name);
+        }
         LLNotificationsUtil::add(notify_name);
     }
     else if (message[0] == '/')
@@ -6969,6 +7032,12 @@ void process_alert_core(const std::string& message, bool modal)
     }
     else
     {
+        if (message == "Cannot create requested inventory." ||
+            message == "Cannot create requested inventory folder.")
+        {
+            try_recover_inventory_connection(message);
+        }
+
         // Hack fix for EXP-623 (blame fix on RN :)) to avoid a sim deploy
         const std::string AUTOPILOT_CANCELED_MSG("Autopilot canceled");
         if (message.find(AUTOPILOT_CANCELED_MSG) == std::string::npos )
