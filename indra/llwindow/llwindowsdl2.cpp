@@ -1254,7 +1254,11 @@ void LLWindowSDL::gatherInput()
                 mKeyModifiers = gKeyboard->currentMask( false );
                 if (altGrMask)
                 {
-                    mKeyModifiers &= ~MASK_ALT;
+                    // AltGr may appear as RALT alone or as LCTRL+RALT depending
+                    // on the backend.  Strip both phantom modifiers so the text
+                    // is routed to handleUnicodeUTF16 instead of being mistaken
+                    // for a Ctrl/Alt shortcut.
+                    mKeyModifiers &= ~(MASK_ALT | MASK_CONTROL);
                 }
                 mInputType = "textinput";
                 for( auto key: string )
@@ -1275,20 +1279,22 @@ void LLWindowSDL::gatherInput()
             case SDL_KEYDOWN:
                 mKeyVirtualKey = event.key.keysym.sym;
                 mKeyModifiers = event.key.keysym.mod & (~altGrMask);
+                if (altGrMask)
+                {
+                    // Also strip the phantom LCTRL that X11 sends alongside
+                    // AltGr, so character keys don't trigger Ctrl shortcuts.
+                    mKeyModifiers &= ~KMOD_LCTRL;
+                }
                 mInputType = "keydown";
 
                 // Detect AltGr via SDL2 scancode.
                 // On keyboards with AltGr, RALT acts as Level3 Shift.
-                // SDL2's Wayland backend handles the actual text input correctly,
-                // but we need to track the modifier mask for the TEXTINPUT handler.
+                // Some backends (X11) send a phantom LCTRL alongside RALT,
+                // others (Wayland) send just RALT. Detect both cases so that
+                // the TEXTINPUT handler can strip the phantom modifiers.
                 if (event.key.keysym.scancode == SDL_SCANCODE_RALT)
                 {
-                    // If RALT + LCTRL are both pressed, this is likely AltGr
-                    // (many keyboard layouts send LCTRL+RALT for AltGr)
-                    if (event.key.keysym.mod & KMOD_LCTRL)
-                    {
-                        altGrMask = KMOD_RALT;
-                    }
+                    altGrMask = KMOD_RALT;
                 }
 
                 // treat all possible Enter/Return keys the same
@@ -1331,6 +1337,10 @@ void LLWindowSDL::gatherInput()
             case SDL_KEYUP:
                 mKeyVirtualKey = event.key.keysym.sym;
                 mKeyModifiers = event.key.keysym.mod & (~altGrMask);
+                if (altGrMask)
+                {
+                    mKeyModifiers &= ~KMOD_LCTRL;
+                }
                 mInputType = "keyup";
 
                 // Clear AltGr mask when RALT is released
