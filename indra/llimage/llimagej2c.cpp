@@ -52,6 +52,15 @@ extern LLImageJ2CImpl* createLLImageJ2CNVJPEG();
 static LLImageJ2CImpl* createLLImageJ2CImpl()
 {
 #if LL_NVJPEG2K
+    // Runtime kill switch for troubleshooting driver/library issues:
+    // LL_DISABLE_NVJPEG2K=1 forces OpenJPEG even in nvJPEG2K builds.
+    static bool sDisableNVJPEG2K = !LLStringUtil::getenv("LL_DISABLE_NVJPEG2K").empty();
+
+    if (sDisableNVJPEG2K)
+    {
+        return fallbackCreateLLImageJ2CImpl();
+    }
+
     if (LLCUDAContext::isCUDAAvailable())
     {
         return createLLImageJ2CNVJPEG();
@@ -697,4 +706,3 @@ void LLImageCompressionTester::updateDecompressionStats(const S32 bytesIn, const
 //----------------------------------------------------------------------------------------------
 // End of LLTexturePipelineTester
 //----------------------------------------------------------------------------------------------
-
