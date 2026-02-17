@@ -180,6 +180,14 @@ bool LLImageJ2CNVJPEG::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 d
 bool LLImageJ2CNVJPEG::decodeCUDA(LLImageJ2C &base, LLImageRaw &raw_image,
                                    S32 first_channel, S32 max_channel_count)
 {
+    // The current nvJPEG2K path only safely handles full-resolution output.
+    // For discard-level decodes, fall back to OpenJPEG to avoid incorrect
+    // output sizing and potential buffer corruption.
+    if (base.mDiscardLevel > 0)
+    {
+        return false;
+    }
+
     LLCUDAContext* ctx = LLCUDAContext::getThreadContext();
     if (!ctx)
     {
@@ -227,24 +235,13 @@ bool LLImageJ2CNVJPEG::decodeCUDA(LLImageJ2C &base, LLImageRaw &raw_image,
             return false;
         }
 
-        // Get number of resolution levels from first tile
-        uint32_t num_res = 1;
-        status = nvjpeg2kStreamGetResolutionsInTile(jpeg2k_stream, 0, &num_res);
-        if (status != NVJPEG2K_STATUS_SUCCESS)
+        U32 output_width = image_info.image_width;
+        U32 output_height = image_info.image_height;
+        if (output_width == 0 || output_height == 0)
         {
-            // Default to 1 if we can't get the info
-            num_res = 1;
+            nvjpeg2kStreamDestroy(jpeg2k_stream);
+            return false;
         }
-
-        // Set reduction factor for discard level
-        U32 discard = static_cast<U32>(base.mDiscardLevel);
-        U32 reduction = (discard < num_res) ? discard : (num_res > 0 ? num_res - 1 : 0);
-
-        // Calculate output dimensions based on reduction
-        U32 output_width = image_info.image_width >> reduction;
-        U32 output_height = image_info.image_height >> reduction;
-        if (output_width == 0) output_width = 1;
-        if (output_height == 0) output_height = 1;
 
         U32 num_components = image_info.num_components;
         S32 channels = static_cast<S32>(num_components) - first_channel;
@@ -377,7 +374,7 @@ bool LLImageJ2CNVJPEG::decodeCUDA(LLImageJ2C &base, LLImageRaw &raw_image,
             }
         }
 
-        base.setDiscardLevel(reduction);
+        base.setDiscardLevel(0);
 
         return true;
     }
