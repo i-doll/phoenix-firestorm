@@ -508,6 +508,32 @@
 
             <pie_slice
                 enabled="false"
+                label="Compile (LSL → Luau)"
+                name="CompileLSLLuau">
+                <pie_slice.on_click
+                    function="Tools.SelectedScriptAction"
+                    parameter="compile lsl-luau" />
+                <pie_slice.on_visible
+                    function="LuaScriptsEnabledInRegion" />
+                <pie_slice.on_enable
+                    function="EditableSelectedLuau" />
+            </pie_slice>
+
+            <pie_slice
+                enabled="false"
+                label="Compile (Luau)"
+                name="CompileLuau">
+                <pie_slice.on_click
+                    function="Tools.SelectedScriptAction"
+                    parameter="compile luau" />
+                <pie_slice.on_visible
+                    function="LuaScriptsEnabledInRegion" />
+                <pie_slice.on_enable
+                    function="EditableSelectedLuau" />
+            </pie_slice>
+
+            <pie_slice
+                enabled="false"
                 label="Reset Scripts"
                 name="Object Reset Scripts">
                 <pie_slice.on_click

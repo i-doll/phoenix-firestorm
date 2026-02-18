@@ -41,37 +41,57 @@ class LLSyntaxIdLSL : public LLSingleton<LLSyntaxIdLSL>
     LLSINGLETON(LLSyntaxIdLSL);
     friend class fetchKeywordsFileResponder;
 
+public:
+    using syntax_id_changed_signal_t = boost::signals2::signal<void()>;
+    using syntax_id_changed_h        = boost::signals2::connection;
+
+    void                initialize();
+    bool                keywordFetchInProgress();
+    LLSD                getKeywordsXML() const { return mKeywordsXml; };
+    LLUUID              getSyntaxID() const { return mSyntaxId; }
+    syntax_id_changed_h addSyntaxIDCallback(const syntax_id_changed_signal_t::slot_type& cb);
+
 private:
-    std::set<std::string> mInflightFetches;
-    typedef boost::signals2::signal<void()> syntax_id_changed_signal_t;
+    std::set<std::string>      mInflightFetches;
     syntax_id_changed_signal_t mSyntaxIDChangedSignal;
-    boost::signals2::connection mRegionChangedCallback;
+    syntax_id_changed_h        mRegionChangedCallback;
 
-    bool    syntaxIdChanged();
-    bool    isSupportedVersion(const LLSD& content);
-    void    handleRegionChanged();
-    void    handleCapsReceived(const LLUUID& region_uuid);
-    void    setKeywordsXml(const LLSD& content) { mKeywordsXml = content; };
-    void    buildFullFileSpec();
-    void    fetchKeywordsFile(const std::string& filespec);
-    void    loadDefaultKeywordsIntoLLSD();
-    void    loadKeywordsIntoLLSD();
+    bool syntaxIdChanged();
+    bool isSupportedVersion(const LLSD& content);
+    void handleRegionChanged();
+    void handleCapsReceived(const LLUUID& region_uuid);
+    void setKeywordsXml(const LLSD& content) { mKeywordsXml = content; };
+    void buildFullFileSpec();
+    void fetchKeywordsFile(const std::string& filespec);
+    void loadDefaultKeywordsIntoLLSD();
+    void loadKeywordsIntoLLSD();
 
-    void    fetchKeywordsFileCoro(std::string url, std::string fileSpec);
-    void    cacheFile(const std::string &fileSpec, const LLSD& content_ref);
+    void fetchKeywordsFileCoro(std::string url, std::string fileSpec);
+    void cacheFile(const std::string& fileSpec, const LLSD& content_ref);
 
-    std::string     mCapabilityURL;
-    std::string     mFullFileSpec;
-    ELLPath         mFilePath;
-    LLUUID          mSyntaxId;
-    LLSD            mKeywordsXml;
-    bool            mInitialized;
+    std::string mCapabilityURL;
+    std::string mFullFileSpec;
+    ELLPath     mFilePath;
+    LLUUID      mSyntaxId;
+    LLSD        mKeywordsXml;
+    bool        mInitialized;
+};
+
+class LLSyntaxLua : public LLSingleton<LLSyntaxLua>
+{
+    LLSINGLETON(LLSyntaxLua);
 
 public:
     void initialize();
-    bool keywordFetchInProgress();
-    LLSD getKeywordsXML() const { return mKeywordsXml; };
-    boost::signals2::connection addSyntaxIDCallback(const syntax_id_changed_signal_t::slot_type& cb);
+    LLSD getKeywordsXML() const { return mKeywordsXml; }
+    LLSD getTypesXML() const { return mTypesXml; }
+
+private:
+    void loadDefaultKeywordsIntoLLSD();
+    void loadLuaTypesIntoLLSD();
+    LLSD mKeywordsXml;
+    LLSD mTypesXml;
+    bool mInitialized;
 };
 
 #endif // LLSYNTAXID_H

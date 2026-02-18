@@ -369,9 +369,22 @@
   <combo_box
     follows="left|bottom"
     height="23"
+    label="Compile target"
+    layout="topleft"
+    name="compile_target"
+    width="120">
+    <combo_item name="lsl2" value="lsl2" label="LSL2" />
+    <combo_item name="mono" value="mono" label="Mono" />
+    <combo_item name="lsl-luau" value="lsl-luau" label="LSL → Luau" enabled="false" />
+    <combo_item name="luau" value="luau" label="Luau" enabled="false" />
+  </combo_box>
+  <combo_box
+    follows="left|bottom"
+    height="23"
     label="Insert..."
     layout="topleft"
     name="Insert..."
+     left_pad="8"
      width="128" />
     <text
      follows="left|bottom"
