@@ -135,6 +135,29 @@
           <menu_item_call.on_enable
             function="EditableSelected" />
         </menu_item_call>
+
+        <menu_item_call
+          label="Compile (LSL → Luau)"
+          name="LSL_Luau">
+          <menu_item_call.on_click
+            function="Tools.SelectedScriptAction"
+            parameter="compile lsl-luau" />
+          <menu_item_call.on_visible
+            function="LuaScriptsEnabledInRegion" />
+          <menu_item_call.on_enable
+            function="EditableSelectedLuau" />
+        </menu_item_call>
+        <menu_item_call
+          label="Compile (Luau)"
+          name="Luau">
+          <menu_item_call.on_click
+            function="Tools.SelectedScriptAction"
+            parameter="compile luau" />
+          <menu_item_call.on_visible
+            function="LuaScriptsEnabledInRegion" />
+          <menu_item_call.on_enable
+            function="EditableSelectedLuau" />
+        </menu_item_call>
        <menu_item_call
           label="Reset Scripts"
           name="Object Reset Scripts">

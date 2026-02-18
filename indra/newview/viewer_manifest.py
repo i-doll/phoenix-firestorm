@@ -89,8 +89,12 @@ class ViewerManifest(LLManifest,FSViewerManifest):
         # </FS:Ansariel>
 
         # <FS:Ansariel> Copy emoji characters to build output
-        with self.prefix(src=pkgdir, dst="skins/default"):
-            self.path("xui")
+        # The emoji mapping file(s) live in the 3p package under 'packages/xui'.
+        # Some codepaths search only CURRENT_SKIN XUI; ensure every shipped skin
+        # has the mappings available.
+        for skin in ("default", "firestorm", "vintage", "starlight", "starlightcui", "ansastorm", "metaharper"):
+            with self.prefix(src=pkgdir, dst=f"skins/{skin}"):
+                self.path("xui")
         # </FS:Ansariel>
 
         if self.is_packaging_viewer():

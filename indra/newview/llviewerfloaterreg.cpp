@@ -25,7 +25,6 @@
  * $/LicenseInfo$
  */
 
-
 #include "llviewerprecompiledheaders.h"
 
 #include "llfloaterreg.h"
@@ -41,7 +40,7 @@
 #include "llfloaterautoreplacesettings.h"
 #include "llfloateravatarpicker.h"
 #include "llfloateravatarwelcomepack.h"
-//#include "llfloateravatarrendersettings.h" // <FS:Ansariel> [FS Persisted Avatar Render Settings]
+// #include "llfloateravatarrendersettings.h" // <FS:Ansariel> [FS Persisted Avatar Render Settings]
 #include "llfloateravatartextures.h"
 #include "llfloaterbanduration.h"
 #include "llfloaterbigpreview.h"
@@ -171,7 +170,7 @@
 #include "llmaterialeditor.h"
 #include "llmoveview.h"
 // <FS:Ansariel> [FS communication UI]
-//#include "llfloaterimnearbychat.h
+// #include "llfloaterimnearbychat.h
 #include "fsfloaternearbychat.h"
 // <FS:Ansariel> [FS communication UI]
 #include "fsfloaterposer.h" // <FS:AR> [FIRE-30873]: Poser
@@ -227,7 +226,7 @@
 #include "fsfloatervramusage.h"
 #include "fsfloaterwearablefavorites.h"
 #include "fsmoneytracker.h"
-//#include "fspanelclassified.h"
+// #include "fspanelclassified.h"
 #include "lggbeamcolormapfloater.h"
 #include "lggbeammapfloater.h"
 #include "llfloaterdisplayname.h"
@@ -240,7 +239,7 @@
 #include "NACLfloaterexploresounds.h"
 #include "particleeditor.h"
 #include "quickprefs.h"
-#include "vjfloaterlocalmesh.h" // local mesh
+#include "vjfloaterlocalmesh.h"       // local mesh
 #include "fsfloaterwhitelisthelper.h" // fs whitelist helper
 #include "omnifilter.h"               // Omnifilter support
 
@@ -250,13 +249,9 @@ class LLFloaterOpenHandler : public LLCommandHandler
 {
 public:
     // requires trusted browser to trigger or an explicit click
-    LLFloaterOpenHandler() : LLCommandHandler("openfloater", UNTRUSTED_THROTTLE) { }
+    LLFloaterOpenHandler() : LLCommandHandler("openfloater", UNTRUSTED_THROTTLE) {}
 
-    bool canHandleUntrusted(
-        const LLSD& params,
-        const LLSD& query_map,
-        LLMediaCtrl* web,
-        const std::string& nav_type) override
+    bool canHandleUntrusted(const LLSD& params, const LLSD& query_map, LLMediaCtrl* web, const std::string& nav_type) override
     {
         if (params.size() != 1)
         {
@@ -268,33 +263,30 @@ public:
         // External browsers explicitly ask user about opening links
         // so treat "external" same as "clicked" in this case,
         // despite it being treated as untrusted.
-        if (nav_type == NAV_TYPE_CLICKED
-            || nav_type == NAV_TYPE_EXTERNAL)
+        if (nav_type == NAV_TYPE_CLICKED || nav_type == NAV_TYPE_EXTERNAL)
         {
-            const std::list<std::string> blacklist_clicked = {
-                "camera_presets",
-                "delete_pref_preset",
-                "forget_username",
-                "gltf_asset_editor",
-                "god_tools",
-                "group_picker",
-                "hud",
-                "incoming_call",
-                "linkreplace",
-                "message_critical", // Modal!!! Login specific.
-                "message_tos", // Modal!!! Login specific.
-                "save_pref_preset",
-                "save_camera_preset",
-                "region_restarting",
-                "outfit_snapshot",
-                "upload_anim_bvh",
-                "upload_anim_anim",
-                "upload_image",
-                "upload_model",
-                "upload_script",
-                "upload_sound",
-                "bulk_upload"
-            };
+            const std::list<std::string> blacklist_clicked = { "camera_presets",
+                                                               "delete_pref_preset",
+                                                               "forget_username",
+                                                               "gltf_asset_editor",
+                                                               "god_tools",
+                                                               "group_picker",
+                                                               "hud",
+                                                               "incoming_call",
+                                                               "linkreplace",
+                                                               "message_critical", // Modal!!! Login specific.
+                                                               "message_tos",      // Modal!!! Login specific.
+                                                               "save_pref_preset",
+                                                               "save_camera_preset",
+                                                               "region_restarting",
+                                                               "outfit_snapshot",
+                                                               "upload_anim_bvh",
+                                                               "upload_anim_anim",
+                                                               "upload_image",
+                                                               "upload_model",
+                                                               "upload_script",
+                                                               "upload_sound",
+                                                               "bulk_upload" };
             return std::find(blacklist_clicked.begin(), blacklist_clicked.end(), fl_name) == blacklist_clicked.end();
         }
         else
@@ -327,7 +319,7 @@ public:
                 "mem_leaking",
                 "marketplace_validation",
                 "message_critical", // Modal!!! Login specific. If this is in use elsewhere, better to create a non modal variant
-                "message_tos", // Modal!!! Login specific.
+                "message_tos",      // Modal!!! Login specific.
                 "mute_object_by_name",
                 "new_feature_notification",
                 "publish_classified",
@@ -350,15 +342,10 @@ public:
             return std::find(blacklist_untrusted.begin(), blacklist_untrusted.end(), fl_name) == blacklist_untrusted.end();
         }
 
-
         return true;
     }
 
-    bool handle(
-        const LLSD& params,
-        const LLSD& query_map,
-        const std::string& grid,
-        LLMediaCtrl* web) override
+    bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web) override
     {
         if (params.size() != 1)
         {
@@ -367,12 +354,12 @@ public:
 
         const std::string floater_name = LLURI::unescape(params[0].asString());
         // <FS:Zi> Support passing arguments to opened floater like secondlife:///app/openfloater/{NAME}?tab=msg&subtab=xyz
-        //LLSD key;
-        //if (floater_name == FLOATER_PROFILE)
+        // LLSD key;
+        // if (floater_name == FLOATER_PROFILE)
         //{
         //    key["id"] = gAgentID;
         //}
-        //LLFloaterReg::showInstance(floater_name, key);
+        // LLFloaterReg::showInstance(floater_name, key);
         if (floater_name == FLOATER_PROFILE)
         {
             LLSD key;
@@ -429,46 +416,68 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("fs_camera_small", "floater_fs_camera_small.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterCamera>);
     LLFloaterReg::add("camera_presets", "floater_camera_presets.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterCameraPresets>);
     LLFloaterReg::add("chat_voice", "floater_voice_chat_volume.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterChatVoiceVolume>);
-    LLFloaterReg::add("change_item_thumbnail", "floater_change_item_thumbnail.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterChangeItemThumbnail>);
+    LLFloaterReg::add("change_item_thumbnail",
+                      "floater_change_item_thumbnail.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterChangeItemThumbnail>);
     // <FS:Ansariel> [FS communication UI]
-    //LLFloaterReg::add("nearby_chat", "floater_im_session.xml", (LLFloaterBuildFunc)&LLFloaterIMNearbyChat::buildFloater);
+    // LLFloaterReg::add("nearby_chat", "floater_im_session.xml", (LLFloaterBuildFunc)&LLFloaterIMNearbyChat::buildFloater);
     LLFloaterReg::add("fs_nearby_chat", "floater_fs_nearby_chat.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterNearbyChat>);
     // </FS:Ansariel> [FS communication UI]
-    LLFloaterReg::add("chat_mention_picker", "floater_chat_mention_picker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterChatMentionPicker>);
+    LLFloaterReg::add("chat_mention_picker",
+                      "floater_chat_mention_picker.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterChatMentionPicker>);
     LLFloaterReg::add("classified", "floater_classified.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterClassified>);
-    LLFloaterReg::add("compile_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterCompileQueue>);
+    LLFloaterReg::add("compile_queue", "floater_compile_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterCompileQueue>);
     LLFloaterReg::add("conversation", "floater_conversation_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterConversationLog>);
     LLFloaterReg::add("add_landmark", "floater_create_landmark.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterCreateLandmark>);
 
-    LLFloaterReg::add("delete_pref_preset", "floater_delete_pref_preset.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeletePrefPreset>);
+    LLFloaterReg::add("delete_pref_preset",
+                      "floater_delete_pref_preset.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeletePrefPreset>);
     LLFloaterReg::add("destinations", "floater_destinations.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDestinations>);
 
     LLFloaterReg::add("emoji_picker", "floater_emoji_picker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEmojiPicker>);
     LLFloaterReg::add("emoji_complete", "floater_emoji_complete.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEmojiComplete>);
     LLFloaterReg::add("env_post_process", "floater_post_process.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPostProcess>);
-	
-	// <FS:William_W:EnvFileReplace> [PhotoTools] Use FS specific XML for Fixed Environment Floater
-    //LLFloaterReg::add("env_fixed_environmentent_water", "floater_fixedenvironment.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentSky>);   // Commenting out original LL line
-    LLFloaterReg::add("env_fixed_environmentent_water", "floater_fs_fixedenvironment.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentWater>);  // Using FS specific floater XML
+
     // <FS:William_W:EnvFileReplace> [PhotoTools] Use FS specific XML for Fixed Environment Floater
-    //LLFloaterReg::add("env_fixed_environmentent_sky", "floater_fixedenvironment.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentSky>);   // Commenting out original LL line	
-    LLFloaterReg::add("env_fixed_environmentent_sky", "floater_fs_fixedenvironment.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentSky>); // Using FS specific floater XML
+    // LLFloaterReg::add("env_fixed_environmentent_water", "floater_fixedenvironment.xml",
+    // (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentSky>);   // Commenting out original LL line
+    LLFloaterReg::add("env_fixed_environmentent_water",
+                      "floater_fs_fixedenvironment.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentWater>); // Using FS specific floater XML
+    // <FS:William_W:EnvFileReplace> [PhotoTools] Use FS specific XML for Fixed Environment Floater
+    // LLFloaterReg::add("env_fixed_environmentent_sky", "floater_fixedenvironment.xml",
+    // (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentSky>);   // Commenting out original LL line
+    LLFloaterReg::add("env_fixed_environmentent_sky",
+                      "floater_fs_fixedenvironment.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFixedEnvironmentSky>); // Using FS specific floater XML
 
-    LLFloaterReg::add("env_adjust_snapshot", "floater_adjust_environment.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEnvironmentAdjust>);
+    LLFloaterReg::add("env_adjust_snapshot",
+                      "floater_adjust_environment.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEnvironmentAdjust>);
 
-    LLFloaterReg::add("env_edit_extdaycycle", "floater_edit_ext_day_cycle.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEditExtDayCycle>);
+    LLFloaterReg::add("env_edit_extdaycycle",
+                      "floater_edit_ext_day_cycle.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEditExtDayCycle>);
     LLFloaterReg::add("my_environments", "floater_my_environments.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMyEnvironment>);
 
     LLFloaterReg::add("event", "floater_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEvent>);
     LLFloaterReg::add("experiences", "floater_experiences.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiences>);
-    LLFloaterReg::add("experience_profile", "floater_experienceprofile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperienceProfile>);
-    LLFloaterReg::add("experience_search", "floater_experience_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiencePicker>);
+    LLFloaterReg::add("experience_profile",
+                      "floater_experienceprofile.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperienceProfile>);
+    LLFloaterReg::add("experience_search",
+                      "floater_experience_search.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiencePicker>);
 
     LLFloaterReg::add("font_test", "floater_font_test.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFontTest>);
-    //LLFloaterReg::add("forget_username", "floater_forget_user.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterForgetUser>);
+    // LLFloaterReg::add("forget_username", "floater_forget_user.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterForgetUser>);
 
     LLFloaterReg::add("gestures", "floater_gesture.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGesture>);
-    LLFloaterReg::add("gltf_asset_editor", "floater_gltf_asset_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGLTFAssetEditor>);
+    LLFloaterReg::add("gltf_asset_editor",
+                      "floater_gltf_asset_editor.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGLTFAssetEditor>);
     LLFloaterReg::add("god_tools", "floater_god_tools.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGodTools>);
     LLFloaterReg::add("grid_status", "floater_grid_status.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGridStatus>);
     LLFloaterReg::add("group_picker", "floater_choose_group.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGroupPicker>);
@@ -478,8 +487,8 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("hud", "floater_hud.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHUD>);
 
     // <FS:Ansariel> [FS communication UI]
-    //LLFloaterReg::add("impanel", "floater_im_session.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterIMSession>);
-    //LLFloaterReg::add("im_container", "floater_im_container.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterIMContainer>);
+    // LLFloaterReg::add("impanel", "floater_im_session.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterIMSession>);
+    // LLFloaterReg::add("im_container", "floater_im_container.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterIMContainer>);
     LLFloaterReg::add("fs_impanel", "floater_fs_im_session.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterIM>);
     LLFloaterReg::add("fs_im_container", "floater_fs_im_container.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterIMContainer>);
     // <FS:Ansariel> [FS communication UI]
@@ -487,10 +496,14 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("incoming_call", "floater_incoming_call.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLIncomingCallDialog>);
     LLFloaterReg::add("inventory", "floater_my_inventory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSidePanelContainer>);
     LLFloaterReg::add("inspect", "floater_inspect.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterInspect>);
-    LLFloaterReg::add("inventory_thumbnails_helper", "floater_inventory_thumbnails_helper.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterInventoryThumbnailsHelper>);
+    LLFloaterReg::add("inventory_thumbnails_helper",
+                      "floater_inventory_thumbnails_helper.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterInventoryThumbnailsHelper>);
     LLFloaterReg::add("item_properties", "floater_item_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterItemProperties>);
     LLFloaterReg::add("task_properties", "floater_task_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterItemProperties>);
-    LLFloaterReg::add("inventory_settings", "floater_inventory_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterInventorySettings>);
+    LLFloaterReg::add("inventory_settings",
+                      "floater_inventory_settings.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterInventorySettings>);
     LLInspectAvatarUtil::registerFloater();
     LLInspectGroupUtil::registerFloater();
     LLInspectObjectUtil::registerFloater();
@@ -502,32 +515,49 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("lagmeter", "floater_lagmeter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLagMeter>);
     LLFloaterReg::add("land_holdings", "floater_land_holdings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLandHoldings>);
     LLFloaterReg::add("linkreplace", "floater_linkreplace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLinkReplace>);
-    LLFloaterReg::add("load_pref_preset", "floater_load_pref_preset.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLoadPrefPreset>);
+    LLFloaterReg::add("load_pref_preset",
+                      "floater_load_pref_preset.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLoadPrefPreset>);
 
     LLFloaterReg::add("mem_leaking", "floater_mem_leaking.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMemLeak>);
 
     LLFloaterReg::add("media_settings", "floater_media_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMediaSettings>);
     LLFloaterReg::add("marketplace", "floater_marketplace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMarketplace>);
-    LLFloaterReg::add("marketplace_listings", "floater_marketplace_listings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMarketplaceListings>);
-    LLFloaterReg::add("marketplace_validation", "floater_marketplace_validation.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMarketplaceValidation>);
+    LLFloaterReg::add("marketplace_listings",
+                      "floater_marketplace_listings.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMarketplaceListings>);
+    LLFloaterReg::add("marketplace_validation",
+                      "floater_marketplace_validation.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMarketplaceValidation>);
     LLFloaterReg::add("message_critical", "floater_critical.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterTOS>);
     LLFloaterReg::add("message_tos", "floater_tos.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterTOS>);
     LLFloaterReg::add("moveview", "floater_moveview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMove>);
-    LLFloaterReg::add("mute_object_by_name", "floater_mute_object.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGetBlockedObjectName>);
+    LLFloaterReg::add("mute_object_by_name",
+                      "floater_mute_object.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGetBlockedObjectName>);
     LLFloaterReg::add("mini_map", "floater_map.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMap>);
-    LLFloaterReg::add("new_feature_notification", "floater_new_feature_notification.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNewFeatureNotification>);
+    LLFloaterReg::add("new_feature_notification",
+                      "floater_new_feature_notification.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNewFeatureNotification>);
 
-    LLFloaterReg::add("notifications_console", "floater_notifications_console.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationConsole>);
+    LLFloaterReg::add("notifications_console",
+                      "floater_notifications_console.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationConsole>);
 
     // <FS:Ansariel> Optional legacy notification well
-    //LLFloaterReg::add("notification_well_window", "floater_notifications_tabbed.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
+    // LLFloaterReg::add("notification_well_window", "floater_notifications_tabbed.xml",
+    // (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
     if (!gSavedSettings.getBOOL("FSInternalLegacyNotificationWell"))
     {
-        LLFloaterReg::add("notification_well_window", "floater_notifications_tabbed.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
+        LLFloaterReg::add("notification_well_window",
+                          "floater_notifications_tabbed.xml",
+                          (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
     }
     else
     {
-        LLFloaterReg::add("notification_well_window", "floater_sys_well.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLNotificationWellWindow>);
+        LLFloaterReg::add("notification_well_window",
+                          "floater_sys_well.xml",
+                          (LLFloaterBuildFunc)&LLFloaterReg::build<LLNotificationWellWindow>);
     }
     // </FS:Ansariel>
 
@@ -536,43 +566,88 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("outgoing_call", "floater_outgoing_call.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLOutgoingCallDialog>);
     LLFloaterPayUtil::registerFloater();
 
-    LLFloaterReg::add("pathfinding_characters", "floater_pathfinding_characters.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPathfindingCharacters>);
-    LLFloaterReg::add("pathfinding_linksets", "floater_pathfinding_linksets.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPathfindingLinksets>);
-    LLFloaterReg::add("pathfinding_console", "floater_pathfinding_console.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPathfindingConsole>);
+    LLFloaterReg::add("pathfinding_characters",
+                      "floater_pathfinding_characters.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPathfindingCharacters>);
+    LLFloaterReg::add("pathfinding_linksets",
+                      "floater_pathfinding_linksets.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPathfindingLinksets>);
+    LLFloaterReg::add("pathfinding_console",
+                      "floater_pathfinding_console.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPathfindingConsole>);
     LLFloaterReg::add("people", "floater_people.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSidePanelContainer>);
-    //LLFloaterReg::add("performance", "floater_performance.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPerformance>);
+    // LLFloaterReg::add("performance", "floater_performance.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPerformance>);
     LLFloaterReg::add("perms_default", "floater_perms_default.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPermsDefault>);
     LLFloaterReg::add("places", "floater_places.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSidePanelContainer>);
     LLFloaterReg::add("preferences", "floater_preferences.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPreference>);
-    // LLFloaterReg::add("prefs_graphics_advanced", "floater_preferences_graphics_advanced.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPreferenceGraphicsAdvanced>);
-    LLFloaterReg::add("prefs_view_advanced", "floater_preferences_view_advanced.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPreferenceViewAdvanced>);
+    // LLFloaterReg::add("prefs_graphics_advanced", "floater_preferences_graphics_advanced.xml",
+    // (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPreferenceGraphicsAdvanced>);
+    LLFloaterReg::add("prefs_view_advanced",
+                      "floater_preferences_view_advanced.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPreferenceViewAdvanced>);
     LLFloaterReg::add("prefs_proxy", "floater_preferences_proxy.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPreferenceProxy>);
-    LLFloaterReg::add("prefs_spellchecker_import", "floater_spellcheck_import.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSpellCheckerImport>);
-    LLFloaterReg::add("prefs_translation", "floater_translation_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterTranslationSettings>);
-    LLFloaterReg::add("prefs_spellchecker", "floater_spellcheck.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSpellCheckerSettings>);
-    LLFloaterReg::add("prefs_autoreplace", "floater_autoreplace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAutoReplaceSettings>);
+    LLFloaterReg::add("prefs_spellchecker_import",
+                      "floater_spellcheck_import.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSpellCheckerImport>);
+    LLFloaterReg::add("prefs_translation",
+                      "floater_translation_settings.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterTranslationSettings>);
+    LLFloaterReg::add("prefs_spellchecker",
+                      "floater_spellcheck.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSpellCheckerSettings>);
+    LLFloaterReg::add("prefs_autoreplace",
+                      "floater_autoreplace.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAutoReplaceSettings>);
     LLFloaterReg::add("pref_joystick", "floater_joystick.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterJoystick>);
-    LLFloaterReg::add("preview_anim", "floater_preview_animation.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewAnim>/*, "preview"*/);
-    LLFloaterReg::add("preview_conversation", "floater_conversation_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterConversationPreview>);
-    LLFloaterReg::add("preview_gesture", "floater_preview_gesture.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewGesture>/*, "preview"*/);
-    LLFloaterReg::add("preview_notecard", "floater_preview_notecard.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewNotecard>/*, "preview"*/);
-    LLFloaterReg::add("preview_script", "floater_script_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewLSL>, "preview_script" /*"preview"*/);
-    LLFloaterReg::add("preview_scriptedit", "floater_live_lsleditor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLLiveLSLEditor>, "preview_script" /*"preview"*/);
-    LLFloaterReg::add("preview_sound", "floater_preview_sound.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewSound>/*, "preview"*/);
-    LLFloaterReg::add("preview_texture", "floater_preview_texture.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewTexture>/*, "preview"*/);
+    LLFloaterReg::add("preview_anim",
+                      "floater_preview_animation.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewAnim> /*, "preview"*/);
+    LLFloaterReg::add("preview_conversation",
+                      "floater_conversation_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterConversationPreview>);
+    LLFloaterReg::add("preview_gesture",
+                      "floater_preview_gesture.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewGesture> /*, "preview"*/);
+    LLFloaterReg::add("preview_notecard",
+                      "floater_preview_notecard.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewNotecard> /*, "preview"*/);
+    LLFloaterReg::add("preview_script",
+                      "floater_script_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewLSL>,
+                      "preview_script" /*"preview"*/);
+    LLFloaterReg::add("preview_scriptedit",
+                      "floater_live_lsleditor.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLLiveLSLEditor>,
+                      "preview_script" /*"preview"*/);
+    LLFloaterReg::add("preview_sound",
+                      "floater_preview_sound.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewSound> /*, "preview"*/);
+    LLFloaterReg::add("preview_texture",
+                      "floater_preview_texture.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLPreviewTexture> /*, "preview"*/);
     LLFloaterReg::add("preview_trash", "floater_preview_trash.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterPreviewTrash>);
-    LLFloaterReg::add("properties", "floater_inventory_item_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProperties>); // <FS:Ansariel> Keep legacy properties floater
-    LLFloaterReg::add("publish_classified", "floater_publish_classified.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLPublishClassifiedFloater>);
-    LLFloaterReg::add("save_pref_preset", "floater_save_pref_preset.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSavePrefPreset>);
-    LLFloaterReg::add("save_camera_preset", "floater_save_camera_preset.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSaveCameraPreset>);
+    LLFloaterReg::add("properties",
+                      "floater_inventory_item_properties.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProperties>); // <FS:Ansariel> Keep legacy properties floater
+    LLFloaterReg::add("publish_classified",
+                      "floater_publish_classified.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLPublishClassifiedFloater>);
+    LLFloaterReg::add("save_pref_preset",
+                      "floater_save_pref_preset.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSavePrefPreset>);
+    LLFloaterReg::add("save_camera_preset",
+                      "floater_save_camera_preset.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSaveCameraPreset>);
     LLFloaterReg::add("script_colors", "floater_script_ed_prefs.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptEdPrefs>);
 
     LLFloaterReg::add("material_editor", "floater_material_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLMaterialEditor>);
-    LLFloaterReg::add("live_material_editor", "floater_live_material_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLMaterialEditor>);
+    LLFloaterReg::add("live_material_editor",
+                      "floater_live_material_editor.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLMaterialEditor>);
 
-    LLFloaterReg::add("telehubs", "floater_telehub.xml",&LLFloaterReg::build<LLFloaterTelehub>);
+    LLFloaterReg::add("telehubs", "floater_telehub.xml", &LLFloaterReg::build<LLFloaterTelehub>);
     LLFloaterReg::add("test_inspectors", "floater_test_inspectors.xml", &LLFloaterReg::build<LLFloaterTestInspectors>);
-    //LLFloaterReg::add("test_list_view", "floater_test_list_view.xml",&LLFloaterReg::build<LLFloaterTestListView>);
+    // LLFloaterReg::add("test_list_view", "floater_test_list_view.xml",&LLFloaterReg::build<LLFloaterTestListView>);
     LLFloaterReg::add("test_textbox", "floater_test_textbox.xml", &LLFloaterReg::build<LLFloater>);
     LLFloaterReg::add("test_text_editor", "floater_test_text_editor.xml", &LLFloaterReg::build<LLFloater>);
     LLFloaterReg::add("test_widgets", "floater_test_widgets.xml", &LLFloaterReg::build<LLFloater>);
@@ -581,18 +656,24 @@ void LLViewerFloaterReg::registerFloaters()
 
     LLFloaterReg::add("reporter", "floater_report_abuse.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterReporter>);
     LLFloaterReg::add("reset_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterResetQueue>);
-    LLFloaterReg::add("region_debug_console", "floater_region_debug_console.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterRegionDebugConsole>);
+    LLFloaterReg::add("region_debug_console",
+                      "floater_region_debug_console.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterRegionDebugConsole>);
     LLFloaterReg::add("region_info", "floater_region_info.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterRegionInfo>);
-    LLFloaterReg::add("region_restarting", "floater_region_restarting.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterRegionRestarting>);
-// [RLVa:KB] - Checked: 2010-03-11 (RLVa-1.2.0e) | Added: RLVa-1.2.0a
+    LLFloaterReg::add("region_restarting",
+                      "floater_region_restarting.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterRegionRestarting>);
+    // [RLVa:KB] - Checked: 2010-03-11 (RLVa-1.2.0e) | Added: RLVa-1.2.0a
     LLFloaterReg::add("rlv_behaviours", "floater_rlv_behaviours.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<RlvFloaterBehaviours>);
     LLFloaterReg::add("rlv_console", "floater_rlv_console.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<RlvFloaterConsole>);
     LLFloaterReg::add("rlv_locks", "floater_rlv_locks.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<RlvFloaterLocks>);
     LLFloaterReg::add("rlv_strings", "floater_rlv_strings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<RlvFloaterStrings>);
-// [/RLVa:KB]
+    // [/RLVa:KB]
 
     LLFloaterReg::add("script_debug", "floater_script_debug.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptDebug>);
-    LLFloaterReg::add("script_debug_output", "floater_script_debug_panel.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptDebugOutput>);
+    LLFloaterReg::add("script_debug_output",
+                      "floater_script_debug_panel.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptDebugOutput>);
     LLFloaterReg::add("script_floater", "floater_script.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLScriptFloater>);
     LLFloaterReg::add("script_limits", "floater_script_limits.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptLimits>);
     LLFloaterReg::add("my_scripts", "floater_my_scripts.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMyScripts>);
@@ -601,30 +682,52 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("settings_debug", "floater_settings_debug.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSettingsDebug>);
     LLFloaterReg::add("sound_devices", "floater_sound_devices.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSoundDevices>);
     // <FS:LO> Add ability for the statistics window to not be able to receive focus
-    //LLFloaterReg::add("stats", "floater_stats.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
+    // LLFloaterReg::add("stats", "floater_stats.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
     LLFloaterReg::add("stats", "floater_stats.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterStatistics>);
     // </FS:LO
     LLFloaterReg::add("start_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterRunQueue>);
-    LLFloaterReg::add("scene_load_stats", "floater_scene_load_stats.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSceneLoadStats>);
+    LLFloaterReg::add("scene_load_stats",
+                      "floater_scene_load_stats.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSceneLoadStats>);
     LLFloaterReg::add("stop_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotRunQueue>);
     LLFloaterReg::add("snapshot", "floater_snapshot.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSnapshot>);
     LLFloaterReg::add("simple_snapshot", "floater_simple_snapshot.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSimpleSnapshot>);
-    LLFloaterReg::add("snapshot_guide_settings", "floater_snapshot_guide_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);// <FS:Beq/> photo guide settings
+    LLFloaterReg::add("snapshot_guide_settings",
+                      "floater_snapshot_guide_settings.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>); // <FS:Beq/> photo guide settings
     // <FS:CR> Search floater is deferred to login now so we can tell what grid we're in.
-    //LLFloaterReg::add("search", "floater_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearch>);
-    LLFloaterReg::add("profile", "floater_profile.xml",(LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProfile>);
+    // LLFloaterReg::add("search", "floater_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearch>);
+    LLFloaterReg::add("profile", "floater_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProfile>);
     LLFloaterReg::add("guidebook", "floater_how_to.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHowTo>);
     LLFloaterReg::add("slapp_test", "floater_test_slapp.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSLappTest>);
 
     LLFloaterReg::add("big_preview", "floater_big_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBigPreview>);
 
     LLFloaterUIPreviewUtil::registerFloater();
-    LLFloaterReg::add("upload_anim_bvh", "floater_animation_bvh_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBvhPreview>, "upload");
-    LLFloaterReg::add("upload_anim_anim", "floater_animation_anim_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAnimPreview>, "upload");
-    LLFloaterReg::add("upload_image", "floater_image_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterImagePreview>, "upload");
-    LLFloaterReg::add("upload_model", "floater_model_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterModelPreview>, "upload");
-    LLFloaterReg::add("upload_script", "floater_script_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptPreview>, "upload");
-    LLFloaterReg::add("upload_sound", "floater_sound_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSoundPreview>, "upload");
+    LLFloaterReg::add("upload_anim_bvh",
+                      "floater_animation_bvh_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBvhPreview>,
+                      "upload");
+    LLFloaterReg::add("upload_anim_anim",
+                      "floater_animation_anim_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAnimPreview>,
+                      "upload");
+    LLFloaterReg::add("upload_image",
+                      "floater_image_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterImagePreview>,
+                      "upload");
+    LLFloaterReg::add("upload_model",
+                      "floater_model_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterModelPreview>,
+                      "upload");
+    LLFloaterReg::add("upload_script",
+                      "floater_script_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptPreview>,
+                      "upload");
+    LLFloaterReg::add("upload_sound",
+                      "floater_sound_preview.xml",
+                      (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSoundPreview>,
+                      "upload");
 
     LLFloaterReg::add("voice_effect", "floater_voice_effect.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterVoiceEffect>);
 

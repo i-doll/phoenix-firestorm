@@ -38,19 +38,20 @@
 //-----------------------------------------------------------------------------
 // LLSyntaxIdLSL
 //-----------------------------------------------------------------------------
-const std::string SYNTAX_ID_CAPABILITY_NAME = "LSLSyntax";
+const std::string SYNTAX_ID_CAPABILITY_NAME   = "LSLSyntax";
 const std::string SYNTAX_ID_SIMULATOR_FEATURE = "LSLSyntaxId";
-const std::string FILENAME_DEFAULT = "keywords_lsl_default.xml";
+const std::string FILENAME_DEFAULT_LSL        = "keywords_lsl_default.xml";
+const std::string FILENAME_DEFAULT_LUA        = "keywords_lua_default.xml";
 
 /**
  * @brief LLSyntaxIdLSL constructor
  */
-LLSyntaxIdLSL::LLSyntaxIdLSL()
-:   mKeywordsXml(LLSD())
-,   mCapabilityURL(std::string())
-,   mFilePath(LL_PATH_APP_SETTINGS)
-,   mSyntaxId(LLUUID())
-,   mInitialized(false)
+LLSyntaxIdLSL::LLSyntaxIdLSL() :
+    mKeywordsXml(LLSD()),
+    mCapabilityURL(std::string()),
+    mFilePath(LL_PATH_APP_SETTINGS),
+    mSyntaxId(LLUUID()),
+    mInitialized(false)
 {
     loadDefaultKeywordsIntoLLSD();
     mRegionChangedCallback = gAgent.addRegionChangedCallback(boost::bind(&LLSyntaxIdLSL::handleRegionChanged, this));
@@ -59,9 +60,9 @@ LLSyntaxIdLSL::LLSyntaxIdLSL()
 
 void LLSyntaxIdLSL::buildFullFileSpec()
 {
-    ELLPath path = mSyntaxId.isNull() ? LL_PATH_APP_SETTINGS : LL_PATH_CACHE;
-    const std::string filename = mSyntaxId.isNull() ? FILENAME_DEFAULT : "keywords_lsl_" + mSyntaxId.asString() + ".llsd.xml";
-    mFullFileSpec = gDirUtilp->getExpandedFilename(path, filename);
+    ELLPath           path     = mSyntaxId.isNull() ? LL_PATH_APP_SETTINGS : LL_PATH_CACHE;
+    const std::string filename = mSyntaxId.isNull() ? FILENAME_DEFAULT_LSL : "keywords_lsl_" + mSyntaxId.asString() + ".llsd.xml";
+    mFullFileSpec              = gDirUtilp->getExpandedFilename(path, filename);
 }
 
 //-----------------------------------------------------------------------------
@@ -82,7 +83,7 @@ bool LLSyntaxIdLSL::syntaxIdChanged()
             {
                 // get and check the hash
                 LLUUID new_syntax_id = sim_features[SYNTAX_ID_SIMULATOR_FEATURE].asUUID();
-                mCapabilityURL = region->getCapability(SYNTAX_ID_CAPABILITY_NAME);
+                mCapabilityURL       = region->getCapability(SYNTAX_ID_CAPABILITY_NAME);
                 LL_DEBUGS("SyntaxLSL") << SYNTAX_ID_SIMULATOR_FEATURE << " capability URL: " << mCapabilityURL << LL_ENDL;
                 if (new_syntax_id != mSyntaxId)
                 {
@@ -109,8 +110,9 @@ bool LLSyntaxIdLSL::syntaxIdChanged()
 void LLSyntaxIdLSL::fetchKeywordsFile(const std::string& filespec)
 {
     LLCoros::instance().launch("LLSyntaxIdLSL::fetchKeywordsFileCoro",
-        boost::bind(&LLSyntaxIdLSL::fetchKeywordsFileCoro, this, mCapabilityURL, filespec));
-    LL_DEBUGS("SyntaxLSL") << "LSLSyntaxId capability URL is: " << mCapabilityURL << ". Filename to use is: '" << filespec << "'." << LL_ENDL;
+                               boost::bind(&LLSyntaxIdLSL::fetchKeywordsFileCoro, this, mCapabilityURL, filespec));
+    LL_DEBUGS("SyntaxLSL") << "LSLSyntaxId capability URL is: " << mCapabilityURL << ". Filename to use is: '" << filespec << "'."
+                           << LL_ENDL;
 }
 
 //-----------------------------------------------------------------------------
@@ -118,10 +120,9 @@ void LLSyntaxIdLSL::fetchKeywordsFile(const std::string& filespec)
 //-----------------------------------------------------------------------------
 void LLSyntaxIdLSL::fetchKeywordsFileCoro(std::string url, std::string fileSpec)
 {
-    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpRequest::policy_t               httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t                  httpRequest(new LLCore::HttpRequest);
 
     std::pair<std::set<std::string>::iterator, bool> insrt = mInflightFetches.insert(fileSpec);
     if (!insrt.second)
@@ -132,8 +133,8 @@ void LLSyntaxIdLSL::fetchKeywordsFileCoro(std::string url, std::string fileSpec)
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
-    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
-    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+    LLSD               httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status      = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
     mInflightFetches.erase(fileSpec);
 
@@ -155,13 +156,12 @@ void LLSyntaxIdLSL::fetchKeywordsFileCoro(std::string url, std::string fileSpec)
     {
         LL_WARNS("SyntaxLSL") << "Unknown or unsupported version of syntax file." << LL_ENDL;
     }
-
 }
 
 //-----------------------------------------------------------------------------
 // cacheFile
 //-----------------------------------------------------------------------------
-void LLSyntaxIdLSL::cacheFile(const std::string &fileSpec, const LLSD& content_ref)
+void LLSyntaxIdLSL::cacheFile(const std::string& fileSpec, const LLSD& content_ref)
 {
     std::stringstream str;
     LLSDSerialize::toXML(content_ref, str);
@@ -180,7 +180,8 @@ void LLSyntaxIdLSL::cacheFile(const std::string &fileSpec, const LLSD& content_r
 //-----------------------------------------------------------------------------
 void LLSyntaxIdLSL::initialize()
 {
-    if(mInitialized) return;
+    if (mInitialized)
+        return;
     if (mSyntaxId.isNull())
     {
         loadDefaultKeywordsIntoLLSD();
@@ -270,7 +271,7 @@ void LLSyntaxIdLSL::loadDefaultKeywordsIntoLLSD()
  */
 void LLSyntaxIdLSL::loadKeywordsIntoLLSD()
 {
-    LLSD content;
+    LLSD       content;
     llifstream file;
     file.open(mFullFileSpec.c_str());
     if (file.is_open())
@@ -314,8 +315,7 @@ void LLSyntaxIdLSL::handleCapsReceived(const LLUUID& region_uuid)
 {
     LLViewerRegion* current_region = gAgent.getRegion();
 
-    if (region_uuid.notNull()
-        && current_region->getRegionID() == region_uuid)
+    if (region_uuid.notNull() && current_region->getRegionID() == region_uuid)
     {
         syntaxIdChanged();
     }
@@ -324,4 +324,51 @@ void LLSyntaxIdLSL::handleCapsReceived(const LLUUID& region_uuid)
 boost::signals2::connection LLSyntaxIdLSL::addSyntaxIDCallback(const syntax_id_changed_signal_t::slot_type& cb)
 {
     return mSyntaxIDChangedSignal.connect(cb);
+}
+
+//-----------------------------------------------------------------------------
+// LLSyntaxLua
+//-----------------------------------------------------------------------------
+LLSyntaxLua::LLSyntaxLua() : mKeywordsXml(LLSD()), mInitialized(false)
+{
+}
+
+void LLSyntaxLua::initialize()
+{
+    if (mInitialized)
+        return;
+
+    loadDefaultKeywordsIntoLLSD();
+    loadLuaTypesIntoLLSD();
+    mInitialized = true;
+}
+
+void LLSyntaxLua::loadDefaultKeywordsIntoLLSD()
+{
+    std::string fullFileSpec = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, FILENAME_DEFAULT_LUA);
+    llifstream  file(fullFileSpec.c_str());
+
+    if (file.good())
+    {
+        LLSD content;
+        if (LLSDSerialize::fromXML(content, file) != LLSDParser::PARSE_FAILURE)
+        {
+            mKeywordsXml = content;
+        }
+    }
+}
+
+void LLSyntaxLua::loadLuaTypesIntoLLSD()
+{
+    std::string fullFileSpec = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "types_lua_default.xml");
+    llifstream  file(fullFileSpec.c_str());
+
+    if (file.good())
+    {
+        LLSD content;
+        if (LLSDSerialize::fromXML(content, file) != LLSDParser::PARSE_FAILURE)
+        {
+            mTypesXml = content;
+        }
+    }
 }

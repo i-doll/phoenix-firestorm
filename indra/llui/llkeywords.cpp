@@ -37,10 +37,10 @@
 inline bool LLKeywordToken::isHead(const llwchar* s) const
 {
     // strncmp is much faster than string compare
-    bool res = true;
-    const llwchar* t = mToken.c_str();
-    auto len = mToken.size();
-    for (S32 i=0; i<len; i++)
+    bool           res = true;
+    const llwchar* t   = mToken.c_str();
+    auto           len = mToken.size();
+    for (S32 i = 0; i < len; i++)
     {
         if (s[i] != t[i])
         {
@@ -53,10 +53,10 @@ inline bool LLKeywordToken::isHead(const llwchar* s) const
 
 inline bool LLKeywordToken::isTail(const llwchar* s) const
 {
-    bool res = true;
-    const llwchar* t = mDelimiter.c_str();
-    auto len = mDelimiter.size();
-    for (S32 i=0; i<len; i++)
+    bool           res = true;
+    const llwchar* t   = mDelimiter.c_str();
+    auto           len = mDelimiter.size();
+    for (S32 i = 0; i < len; i++)
     {
         if (s[i] != t[i])
         {
@@ -67,8 +67,7 @@ inline bool LLKeywordToken::isTail(const llwchar* s) const
     return res;
 }
 
-LLKeywords::LLKeywords()
-:   mLoaded(false)
+LLKeywords::LLKeywords() : mLoaded(false)
 {
 }
 
@@ -84,47 +83,48 @@ LLKeywords::~LLKeywords()
 
 // Add the token as described
 void LLKeywords::addToken(LLKeywordToken::ETokenType type,
-                          const std::string& key_in,
-                          const LLUIColor& color,
-                          const std::string& tool_tip_in,
-                          const std::string& delimiter_in)
+                          const std::string&         key_in,
+                          const LLUIColor&           color,
+                          const std::string&         tool_tip_in,
+                          const std::string&         delimiter_in)
 {
     std::string tip_text = tool_tip_in;
-    LLStringUtil::replaceString(tip_text, "\\n", "\n" );
-    LLStringUtil::replaceString(tip_text, "\t", " " );
+    LLStringUtil::replaceString(tip_text, "\\n", "\n");
+    LLStringUtil::replaceString(tip_text, "\t", " ");
     if (tip_text.empty())
     {
         tip_text = "[no info]";
     }
     LLWString tool_tip = utf8str_to_wstring(tip_text);
 
-    LLWString key = utf8str_to_wstring(key_in);
+    LLWString key       = utf8str_to_wstring(key_in);
     LLWString delimiter = utf8str_to_wstring(delimiter_in);
-    switch(type)
+    switch (type)
     {
-    case LLKeywordToken::TT_CONSTANT:
-    case LLKeywordToken::TT_CONTROL:
-    case LLKeywordToken::TT_EVENT:
-    case LLKeywordToken::TT_FUNCTION:
-    case LLKeywordToken::TT_LABEL:
-    case LLKeywordToken::TT_SECTION:
-    case LLKeywordToken::TT_TYPE:
-    case LLKeywordToken::TT_WORD:
-        mWordTokenMap[key] = new LLKeywordToken(type, color, key, tool_tip, LLWStringUtil::null);
-        break;
+        case LLKeywordToken::TT_CONSTANT:
+        case LLKeywordToken::TT_CONTROL:
+        case LLKeywordToken::TT_EVENT:
+        case LLKeywordToken::TT_FUNCTION:
+        case LLKeywordToken::TT_LABEL:
+        case LLKeywordToken::TT_SECTION:
+        case LLKeywordToken::TT_TYPE:
+        case LLKeywordToken::TT_WORD:
+            mWordTokenMap[key] = new LLKeywordToken(type, color, key, tool_tip, LLWStringUtil::null);
+            break;
 
-    case LLKeywordToken::TT_LINE:
-        mLineTokenList.push_front(new LLKeywordToken(type, color, key, tool_tip, LLWStringUtil::null));
-        break;
+        case LLKeywordToken::TT_LINE:
+            mLineTokenList.push_front(new LLKeywordToken(type, color, key, tool_tip, LLWStringUtil::null));
+            break;
 
-    case LLKeywordToken::TT_TWO_SIDED_DELIMITER:
-    case LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS:
-    case LLKeywordToken::TT_ONE_SIDED_DELIMITER:
-        mDelimiterTokenList.push_front(new LLKeywordToken(type, color, key, tool_tip, delimiter));
-        break;
+        case LLKeywordToken::TT_TWO_SIDED_DELIMITER:
+        case LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS:
+        case LLKeywordToken::TT_ONE_SIDED_DELIMITER:
+        case LLKeywordToken::TT_LONG_BRACKET:
+            mDelimiterTokenList.push_front(new LLKeywordToken(type, color, key, tool_tip, delimiter));
+            break;
 
-    default:
-        llassert(0);
+        default:
+            llassert(0);
     }
 }
 
@@ -134,15 +134,15 @@ std::string LLKeywords::getArguments(LLSD& arguments)
 
     if (arguments.isArray())
     {
-        auto argsCount = arguments.size();
-        LLSD::array_iterator arrayIt = arguments.beginArray();
-        for ( ; arrayIt != arguments.endArray(); ++arrayIt)
+        auto                 argsCount = arguments.size();
+        LLSD::array_iterator arrayIt   = arguments.beginArray();
+        for (; arrayIt != arguments.endArray(); ++arrayIt)
         {
             LLSD& args = (*arrayIt);
             if (args.isMap())
             {
                 LLSD::map_iterator argsIt = args.beginMap();
-                for ( ; argsIt != args.endMap(); ++argsIt)
+                for (; argsIt != args.endMap(); ++argsIt)
                 {
                     argString += argsIt->second.get("type").asString() + " " + argsIt->first;
                     if (argsCount-- > 1)
@@ -193,16 +193,16 @@ LLUIColor LLKeywords::getColorGroup(std::string_view key_in) const
     {
         color_group = "SyntaxLslControlFlow";
     }
-    else if (key_in =="deprecated")
+    else if (key_in == "deprecated")
     {
         color_group = "SyntaxLslDeprecated";
     }
-    else if (key_in =="god-mode")
+    else if (key_in == "god-mode")
     {
         color_group = "SyntaxLslGodMode";
     }
     // <FS:Ansariel> Split constant types up
-    //else if (key_in == "constants"
+    // else if (key_in == "constants"
     //       || key_in == "constants-integer"
     //       || key_in == "constants-float"
     //       || key_in == "constants-string"
@@ -223,13 +223,11 @@ LLUIColor LLKeywords::getColorGroup(std::string_view key_in) const
     {
         color_group = "SyntaxLslFloatConstant";
     }
-    else if (key_in == "constants-string"
-             || key_in == "constants-key")
+    else if (key_in == "constants-string" || key_in == "constants-key")
     {
         color_group = "SyntaxLslStringConstant";
     }
-    else if (key_in == "constants-rotation"
-             || key_in == "constants-vector")
+    else if (key_in == "constants-rotation" || key_in == "constants-vector")
     {
         color_group = "SyntaxLslCompoundConstant";
     }
@@ -255,15 +253,71 @@ void LLKeywords::processTokens()
         return;
     }
 
-    // Add 'standard' stuff: Quotes, Comments, Strings, Labels, etc. before processing the LLSD
+    const bool is_lsl = mSyntax.isMap() && mSyntax.has("llsd-lsl-syntax-version");
+
+    // Add language-specific 'standard' stuff (quotes, comments, strings, labels) before processing the LLSD.
+    // LSL syntax includes a version key; Lua/Luau does not.
     std::string delimiter;
-    addToken(LLKeywordToken::TT_LABEL, "@", getColorGroup("misc-flow-label"), "Label\nTarget for jump statement", delimiter );
-    addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER, "//", LLUIColorTable::instance().getColor("SyntaxLslComment"), "Comment (single-line)\nNon-functional commentary or disabled code", delimiter );
-    addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", LLUIColorTable::instance().getColor("SyntaxLslComment"), "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
-    addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"), "String literal", "\"" );
+    if (is_lsl)
+    {
+        addToken(LLKeywordToken::TT_LABEL, "@", getColorGroup("misc-flow-label"), "Label\nTarget for jump statement", delimiter);
+        addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER,
+                 "//",
+                 LLUIColorTable::instance().getColor("SyntaxLslComment"),
+                 "Comment (single-line)\nNon-functional commentary or disabled code",
+                 delimiter);
+        addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER,
+                 "/*",
+                 LLUIColorTable::instance().getColor("SyntaxLslComment"),
+                 "Comment (multi-line)\nNon-functional commentary or disabled code",
+                 "*/");
+        addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS,
+                 "\"",
+                 LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"),
+                 "String literal",
+                 "\"");
+    }
+    else
+    {
+        // Lua / Luau
+        // IMPORTANT: add "--" before "--[" so that "--[" is matched first (push_front ordering).
+        addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER,
+                 "--",
+                 LLUIColorTable::instance().getColor("SyntaxLslComment"),
+                 "Comment (single-line)",
+                 delimiter);
+        addToken(LLKeywordToken::TT_LONG_BRACKET,
+                 "--[",
+                 LLUIColorTable::instance().getColor("SyntaxLslComment"),
+                 "Comment (multi-line)",
+                 "]");
+
+        addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS,
+                 "\"",
+                 LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"),
+                 "String literal",
+                 "\"");
+        addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS,
+                 "'",
+                 LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"),
+                 "String literal",
+                 "'");
+        addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS,
+                 "`",
+                 LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"),
+                 "String literal",
+                 "`");
+
+        // Lua long bracket strings: [[...]] and [=[...]=] etc.
+        addToken(LLKeywordToken::TT_LONG_BRACKET,
+                 "[",
+                 LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"),
+                 "String literal",
+                 "]");
+    }
 
     LLSD::map_iterator itr = mSyntax.beginMap();
-    for ( ; itr != mSyntax.endMap(); ++itr)
+    for (; itr != mSyntax.endMap(); ++itr)
     {
         if (itr->first == "llsd-lsl-syntax-version")
         {
@@ -289,7 +343,7 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
     LLUIColor color;
     LLUIColor color_group;
     LLUIColor color_deprecated = getColorGroup("deprecated");
-    LLUIColor color_god_mode = getColorGroup("god-mode");
+    LLUIColor color_god_mode   = getColorGroup("god-mode");
 
     LLKeywordToken::ETokenType token_type = LLKeywordToken::TT_UNKNOWN;
     // If a new token type is added here, it must also be added to the 'addToken' method
@@ -324,14 +378,14 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
     if (tokens.isMap())
     {
         LLSD::map_const_iterator outer_itr = tokens.beginMap();
-        for ( ; outer_itr != tokens.endMap(); ++outer_itr )
+        for (; outer_itr != tokens.endMap(); ++outer_itr)
         {
             if (outer_itr->second.isMap())
             {
                 mAttributes.clear();
-                LLSD arguments = LLSD();
+                LLSD                     arguments = LLSD();
                 LLSD::map_const_iterator inner_itr = outer_itr->second.beginMap();
-                for ( ; inner_itr != outer_itr->second.endMap(); ++inner_itr )
+                for (; inner_itr != outer_itr->second.endMap(); ++inner_itr)
                 {
                     if (inner_itr->first == "arguments")
                     {
@@ -399,7 +453,7 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
             }
         }
     }
-    else if (tokens.isArray())  // Currently nothing should need this, but it's here for completeness
+    else if (tokens.isArray()) // Currently nothing should need this, but it's here for completeness
     {
         LL_INFOS("SyntaxLSL") << "Curious, shouldn't be an array here; adding all using color " << color.get() << LL_ENDL;
         for (S32 count = 0; count < tokens.size(); ++count)
@@ -415,15 +469,15 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
 
 LLKeywords::WStringMapIndex::WStringMapIndex(const WStringMapIndex& other)
 {
-    if(other.mOwner)
+    if (other.mOwner)
     {
         copyData(other.mData, other.mLength);
     }
     else
     {
-        mOwner = false;
+        mOwner  = false;
         mLength = other.mLength;
-        mData = other.mData;
+        mData   = other.mData;
     }
 }
 
@@ -432,10 +486,7 @@ LLKeywords::WStringMapIndex::WStringMapIndex(const LLWString& str)
     copyData(str.data(), str.size());
 }
 
-LLKeywords::WStringMapIndex::WStringMapIndex(const llwchar *start, size_t length)
-:   mData(start)
-,   mLength(length)
-,   mOwner(false)
+LLKeywords::WStringMapIndex::WStringMapIndex(const llwchar* start, size_t length) : mData(start), mLength(length), mOwner(false)
 {
 }
 
@@ -447,30 +498,30 @@ LLKeywords::WStringMapIndex::~WStringMapIndex()
     }
 }
 
-void LLKeywords::WStringMapIndex::copyData(const llwchar *start, size_t length)
+void LLKeywords::WStringMapIndex::copyData(const llwchar* start, size_t length)
 {
-    llwchar *data = new llwchar[length];
+    llwchar* data = new llwchar[length];
     memcpy((void*)data, (const void*)start, length * sizeof(llwchar));
 
-    mOwner = true;
+    mOwner  = true;
     mLength = length;
-    mData = data;
+    mData   = data;
 }
 
-bool LLKeywords::WStringMapIndex::operator<(const LLKeywords::WStringMapIndex &other) const
+bool LLKeywords::WStringMapIndex::operator<(const LLKeywords::WStringMapIndex& other) const
 {
     // NOTE: Since this is only used to organize a std::map, it doesn't matter if it uses correct collate order or not.
     // The comparison only needs to strictly order all possible strings, and be stable.
 
-    bool result = false;
-    const llwchar* self_iter = mData;
-    const llwchar* self_end = mData + mLength;
+    bool           result     = false;
+    const llwchar* self_iter  = mData;
+    const llwchar* self_end   = mData + mLength;
     const llwchar* other_iter = other.mData;
-    const llwchar* other_end = other.mData + other.mLength;
+    const llwchar* other_end  = other.mData + other.mLength;
 
-    while(true)
+    while (true)
     {
-        if(other_iter >= other_end)
+        if (other_iter >= other_end)
         {
             // We've hit the end of other.
             // This covers two cases: other being shorter than self, or the strings being equal.
@@ -478,13 +529,13 @@ bool LLKeywords::WStringMapIndex::operator<(const LLKeywords::WStringMapIndex &o
             result = false;
             break;
         }
-        else if(self_iter >= self_end)
+        else if (self_iter >= self_end)
         {
             // self is shorter than other.
             result = true;
             break;
         }
-        else if(*self_iter != *other_iter)
+        else if (*self_iter != *other_iter)
         {
             // The current character differs.  The strings are not equal.
             result = *self_iter < *other_iter;
@@ -507,7 +558,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
     LL_RECORD_BLOCK_TIME(FTM_SYNTAX_COLORING);
     seg_list->clear();
 
-    if( wtext.empty() )
+    if (wtext.empty())
     {
         return;
     }
@@ -515,39 +566,39 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
     S32 text_len = static_cast<S32>(wtext.size()) + 1;
 
     // <FS:Ansariel> Script editor ignoring font selection
-    //seg_list->push_back( new LLNormalTextSegment( style, 0, text_len, editor ) );
+    // seg_list->push_back( new LLNormalTextSegment( style, 0, text_len, editor ) );
     LLStyleSP actual_style = getDefaultStyle(editor);
     actual_style->setColor(style->getColor());
-    seg_list->push_back( new LLNormalTextSegment( actual_style, 0, text_len, editor ) );
+    seg_list->push_back(new LLNormalTextSegment(actual_style, 0, text_len, editor));
     // </FS:Ansariel>
 
     const llwchar* base = wtext.c_str();
-    const llwchar* cur = base;
-    while( *cur )
+    const llwchar* cur  = base;
+    while (*cur)
     {
-        if( *cur == '\n' || cur == base )
+        if (*cur == '\n' || cur == base)
         {
-            if( *cur == '\n' )
+            if (*cur == '\n')
             {
                 // <FS:Ansariel> Script editor ignoring font selection
-                //LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(style, (S32)(cur - base));
+                // LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(style, (S32)(cur - base));
                 LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(getDefaultStyle(editor), (S32)(cur - base));
                 // </FS:Ansariel>
-                text_segment->setToken( 0 );
-                insertSegment( *seg_list, text_segment, text_len, style, editor);
+                text_segment->setToken(0);
+                insertSegment(*seg_list, text_segment, text_len, style, editor);
                 cur++;
-                if( !*cur || *cur == '\n' )
+                if (!*cur || *cur == '\n')
                 {
                     continue;
                 }
             }
 
             // Skip white space
-            while( *cur && iswspace(*cur) && (*cur != '\n')  )
+            while (*cur && iswspace(*cur) && (*cur != '\n'))
             {
                 cur++;
             }
-            if( !*cur || *cur == '\n' )
+            if (!*cur || *cur == '\n')
             {
                 continue;
             }
@@ -557,28 +608,27 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
             // Line start tokens
             {
                 bool line_done = false;
-                for (token_list_t::iterator iter = mLineTokenList.begin();
-                     iter != mLineTokenList.end(); ++iter)
+                for (token_list_t::iterator iter = mLineTokenList.begin(); iter != mLineTokenList.end(); ++iter)
                 {
                     LLKeywordToken* cur_token = *iter;
-                    if( cur_token->isHead( cur ) )
+                    if (cur_token->isHead(cur))
                     {
                         S32 seg_start = (S32)(cur - base);
-                        while( *cur && *cur != '\n' )
+                        while (*cur && *cur != '\n')
                         {
                             // skip the rest of the line
                             cur++;
                         }
                         S32 seg_end = (S32)(cur - base);
 
-                        //create segments from seg_start to seg_end
-                        insertSegments(wtext, *seg_list,cur_token, text_len, seg_start, seg_end, style, editor);
+                        // create segments from seg_start to seg_end
+                        insertSegments(wtext, *seg_list, cur_token, text_len, seg_start, seg_end, style, editor);
                         line_done = true; // to break out of second loop.
                         break;
                     }
                 }
 
-                if( line_done )
+                if (line_done)
                 {
                     continue;
                 }
@@ -586,40 +636,99 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
         }
 
         // Skip white space
-        while( *cur && iswspace(*cur) && (*cur != '\n')  )
+        while (*cur && iswspace(*cur) && (*cur != '\n'))
         {
             cur++;
         }
 
-        while( *cur && *cur != '\n' )
+        while (*cur && *cur != '\n')
         {
             // Check against delimiters
             {
-                S32 seg_start = 0;
+                S32             seg_start     = 0;
                 LLKeywordToken* cur_delimiter = NULL;
-                for (token_list_t::iterator iter = mDelimiterTokenList.begin();
-                     iter != mDelimiterTokenList.end(); ++iter)
+                for (token_list_t::iterator iter = mDelimiterTokenList.begin(); iter != mDelimiterTokenList.end(); ++iter)
                 {
                     LLKeywordToken* delimiter = *iter;
-                    if( delimiter->isHead( cur ) )
+                    if (delimiter->isHead(cur))
                     {
+                        // Long bracket tokens require extra validation ("[" is common in Lua code).
+                        if (delimiter->getType() == LLKeywordToken::TT_LONG_BRACKET)
+                        {
+                            const llwchar* p = cur + delimiter->getLengthHead();
+                            // Must be: '='* then '['
+                            while (*p == '=')
+                            {
+                                ++p;
+                            }
+                            if (*p != '[')
+                            {
+                                continue;
+                            }
+                        }
+
                         cur_delimiter = delimiter;
                         break;
                     }
                 }
 
-                if( cur_delimiter )
+                if (cur_delimiter)
                 {
                     S32 between_delimiters = 0;
-                    S32 seg_end = 0;
+                    S32 seg_end            = 0;
 
                     seg_start = (S32)(cur - base);
                     cur += cur_delimiter->getLengthHead();
 
                     LLKeywordToken::ETokenType type = cur_delimiter->getType();
-                    if( type == LLKeywordToken::TT_TWO_SIDED_DELIMITER || type == LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS )
+                    if (type == LLKeywordToken::TT_LONG_BRACKET)
                     {
-                        while( *cur && !cur_delimiter->isTail(cur))
+                        // Lua long bracket: [=*[ ... ]=*]
+                        // We are currently positioned right after the first '[' (or after "--[").
+                        S32 equals_count = 0;
+                        while (*cur == '=')
+                        {
+                            ++equals_count;
+                            ++cur;
+                        }
+
+                        // Must have the second '['
+                        if (*cur != '[')
+                        {
+                            // Validation should have prevented this; treat as normal char.
+                            cur = base + seg_start + 1;
+                            continue;
+                        }
+                        ++cur; // consume second '['
+
+                        // Scan for matching close: ']' + '='* + ']'
+                        const llwchar* scan = cur;
+                        while (*scan)
+                        {
+                            if (*scan == ']')
+                            {
+                                const llwchar* t       = scan + 1;
+                                S32            eq_seen = 0;
+                                while (eq_seen < equals_count && *t == '=')
+                                {
+                                    ++eq_seen;
+                                    ++t;
+                                }
+                                if (eq_seen == equals_count && *t == ']')
+                                {
+                                    scan = t + 1;
+                                    break;
+                                }
+                            }
+                            ++scan;
+                        }
+
+                        seg_end = (S32)(scan - base);
+                        cur     = scan;
+                    }
+                    else if (type == LLKeywordToken::TT_TWO_SIDED_DELIMITER || type == LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS)
+                    {
+                        while (*cur && !cur_delimiter->isTail(cur))
                         {
                             // Check for an escape sequence.
                             if (type == LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS && *cur == '\\')
@@ -656,7 +765,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
                             }
                         }
 
-                        if( *cur )
+                        if (*cur)
                         {
                             cur += cur_delimiter->getLengthHead();
                             seg_end = seg_start + between_delimiters + cur_delimiter->getLengthHead() + cur_delimiter->getLengthTail();
@@ -669,9 +778,9 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
                     }
                     else
                     {
-                        llassert( cur_delimiter->getType() == LLKeywordToken::TT_ONE_SIDED_DELIMITER );
+                        llassert(cur_delimiter->getType() == LLKeywordToken::TT_ONE_SIDED_DELIMITER);
                         // Left side is the delimiter.  Right side is eol or eof.
-                        while( *cur && ('\n' != *cur) )
+                        while (*cur && ('\n' != *cur))
                         {
                             between_delimiters++;
                             cur++;
@@ -679,7 +788,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
                         seg_end = seg_start + between_delimiters + cur_delimiter->getLengthHead();
                     }
 
-                    insertSegments(wtext, *seg_list,cur_delimiter, text_len, seg_start, seg_end, style, editor);
+                    insertSegments(wtext, *seg_list, cur_delimiter, text_len, seg_start, seg_end, style, editor);
                     /*
                     // <FS:Ansariel> Script editor ignoring font selection
                     //LLTextSegmentPtr text_segment = new LLNormalTextSegment( cur_delimiter->getColor(), seg_start, seg_end, editor );
@@ -698,39 +807,39 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
             }
 
             // check against words
-            llwchar prev = cur > base ? *(cur-1) : 0;
+            llwchar prev = cur > base ? *(cur - 1) : 0;
             // NaCl - LSL Preprocessor
-            //if( !iswalnum( prev ) && (prev != '_') )
-            if( !iswalnum( prev ) && (prev != '_') && (prev != '#'))
+            // if( !iswalnum( prev ) && (prev != '_') )
+            if (!iswalnum(prev) && (prev != '_') && (prev != '#'))
             {
                 const llwchar* p = cur;
-                //while( iswalnum( *p ) || (*p == '_') )
-                while( *p && ( iswalnum( *p ) || (*p == '_') || (*p == '#') ) )
+                // while( iswalnum( *p ) || (*p == '_') )
+                while (*p && (iswalnum(*p) || (*p == '_') || (*p == '#')))
                 // NaCl End
                 {
                     p++;
                 }
                 S32 seg_len = (S32)(p - cur);
-                if( seg_len > 0 )
+                if (seg_len > 0)
                 {
-                    WStringMapIndex word( cur, seg_len );
+                    WStringMapIndex            word(cur, seg_len);
                     word_token_map_t::iterator map_iter = mWordTokenMap.find(word);
-                    if( map_iter != mWordTokenMap.end() )
+                    if (map_iter != mWordTokenMap.end())
                     {
                         LLKeywordToken* cur_token = map_iter->second;
-                        S32 seg_start = (S32)(cur - base);
-                        S32 seg_end = seg_start + seg_len;
+                        S32             seg_start = (S32)(cur - base);
+                        S32             seg_end   = seg_start + seg_len;
 
                         // LL_INFOS("SyntaxLSL") << "Seg: [" << word.c_str() << "]" << LL_ENDL;
 
-                        insertSegments(wtext, *seg_list,cur_token, text_len, seg_start, seg_end, style, editor);
+                        insertSegments(wtext, *seg_list, cur_token, text_len, seg_start, seg_end, style, editor);
                     }
                     cur += seg_len;
                     continue;
                 }
             }
 
-            if( *cur && *cur != '\n' )
+            if (*cur && *cur != '\n')
             {
                 cur++;
             }
@@ -738,93 +847,108 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
     }
 }
 
-void LLKeywords::insertSegments(const LLWString& wtext, std::vector<LLTextSegmentPtr>& seg_list, LLKeywordToken* cur_token, S32 text_len, S32 seg_start, S32 seg_end, LLStyleConstSP style, LLTextEditor& editor )
+void LLKeywords::insertSegments(const LLWString&               wtext,
+                                std::vector<LLTextSegmentPtr>& seg_list,
+                                LLKeywordToken*                cur_token,
+                                S32                            text_len,
+                                S32                            seg_start,
+                                S32                            seg_end,
+                                LLStyleConstSP                 style,
+                                LLTextEditor&                  editor)
 {
-    std::string::size_type pos = wtext.find('\n',seg_start);
+    std::string::size_type pos = wtext.find('\n', seg_start);
 
     // <FS:Ansariel> Script editor ignoring font selection
-    //LLStyleConstSP cur_token_style = new LLStyle(LLStyle::Params().font(style->getFont()).color(cur_token->getColor()));
+    // LLStyleConstSP cur_token_style = new LLStyle(LLStyle::Params().font(style->getFont()).color(cur_token->getColor()));
 
-    while (pos!=-1 && pos < (std::string::size_type)seg_end)
+    while (pos != -1 && pos < (std::string::size_type)seg_end)
     {
-        if (pos!=seg_start)
+        if (pos != seg_start)
         {
             // <FS:Ansariel> Script editor ignoring font selection
-            //LLTextSegmentPtr text_segment = new LLNormalTextSegment( cur_token->getColor(), seg_start, static_cast<S32>(pos), editor );
+            // LLTextSegmentPtr text_segment = new LLNormalTextSegment( cur_token->getColor(), seg_start, static_cast<S32>(pos), editor );
             LLStyleSP style = getDefaultStyle(editor);
             style->setColor(cur_token->getColor());
-            LLTextSegmentPtr text_segment = new LLNormalTextSegment( style, seg_start, static_cast<S32>(pos), editor );
+            LLTextSegmentPtr text_segment = new LLNormalTextSegment(style, seg_start, static_cast<S32>(pos), editor);
             // </FS:Ansariel>
-            text_segment->setToken( cur_token );
-            insertSegment( seg_list, text_segment, text_len, style, editor);
+            text_segment->setToken(cur_token);
+            insertSegment(seg_list, text_segment, text_len, style, editor);
         }
 
         // <FS:Ansariel> Script editor ignoring font selection
-        //LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(style, static_cast<S32>(pos));
+        // LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(style, static_cast<S32>(pos));
         LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(getDefaultStyle(editor), static_cast<S32>(pos));
         // </FS:Ansariel>
-        text_segment->setToken( cur_token );
-        insertSegment( seg_list, text_segment, text_len, style, editor);
+        text_segment->setToken(cur_token);
+        insertSegment(seg_list, text_segment, text_len, style, editor);
 
         seg_start = static_cast<S32>(pos) + 1;
-        pos = wtext.find('\n',seg_start);
+        pos       = wtext.find('\n', seg_start);
     }
 
     // <FS:Ansariel> Script editor ignoring font selection
-    //LLTextSegmentPtr text_segment = new LLNormalTextSegment(cur_token_style, seg_start, seg_end, editor);
+    // LLTextSegmentPtr text_segment = new LLNormalTextSegment(cur_token_style, seg_start, seg_end, editor);
     LLStyleSP actual_style = getDefaultStyle(editor);
     actual_style->setColor(cur_token->getColor());
     LLTextSegmentPtr text_segment = new LLNormalTextSegment(actual_style, seg_start, seg_end, editor);
     // </FS:Ansariel>
-    text_segment->setToken( cur_token );
-    insertSegment( seg_list, text_segment, text_len, style, editor);
+    text_segment->setToken(cur_token);
+    insertSegment(seg_list, text_segment, text_len, style, editor);
 }
 
-void LLKeywords::insertSegment(std::vector<LLTextSegmentPtr>& seg_list, LLTextSegmentPtr new_segment, S32 text_len, const LLUIColor& defaultColor, LLTextEditor& editor )
+void LLKeywords::insertSegment(std::vector<LLTextSegmentPtr>& seg_list,
+                               LLTextSegmentPtr               new_segment,
+                               S32                            text_len,
+                               const LLUIColor&               defaultColor,
+                               LLTextEditor&                  editor)
 {
-    LLTextSegmentPtr last = seg_list.back();
-    S32 new_seg_end = new_segment->getEnd();
+    LLTextSegmentPtr last        = seg_list.back();
+    S32              new_seg_end = new_segment->getEnd();
 
-    if( new_segment->getStart() == last->getStart() )
+    if (new_segment->getStart() == last->getStart())
     {
         seg_list.pop_back();
     }
     else
     {
-        last->setEnd( new_segment->getStart() );
+        last->setEnd(new_segment->getStart());
     }
-    seg_list.push_back( new_segment );
+    seg_list.push_back(new_segment);
 
-    if( new_seg_end < text_len )
+    if (new_seg_end < text_len)
     {
         // <FS:Ansariel> Script editor ignoring font selection
-        //seg_list.push_back( new LLNormalTextSegment( defaultColor, new_seg_end, text_len, editor ) );
+        // seg_list.push_back( new LLNormalTextSegment( defaultColor, new_seg_end, text_len, editor ) );
         LLStyleSP style = getDefaultStyle(editor);
         style->setColor(defaultColor);
-        seg_list.push_back( new LLNormalTextSegment( style, new_seg_end, text_len, editor ) );
+        seg_list.push_back(new LLNormalTextSegment(style, new_seg_end, text_len, editor));
         // </FS:Ansariel>
     }
 }
 
-void LLKeywords::insertSegment(std::vector<LLTextSegmentPtr>& seg_list, LLTextSegmentPtr new_segment, S32 text_len, LLStyleConstSP style, LLTextEditor& editor )
+void LLKeywords::insertSegment(std::vector<LLTextSegmentPtr>& seg_list,
+                               LLTextSegmentPtr               new_segment,
+                               S32                            text_len,
+                               LLStyleConstSP                 style,
+                               LLTextEditor&                  editor)
 {
-    LLTextSegmentPtr last = seg_list.back();
-    S32 new_seg_end = new_segment->getEnd();
+    LLTextSegmentPtr last        = seg_list.back();
+    S32              new_seg_end = new_segment->getEnd();
 
-    if( new_segment->getStart() == last->getStart() )
+    if (new_segment->getStart() == last->getStart())
     {
         seg_list.pop_back();
     }
     else
     {
-        last->setEnd( new_segment->getStart() );
+        last->setEnd(new_segment->getStart());
     }
-    seg_list.push_back( new_segment );
+    seg_list.push_back(new_segment);
 
-    if( new_seg_end < text_len )
+    if (new_seg_end < text_len)
     {
         // <FS:Ansariel> Script editor ignoring font selection
-        //seg_list.push_back( new LLNormalTextSegment( style, new_seg_end, text_len, editor ) );
+        // seg_list.push_back( new LLNormalTextSegment( style, new_seg_end, text_len, editor ) );
         LLStyleSP actual_style = getDefaultStyle(editor);
         actual_style->setColor(style->getColor());
         seg_list.push_back(new LLNormalTextSegment(actual_style, new_seg_end, text_len, editor));
@@ -841,7 +965,7 @@ bool LLKeywords::loadFromLegacyFile(const std::string& filename)
     // Parse the script library xml
 
     LLXMLNodePtr xml_root;
-    if ( (!LLUICtrlFactory::getLayeredXMLNode(filename, xml_root)) || (xml_root.isNull()) || (!xml_root->hasName("script_library")) )
+    if ((!LLUICtrlFactory::getLayeredXMLNode(filename, xml_root)) || (xml_root.isNull()) || (!xml_root->hasName("script_library")))
     {
         LL_WARNS() << "Could not read the script library (" << filename << ")" << LL_ENDL;
         return false;
@@ -853,77 +977,74 @@ bool LLKeywords::loadFromLegacyFile(const std::string& filename)
             std::string keyword;
             for (LLXMLNode* pStringNode = pNode->getFirstChild(); pStringNode != NULL; pStringNode = pStringNode->getNextSibling())
             {
-                std::string tool_tip;
-                LLColor4 cur_color(LLUIColorTable::instance().getColor("ScriptText"));
+                std::string                tool_tip;
+                LLColor4                   cur_color(LLUIColorTable::instance().getColor("ScriptText"));
                 LLKeywordToken::ETokenType cur_type = LLKeywordToken::TT_WORD;
                 if (!pStringNode->getAttributeString("name", keyword))
                     continue;
                 if (pStringNode->hasName("integer_constant"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslIntegerConstant");
                 }
                 else if (pStringNode->hasName("event"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslEvent");
-
                 }
                 else if (pStringNode->hasName("section"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslSection");
-
                 }
                 else if (pStringNode->hasName("data_type"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslDataType");
-
                 }
                 else if (pStringNode->hasName("string_constant"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslStringConstant");
                 }
                 else if (pStringNode->hasName("float_constant"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslFloatConstant");
                 }
                 else if (pStringNode->hasName("compound_constant"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslCompoundConstant");
                 }
                 else if (pStringNode->hasName("flow_control_keyword"))
                 {
-                    cur_type = LLKeywordToken::TT_WORD;
+                    cur_type  = LLKeywordToken::TT_WORD;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslControlFlow");
                 }
                 else if (pStringNode->hasName("flow_control_label"))
                 {
-                    cur_type = LLKeywordToken::TT_LINE;
+                    cur_type  = LLKeywordToken::TT_LINE;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslControlFlow");
                 }
                 else if (pStringNode->hasName("comment"))
                 {
-                    cur_type = LLKeywordToken::TT_ONE_SIDED_DELIMITER;
+                    cur_type  = LLKeywordToken::TT_ONE_SIDED_DELIMITER;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslComment");
                 }
                 else if (pStringNode->hasName("block_comment"))
                 {
-                    cur_type = LLKeywordToken::TT_TWO_SIDED_DELIMITER;
+                    cur_type  = LLKeywordToken::TT_TWO_SIDED_DELIMITER;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslComment");
                 }
                 else if (pStringNode->hasName("string_literal"))
                 {
-                    cur_type = LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS;
+                    cur_type  = LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslStringLiteral");
                 }
                 else if (pStringNode->hasName("preprocessor"))
                 {
-                    cur_type = LLKeywordToken::TT_ONE_SIDED_DELIMITER;
+                    cur_type  = LLKeywordToken::TT_ONE_SIDED_DELIMITER;
                     cur_color = LLUIColorTable::instance().getColor("SyntaxLslPreprocessor");
                 }
                 if (!pStringNode->getAttributeString("desc", tool_tip))
@@ -942,12 +1063,12 @@ bool LLKeywords::loadFromLegacyFile(const std::string& filename)
                     std::string token_buffer(keyword);
                     LLStringUtil::trim(token_buffer);
 
-                    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-                    boost::char_separator<char> sep_word(" ");
-                    tokenizer word_tokens(token_buffer, sep_word);
-                    tokenizer::iterator token_word_iter = word_tokens.begin();
+                    typedef boost::tokenizer<boost::char_separator<char>> tokenizer;
+                    boost::char_separator<char>                           sep_word(" ");
+                    tokenizer                                             word_tokens(token_buffer, sep_word);
+                    tokenizer::iterator                                   token_word_iter = word_tokens.begin();
 
-                    if( !token_buffer.empty() && token_word_iter != word_tokens.end() )
+                    if (!token_buffer.empty() && token_word_iter != word_tokens.end())
                     {
                         // first word is the keyword or a left delimiter
                         keyword = (*token_word_iter);
@@ -962,15 +1083,15 @@ bool LLKeywords::loadFromLegacyFile(const std::string& filename)
                     }
                 }
 
-                if( !tool_tip.empty() )
+                if (!tool_tip.empty())
                 {
                     // Replace ; with \n for multi-line tool tips.
-                    LLStringUtil::replaceChar( tool_tip, ';', '\n' );
-                    addToken(cur_type, keyword, cur_color, tool_tip, delimiter );
+                    LLStringUtil::replaceChar(tool_tip, ';', '\n');
+                    addToken(cur_type, keyword, cur_color, tool_tip, delimiter);
                 }
                 else
                 {
-                    addToken(cur_type, keyword, cur_color, LLStringUtil::null, delimiter );
+                    addToken(cur_type, keyword, cur_color, LLStringUtil::null, delimiter);
                 }
             }
         }
@@ -995,10 +1116,9 @@ void LLKeywords::dump()
 {
     LL_INFOS() << "LLKeywords" << LL_ENDL;
 
-
     LL_INFOS() << "LLKeywords::sWordTokenMap" << LL_ENDL;
     word_token_map_t::iterator word_token_iter = mWordTokenMap.begin();
-    while( word_token_iter != mWordTokenMap.end() )
+    while (word_token_iter != mWordTokenMap.end())
     {
         LLKeywordToken* word_token = word_token_iter->second;
         word_token->dump();
@@ -1006,17 +1126,14 @@ void LLKeywords::dump()
     }
 
     LL_INFOS() << "LLKeywords::sLineTokenList" << LL_ENDL;
-    for (token_list_t::iterator iter = mLineTokenList.begin();
-         iter != mLineTokenList.end(); ++iter)
+    for (token_list_t::iterator iter = mLineTokenList.begin(); iter != mLineTokenList.end(); ++iter)
     {
         LLKeywordToken* line_token = *iter;
         line_token->dump();
     }
 
-
     LL_INFOS() << "LLKeywords::sDelimiterTokenList" << LL_ENDL;
-    for (token_list_t::iterator iter = mDelimiterTokenList.begin();
-         iter != mDelimiterTokenList.end(); ++iter)
+    for (token_list_t::iterator iter = mDelimiterTokenList.begin(); iter != mDelimiterTokenList.end(); ++iter)
     {
         LLKeywordToken* delimiter_token = *iter;
         delimiter_token->dump();
@@ -1025,12 +1142,8 @@ void LLKeywords::dump()
 
 void LLKeywordToken::dump()
 {
-    LL_INFOS() << "[" <<
-        mColor.mV[VRED] << ", " <<
-        mColor.mV[VGREEN] << ", " <<
-        mColor.mV[VBLUE] << "] [" <<
-        wstring_to_utf8str(mToken) << "]" <<
-        LL_ENDL;
+    LL_INFOS() << "[" << mColor.mV[VRED] << ", " << mColor.mV[VGREEN] << ", " << mColor.mV[VBLUE] << "] [" << wstring_to_utf8str(mToken)
+               << "]" << LL_ENDL;
 }
 
-#endif  // DEBUG
+#endif // DEBUG
