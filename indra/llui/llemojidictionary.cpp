@@ -1,28 +1,28 @@
 /**
-* @file llemojidictionary.cpp
-* @brief Implementation of LLEmojiDictionary
-*
-* $LicenseInfo:firstyear=2014&license=viewerlgpl$
-* Second Life Viewer Source Code
-* Copyright (C) 2014, Linden Research, Inc.
-*
-* This library is free software; you can redistribute it and/or
-* modify it under the terms of the GNU Lesser General Public
-* License as published by the Free Software Foundation;
-* version 2.1 of the License only.
-*
-* This library is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-* Lesser General Public License for more details.
-*
-* You should have received a copy of the GNU Lesser General Public
-* License along with this library; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-*
-* Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
-* $/LicenseInfo$
-*/
+ * @file llemojidictionary.cpp
+ * @brief Implementation of LLEmojiDictionary
+ *
+ * $LicenseInfo:firstyear=2014&license=viewerlgpl$
+ * Second Life Viewer Source Code
+ * Copyright (C) 2014, Linden Research, Inc.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
+ * $/LicenseInfo$
+ */
 
 #include "linden_common.h"
 
@@ -138,16 +138,16 @@ void LLEmojiDictionary::initClass()
 LLWString LLEmojiDictionary::findMatchingEmojis(const std::string& needle) const
 {
     LLWString result;
-    boost::transform(mEmojis | boost::adaptors::filtered(emoji_filter_shortcode_or_category_contains(needle)),
-                     std::back_inserter(result), [](const auto& descr) { return descr.Character; });
+    boost::transform(mEmojis | boost::adaptors::filtered(emoji_filter_shortcode_or_category_contains(needle)), std::back_inserter(result),
+                     [](const auto& descr) { return descr.Character; });
     return result;
 }
 
 // static
 bool LLEmojiDictionary::searchInShortCode(std::size_t& begin, std::size_t& end, const std::string& shortCode, const std::string& needle)
 {
-    begin = 0;
-    end = 1;
+    begin             = 0;
+    end               = 1;
     std::size_t index = 1;
     // Search for begin
     char d = tolower(needle[index++]);
@@ -178,20 +178,17 @@ bool LLEmojiDictionary::searchInShortCode(std::size_t& begin, std::size_t& end, 
         }
         switch (s)
         {
-        case L'-':
-        case L'_':
-        case L'+':
-            continue;
+            case L'-':
+            case L'_':
+            case L'+':
+                continue;
         }
         break;
     }
     return false;
 }
 
-void LLEmojiDictionary::findByShortCode(
-    std::vector<LLEmojiSearchResult>& result,
-    const std::string& needle
-) const
+void LLEmojiDictionary::findByShortCode(std::vector<LLEmojiSearchResult>& result, const std::string& needle) const
 {
     result.clear();
 
@@ -257,7 +254,8 @@ bool LLEmojiDictionary::isEmoji(llwchar ch) const
 
 void LLEmojiDictionary::loadTranslations()
 {
-    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_CATEGORY_FILENAME, LLDir::CURRENT_SKIN);
+    // Emoji category data is not skin-specific UI chrome; allow fallback to default skin.
+    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_CATEGORY_FILENAME, LLDir::ALL_SKINS);
     if (filenames.empty())
     {
         LL_WARNS() << "Emoji file categories not found" << LL_ENDL;
@@ -265,7 +263,7 @@ void LLEmojiDictionary::loadTranslations()
     }
 
     const std::string filename = filenames.back();
-    llifstream file(filename.c_str());
+    llifstream        file(filename.c_str());
     if (!file.is_open())
     {
         LL_WARNS() << "Emoji file categories failed to open" << LL_ENDL;
@@ -285,8 +283,8 @@ void LLEmojiDictionary::loadTranslations()
     // Register translations for all categories
     for (LLSD::array_const_iterator it = data.beginArray(), end = data.endArray(); it != end; ++it)
     {
-        const LLSD& sd = *it;
-        const std::string& name = sd["Name"].asStringRef();
+        const LLSD&        sd       = *it;
+        const std::string& name     = sd["Name"].asStringRef();
         const std::string& category = sd["Category"].asStringRef();
         if (!name.empty() && !category.empty())
         {
@@ -302,7 +300,7 @@ void LLEmojiDictionary::loadTranslations()
 void LLEmojiDictionary::loadGroups()
 {
     const std::string filename = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, COMMON_GROUP_FILENAME);
-    llifstream file(filename.c_str());
+    llifstream        file(filename.c_str());
     if (!file.is_open())
     {
         LL_WARNS() << "Emoji file groups failed to open" << LL_ENDL;
@@ -324,7 +322,7 @@ void LLEmojiDictionary::loadGroups()
     // Register all groups
     for (LLSD::array_const_iterator it = data.beginArray(), end = data.endArray(); it != end; ++it)
     {
-        const LLSD& sd = *it;
+        const LLSD&        sd   = *it;
         const std::string& name = sd["Name"].asStringRef();
         if (name == GROUP_NAME_SKIP)
         {
@@ -336,8 +334,8 @@ void LLEmojiDictionary::loadGroups()
             // Add new group
             mGroups.emplace_back();
             LLEmojiGroup& group = mGroups.back();
-            group.Character = loadIcon(sd);
-            group.Categories = loadCategories(sd);
+            group.Character     = loadIcon(sd);
+            group.Categories    = loadCategories(sd);
             translateCategories(group.Categories);
 
             for (const std::string& category : group.Categories)
@@ -354,7 +352,8 @@ void LLEmojiDictionary::loadGroups()
 
 void LLEmojiDictionary::loadEmojis()
 {
-    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_EMOJI_FILENAME, LLDir::CURRENT_SKIN);
+    // Emoji character mappings should be available regardless of selected skin.
+    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_EMOJI_FILENAME, LLDir::ALL_SKINS);
     if (filenames.empty())
     {
         LL_WARNS() << "Emoji file characters not found" << LL_ENDL;
@@ -362,7 +361,7 @@ void LLEmojiDictionary::loadEmojis()
     }
 
     const std::string filename = filenames.back();
-    llifstream file(filename.c_str());
+    llifstream        file(filename.c_str());
     if (!file.is_open())
     {
         LL_WARNS() << "Emoji file characters failed to open" << LL_ENDL;
@@ -390,7 +389,7 @@ void LLEmojiDictionary::loadEmojis()
             continue;
         }
 
-        std::string category;
+        std::string            category;
         std::list<std::string> categories = loadCategories(sd);
         if (categories.empty())
         {
@@ -424,9 +423,9 @@ void LLEmojiDictionary::loadEmojis()
 
         mEmojis.emplace_back();
         LLEmojiDescriptor& emoji = mEmojis.back();
-        emoji.Character = icon;
-        emoji.Category = category;
-        emoji.ShortCodes = std::move(shortCodes);
+        emoji.Character          = icon;
+        emoji.Category           = category;
+        emoji.ShortCodes         = std::move(shortCodes);
 
         mEmoji2Descr.insert(std::make_pair(icon, &emoji));
         mCategory2Descrs[category].push_back(&emoji);
@@ -453,7 +452,10 @@ std::list<std::string> LLEmojiDictionary::loadCategories(const LLSD& sd)
 std::list<std::string> LLEmojiDictionary::loadShortCodes(const LLSD& sd)
 {
     static const std::string key("ShortCodes");
-    auto toLower = [](std::string& str) { LLStringUtil::toLower(str); };
+    auto                     toLower = [](std::string& str)
+    {
+        LLStringUtil::toLower(str);
+    };
     return llsd_array_to_list<std::string>(sd[key], toLower);
 }
 

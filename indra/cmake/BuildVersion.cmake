@@ -21,22 +21,43 @@ if (NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/n
 
         else (DEFINED ENV{revision})
             find_program(GIT git)
-            if (DEFINED GIT )
+
+            # NOTE: this project typically has its top-level CMakeLists.txt in "indra/",
+            # but the git repo root is one level above. Out-of-tree builds can otherwise
+            # end up with a revision of 0.
+            set(_git_workdir "${CMAKE_SOURCE_DIR}/..")
+            if (NOT EXISTS "${_git_workdir}/.git")
+                # Fallback: try the source dir itself.
+                set(_git_workdir "${CMAKE_SOURCE_DIR}")
+            endif()
+
+            if (GIT AND NOT "${GIT}" MATCHES "-NOTFOUND$")
                 execute_process(
-                        COMMAND ${GIT} rev-list --count HEAD
+                        COMMAND ${GIT} -C "${_git_workdir}" rev-list --count HEAD
                         OUTPUT_VARIABLE VIEWER_VERSION_REVISION
                         OUTPUT_STRIP_TRAILING_WHITESPACE
+                        ERROR_QUIET
                 )
                 if ("${VIEWER_VERSION_REVISION}" MATCHES "^[0-9]+$")
                     message(STATUS "Revision (from git) ${VIEWER_VERSION_REVISION}")
                 else ("${VIEWER_VERSION_REVISION}" MATCHES "^[0-9]+$")
-                    message(STATUS "Revision not set (repository not found?); using 0")
+                    message(STATUS "Revision not set (git repo not found?); using 0")
                     set(VIEWER_VERSION_REVISION 0 )
                 endif ("${VIEWER_VERSION_REVISION}" MATCHES "^[0-9]+$")
-            else (DEFINED GIT )
-                message(STATUS "Revision not set: 'git' found; using 0")
+
+                # Provide a sane default for the git hash if the build environment didn't.
+                if (NOT DEFINED VIEWER_VERSION_GITHASH OR "${VIEWER_VERSION_GITHASH}" STREQUAL "")
+                    execute_process(
+                            COMMAND ${GIT} -C "${_git_workdir}" rev-parse --short=10 HEAD
+                            OUTPUT_VARIABLE VIEWER_VERSION_GITHASH
+                            OUTPUT_STRIP_TRAILING_WHITESPACE
+                            ERROR_QUIET
+                    )
+                endif()
+            else (GIT AND NOT "${GIT}" MATCHES "-NOTFOUND$")
+                message(STATUS "Revision not set: 'git' not found; using 0")
                 set(VIEWER_VERSION_REVISION 0)
-            endif (DEFINED GIT)
+            endif (GIT AND NOT "${GIT}" MATCHES "-NOTFOUND$")
         endif (DEFINED ENV{revision})
         message(STATUS "Building '${VIEWER_CHANNEL}' Version ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
     else ( EXISTS ${VIEWER_VERSION_BASE_FILE} )

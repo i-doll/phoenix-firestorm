@@ -41,19 +41,19 @@ class FSLSLPreprocessor;
 
 struct LLScriptQueueData
 {
-    LLUUID mQueueID;
-    LLUUID mTaskId;
+    LLUUID                     mQueueID;
+    LLUUID                     mTaskId;
     LLPointer<LLInventoryItem> mItem;
-    LLUUID mExperienceId;
-    std::string mExperiencename;
+    LLUUID                     mExperienceId;
+    std::string                mExperiencename;
 
     LLScriptQueueData(const LLUUID& q_id, const LLUUID& task_id, const LLUUID& experience_id, LLInventoryItem* item) :
         mQueueID(q_id),
         mTaskId(task_id),
         mExperienceId(experience_id),
         mItem(new LLInventoryItem(item))
-    { }
-
+    {
+    }
 };
 // </FS:KC>
 
@@ -68,7 +68,7 @@ struct LLScriptQueueData
 // scripts manipulated.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLFloaterScriptQueue : public LLFloater/*, public LLVOInventoryListener*/
+class LLFloaterScriptQueue : public LLFloater /*, public LLVOInventoryListener*/
 {
 public:
     LLFloaterScriptQueue(const LLSD& key);
@@ -76,7 +76,7 @@ public:
 
     /*virtual*/ bool postBuild();
 
-    void setMono(bool mono) { mMono = mono; }
+    void setCompileTarget(std::string target) { mCompileTarget = std::move(target); }
 
     // addObject() accepts an object id.
     void addObject(const LLUUID& id, std::string name);
@@ -84,8 +84,8 @@ public:
     // start() returns true if the queue has started, otherwise false.
     bool start();
 
-    void addProcessingMessage(const std::string &message, const LLSD &args);
-    void addStringMessage(const std::string &message);
+    void addProcessingMessage(const std::string& message, const LLSD& args);
+    void addStringMessage(const std::string& message);
 
     std::string getStartString() const { return mStartString; }
 
@@ -103,27 +103,27 @@ protected:
 
 protected:
     // UI
-    LLScrollListCtrl* mMessages;
-    LLButton* mCloseBtn;
+    LLScrollListCtrl* mMessages{ nullptr };
+    LLButton*         mCloseBtn{ nullptr };
 
     // Object Queue
     struct ObjectData
     {
-        LLUUID mObjectId;
+        LLUUID      mObjectId;
         std::string mObjectName;
     };
     typedef std::vector<ObjectData> object_data_list_t;
 
     object_data_list_t mObjectList;
-    LLUUID mCurrentObjectID;
-    bool mDone;
+    LLUUID             mCurrentObjectID;
+    bool               mDone{ false };
 
     std::string mStartString;
-    bool mMono;
+    std::string mCompileTarget{ "lsl2" };
 
-    typedef std::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
-    static void objectScriptProcessingQueueCoro(std::string action, LLHandle<LLFloaterScriptQueue> hfloater, object_data_list_t objectList, fnQueueAction_t func);
-
+    typedef boost::function<bool(const LLPointer<LLViewerObject>&, LLInventoryObject*, LLEventPump&)> fnQueueAction_t;
+    static void objectScriptProcessingQueueCoro(std::string action, LLHandle<LLFloaterScriptQueue> hfloater, object_data_list_t objectList,
+                                                fnQueueAction_t func);
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -136,37 +136,42 @@ struct LLCompileQueueData
 {
     LLUUID mQueueID;
     LLUUID mItemId;
-    LLCompileQueueData(const LLUUID& q_id, const LLUUID& item_id) :
-        mQueueID(q_id), mItemId(item_id) {}
+    LLCompileQueueData(const LLUUID& q_id, const LLUUID& item_id) : mQueueID(q_id), mItemId(item_id) {}
 };
 
 class LLFloaterCompileQueue : public LLFloaterScriptQueue
 {
     friend class LLFloaterReg;
-public:
 
-    void experienceIdsReceived( const LLSD& content );
-    bool hasExperience(const LLUUID& id)const;
+public:
+    /*virtual*/ bool postBuild();
+
+    void experienceIdsReceived(const LLSD& content);
+    bool hasExperience(const LLUUID& id) const;
 
     // <FS:KC> [LSL PreProc]
     static void finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, std::string scriptName, LLUUID queueId);
     static void scriptPreprocComplete(LLScriptQueueData* data, LLAssetType::EType type, const std::string& script_text);
     static void scriptLogMessage(LLScriptQueueData* data, std::string_view message);
+
 protected:
     LLFloaterCompileQueue(const LLSD& key);
     virtual ~LLFloaterCompileQueue();
 
     virtual bool startQueue();
 
-    static bool processScript(LLHandle<LLFloaterCompileQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
+    static bool processScript(LLHandle<LLFloaterCompileQueue> hfloater, const LLPointer<LLViewerObject>& object,
+                              LLInventoryObject* inventory, LLEventPump& pump);
 
-    //bool checkAssetId(const LLUUID &assetId);
-    static void handleHTTPResponse(std::string pumpName, const LLSD &expresult);
+    // bool checkAssetId(const LLUUID &assetId);
+    static void handleHTTPResponse(std::string pumpName, const LLSD& expresult);
     static void handleScriptRetrieval(const LLUUID& assetId, LLAssetType::EType type, void* userData, S32 status, LLExtStat extStatus);
 
 private:
+    void onCompileTargetCommit();
+
     static void processExperienceIdResults(LLSD result, LLUUID parent);
-    //uuid_list_t mAssetIds;  // list of asset IDs processed.
+    // uuid_list_t mAssetIds;  // list of asset IDs processed.
     uuid_list_t mExperienceIds;
 
     // <FS:KC> [LSL PreProc]
@@ -182,11 +187,13 @@ private:
 class LLFloaterResetQueue : public LLFloaterScriptQueue
 {
     friend class LLFloaterReg;
+
 protected:
     LLFloaterResetQueue(const LLSD& key);
     virtual ~LLFloaterResetQueue();
 
-    static bool resetObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
+    static bool resetObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject>& object,
+                                   LLInventoryObject* inventory, LLEventPump& pump);
 
     virtual bool startQueue();
 };
@@ -200,11 +207,13 @@ protected:
 class LLFloaterRunQueue : public LLFloaterScriptQueue
 {
     friend class LLFloaterReg;
+
 protected:
     LLFloaterRunQueue(const LLSD& key);
     virtual ~LLFloaterRunQueue();
 
-    static bool runObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
+    static bool runObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject>& object,
+                                 LLInventoryObject* inventory, LLEventPump& pump);
 
     virtual bool startQueue();
 };
@@ -218,11 +227,13 @@ protected:
 class LLFloaterNotRunQueue : public LLFloaterScriptQueue
 {
     friend class LLFloaterReg;
+
 protected:
     LLFloaterNotRunQueue(const LLSD& key);
     virtual ~LLFloaterNotRunQueue();
 
-    static bool stopObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
+    static bool stopObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject>& object,
+                                  LLInventoryObject* inventory, LLEventPump& pump);
 
     virtual bool startQueue();
 };
@@ -237,11 +248,13 @@ protected:
 class LLFloaterDeleteQueue : public LLFloaterScriptQueue
 {
     friend class LLFloaterReg;
+
 protected:
     LLFloaterDeleteQueue(const LLSD& key);
     virtual ~LLFloaterDeleteQueue();
 
-    static bool deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
+    static bool deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject>& object,
+                                    LLInventoryObject* inventory, LLEventPump& pump);
 
     virtual bool startQueue();
 };

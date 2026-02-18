@@ -33,41 +33,43 @@
 class LLScriptEditor : public LLTextEditor
 {
 public:
-
     struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
     {
-        Optional<bool>      show_line_numbers;
+        Optional<bool> show_line_numbers;
         Optional<bool> default_font_size;
         Params();
     };
 
-    virtual ~LLScriptEditor() {};
+    ~LLScriptEditor() override {};
 
     // LLView override
-    virtual void    draw();
-    bool postBuild();
+    void draw() override;
+    bool postBuild() override;
 
     // <FS> Improved Home-key behavior
     // LLTextBase override
-    virtual void    startOfLine();
+    virtual void startOfLine();
 
-    void    initKeywords();
-    void    loadKeywords();
-    /* virtual */ void  clearSegments();
-    LLKeywords::keyword_iterator_t keywordsBegin()  { return mKeywords.begin(); }
-    LLKeywords::keyword_iterator_t keywordsEnd()    { return mKeywords.end(); }
+    void                           initKeywords(bool luau_language = false);
+    void                           loadKeywords();
+    void                           clearSegments();
+    LLKeywords::keyword_iterator_t keywordsBegin();
+    LLKeywords::keyword_iterator_t keywordsEnd();
+    LLKeywords&                    getKeywords();
+    bool                           getIsLuauLanguage() const { return mLuauLanguage; }
+    void                           setLuauLanguage(bool luau_language) { mLuauLanguage = luau_language; }
 
     // <FS:Ansariel> FIRE-20818: User-selectable font and size for script editor
-    //static std::string getScriptFontSize();
-    //LLFontGL* getScriptFont();
-    //void onFontSizeChange();
+    // static std::string getScriptFontSize();
+    // LLFontGL* getScriptFont();
+    // void onFontSizeChange();
     // <FS:Ansariel>
 
     // <FS:Ansariel> Re-add legacy format support
-    void    loadKeywords(const std::string& filename,
-                         const std::vector<std::string>& funcs,
-                         const std::vector<std::string>& tooltips,
-                         const LLColor3& func_color);
+    void loadKeywords(const std::string&              filename,
+                      const std::vector<std::string>& funcs,
+                      const std::vector<std::string>& tooltips,
+                      const LLColor3&                 func_color);
     // </FS:Ansariel>
 
 protected:
@@ -75,19 +77,21 @@ protected:
     LLScriptEditor(const Params& p);
 
 private:
-    void    drawLineNumbers();
-    /* virtual */ void  updateSegments();
-    /* virtual */ void  drawSelectionBackground();
+    void               drawLineNumbers();
+    /* virtual */ void updateSegments();
+    /* virtual */ void drawSelectionBackground();
     // <FS:Ansariel> Doesn't exist
-    //void  loadKeywords(const std::string& filename_keywords,
+    // void  loadKeywords(const std::string& filename_keywords,
     //                   const std::string& filename_colors);
 
     // <FS:Ansariel> Show keyword help on F1
     /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
 
-    LLKeywords  mKeywords;
-    bool        mShowLineNumbers;
-    bool mUseDefaultFontSize;
+    LLKeywords mKeywordsLua;
+    LLKeywords mKeywordsLSL;
+    bool       mLuauLanguage;
+    bool       mShowLineNumbers;
+    bool       mUseDefaultFontSize;
 };
 
 #endif // LL_SCRIPTEDITOR_H
