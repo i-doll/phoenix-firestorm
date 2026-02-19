@@ -44,7 +44,6 @@
 #include "v3color.h"
 #include "llui.h"
 #include "llglheaders.h"
-#include "llglfunctiondecls.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -4580,7 +4579,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
             if (can_use_wboit && oit_targets_ready && is_transparent_pool)
             {
                 const bool rigged_only_wboit = RenderOITRiggedOnly;
-                const bool supports_dual_blend = gGLFunc_glBlendFunci && gGLFunc_glEnablei && gGLFunc_glDisablei;
+                const bool supports_dual_blend = gGLManager.mGLVersion >= 4.f;
 
                 if (!oit_started)
                 {
