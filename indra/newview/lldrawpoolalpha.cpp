@@ -29,7 +29,6 @@
 #include "lldrawpoolalpha.h"
 
 #include "llglheaders.h"
-#include "llglfunctiondecls.h"
 #include "llviewercontrol.h"
 #include "llcriticaldamp.h"
 #include "llfasttimer.h"
