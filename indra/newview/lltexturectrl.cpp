@@ -76,6 +76,8 @@
 #include "lllocalbitmaps.h"
 #include "lllocalgltfmaterials.h"
 #include "llerror.h"
+#include "llimagepng.h"
+#include "llnotificationsutil.h"
 
 #include "llavatarappearancedefines.h"
 
@@ -199,6 +201,13 @@ LLFloaterTexturePicker::LLFloaterTexturePicker(
 
 LLFloaterTexturePicker::~LLFloaterTexturePicker()
 {
+    LLLoadedCallbackEntry::cleanUpCallbackList(&mCallbackTextureList);
+
+    if (mLoadingFullImage)
+    {
+        getWindow()->decBusyCount();
+        mLoadingFullImage = false;
+    }
 }
 
 void LLFloaterTexturePicker::setImageID(const LLUUID& image_id, bool set_selection /*=true*/)
@@ -455,6 +464,7 @@ bool LLFloaterTexturePicker::updateImageStats()
         mPipetteBtn->setVisible(result);
         // <FS> Special additions
         mTransparentBtn->setVisible(result);
+        mSavePNGBtn->setVisible(result);
     }
     return result;
 }
@@ -634,6 +644,7 @@ bool LLFloaterTexturePicker::postBuild()
     mTransparentBtn = getChild<LLButton>("Transparent");
     mUUIDBtn = getChild<LLButton>("TextureKeyApply");
     mUUIDEditor = getChild<LLLineEditor>("TextureKey");
+    mSavePNGBtn = getChild<LLButton>("save_png_btn");
 
     mDefaultBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnSetToDefault,this));
     mNoneBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnNone, this));
@@ -644,6 +655,7 @@ bool LLFloaterTexturePicker::postBuild()
     // <FS> Special additions
     mTransparentBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnTransparent, this));
     mUUIDBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnApplyTexture, this));
+    mSavePNGBtn->setClickedCallback(boost::bind(&LLFloaterTexturePicker::onBtnSavePNG, this));
 
     mFilterEdit = getChild<LLFilterEditor>("inventory search editor");
     mFilterEdit->setCommitCallback(boost::bind(&LLFloaterTexturePicker::onFilterEdit, this, _2));
@@ -811,6 +823,9 @@ void LLFloaterTexturePicker::draw()
         mBlankBtn->setEnabled((mImageAssetID != mBlankImageAssetID && mBlankImageAssetID.notNull()) || getTentative());
         mNoneBtn->setEnabled(mAllowNoTexture && (!mImageAssetID.isNull() || getTentative()));
         mTransparentBtn->setEnabled((mImageAssetID != mTransparentImageAssetID && mTransparentImageAssetID.notNull()) || getTentative()); // <FS:PP> FIRE-5082: "Transparent" button in Texture Panel
+        mSavePNGBtn->setEnabled(mImageAssetID.notNull() && !mLoadingFullImage && mTexturep.notNull()
+            && mInventoryPickType != PICK_MATERIAL
+            && !LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID));
 
         LLFloater::draw();
 
@@ -1120,6 +1135,119 @@ void LLFloaterTexturePicker::onBtnNone(void* userdata)
     // Deselect in case inventory has a selected item with null id
     self->mInventoryPanel->getRootFolder()->clearSelection();
     self->commitIfImmediateSet();
+}
+
+void LLFloaterTexturePicker::onBtnSavePNG()
+{
+    if (mLoadingFullImage || mImageAssetID.isNull())
+        return;
+
+    std::string filename;
+    LLViewerInventoryItem* itemp = findInvItem(mImageAssetID, false);
+    if (itemp)
+    {
+        filename = LLDir::getScrubbedFileName(itemp->getName());
+    }
+    else
+    {
+        filename = mImageAssetID.asString();
+    }
+
+    if (!filename.empty() && gDirUtilp->getExtension(filename) != "png")
+    {
+        filename += ".png";
+    }
+
+    LLFilePickerReplyThread::startPicker(
+        boost::bind(&LLFloaterTexturePicker::onSavePNGFileSelected, this, _1),
+        LLFilePicker::FFSAVE_PNG,
+        filename);
+}
+
+struct SavePNGData
+{
+    LLHandle<LLFloater> mHandle;
+    std::string mFileName;
+};
+
+void LLFloaterTexturePicker::onSavePNGFileSelected(const std::vector<std::string>& filenames)
+{
+    if (filenames.empty() || mImageAssetID.isNull())
+        return;
+
+    std::string filepath = filenames[0];
+
+    // Ensure .png extension
+    std::string ext = gDirUtilp->getExtension(filepath);
+    if (ext.empty())
+    {
+        filepath += ".png";
+    }
+
+    mSaveFileName = filepath;
+    mLoadingFullImage = true;
+    getWindow()->incBusyCount();
+
+    LLPointer<LLViewerFetchedTexture> texture = LLViewerTextureManager::getFetchedTexture(mImageAssetID);
+    texture->forceToSaveRawImage(0);
+
+    SavePNGData* data = new SavePNGData();
+    data->mHandle = getHandle();
+    data->mFileName = filepath;
+
+    texture->setLoadedCallback(
+        LLFloaterTexturePicker::onFileLoadedForSavePNG,
+        0, true, false, data, &mCallbackTextureList);
+}
+
+// static
+void LLFloaterTexturePicker::onFileLoadedForSavePNG(
+    bool success,
+    LLViewerFetchedTexture* src_vi,
+    LLImageRaw* src,
+    LLImageRaw* aux_src,
+    S32 discard_level,
+    bool final,
+    void* userdata)
+{
+    SavePNGData* data = (SavePNGData*)userdata;
+    LLFloaterTexturePicker* self = (LLFloaterTexturePicker*)data->mHandle.get();
+
+    if (final || !success)
+    {
+        if (self)
+        {
+            self->getWindow()->decBusyCount();
+            self->mLoadingFullImage = false;
+        }
+    }
+
+    if (self && final && success)
+    {
+        LLPointer<LLImagePNG> image_png = new LLImagePNG;
+        if (!image_png->encode(src, 0.0))
+        {
+            LLSD args;
+            args["FILE"] = data->mFileName;
+            LLNotificationsUtil::add("CannotEncodeFile", args);
+        }
+        else if (!image_png->save(data->mFileName))
+        {
+            LLSD args;
+            args["FILE"] = data->mFileName;
+            LLNotificationsUtil::add("CannotWriteFile", args);
+        }
+    }
+
+    if (self && !success)
+    {
+        LLNotificationsUtil::add("CannotDownloadFile");
+    }
+
+    if (final || !success)
+    {
+        delete data;
+    }
 }
 
 
@@ -1539,6 +1667,7 @@ void LLFloaterTexturePicker::changeMode()
     mBlankBtn->setVisible(index == PICKER_INVENTORY);
     mNoneBtn->setVisible(index == PICKER_INVENTORY);
     mTransparentBtn->setVisible(index == PICKER_INVENTORY); // <FS:PP> FIRE-5082: "Transparent" button in Texture Panel
+    mSavePNGBtn->setVisible(index == PICKER_INVENTORY);
     mFilterEdit->setVisible(index == PICKER_INVENTORY);
     mInventoryPanel->setVisible(index == PICKER_INVENTORY);
 

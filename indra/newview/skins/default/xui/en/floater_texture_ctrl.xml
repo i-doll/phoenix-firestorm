@@ -152,6 +152,17 @@ Pick: Texture
      top_pad="0"
      width="73" />
     <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="Save PNG"
+     label_selected="Save PNG"
+     layout="topleft"
+     left_delta="0"
+     name="save_png_btn"
+     top_pad="0"
+     width="73" />
+    <button
      follows="left|top"
      height="28"
      image_selected="eye_button_active.tga"
