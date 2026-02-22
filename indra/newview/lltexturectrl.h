@@ -405,6 +405,9 @@ public:
     static void     onBtnBlank(void* userdata);
     static void     onBtnTransparent( void* userdata ); // <FS:PP> FIRE-5082: "Transparent" button in Texture Panel
     static void     onBtnNone(void* userdata);
+    void            onBtnSavePNG();
+    void            onSavePNGFileSelected(const std::vector<std::string>& filenames);
+    static void     onFileLoadedForSavePNG(bool success, LLViewerFetchedTexture* src_vi, LLImageRaw* src, LLImageRaw* aux_src, S32 discard_level, bool final, void* userdata);
     void            onSelectionChange(const std::deque<LLFolderViewItem*> &items, bool user_action);
     static void     onApplyImmediateCheck(LLUICtrl* ctrl, void* userdata);
     void            onTextureSelect(const LLTextureEntry& te);
@@ -480,6 +483,7 @@ protected:
     LLLineEditor*       mUUIDEditor{ nullptr };
     LLButton*           mUUIDBtn{ nullptr };
     LLButton*           mTransparentBtn{ nullptr };
+    LLButton*           mSavePNGBtn{ nullptr };
 
 private:
     bool mCanApply;
@@ -499,6 +503,10 @@ private:
 
     bool mBakeTextureEnabled;
     bool mLocalTextureEnabled;
+
+    bool mLoadingFullImage{ false };
+    std::string mSaveFileName;
+    LLLoadedCallbackEntry::source_callback_list_t mCallbackTextureList;
 
     static S32 sLastPickerMode;
 };
