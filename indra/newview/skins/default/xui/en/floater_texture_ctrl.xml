@@ -3,9 +3,9 @@
  legacy_header_height="18"
  can_minimize="false"
  can_resize="true"
- height="360"
+ height="378"
  layout="topleft"
- min_height="330"
+ min_height="348"
  min_width="410"
  name="texture picker"
  help_topic="texture_picker"
@@ -175,6 +175,17 @@ Pick: Texture
      layout="topleft"
      left_delta="0"
      name="save_png_btn"
+     top_pad="0"
+     width="73" />
+    <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="Copy UUID"
+     label_selected="Copy UUID"
+     layout="topleft"
+     left_delta="0"
+     name="copy_uuid_btn"
      top_pad="0"
      width="73" />
     <button
