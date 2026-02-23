@@ -406,6 +406,7 @@ public:
     static void     onBtnTransparent( void* userdata ); // <FS:PP> FIRE-5082: "Transparent" button in Texture Panel
     static void     onBtnNone(void* userdata);
     void            onBtnSavePNG();
+    void            onBtnCopyUUID();
     void            onSavePNGFileSelected(const std::vector<std::string>& filenames);
     static void     onFileLoadedForSavePNG(bool success, LLViewerFetchedTexture* src_vi, LLImageRaw* src, LLImageRaw* aux_src, S32 discard_level, bool final, void* userdata);
     void            onSelectionChange(const std::deque<LLFolderViewItem*> &items, bool user_action);
@@ -484,6 +485,7 @@ protected:
     LLButton*           mUUIDBtn{ nullptr };
     LLButton*           mTransparentBtn{ nullptr };
     LLButton*           mSavePNGBtn{ nullptr };
+    LLButton*           mCopyUUIDBtn{ nullptr };
 
 private:
     bool mCanApply;
