@@ -77,6 +77,7 @@
 #include "lllocalgltfmaterials.h"
 #include "llerror.h"
 #include "llimagepng.h"
+#include "llclipboard.h"
 #include "llnotificationsutil.h"
 
 #include "llavatarappearancedefines.h"
@@ -465,6 +466,7 @@ bool LLFloaterTexturePicker::updateImageStats()
         // <FS> Special additions
         mTransparentBtn->setVisible(result);
         mSavePNGBtn->setVisible(result);
+        mCopyUUIDBtn->setVisible(result);
     }
     return result;
 }
@@ -645,6 +647,7 @@ bool LLFloaterTexturePicker::postBuild()
     mUUIDBtn = getChild<LLButton>("TextureKeyApply");
     mUUIDEditor = getChild<LLLineEditor>("TextureKey");
     mSavePNGBtn = getChild<LLButton>("save_png_btn");
+    mCopyUUIDBtn = getChild<LLButton>("copy_uuid_btn");
 
     mDefaultBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnSetToDefault,this));
     mNoneBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnNone, this));
@@ -656,6 +659,7 @@ bool LLFloaterTexturePicker::postBuild()
     mTransparentBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnTransparent, this));
     mUUIDBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnApplyTexture, this));
     mSavePNGBtn->setClickedCallback(boost::bind(&LLFloaterTexturePicker::onBtnSavePNG, this));
+    mCopyUUIDBtn->setClickedCallback(boost::bind(&LLFloaterTexturePicker::onBtnCopyUUID, this));
 
     mFilterEdit = getChild<LLFilterEditor>("inventory search editor");
     mFilterEdit->setCommitCallback(boost::bind(&LLFloaterTexturePicker::onFilterEdit, this, _2));
@@ -826,6 +830,7 @@ void LLFloaterTexturePicker::draw()
         mSavePNGBtn->setEnabled(mImageAssetID.notNull() && !mLoadingFullImage && mTexturep.notNull()
             && mInventoryPickType != PICK_MATERIAL
             && !LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID));
+        mCopyUUIDBtn->setEnabled(mImageAssetID.notNull());
 
         LLFloater::draw();
 
@@ -1162,6 +1167,14 @@ void LLFloaterTexturePicker::onBtnSavePNG()
         boost::bind(&LLFloaterTexturePicker::onSavePNGFileSelected, this, _1),
         LLFilePicker::FFSAVE_PNG,
         filename);
+}
+
+void LLFloaterTexturePicker::onBtnCopyUUID()
+{
+    if (mImageAssetID.isNull())
+        return;
+    std::string uuid = mImageAssetID.asString();
+    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(uuid), 0, static_cast<S32>(uuid.size()));
 }
 
 struct SavePNGData
@@ -1668,6 +1681,7 @@ void LLFloaterTexturePicker::changeMode()
     mNoneBtn->setVisible(index == PICKER_INVENTORY);
     mTransparentBtn->setVisible(index == PICKER_INVENTORY); // <FS:PP> FIRE-5082: "Transparent" button in Texture Panel
     mSavePNGBtn->setVisible(index == PICKER_INVENTORY);
+    mCopyUUIDBtn->setVisible(index == PICKER_INVENTORY);
     mFilterEdit->setVisible(index == PICKER_INVENTORY);
     mInventoryPanel->setVisible(index == PICKER_INVENTORY);
 
