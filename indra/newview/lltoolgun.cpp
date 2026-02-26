@@ -129,8 +129,7 @@ bool LLToolGun::handleHover(S32 x, S32 y, MASK mask)
             {
                 gAgent.pitch(mouse_sensitivity * dy);
             }
-            LLVector3 skyward = gAgent.getReferenceUpVector();
-            gAgent.rotate(mouse_sensitivity * dx, skyward.mV[VX], skyward.mV[VY], skyward.mV[VZ]);
+            gAgent.yaw(mouse_sensitivity * dx);
 
             // <FS:Ansariel> Use faster LLCachedControl
             //if (gSavedSettings.getBOOL("MouseSun"))

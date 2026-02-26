@@ -137,6 +137,7 @@ public:
     LLQuaternion getCurrentAvatarRotation();
     bool isJoystickCameraUsed();
     void setInitSitRot(LLQuaternion sit_rot) { mInitSitRot = sit_rot; };
+    LLQuaternion getInitSitRot() const { return mInitSitRot; }
     void rotateToInitSitRot();
 
 private:
