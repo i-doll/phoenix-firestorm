@@ -88,6 +88,16 @@ public:
      */
     static bool getCameraFOVLimits(float& nFOVMin, float& nFOVMax);
 
+    /*
+     * Retrieves the current camera pitch limits (from horizontal, in radians)
+     */
+    static bool getCameraPitchLimits(float& nPitchUp, float& nPitchDown);
+
+    /*
+     * Retrieves the current camera yaw half-range (from sit direction, in radians)
+     */
+    static bool getCameraYawLimit(float& nYawHalfRange);
+
     // ================================
     // Communication/Avatar interaction
     // ================================

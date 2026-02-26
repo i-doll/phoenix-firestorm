@@ -129,6 +129,32 @@ bool RlvActions::getCameraFOVLimits(F32& nFOVMin, F32& nFOVMax)
     return false;
 }
 
+bool RlvActions::getCameraPitchLimits(F32& nPitchUp, F32& nPitchDown)
+{
+    bool fClampUp = gRlvHandler.hasBehaviour(RLV_BHVR_SETCAM_PITCHMIN), fClampDown = gRlvHandler.hasBehaviour(RLV_BHVR_SETCAM_PITCHMAX);
+    if ( (fClampUp) || (fClampDown) )
+    {
+        static RlvCachedBehaviourModifier<float> sCamPitchUp(RLV_MODIFIER_SETCAM_PITCHMIN);
+        static RlvCachedBehaviourModifier<float> sCamPitchDown(RLV_MODIFIER_SETCAM_PITCHMAX);
+
+        nPitchUp = (fClampUp) ? sCamPitchUp : F_PI_BY_TWO;
+        nPitchDown = (fClampDown) ? sCamPitchDown : F_PI_BY_TWO;
+        return true;
+    }
+    return false;
+}
+
+bool RlvActions::getCameraYawLimit(F32& nYawHalfRange)
+{
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SETCAM_YAW))
+    {
+        static RlvCachedBehaviourModifier<float> sCamYaw(RLV_MODIFIER_SETCAM_YAW);
+        nYawHalfRange = sCamYaw;
+        return true;
+    }
+    return false;
+}
+
 // ============================================================================
 // Communication/Avatar interaction
 //
