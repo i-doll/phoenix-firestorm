@@ -2425,6 +2425,18 @@ void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_FOVMAX>::onValueChange() co
     LLViewerCamera::instance().setDefaultFOV(LLViewerCamera::instance().getDefaultFOV());
 }
 
+// Handles: @setcam_pitchmin:<angle>=n|y changes
+template<>
+void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_PITCHMIN>::onValueChange() const {}
+
+// Handles: @setcam_pitchmax:<angle>=n|y changes
+template<>
+void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_PITCHMAX>::onValueChange() const {}
+
+// Handles: @setcam_yaw:<half_range>=n|y changes
+template<>
+void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_YAW>::onValueChange() const {}
+
 // Handles: @setcam_mouselook=n|y toggles
 template<> template<>
 void RlvBehaviourToggleHandler<RLV_BHVR_SETCAM_MOUSELOOK>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
@@ -2504,6 +2516,9 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SETCAM>::onCommandToggle(ERlvBehaviour e
     RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOCUSOFFSET)->setPrimaryObject(idRlvObject);
     RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOVMIN)->setPrimaryObject(idRlvObject);
     RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOVMAX)->setPrimaryObject(idRlvObject);
+    RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_PITCHMIN)->setPrimaryObject(idRlvObject);
+    RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_PITCHMAX)->setPrimaryObject(idRlvObject);
+    RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_YAW)->setPrimaryObject(idRlvObject);
     RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_TEXTURE)->setPrimaryObject(idRlvObject);
 }
 

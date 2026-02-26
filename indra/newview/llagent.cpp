@@ -1660,10 +1660,24 @@ void LLAgent::pitch(F32 angle)
 
     LLVector3 skyward = getReferenceUpVector();
 
+// [RLVa:KB] - @setcam_pitchmin, @setcam_pitchmax
+    F32 look_down_limit = 179.f * DEG_TO_RAD;
+    F32 look_up_limit = 5.f * DEG_TO_RAD;
+    if (gAgentCamera.cameraMouselook())
+    {
+        F32 rlvPitchUp = 0.f, rlvPitchDown = 0.f;
+        if (RlvActions::getCameraPitchLimits(rlvPitchUp, rlvPitchDown))
+        {
+            // RLVa values are "from horizontal" — convert to "from skyward"
+            look_up_limit = llmax(look_up_limit, F_PI_BY_TWO - rlvPitchUp);
+            look_down_limit = llmin(look_down_limit, F_PI_BY_TWO + rlvPitchDown);
+        }
+    }
+// [/RLVa:KB]
+
     // clamp pitch to limits
     if (angle >= 0.f)
     {
-        const F32 look_down_limit = 179.f * DEG_TO_RAD;
         F32 angle_from_skyward = acos(mFrameAgent.getAtAxis() * skyward);
         if (angle_from_skyward + angle > look_down_limit)
         {
@@ -1672,7 +1686,6 @@ void LLAgent::pitch(F32 angle)
     }
     else if (angle < 0.f)
     {
-        const F32 look_up_limit = 5.f * DEG_TO_RAD;
         const LLVector3& viewer_camera_pos = LLViewerCamera::getInstance()->getOrigin();
         LLVector3 agent_focus_pos = getPosAgentFromGlobal(gAgentCamera.calcFocusPositionTargetGlobal());
         LLVector3 look_dir = agent_focus_pos - viewer_camera_pos;
@@ -1704,6 +1717,51 @@ void LLAgent::yaw(F32 angle)
 {
     if (!rotateGrabbed())
     {
+// [RLVa:KB] - @setcam_yaw + sitting mouselook yaw limit
+        if (isAgentAvatarValid() && gAgentAvatarp->getParent() && gAgentCamera.cameraMouselook())
+        {
+            // Determine the effective yaw half-range: hardcoded 90° or RLVa value, whichever is tighter
+            F32 yaw_limit = F_PI_BY_TWO;
+            F32 rlvYawHalfRange = 0.f;
+            if (RlvActions::getCameraYawLimit(rlvYawHalfRange))
+            {
+                yaw_limit = llmin(yaw_limit, rlvYawHalfRange);
+            }
+
+            LLVector3 up = getReferenceUpVector();
+
+            // Project the initial sit at-axis onto the plane perpendicular to the up vector
+            LLVector3 init_at = LLVector3::x_axis * gAgentCamera.getInitSitRot();
+            init_at -= up * (init_at * up);
+
+            // Project current at-axis the same way
+            LLVector3 cur_at = mFrameAgent.getAtAxis();
+            cur_at -= up * (cur_at * up);
+
+            F32 init_len = init_at.normalize();
+            F32 cur_len = cur_at.normalize();
+
+            if (init_len > 0.001f && cur_len > 0.001f)
+            {
+                // Compute signed yaw angle from initial to current direction
+                F32 dot = llclamp(init_at * cur_at, -1.f, 1.f);
+                LLVector3 cross = init_at % cur_at;
+                F32 current_yaw = atan2f(cross * up, dot);
+
+                // Clamp so that current_yaw + angle stays within ±yaw_limit
+                F32 new_yaw = current_yaw + angle;
+                if (new_yaw > yaw_limit)
+                {
+                    angle = yaw_limit - current_yaw;
+                }
+                else if (new_yaw < -yaw_limit)
+                {
+                    angle = -yaw_limit - current_yaw;
+                }
+            }
+        }
+// [/RLVa:KB]
+
         mFrameAgent.rotate(angle, getReferenceUpVector());
     }
 }
