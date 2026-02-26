@@ -221,6 +221,12 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addModifier(RLV_BHVR_SETCAM_FOVMIN, RLV_MODIFIER_SETCAM_FOVMIN, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_FOVMIN>("Camera - FOV (Min)", DEFAULT_FIELD_OF_VIEW, true, new RlvBehaviourModifierCompMax));
     addEntry(new RlvBehaviourProcessor<RLV_BHVR_SETCAM_FOVMAX, RlvBehaviourSetCamFovHandler>("setcam_fovmax"));
     addModifier(RLV_BHVR_SETCAM_FOVMAX, RLV_MODIFIER_SETCAM_FOVMAX, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_FOVMAX>("Camera - FOV (Max)", DEFAULT_FIELD_OF_VIEW, true, new RlvBehaviourModifierCompMin));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_pitchmin", RLV_BHVR_SETCAM_PITCHMIN));
+    addModifier(RLV_BHVR_SETCAM_PITCHMIN, RLV_MODIFIER_SETCAM_PITCHMIN, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_PITCHMIN>("Camera - Pitch Up Limit", F_PI_BY_TWO, false, new RlvBehaviourModifierCompMin));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_pitchmax", RLV_BHVR_SETCAM_PITCHMAX));
+    addModifier(RLV_BHVR_SETCAM_PITCHMAX, RLV_MODIFIER_SETCAM_PITCHMAX, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_PITCHMAX>("Camera - Pitch Down Limit", F_PI_BY_TWO, false, new RlvBehaviourModifierCompMin));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_yaw", RLV_BHVR_SETCAM_YAW));
+    addModifier(RLV_BHVR_SETCAM_YAW, RLV_MODIFIER_SETCAM_YAW, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_YAW>("Camera - Yaw Limit", F_PI, false, new RlvBehaviourModifierCompMin));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETCAM_MOUSELOOK, RLV_OPTION_NONE>("setcam_mouselook"));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_MODIFIER>("setcam_textures", RLV_BHVR_SETCAM_TEXTURES));
     addModifier(RLV_BHVR_SETCAM_TEXTURES, RLV_MODIFIER_SETCAM_TEXTURE, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_TEXTURE>("Camera - Forced Texture", IMG_DEFAULT, true, nullptr));
