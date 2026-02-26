@@ -244,6 +244,9 @@ enum ERlvBehaviour {
     RLV_BHVR_SETCAM_FOV,            // Changes the current - vertical - field of view
     RLV_BHVR_SETCAM_FOVMIN,         // Enforces a minimum - vertical - FOV (in degrees)
     RLV_BHVR_SETCAM_FOVMAX,         // Enforces a maximum - vertical - FOV (in degrees)
+    RLV_BHVR_SETCAM_PITCHMIN,       // Enforces a max upward pitch angle from horizontal (in radians)
+    RLV_BHVR_SETCAM_PITCHMAX,       // Enforces a max downward pitch angle from horizontal (in radians)
+    RLV_BHVR_SETCAM_YAW,            // Enforces a yaw half-range from sit direction (in radians)
     RLV_BHVR_SETCAM_MOUSELOOK,      // Prevent the user from going into mouselook
     RLV_BHVR_SETCAM_TEXTURES,       // Replaces all textures with the specified texture (or the default unrezzed one)
     RLV_BHVR_SETCAM_UNLOCK,         // Forces the camera focus to the user's avatar
@@ -293,6 +296,9 @@ enum ERlvBehaviourModifier
     RLV_MODIFIER_SETCAM_FOCUSOFFSET,    // Specifies the default camera's focus (vector)
     RLV_MODIFIER_SETCAM_FOVMIN,         // Minimum value for the camera's field of view (angle in radians)
     RLV_MODIFIER_SETCAM_FOVMAX,         // Maximum value for the camera's field of view (angle in radians)
+    RLV_MODIFIER_SETCAM_PITCHMIN,       // Max upward pitch from horizontal (in radians)
+    RLV_MODIFIER_SETCAM_PITCHMAX,       // Max downward pitch from horizontal (in radians)
+    RLV_MODIFIER_SETCAM_YAW,            // Yaw half-range from sit direction (in radians)
     RLV_MODIFIER_SETCAM_TEXTURE,        // Specifies the UUID of the texture used to texture the world view
     RLV_MODIFIER_SHOWNAMETAGSDIST,      // Distance at which name tags will still be shown
     RLV_MODIFIER_SITTPDIST,
