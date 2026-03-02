@@ -114,6 +114,7 @@
 #include "llspellcheckmenuhandler.h"
 #include "llstatusbar.h"
 #include "llterrainpaintmap.h"
+#include "llviewerregion.h"
 #include "lltextureview.h"
 #include "lltoolbarview.h"
 #include "lltoolcomp.h"
@@ -3379,6 +3380,29 @@ void destroy_texture(const LLUUID& id) // will be used by the texture refresh fu
     LLAppViewer::getTextureCache()->removeFromCache(id);
 }
 
+static void queue_pbr_override_refresh(LLViewerObject* object)
+{
+    if (!object || !object->hasRenderMaterialParams())
+    {
+        return;
+    }
+
+    LLViewerRegion* regionp = object->getRegion();
+    if (!regionp)
+    {
+        return;
+    }
+
+    const U32 local_id = object->getLocalID();
+    if (!local_id)
+    {
+        return;
+    }
+
+    // Force a full update so the sim can resend GLTF material overrides if needed.
+    regionp->addCacheMissFull(local_id);
+}
+
 void handle_object_tex_refresh(LLViewerObject* object, LLSelectNode* node)
 {
     U8 te_count = object->getNumTEs();
@@ -3448,6 +3472,8 @@ void handle_object_tex_refresh(LLViewerObject* object, LLSelectNode* node)
             }
         }
     }
+
+    queue_pbr_override_refresh(object);
 }
 
 class LLObjectTexRefresh : public view_listener_t
