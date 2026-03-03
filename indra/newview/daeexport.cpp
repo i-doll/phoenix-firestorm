@@ -51,6 +51,7 @@
 #include "llappviewer.h"
 #include "llcallbacklist.h"
 #include "llfilepicker.h"
+#include "llinventoryfunctions.h"
 #include "llnotificationsutil.h"
 #include "llselectmgr.h"
 #include "lltexturecache.h"
@@ -59,7 +60,7 @@
 #include "llviewermenufile.h"
 #include "llviewernetwork.h"
 #include "llviewertexturelist.h"
-#include "fsexportperms.h"
+#include "llvovolume.h"
 
 static constexpr F32 TEXTURE_DOWNLOAD_TIMEOUT = 60.f;
 
@@ -80,6 +81,220 @@ namespace DAEExportUtil
         ft_j2c
     };
 }
+
+namespace
+{
+struct RigWeightInfluence
+{
+    S32 mJoint = 0;
+    F32 mWeight = 0.f;
+};
+
+using rig_weight_list_t = std::vector<RigWeightInfluence>;
+using rig_vertex_weights_t = std::vector<rig_weight_list_t>;
+
+std::string getTextureNameFromInventory(const LLUUID& texture_id)
+{
+    LLViewerInventoryCategory::cat_array_t cats;
+    LLViewerInventoryItem::item_array_t items;
+    LLAssetIDMatches asset_id_matches(texture_id);
+    gInventory.collectDescendentsIf(LLUUID::null, cats, items, LLInventoryModel::INCLUDE_TRASH, asset_id_matches);
+
+    if (!items.empty())
+    {
+        return items[0]->getName();
+    }
+
+    return std::string();
+}
+
+std::string makeTextureExportName(const LLUUID& texture_id)
+{
+    std::string safe_name = gDirUtilp->getScrubbedFileName(getTextureNameFromInventory(texture_id));
+    std::replace(safe_name.begin(), safe_name.end(), ' ', '_');
+
+    if (safe_name.empty())
+    {
+        safe_name = "texture";
+    }
+
+    return llformat("%s_%s", safe_name.c_str(), texture_id.asString().c_str());
+}
+
+std::string makeColladaId(const std::string& base)
+{
+    std::string result;
+    result.reserve(base.size());
+
+    for (char ch : base)
+    {
+        const bool is_alpha = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+        const bool is_digit = (ch >= '0' && ch <= '9');
+        if (is_alpha || is_digit || ch == '_' || ch == '-' || ch == '.')
+        {
+            result.push_back(ch);
+        }
+        else
+        {
+            result.push_back('_');
+        }
+    }
+
+    if (result.empty())
+    {
+        result = "id";
+    }
+
+    if (result[0] >= '0' && result[0] <= '9')
+    {
+        result.insert(result.begin(), '_');
+    }
+
+    return result;
+}
+
+void appendMatrixColumnMajor(const LLMatrix4a& matrix, std::vector<F32>& out)
+{
+    LLMatrix4 mat(matrix.getF32ptr());
+    for (S32 col = 0; col < 4; ++col)
+    {
+        for (S32 row = 0; row < 4; ++row)
+        {
+            out.push_back(mat.mMatrix[row][col]);
+        }
+    }
+}
+
+std::string joinFloatValues(const std::vector<F32>& values)
+{
+    std::string out;
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        if (i != 0)
+        {
+            out += " ";
+        }
+        out += llformat("%f", values[i]);
+    }
+    return out;
+}
+
+std::string joinNames(const std::vector<std::string>& names)
+{
+    std::string out;
+    for (size_t i = 0; i < names.size(); ++i)
+    {
+        if (i != 0)
+        {
+            out += " ";
+        }
+        out += names[i];
+    }
+    return out;
+}
+
+std::string joinIntValues(const std::vector<S32>& values)
+{
+    std::string out;
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        if (i != 0)
+        {
+            out += " ";
+        }
+        out += llformat("%d", values[i]);
+    }
+    return out;
+}
+
+bool getRiggedSkinInfo(LLViewerObject* obj, const LLMeshSkinInfo*& skin_info)
+{
+    skin_info = nullptr;
+
+    if (!obj || obj->getPCode() != LL_PCODE_VOLUME)
+    {
+        return false;
+    }
+
+    LLVOVolume* volobjp = static_cast<LLVOVolume*>(obj);
+    if (!volobjp->isRiggedMesh())
+    {
+        return false;
+    }
+
+    skin_info = volobjp->getSkinInfo();
+    if (!skin_info || skin_info->mJointNames.empty())
+    {
+        return false;
+    }
+
+    return true;
+}
+
+rig_weight_list_t decodePackedWeights(const LLVector4a& packed_weights, U32 joint_count)
+{
+    rig_weight_list_t weights;
+    if (joint_count == 0)
+    {
+        return weights;
+    }
+
+    F32 total = 0.f;
+    const F32* packed = packed_weights.getF32ptr();
+    for (S32 idx = 0; idx < 4; ++idx)
+    {
+        F32 packed_weight = packed[idx];
+        S32 joint_idx = llclamp((S32)floorf(packed_weight), 0, (S32)joint_count - 1);
+        F32 weight = packed_weight - floorf(packed_weight);
+        if (weight > 0.f)
+        {
+            weights.push_back({ joint_idx, weight });
+            total += weight;
+        }
+    }
+
+    if (total > 0.f)
+    {
+        F32 norm = 1.f / total;
+        for (RigWeightInfluence& influence : weights)
+        {
+            influence.mWeight *= norm;
+        }
+    }
+    else
+    {
+        weights.push_back({ 0, 1.f });
+    }
+
+    return weights;
+}
+
+void addSkeletonNodes(daeElement* scene, const std::string& skeleton_root_id, const LLMeshSkinInfo* skin_info, const std::string& id_prefix)
+{
+    if (!scene || !skin_info)
+    {
+        return;
+    }
+
+    daeElement* skeleton_root = scene->add("node");
+    skeleton_root->setAttribute("type", "JOINT");
+    skeleton_root->setAttribute("id", skeleton_root_id.c_str());
+    skeleton_root->setAttribute("sid", skeleton_root_id.c_str());
+    skeleton_root->setAttribute("name", skeleton_root_id.c_str());
+    skeleton_root->add("matrix")->setCharData("1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1");
+
+    for (S32 idx = 0; idx < skin_info->mJointNames.size(); ++idx)
+    {
+        const std::string joint_name = skin_info->mJointNames[idx];
+        daeElement* joint_node = skeleton_root->add("node");
+        joint_node->setAttribute("type", "JOINT");
+        joint_node->setAttribute("id", llformat("%s-joint-%d", id_prefix.c_str(), idx).c_str());
+        joint_node->setAttribute("sid", joint_name.c_str());
+        joint_node->setAttribute("name", joint_name.c_str());
+        joint_node->add("matrix")->setCharData("1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1");
+    }
+}
+} // namespace
 
 
 ColladaExportFloater::ColladaExportFloater(const LLSD& key)
@@ -244,7 +459,7 @@ void ColladaExportFloater::addSelectedObjects()
             {
                 mTotal++;
                 LLSelectNode* node = *iter;
-                if (!node->getObject()->getVolume() || !FSExportPermsCheck::canExportNode(node, true)) continue;
+                if (!node->getObject()->getVolume()) continue;
                 mIncluded++;
                 mSaver.add(node->getObject(), node->mName);
             }
@@ -527,31 +742,9 @@ void DAESaver::updateTextureInfo()
             if (std::find(mTextures.begin(), mTextures.end(), id) != mTextures.end()) continue;
 
             mTextures.push_back(id);
-            bool exportable = false;
-            LLViewerFetchedTexture* imagep = LLViewerTextureManager::getFetchedTexture(id);
-            std::string name;
-            std::string description;
-            if (LLGridManager::getInstance()->isInSecondLife())
+            if (id != DAEExportUtil::LL_TEXTURE_BLANK)
             {
-                if (imagep->mComment.find("a") != imagep->mComment.end())
-                {
-                    if (LLUUID(imagep->mComment["a"]) == gAgentID)
-                    {
-                        exportable = true;
-                        LL_DEBUGS("export") << id <<  " passed texture export comment check." << LL_ENDL;
-                    }
-                }
-            }
-            if (exportable)
-                FSExportPermsCheck::canExportAsset(id, &name, &description);
-            else
-                exportable = FSExportPermsCheck::canExportAsset(id, &name, &description);
-
-            if (id != DAEExportUtil::LL_TEXTURE_BLANK && exportable)
-            {
-                std::string safe_name = gDirUtilp->getScrubbedFileName(name);
-                std::replace(safe_name.begin(), safe_name.end(), ' ', '_');
-                mTextureNames.push_back(safe_name);
+                mTextureNames.push_back(makeTextureExportName(id));
             }
             else
             {
@@ -759,6 +952,7 @@ bool DAESaver::saveDAE(std::string filename)
 
     daeElement* images = root->add("library_images");
     daeElement* geomLib = root->add("library_geometries");
+    daeElement* controllerLib = root->add("library_controllers");
     daeElement* effects = root->add("library_effects");
     daeElement* materials = root->add("library_materials");
     daeElement* scene = root->add("library_visual_scenes visual_scene");
@@ -776,10 +970,12 @@ bool DAESaver::saveDAE(std::string filename)
     {
         LLViewerObject* obj = obj_iter->first;
 
-        std::string name = "";
-        if (name.empty()) name = llformat("prim%d", prim_nr++);
+        std::string name = llformat("prim%d", prim_nr++);
 
         const char* geomID = name.c_str();
+        const LLMeshSkinInfo* skin_info = nullptr;
+        bool has_rigging = getRiggedSkinInfo(obj, skin_info);
+        rig_vertex_weights_t rig_vertex_weights;
 
         daeElement* geom = geomLib->add("geometry");
         geom->setAttribute("id", llformat("%s-%s", geomID, "mesh").c_str());
@@ -835,12 +1031,33 @@ bool DAESaver::saveDAE(std::string filename)
 
                 uv_data.push_back(uv.mV[VX]);
                 uv_data.push_back(uv.mV[VY]);
+
+                if (has_rigging)
+                {
+                    if (face->mWeights)
+                    {
+                        rig_vertex_weights.push_back(decodePackedWeights(face->mWeights[i], (U32)skin_info->mJointNames.size()));
+                    }
+                    else
+                    {
+                        rig_weight_list_t fallback_weights;
+                        fallback_weights.push_back({ 0, 1.f });
+                        rig_vertex_weights.push_back(fallback_weights);
+                    }
+                }
             }
 
             if (applyTexCoord)
             {
                 delete[] newCoord;
             }
+        }
+
+        if (has_rigging && rig_vertex_weights.size() != position_data.size() / 3)
+        {
+            LL_WARNS("export") << "Rigged export fallback to static mesh for " << geomID << " due to vertex/weight mismatch." << LL_ENDL;
+            has_rigging = false;
+            rig_vertex_weights.clear();
         }
 
         addSource(mesh, llformat("%s-%s", geomID, "positions").c_str(), "XYZ", position_data);
@@ -891,6 +1108,110 @@ bool DAESaver::saveDAE(std::string filename)
             }
         }
 
+        std::string controller_id;
+        std::string skeleton_root_id;
+        if (has_rigging && !rig_vertex_weights.empty())
+        {
+            controller_id = llformat("%s-skin", geomID);
+            skeleton_root_id = llformat("%s-skeleton", geomID);
+
+            daeElement* controller = controllerLib->add("controller");
+            controller->setAttribute("id", controller_id.c_str());
+            daeElement* skin = controller->add("skin");
+            skin->setAttribute("source", llformat("#%s-mesh", geomID).c_str());
+
+            std::vector<F32> bind_shape_values;
+            appendMatrixColumnMajor(skin_info->mBindShapeMatrix, bind_shape_values);
+            std::string bind_shape_data = joinFloatValues(bind_shape_values);
+            skin->add("bind_shape_matrix")->setCharData(bind_shape_data.c_str());
+
+            std::string joint_source_id = llformat("%s-joints", geomID);
+            daeElement* joint_source = skin->add("source");
+            joint_source->setAttribute("id", joint_source_id.c_str());
+            daeElement* joint_array = joint_source->add("Name_array");
+            std::string joint_array_id = joint_source_id + "-array";
+            joint_array->setAttribute("id", joint_array_id.c_str());
+            joint_array->setAttribute("count", llformat("%d", (S32)skin_info->mJointNames.size()).c_str());
+            std::string joint_names = joinNames(skin_info->mJointNames);
+            joint_array->setCharData(joint_names.c_str());
+
+            domAccessor* joint_accessor = daeSafeCast<domAccessor>(joint_source->add("technique_common accessor"));
+            std::string joint_array_ref = "#" + joint_array_id;
+            joint_accessor->setSource(joint_array_ref.c_str());
+            joint_accessor->setCount((S32)skin_info->mJointNames.size());
+            joint_accessor->setStride(1);
+            domElement* joint_param = joint_accessor->add("param");
+            joint_param->setAttribute("name", "JOINT");
+            joint_param->setAttribute("type", "Name");
+
+            std::vector<F32> inv_bind_data;
+            inv_bind_data.reserve(skin_info->mJointNames.size() * 16);
+            LLMatrix4 identity;
+            identity.setIdentity();
+            LLMatrix4a identity4(identity);
+            for (S32 joint_idx = 0; joint_idx < skin_info->mJointNames.size(); ++joint_idx)
+            {
+                if (joint_idx < skin_info->mInvBindMatrix.size())
+                {
+                    appendMatrixColumnMajor(skin_info->mInvBindMatrix[joint_idx], inv_bind_data);
+                }
+                else
+                {
+                    appendMatrixColumnMajor(identity4, inv_bind_data);
+                }
+            }
+            std::string inv_bind_source_id = llformat("%s-bind_poses", geomID);
+            addSource(skin, inv_bind_source_id.c_str(), "ABCDEFGHIJKLMNOP", inv_bind_data);
+
+            std::vector<F32> weight_data;
+            std::vector<S32> vcount_data;
+            std::vector<S32> v_data;
+            vcount_data.reserve(rig_vertex_weights.size());
+            for (const rig_weight_list_t& influences : rig_vertex_weights)
+            {
+                vcount_data.push_back((S32)influences.size());
+                for (const RigWeightInfluence& influence : influences)
+                {
+                    const S32 weight_idx = (S32)weight_data.size();
+                    weight_data.push_back(influence.mWeight);
+                    v_data.push_back(influence.mJoint);
+                    v_data.push_back(weight_idx);
+                }
+            }
+
+            std::string weight_source_id = llformat("%s-weights", geomID);
+            addSource(skin, weight_source_id.c_str(), "W", weight_data);
+
+            daeElement* joints = skin->add("joints");
+            daeElement* joints_input = joints->add("input");
+            joints_input->setAttribute("semantic", "JOINT");
+            joints_input->setAttribute("source", ("#" + joint_source_id).c_str());
+            daeElement* bind_input = joints->add("input");
+            bind_input->setAttribute("semantic", "INV_BIND_MATRIX");
+            bind_input->setAttribute("source", ("#" + inv_bind_source_id).c_str());
+
+            daeElement* vertex_weights = skin->add("vertex_weights");
+            vertex_weights->setAttribute("count", llformat("%d", (S32)rig_vertex_weights.size()).c_str());
+            daeElement* joint_input = vertex_weights->add("input");
+            joint_input->setAttribute("semantic", "JOINT");
+            joint_input->setAttribute("source", ("#" + joint_source_id).c_str());
+            joint_input->setAttribute("offset", "0");
+            daeElement* weight_input = vertex_weights->add("input");
+            weight_input->setAttribute("semantic", "WEIGHT");
+            weight_input->setAttribute("source", ("#" + weight_source_id).c_str());
+            weight_input->setAttribute("offset", "1");
+            std::string vcount_str = joinIntValues(vcount_data);
+            vertex_weights->add("vcount")->setCharData(vcount_str.c_str());
+            std::string v_str = joinIntValues(v_data);
+            vertex_weights->add("v")->setCharData(v_str.c_str());
+
+            addSkeletonNodes(scene, skeleton_root_id, skin_info, makeColladaId(name));
+        }
+        else
+        {
+            has_rigging = false;
+        }
+
         daeElement* node = scene->add("node");
         node->setAttribute("type", "NODE");
         node->setAttribute("id", geomID);
@@ -908,8 +1229,17 @@ bool DAESaver::saveDAE(std::string filename)
             for (int j=0; j<4; j++)
                 (matrix->getValue()).append(m4.mMatrix[j][i]);
 
-        // Geometry of the node
-        daeElement* nodeGeometry = node->add("instance_geometry");
+        // Geometry/controller of the node
+        daeElement* nodeGeometry = has_rigging ? node->add("instance_controller") : node->add("instance_geometry");
+        if (has_rigging)
+        {
+            nodeGeometry->setAttribute("url", ("#" + controller_id).c_str());
+            nodeGeometry->add("skeleton")->setCharData(("#" + skeleton_root_id).c_str());
+        }
+        else
+        {
+            nodeGeometry->setAttribute("url", llformat("#%s-%s", geomID, "mesh").c_str());
+        }
 
         // Bind materials
         daeElement* tq = nodeGeometry->add("bind_material technique_common");
@@ -920,8 +1250,6 @@ bool DAESaver::saveDAE(std::string filename)
             instanceMaterial->setAttribute("symbol", (matName + "-material").c_str());
             instanceMaterial->setAttribute("target", ("#" + matName + "-material").c_str());
         }
-
-        nodeGeometry->setAttribute("url", llformat("#%s-%s", geomID, "mesh").c_str());
 
     }
 
