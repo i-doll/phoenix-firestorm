@@ -652,6 +652,7 @@ public:
     void            rotate(const LLQuaternion &quaternion);
     void            pitch(F32 angle);
     void            roll(F32 angle);
+    F32             clampYawToLimits(F32 angle);
     void            yaw(F32 angle);
     LLVector3       getReferenceUpVector();
 
