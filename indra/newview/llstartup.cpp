@@ -4834,6 +4834,14 @@ bool init_benefits(LLSD& response)
 //bool process_login_success_response()
 bool process_login_success_response(U32 &first_sim_size_x, U32 &first_sim_size_y)
 // </FS:CR> Aurora Sim
+// HTTP LOGIN RESPONSE PROCESSING
+// Called after successful HTTP XMLRPC authentication. Extracts critical data
+// from LoginServer response needed to establish the UDP connection:
+//   - agent_id, session_id, secure_session_id (authentication tokens)
+//   - circuit_code (used in UseCircuitCode UDP message)
+//   - sim_ip, sim_port (simulator address for UDP circuit)
+//   - seed_capability (URL for fetching HTTP capability endpoints)
+//
 {
     LLSD response = LLLoginInstance::getInstance()->getResponse();
 
