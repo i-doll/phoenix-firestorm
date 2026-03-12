@@ -1044,6 +1044,10 @@ void LLPanelProfilePick::sendParcelInfoRequest()
 
 void LLPanelProfilePick::processParcelInfo(const LLParcelData& parcel_data)
 {
+    // Region might have moved since the pick was saved; refresh the stored global position
+    // using the authoritative parcel info so map/teleport use the current location.
+    setPosGlobal(LLVector3d(parcel_data.global_x, parcel_data.global_y, parcel_data.global_z));
+
     setPickLocation(createLocationText(LLStringUtil::null, parcel_data.name, parcel_data.sim_name, getPosGlobal()));
 
     // We have received parcel info for the requested ID so clear it now.
@@ -1159,4 +1163,3 @@ void LLPanelProfilePick::updateTabLabel(const std::string& title)
         parent->setCurrentTabName(title);
     }
 }
-
