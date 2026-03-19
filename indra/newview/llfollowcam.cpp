@@ -580,10 +580,12 @@ void LLFollowCam::setPitch( F32 p )
 
 void LLFollowCam::setDistance( F32 d )
 {
-    if (d != mDistance)
+    const F32 clamped_distance = llclamp(d, FOLLOW_CAM_MIN_DISTANCE, mMaxCameraDistantFromSubject);
+    if (clamped_distance != mDistance)
     {
-        LLFollowCamParams::setDistance(d);
-        mSimulatedDistance = d;
+        const F32 user_delta = mSimulatedDistance - mDistance;
+        LLFollowCamParams::setDistance(clamped_distance);
+        mSimulatedDistance = llclamp(mDistance + user_delta, FOLLOW_CAM_MIN_DISTANCE, mMaxCameraDistantFromSubject);
         mZoomedToMinimumDistance = false;
     }
 }
@@ -881,4 +883,3 @@ void LLFollowCamMgr::dump()
             " pos_thresh: " << (*param_it)->getPositionThreshold() << LL_ENDL;
     }
 }
-
