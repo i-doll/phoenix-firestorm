@@ -2394,10 +2394,9 @@ void LLAgentCamera::handleScrollWheel(S32 clicks)
         LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
         const F32 ROOT_ROOT_TWO = sqrt(F_SQRT2);
 
-        // Block if camera is animating
         if (mCameraAnimating)
         {
-            return;
+            stopCameraAnimation();
         }
 
         if (selection->getObjectCount() && selection->getSelectType() == SELECT_TYPE_HUD)
