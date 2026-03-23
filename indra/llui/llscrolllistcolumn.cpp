@@ -224,6 +224,27 @@ void LLScrollColumnHeader::handleReshape(const LLRect& new_rect, bool by_user)
         // propagate constrained delta_width to new width for this column
         new_width = getRect().getWidth() + delta_width - mColumn->mParentCtrl->getColumnPadding();
 
+        // If the user resizes a dynamic-width column, keep the default dynamic
+        // behavior *until* they drag a resize handle, then convert that column
+        // to a fixed column so the resize "sticks".
+        if (by_user && mColumn->mDynamicWidth && mColumn->mParentCtrl && new_width > 0)
+        {
+            mColumn->setWidth(0);
+            mColumn->mDynamicWidth = false;
+            setHasResizableElement(true);
+
+            S32 dynamic_cols = 0;
+            for (S32 col = 0; col < mColumn->mParentCtrl->getNumColumns(); ++col)
+            {
+                LLScrollListColumn* columnp = mColumn->mParentCtrl->getColumn(col);
+                if (columnp && columnp->mDynamicWidth && columnp->getWidth() > 0)
+                {
+                    ++dynamic_cols;
+                }
+            }
+            mColumn->mParentCtrl->setNumDynamicColumns(dynamic_cols);
+        }
+
         // use requested width
         mColumn->setWidth(new_width);
 
