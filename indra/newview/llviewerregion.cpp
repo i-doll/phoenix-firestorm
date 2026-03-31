@@ -3653,6 +3653,8 @@ void LLViewerRegion::setSeedCapability(const std::string& url)
     delete mImpl->mEventPoll;
     mImpl->mEventPoll = NULL;
 
+    setCapabilitiesReceived(false);
+    mImpl->mSeedCapAttempts = 0;
     mImpl->mCapabilities.clear();
     setCapability("Seed", url);
 
@@ -4153,4 +4155,3 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj)
         }
     }
 }
-
