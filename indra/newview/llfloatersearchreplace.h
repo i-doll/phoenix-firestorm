@@ -44,6 +44,7 @@ public:
     /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
     /*virtual*/ bool hasAccelerators() const;
     /*virtual*/ bool postBuild();
+    /*virtual*/ void closeFloater(bool app_quitting = false) override;
     /*virtual*/ void onOpen(const LLSD& sdKey);
     /*virtual*/ void onClose(bool fQuiting);
     void             setCanReplace(bool can_replace);

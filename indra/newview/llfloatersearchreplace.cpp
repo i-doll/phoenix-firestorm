@@ -95,6 +95,22 @@ void LLFloaterSearchReplace::onClose(bool fQuiting)
     }
 }
 
+void LLFloaterSearchReplace::closeFloater(bool app_quitting)
+{
+    // If this floater is minimized while dependent on a script/notecard window,
+    // closing it should not restore the dependee. Detach first so the base
+    // close path's unminimize doesn't propagate back to the parent floater.
+    if (isMinimized())
+    {
+        if (LLFloater* dependee = getDependee())
+        {
+            dependee->removeDependentFloater(this);
+        }
+    }
+
+    LLFloater::closeFloater(app_quitting);
+}
+
 bool LLFloaterSearchReplace::hasAccelerators() const
 {
     const LLView* pView = dynamic_cast<LLTextEditor*>(m_EditorHandle.get());
