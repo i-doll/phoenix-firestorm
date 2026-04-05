@@ -141,6 +141,7 @@ void FSNearbyChatControl::draw()
     applyTextPadding();
     drawBackground();
     LLChatEntry::draw();
+    drawFullHeightCursor();
 }
 
 void FSNearbyChatControl::setTextPadding(S32 left, S32 right)
@@ -215,6 +216,33 @@ void FSNearbyChatControl::drawBackground()
             inner_shade,
             1);
     }
+}
+
+void FSNearbyChatControl::drawFullHeightCursor()
+{
+    if (!hasFocus() || getReadOnly() || !gFocusMgr.getAppHasFocus())
+    {
+        return;
+    }
+
+    const F32 elapsed = mCursorBlinkTimer.getElapsedTimeF32();
+    if (elapsed >= 1.0f && !(S32(elapsed * 2) & 1))
+    {
+        return;
+    }
+
+    LLRect cursor_rect = getLocalRectFromDocIndex(mCursorPos);
+    cursor_rect.translate(-1, 0);
+    cursor_rect.mRight = cursor_rect.mLeft + 2;
+
+    LLRect content_rect = mScroller ? mScroller->getContentWindowRect() : getLocalRect();
+    cursor_rect.mTop = content_rect.mTop;
+    cursor_rect.mBottom = content_rect.mBottom;
+
+    LLColor4 cursor_color = mCursorColor.get() % getDrawContext().mAlpha;
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.color4fv(cursor_color.mV);
+    gl_rect_2d(cursor_rect);
 }
 
 void FSNearbyChatControl::applyTextPadding()
