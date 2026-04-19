@@ -26,6 +26,14 @@ export __GLX_VENDOR_LIBRARY_NAME=nvidia
 #export ASAN_OPTIONS="halt_on_error=0 detect_leaks=1 symbolize=1"
 #export UBSAN_OPTIONS="print_stacktrace=1 print_summary=1 halt_on_error=0"
 
+## - Feral GameMode can give a large FPS boost: it steers the viewer onto
+##   the dGPU on hybrid-GPU systems and prefers performance cores on
+##   asymmetric CPUs (Ryzen X3D, Intel P/E). Auto-enabled if `gamemoderun`
+##   is on $PATH and LL_WRAPPER isn't already set above.
+if [ -z "${LL_WRAPPER:-}" ] && command -v gamemoderun >/dev/null 2>&1; then
+    export LL_WRAPPER='gamemoderun'
+fi
+
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
 
