@@ -88,6 +88,14 @@ fi
 #export LL_WRAPPER='gdb --args'
 #export LL_WRAPPER='valgrind --smc-check=all --error-limit=no --log-file=secondlife.vg --leak-check=full --suppressions=/usr/lib/valgrind/glibc-2.5.supp --suppressions=secondlife-i686.supp'
 
+## - Feral GameMode can give a large FPS boost: it steers the viewer onto
+##   the dGPU on hybrid-GPU systems and prefers performance cores on
+##   asymmetric CPUs (Ryzen X3D, Intel P/E). Auto-enabled if `gamemoderun`
+##   is on $PATH and LL_WRAPPER isn't already set above.
+if [ -z "${LL_WRAPPER:-}" ] && command -v gamemoderun >/dev/null 2>&1; then
+    export LL_WRAPPER='gamemoderun'
+fi
+
 ## - Avoids an often-buggy X feature that doesn't really benefit us anyway.
 export SDL_VIDEO_X11_DGAMOUSE=0
 
