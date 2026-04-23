@@ -1457,6 +1457,17 @@
       <key>Value</key>
       <boolean>0</boolean>
     </map>
+    <key>RLVaDebugSphereUseOpaqueDepth</key>
+    <map>
+      <key>Comment</key>
+      <string>When TRUE, @setsphere uses a pre-alpha depth snapshot to avoid alpha wearables punching through the sphere effect.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <boolean>0</boolean>
+    </map>
     <key>RLVaEnableCompositeFolders</key>
     <map>
       <key>Comment</key>

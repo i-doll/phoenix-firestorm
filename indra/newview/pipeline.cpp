@@ -1033,6 +1033,19 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
             mSMAABlendBuffer.release();
         }
 
+        static LLCachedControl<bool> rlv_sphere_opaque_depth(gSavedSettings, "RLVaDebugSphereUseOpaqueDepth", false);
+        if (rlv_sphere_opaque_depth())
+        {
+            if (!mRlvSphereDepth.allocate(resX, resY, 0, true))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            mRlvSphereDepth.release();
+        }
+
         //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
         mWaterDis.allocate(resX, resY, screenFormat, true);
 
@@ -1428,6 +1441,7 @@ void LLPipeline::releaseScreenBuffers()
     mRT->screen.release();
     mRT->deferredScreen.release();
     mRT->deferredLight.release();
+    mRlvSphereDepth.release();
 
     mAuxillaryRT.screen.release();
     mAuxillaryRT.deferredScreen.release();
@@ -10125,6 +10139,46 @@ void LLPipeline::renderDeferredLighting()
         }
 
         gGL.setColorMask(true, true);
+    }
+
+    static LLCachedControl<bool> rlv_sphere_opaque_depth(gSavedSettings, "RLVaDebugSphereUseOpaqueDepth", false);
+    if (rlv_sphere_opaque_depth() && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
+    {
+        const U32 depth_w = mRT->deferredScreen.getWidth();
+        const U32 depth_h = mRT->deferredScreen.getHeight();
+        if (!mRlvSphereDepth.isComplete() || mRlvSphereDepth.getWidth() != depth_w || mRlvSphereDepth.getHeight() != depth_h)
+        {
+            if (!mRlvSphereDepth.allocate(depth_w, depth_h, 0, true))
+            {
+                mRlvSphereDepth.release();
+            }
+        }
+
+        if (mRlvSphereDepth.isComplete())
+        {
+            LL_PROFILE_GPU_ZONE("rlv sphere depth snapshot");
+            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+
+            mRlvSphereDepth.bindTarget();
+            gCopyDepthProgram.bind();
+
+            S32 diff_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
+            S32 depth_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
+
+            gGL.getTexUnit(diff_map)->bind(screen_target);
+            gGL.getTexUnit(depth_map)->bind(&mRT->deferredScreen, true);
+
+            gGL.setColorMask(false, false);
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            gGL.setColorMask(true, true);
+
+            mRlvSphereDepth.flush();
+        }
+    }
+    else if (mRlvSphereDepth.isComplete() && !rlv_sphere_opaque_depth())
+    {
+        mRlvSphereDepth.release();
     }
 
     {  // render non-deferred geometry (alpha, fullbright, glow)

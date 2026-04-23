@@ -354,17 +354,26 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
         gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
     }
 
-    S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());
+    static LLCachedControl<bool> rlv_sphere_opaque_depth(gSavedSettings, "RLVaDebugSphereUseOpaqueDepth", false);
+    LLRenderTarget* pDepthBuffer = &gPipeline.mRT->deferredScreen;
+    if (rlv_sphere_opaque_depth() && gPipeline.mRlvSphereDepth.isComplete() &&
+        gPipeline.mRlvSphereDepth.getWidth() == pDepthBuffer->getWidth() &&
+        gPipeline.mRlvSphereDepth.getHeight() == pDepthBuffer->getHeight())
+    {
+        pDepthBuffer = &gPipeline.mRlvSphereDepth;
+    }
+
+    S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, pDepthBuffer->getUsage());
     if (nDepthChannel > -1)
     {
-        gGL.getTexUnit(nDepthChannel)->bind(&gPipeline.mRT->deferredScreen, true);
+        gGL.getTexUnit(nDepthChannel)->bind(pDepthBuffer, true);
     }
 
     gPipeline.mScreenTriangleVB->setBuffer();
     gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
     pShader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pParams->m_pSrcBuffer->getUsage());
-    pShader->disableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());
+    pShader->disableTexture(LLShaderMgr::DEFERRED_DEPTH, pDepthBuffer->getUsage());
 
     if (pParams->m_pDstBuffer)
     {
