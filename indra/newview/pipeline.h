@@ -816,6 +816,8 @@ public:
 
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;
+    // Optional pre-alpha depth snapshot for RLVa sphere post effect.
+    LLRenderTarget              mRlvSphereDepth;
 
     static const U32 MAX_PREVIEW_WIDTH;
     static const U32 MAX_PREVIEW_HEIGHT; // <FS:Beq/> dedicated render target for previews
