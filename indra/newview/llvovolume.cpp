@@ -31,6 +31,7 @@
 #include "llvovolume.h"
 
 #include <sstream>
+#include <unordered_map>
 
 #include "llviewercontrol.h"
 #include "lldir.h"
@@ -111,6 +112,60 @@ LLPointer<LLObjectMediaDataClient> LLVOVolume::sObjectMediaClient = NULL;
 LLPointer<LLObjectMediaNavigateClient> LLVOVolume::sObjectMediaNavigateClient = NULL;
 
 extern bool gCubeSnapshot;
+
+namespace
+{
+constexpr size_t LARGE_LINKSET_RESYNC_THRESHOLD = 128;
+constexpr F64 LARGE_LINKSET_RESYNC_INTERVAL_SEC = 0.5;
+
+// Terse updates are unreliable; for very large linksets, alpha/TE bursts can
+// leave random child links visually stale. Throttle a full linkset resync.
+void requestLargeLinksetResync(LLVOVolume* objectp)
+{
+    if (!objectp)
+    {
+        return;
+    }
+
+    LLViewerRegion* regionp = objectp->getRegion();
+    LLViewerObject* rootp = objectp->getRootEdit();
+    if (!regionp || !rootp)
+    {
+        return;
+    }
+
+    const LLViewerObject::const_child_list_t& children = rootp->getChildren();
+    if ((children.size() + 1) < LARGE_LINKSET_RESYNC_THRESHOLD)
+    {
+        return;
+    }
+
+    static std::unordered_map<LLUUID, F64> sLastLinksetResyncRequest;
+    const F64 now = LLFrameTimer::getTotalSeconds();
+    F64& last_request = sLastLinksetResyncRequest[rootp->getID()];
+    if (now - last_request < LARGE_LINKSET_RESYNC_INTERVAL_SEC)
+    {
+        return;
+    }
+    last_request = now;
+
+    if (U32 root_local_id = rootp->getLocalID())
+    {
+        regionp->addCacheMissFull(root_local_id);
+    }
+
+    for (const auto& child_ptr : children)
+    {
+        LLViewerObject* childp = child_ptr.get();
+        if (childp && childp->getLocalID())
+        {
+            regionp->addCacheMissFull(childp->getLocalID());
+        }
+    }
+
+    regionp->requestCacheMisses();
+}
+} // namespace
 
 // NaCl - Graphics crasher protection
 static bool enableVolumeSAPProtection()
@@ -652,10 +707,42 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
             S32 texture_length = mesgsys->getSizeFast(_PREHASH_ObjectData, block_num, _PREHASH_TextureEntry);
             if (texture_length)
             {
-                U8                          tdpbuffer[1024];
-                LLDataPackerBinaryBuffer    tdp(tdpbuffer, 1024);
-                mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_TextureEntry, tdpbuffer, 0, block_num, 1024);
+                // TE data in terse updates is serialized through LLDataPacker::packBinaryData(),
+                // which adds a 4-byte length prefix in front of the TE payload.
+                constexpr S32 max_texture_dp_size = (S32)LLTEContents::MAX_TE_BUFFER + (S32)sizeof(S32);
+                U8 tdpbuffer[max_texture_dp_size];
+                S32 texture_dp_size = llmin(texture_length, max_texture_dp_size);
+                if (texture_length > max_texture_dp_size)
+                {
+                    LL_WARNS("TEXTUREENTRY") << "Excessive terse TextureEntry size " << texture_length
+                                             << " for object " << getID() << ". Truncating to "
+                                             << max_texture_dp_size << LL_ENDL;
+                }
+
+                LLDataPackerBinaryBuffer tdp(tdpbuffer, texture_dp_size);
+                mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_TextureEntry, tdpbuffer, 0, block_num, texture_dp_size);
                 S32 result = unpackTEMessage(tdp);
+
+                // If a terse TE update arrives before this object has valid TE state,
+                // the update can be effectively dropped. Ask for a full update to resync.
+                if (update_type == OUT_TERSE_IMPROVED &&
+                    (result == TEM_INVALID || (result == TEM_CHANGE_NONE && getNumTEs() == 0)))
+                {
+                    if (LLViewerRegion* regionp = getRegion())
+                    {
+                        U32 local_id = getLocalID();
+                        if (local_id)
+                        {
+                            regionp->addCacheMissFull(local_id);
+                            regionp->requestCacheMisses();
+                        }
+                    }
+                }
+                else if (update_type == OUT_TERSE_IMPROVED && texture_length > 0)
+                {
+                    requestLargeLinksetResync(this);
+                }
+
                 if (result & teDirtyBits)
                 {
                     if (mDrawable)
