@@ -668,6 +668,10 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 {
                     LL_DEBUGS() << "update for unknown localid " << local_id << " host " << gMessageSystem->getSender() << ":" << gMessageSystem->getSenderPort() << LL_ENDL;
                     mNumUnknownUpdates++;
+                    // Terse updates can arrive before we have a valid local-id -> UUID mapping.
+                    // Request a full update so state (including TE/alpha changes) is recovered.
+                    regionp->addCacheMissFull(local_id);
+                    regionp->requestCacheMisses();
                 }
             }
         }
@@ -754,6 +758,9 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 if (update_type == OUT_TERSE_IMPROVED)
                 {
                     // LL_INFOS() << "terse update for an unknown object (compressed):" << fullid << LL_ENDL;
+                    // Recover by requesting a full object update on the next cache-miss pass.
+                    regionp->addCacheMissFull(local_id);
+                    regionp->requestCacheMisses();
                     recorder.objectUpdateFailure();
                     continue;
                 }
