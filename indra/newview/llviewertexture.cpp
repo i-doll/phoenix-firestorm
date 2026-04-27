@@ -520,11 +520,16 @@ void LLViewerTexture::updateClass()
     static LLCachedControl<U32> max_vram_budget(gSavedSettings, "RenderMaxVRAMBudget", 0);
     static LLCachedControl<bool> max_vram_budget_enabled(gSavedSettings, "FSLimitTextureVRAMUsage"); // <FS:Ansariel> Expose max texture VRAM setting
 
-    F64 texture_bytes_alloc = LLImageGL::getTextureBytesAllocated() / 1024.0 / 512.0;
-    F64 vertex_bytes_alloc = LLVertexBuffer::getBytesAllocated() / 1024.0 / 512.0;
+    static LLCachedControl<F32> tex_mem_usage_bias(gSavedSettings, "RenderTextureMemoryUsageBias", 1.0f);
+
+    // Scale the tracked MB estimate used for low-memory heuristics.
+    // 1.0 = tracked MB as-is, values >1 are more conservative.
+    const F32 usage_bias = llclamp(tex_mem_usage_bias(), 0.25f, 4.0f);
+    F64 texture_bytes_alloc = (LLImageGL::getTextureBytesAllocated() / 1024.0 / 1024.0) * usage_bias;
+    F64 vertex_bytes_alloc = (LLVertexBuffer::getBytesAllocated() / 1024.0 / 1024.0) * usage_bias;
 
     // get an estimate of how much video memory we're using
-    // NOTE: our metrics miss about half the vram we use, so this biases high but turns out to typically be within 5% of the real number
+    // NOTE: this estimate can be tuned via RenderTextureMemoryUsageBias.
     F32 used = (F32)ll_round(texture_bytes_alloc + vertex_bytes_alloc);
 
     // <FS:Ansariel> Expose max texture VRAM setting

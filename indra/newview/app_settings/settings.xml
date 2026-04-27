@@ -11722,6 +11722,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>1</integer>
   </map>
+  <key>RenderTextureMemoryUsageBias</key>
+  <map>
+    <key>Comment</key>
+    <string>Multiplier applied to tracked texture+vertex MB when deciding low-memory discard behavior (0.25-4.0).</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>1.0</real>
+  </map>
   <key>RenderMinFreeMainMemoryThreshold</key>
   <map>
     <key>Comment</key>
