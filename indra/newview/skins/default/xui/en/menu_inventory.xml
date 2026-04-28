@@ -1106,6 +1106,8 @@
         <menu_item_call.on_click 
                 function="Inventory.DoToSelected"
                 parameter="apply_settings_local" />
+        <menu_item_call.on_enable
+                function="RLV.CanOverrideEnv" />
     </menu_item_call>
     <menu_item_call
             name="Settings Apply Parcel"

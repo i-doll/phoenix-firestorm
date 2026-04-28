@@ -58,6 +58,11 @@ public:
     static bool canChangeToMouselook();
 
     /*
+     * Returns true if the user can exit mouselook (false when camera max distance is 0)
+     */
+    static bool canExitMouselook();
+
+    /*
      * Returns true if the camera's distance (from either the avatar of the focus) is currently restricted/clamped
      */
     static bool isCameraDistanceClamped();
@@ -238,6 +243,11 @@ public:
     static bool canChangeEnvironment(const LLUUID& idRlvObject = LLUUID::null);
 
     /*
+     * Returns true if the user can override the shared environment with local settings
+     */
+    static bool canOverrideEnvironment(const LLUUID& idRlvObject = LLUUID::null);
+
+    /*
      * Returns true if a postprocessing shader is currently active
      */
     static bool hasPostProcess();
@@ -324,6 +334,32 @@ public:
      * Returns true if the user can touch the specified object (with an optional offset relative to its center)
      */
     static bool canTouch(const LLViewerObject* pObj, const LLVector3& posOffset = LLVector3::zero);
+
+    // =======
+    // Profile
+    // =======
+    // [RLVa:ID]
+public:
+    /*
+     * Returns true if the user is allowed to edit their profile content (about text, first life bio, images)
+     */
+    static bool canEditProfile();
+
+    /*
+     * Returns true if the user is allowed to create/edit/delete picks
+     */
+    static bool canEditPicks();
+
+    /*
+     * Returns true if the user is allowed to change their display name
+     */
+    static bool canEditDisplayName();
+
+    /*
+     * Returns true if the user is allowed to change their profile picture
+     */
+    static bool canEditProfileImage();
+    // [/RLVa:ID]
 
     // ===============
     // World (General)

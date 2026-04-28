@@ -47,6 +47,7 @@
 #include "llfloaterbigpreview.h"
 #include "llfloaterbeacons.h"
 #include "llfloaterbuildoptions.h"
+#include "llfloaterbulkgestureedit.h"
 #include "llfloaterbulkpermission.h"
 #include "llfloaterbulkupload.h"
 #include "llfloaterbump.h"
@@ -195,6 +196,7 @@
 #include "animationexplorer.h"
 #include "ao.h"
 #include "daeexport.h"
+#include "idfloaterkeywordcolors.h"
 #include "floatermedialists.h"
 #include "fsareasearch.h"
 #include "fsfloateraddtocontactset.h"
@@ -410,6 +412,7 @@ void LLViewerFloaterReg::registerFloaters()
 
     LLFloaterReg::add("ban_duration", "floater_ban_duration.xml", &LLFloaterReg::build<LLFloaterBanDuration>);
     LLFloaterReg::add("beacons", "floater_beacons.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBeacons>);
+    LLFloaterReg::add("bulk_gesture_edit", "floater_bulk_gesture_edit.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBulkGestureEdit>);
     LLFloaterReg::add("bulk_perms", "floater_bulk_perms.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBulkPermission>);
     LLFloaterReg::add("buy_currency", "floater_buy_currency.xml", &LLFloaterBuyCurrency::buildFloater);
     LLFloaterReg::add("buy_currency_html", "floater_buy_currency_html.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBuyCurrencyHTML>);
@@ -665,6 +668,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("imcontacts", "floater_fs_contacts.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterContacts>);
     LLFloaterReg::add("lgg_beamcolormap", "floater_beamcolor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<lggBeamColorMapFloater>);
     LLFloaterReg::add("lgg_beamshape", "floater_beamshape.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<lggBeamMapFloater>);
+    LLFloaterReg::add("id_keyword_colors", "floater_id_keyword_colors.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<IDFloaterKeywordColors>);
     LLFloaterReg::add("media_lists", "floater_media_lists.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterMediaLists>);
     LLFloaterReg::add("money_tracker", "floater_fs_money_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSMoneyTracker>);
     LLFloaterReg::add("omnifilter", "floater_omnifilter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<Omnifilter>);        // <FS:Zi> Omnifilter support

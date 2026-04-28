@@ -35,6 +35,7 @@
 // Command specific includes
 #include "llagentcamera.h"              // @setcam and related
 #include "llavataractions.h"            // @stopim IM query
+#include "llavatariconctrl.h"           // @setprofileimage - [RLVa:ID]
 #include "llavatarnamecache.h"          // @shownames
 #include "llavatarlist.h"               // @shownames
 #include "llfloatercamera.h"            // @setcam family
@@ -2100,6 +2101,23 @@ void RlvBehaviourToggleHandler<RLV_BHVR_PAY>::onCommandToggle(ERlvBehaviour eBhv
     }
 }
 
+// [RLVa:ID] - Handles: @editdisplayname=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_EDITDISPLAYNAME>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (fHasBhvr)
+    {
+        // Close the floater if currently open
+        LLFloaterReg::hideInstance("display_name");
+        RLV_VERIFY(RlvUIEnabler::instance().addGenericFloaterFilter("display_name"));
+    }
+    else
+    {
+        RLV_VERIFY(RlvUIEnabler::instance().removeGenericFloaterFilter("display_name"));
+    }
+}
+// [/RLVa:ID]
+
 // Handles: @setoverlay=n|y
 template<> template<>
 ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETOVERLAY>::onCommand(const RlvCommand& rlvCmd, bool& fRefCount)
@@ -2287,6 +2305,14 @@ void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMIN>::onValueChange()
 {
     if ( (gAgentCamera.cameraMouselook()) && (!RlvActions::canChangeToMouselook()) )
         gAgentCamera.changeCameraToThirdPerson();
+}
+
+// Handles: @setcam_avdistmax:<distance>=n|y changes (force mouselook when distance is 0)
+template<>
+void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMAX>::onValueChange() const
+{
+    if ( (!RlvActions::canExitMouselook()) && (!gAgentCamera.cameraMouselook()) )
+        gAgentCamera.changeCameraToMouselook();
 }
 
 // Handles: @setcam_eyeoffset:<vector3>=n|y, @setcam_eyeoffsetscale:<float>=n|y and @setcam_focusoffset:<vector3>=n|y toggles
@@ -2531,6 +2557,35 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SETENV>::onCommandToggle(ERlvBehaviour e
         LLEnvironment::instance().updateEnvironment();
     }
 }
+
+// [RLVa:ID] - Handles: @lockenv=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_LOCKENV>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    const std::string strEnvFloaters[] = { "env_adjust_snapshot", "env_edit_extdaycycle", "env_fixed_environmentent_sky", "env_fixed_environmentent_water", "my_environments" };
+    for (int idxFloater = 0, cntFloater = sizeof(strEnvFloaters) / sizeof(std::string); idxFloater < cntFloater; idxFloater++)
+    {
+        if (fHasBhvr)
+        {
+            // Hide the floater if it's currently visible
+            LLFloaterReg::const_instance_list_t envFloaters = LLFloaterReg::getFloaterList(strEnvFloaters[idxFloater]);
+            for (LLFloater* pFloater : envFloaters)
+                pFloater->closeFloater();
+            RLV_VERIFY(RlvUIEnabler::instance().addGenericFloaterFilter(strEnvFloaters[idxFloater]));
+        }
+        else
+        {
+            RLV_VERIFY(RlvUIEnabler::instance().removeGenericFloaterFilter(strEnvFloaters[idxFloater]));
+        }
+    }
+
+    if (fHasBhvr)
+    {
+        // Force the use of shared (parcel/region) environment
+        LLEnvironment::instance().setSharedEnvironment();
+    }
+}
+// [/RLVa:ID]
 
 // Handles: @showhovertext:<uuid>=n|y
 template<> template<>
@@ -3295,6 +3350,59 @@ ERlvCmdRet RlvForceHandler<RLV_BHVR_SETGROUP>::onCommand(const RlvCommand& rlvCm
 
     return (fValid) ? RLV_RET_SUCCESS : RLV_RET_FAILED_OPTION;
 }
+
+// [RLVa:ID] - Handles: @setprofileimage:<texture-uuid>=force
+static void rlvSetProfileImageCoro(std::string cap_url, LLUUID idAgent, LLUUID idTexture)
+{
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("rlvSetProfileImageCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpHeaders::ptr_t httpHeaders;
+
+    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    httpOpts->setFollowRedirects(true);
+
+    std::string finalUrl = cap_url + "/" + idAgent.asString();
+    LLSD data;
+    data["sl_image_id"] = idTexture;
+
+    LLSD result = httpAdapter->putAndSuspend(httpRequest, finalUrl, data, httpOpts, httpHeaders);
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    if (status)
+    {
+        LLAvatarIconIDCache::getInstance()->add(idAgent, idTexture);
+        RLV_DEBUGS << "Profile image updated to " << idTexture << RLV_ENDL;
+    }
+    else
+    {
+        RLV_WARNS << "Failed to update profile image: " << status.toString() << RLV_ENDL;
+    }
+}
+
+template<> template<>
+ERlvCmdRet RlvForceHandler<RLV_BHVR_SETPROFILEIMAGE>::onCommand(const RlvCommand& rlvCmd)
+{
+    LLUUID idTexture;
+    if (!RlvCommandOptionHelper::parseOption(rlvCmd.getOption(), idTexture) || idTexture.isNull())
+        return RLV_RET_FAILED_OPTION;
+
+    std::string cap_url = gAgent.getRegionCapability("AgentProfile");
+    if (cap_url.empty())
+    {
+        RLV_WARNS << "setprofileimage failed - AgentProfile capability not available" << RLV_ENDL;
+        return RLV_RET_FAILED;
+    }
+
+    LLCoros::instance().launch("rlvSetProfileImageCoro",
+        boost::bind(&rlvSetProfileImageCoro, cap_url, gAgent.getID(), idTexture));
+
+    return RLV_RET_SUCCESS;
+}
+// [/RLVa:ID]
 
 // Handles: @sitground=force
 template<> template<>

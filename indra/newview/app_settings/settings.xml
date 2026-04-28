@@ -2,6 +2,52 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="llsd.xsd">
 <map>
+  <key>IDPreloadWebBrowserFloaters</key>
+  <map>
+    <key>Comment</key>
+    <string>If true, preload web browser floaters (destinations, search, marketplace, avatar welcome pack) on login to improve responsiveness. Set to false to reduce memory usage and prevent spawning extra Chromium processes.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <!-- <ID> -->
+  <key>IDMouselookRequireAltForDrag</key>
+  <map>
+    <key>Comment</key>
+    <string>If true, clicking and dragging in mouselook requires holding Alt to initiate object grab/drag.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
+  <!-- </ID> -->
+  <key>FSTrishMouseLookFix</key>
+  <map>
+    <key>Comment</key>
+    <string>Fixes touch in mouselook while cam is controlled. Can break some poorly scripted weapons.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>FSTrishNeighboringRegionLoadAdjacentsFix</key>
+  <map>
+    <key>Comment</key>
+    <string>Fixes crossing for the experimental blockage of neighboring sims by only loading adjacent sims - EXPERIMENTAL.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
   <key>FSLandmarkCreatedNotification</key>
   <map>
     <key>Comment</key>
@@ -458,6 +504,17 @@
     <map>
       <key>Comment</key>
       <string>Whether to color a friends chat based on their friends groups</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSContactSetsColorizeFriendsList</key>
+    <map>
+      <key>Comment</key>
+      <string>Whether to color a friends name in the friends list based on their contact set</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -1223,6 +1280,17 @@
     <map>
       <key>Comment</key>
       <string>When TRUE, forbids to give sub-folders to the #RLV RestrainedLove folder.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <boolean>0</boolean>
+    </map>
+    <key>RestrainedLoveAutoAcceptGiveToRLV</key>
+    <map>
+      <key>Comment</key>
+      <string>When TRUE, automatically accepts inventory offers to the #RLV folder without showing a dialog.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

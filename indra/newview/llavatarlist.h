@@ -30,6 +30,7 @@
 #include "llflatlistview.h"
 #include "llavatarlistitem.h"
 #include "rlvdefines.h"
+#include "lggcontactsets.h"
 
 class LLTimer;
 class LLListContextMenu;
@@ -178,6 +179,10 @@ private:
     boost::signals2::connection mRlvBehaviorCallbackConnection;
     void updateRlvRestrictions(ERlvBehaviour behavior, ERlvParamType type);
     // </FS:Ansariel>
+
+    // Contact set color updates
+    boost::signals2::connection mContactSetChangedConnection;
+    void onContactSetsChanged(LGGContactSets::EContactSetUpdate type);
 };
 
 /** Abstract comparator for avatar items */

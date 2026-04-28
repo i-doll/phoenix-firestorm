@@ -34,6 +34,7 @@
 #include "llfloater.h"
 #include "llscrolllistcolumn.h"
 #include "rlvhandler.h"
+#include "lggcontactsets.h"
 
 class FSScrollListCtrl;
 class LLButton;
@@ -204,6 +205,10 @@ private:
     typedef std::map<LLUUID, LLAvatarNameCache::callback_connection_t> avatar_name_cb_t;
     avatar_name_cb_t    mAvatarNameCacheConnections;
     void                disconnectAvatarNameCacheConnection(const LLUUID& request_id);
+
+    // Contact set color updates
+    boost::signals2::connection mContactSetChangedConnection;
+    void onContactSetsChanged(LGGContactSets::EContactSetUpdate type);
 };
 
 #endif // FS_FLOATERCONTACTS_H

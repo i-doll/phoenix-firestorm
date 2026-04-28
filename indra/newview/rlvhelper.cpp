@@ -143,6 +143,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("sendgesture", RLV_BHVR_SENDGESTURE, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETDEBUG, RLV_OPTION_NONE>("setdebug"));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETENV, RLV_OPTION_NONE>("setenv"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_LOCKENV, RLV_OPTION_NONE>("lockenv"));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("setgroup", RLV_BHVR_SETGROUP));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION>("share", RLV_BHVR_SHARE, RlvBehaviourInfo::BHVR_STRICT));
     addEntry(new RlvBehaviourInfo("sharedunwear",           RLV_BHVR_SHAREDUNWEAR,          RLV_TYPE_ADDREM, RlvBehaviourInfo::BHVR_EXTENDED));
@@ -158,6 +159,8 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourProcessor<RLV_BHVR_SHOWNAMETAGS>("shownametags", RlvBehaviourInfo::BHVR_STRICT));
     addModifier(RLV_BHVR_SHOWNAMETAGS, RLV_MODIFIER_SHOWNAMETAGSDIST, new RlvBehaviourModifierHandler<RLV_MODIFIER_SHOWNAMETAGSDIST>("Name Tags - Visible Distance", 0.0f, true, new RlvBehaviourModifierCompMin));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWNEARBY, RLV_OPTION_NONE>("shownearby", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showpeople", RLV_BHVR_SHOWPEOPLE));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showareasearch", RLV_BHVR_SHOWAREASEARCH));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWSELF, RLV_OPTION_NONE, RlvBehaviourShowSelfToggleHandler>("showself", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWSELFHEAD, RLV_OPTION_NONE, RlvBehaviourShowSelfToggleHandler>("showselfhead", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showworldmap", RLV_BHVR_SHOWWORLDMAP));
@@ -191,6 +194,10 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("viewnote", RLV_BHVR_VIEWNOTE));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("viewscript", RLV_BHVR_VIEWSCRIPT));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("viewtexture", RLV_BHVR_VIEWTEXTURE));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editprofile", RLV_BHVR_EDITPROFILE)); // [RLVa:ID]
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editpicks", RLV_BHVR_EDITPICKS));     // [RLVa:ID]
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_EDITDISPLAYNAME, RLV_OPTION_NONE>("editdisplayname")); // [RLVa:ID]
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editpfp", RLV_BHVR_EDITPFP)); // [RLVa:ID]
 
     // Camera
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETCAM, RLV_OPTION_NONE>("setcam"));
@@ -199,7 +206,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_avdistmin", RLV_BHVR_SETCAM_AVDISTMIN, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addModifier(RLV_BHVR_SETCAM_AVDISTMIN, RLV_MODIFIER_SETCAM_AVDISTMIN, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMIN>("Camera - Avatar Distance (Min)", 0.0f, false, new RlvBehaviourModifierCompMax()));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_avdistmax", RLV_BHVR_SETCAM_AVDISTMAX, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
-    addModifier(RLV_BHVR_SETCAM_AVDISTMAX, RLV_MODIFIER_SETCAM_AVDISTMAX, new RlvBehaviourModifier("Camera - Avatar Distance (Max)", F32_MAX, false, new RlvBehaviourModifierCompMin));
+    addModifier(RLV_BHVR_SETCAM_AVDISTMAX, RLV_MODIFIER_SETCAM_AVDISTMAX, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_AVDISTMAX>("Camera - Avatar Distance (Max)", F32_MAX, false, new RlvBehaviourModifierCompMin));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_origindistmin", RLV_BHVR_SETCAM_ORIGINDISTMIN, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addModifier(RLV_BHVR_SETCAM_ORIGINDISTMIN, RLV_MODIFIER_SETCAM_ORIGINDISTMIN, new RlvBehaviourModifier("Camera - Focus Distance (Min)", 0.0f, true, new RlvBehaviourModifierCompMax));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_MODIFIER>("setcam_origindistmax", RLV_BHVR_SETCAM_ORIGINDISTMAX, RlvBehaviourInfo::BHVR_EXPERIMENTAL));
@@ -295,6 +302,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvForceProcessor<RLV_BHVR_SETCAM_FOV>("setcam_fov", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvForceProcessor<RLV_BHVR_SETCAM_MODE>("setcam_mode", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvForceProcessor<RLV_BHVR_SETGROUP>("setgroup"));
+    addEntry(new RlvForceProcessor<RLV_BHVR_SETPROFILEIMAGE>("setprofileimage")); // [RLVa:ID]
     addEntry(new RlvForceProcessor<RLV_BHVR_SIT>("sit"));
     addEntry(new RlvForceProcessor<RLV_BHVR_SITGROUND>("sitground"));
     addEntry(new RlvForceProcessor<RLV_BHVR_TPTO>("tpto"));

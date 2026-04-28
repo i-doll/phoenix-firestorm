@@ -57,6 +57,14 @@ bool RlvActions::canChangeToMouselook()
         ( (!pCamDistMinModifier->hasValue()) || (pCamDistMinModifier->getValue<float>() == 0.f) );
 }
 
+bool RlvActions::canExitMouselook()
+{
+    // User can exit mouselook if:
+    //   - there is no maximum camera distance defined, or it's greater than 0m
+    const RlvBehaviourModifier* pCamDistMaxModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_AVDISTMAX);
+    return (!pCamDistMaxModifier->hasValue()) || (pCamDistMaxModifier->getValue<float>() != 0.f);
+}
+
 bool RlvActions::isCameraDistanceClamped()
 {
     return
@@ -400,11 +408,46 @@ bool RlvActions::canChangeEnvironment(const LLUUID& idRlvObject)
     return (idRlvObject.isNull()) ? !gRlvHandler.hasBehaviour(RLV_BHVR_SETENV) : !gRlvHandler.hasBehaviourExcept(RLV_BHVR_SETENV, idRlvObject);
 }
 
+bool RlvActions::canOverrideEnvironment(const LLUUID& idRlvObject)
+{
+    // User can override the shared environment with local settings if:
+    //   - not restricted by @setenv (which gives full control to an object)
+    //   - not restricted by @lockenv (which forces shared environment)
+    if (!canChangeEnvironment(idRlvObject))
+        return false;
+    return (idRlvObject.isNull()) ? !gRlvHandler.hasBehaviour(RLV_BHVR_LOCKENV) : !gRlvHandler.hasBehaviourExcept(RLV_BHVR_LOCKENV, idRlvObject);
+}
+
 bool RlvActions::hasPostProcess()
 {
     return LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere);
 }
 
+// ============================================================================
+// Profile
+// [RLVa:ID]
+
+bool RlvActions::canEditProfile()
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITPROFILE);
+}
+
+bool RlvActions::canEditPicks()
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITPICKS);
+}
+
+bool RlvActions::canEditDisplayName()
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITDISPLAYNAME);
+}
+
+bool RlvActions::canEditProfileImage()
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDITPFP);
+}
+
+// [/RLVa:ID]
 // ============================================================================
 // World interaction
 //

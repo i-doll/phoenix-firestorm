@@ -15,6 +15,9 @@ exportMutliArchDRIPath() {
 	fi
 }
 
+## GL Driver Options
+export mesa_glthread=true
+
 
 ## Here are some configuration options for Linux Client Testers.
 ## These options are for self-assisted troubleshooting during this beta
@@ -79,6 +82,7 @@ fi
 ##   you're building your own viewer, bear in mind that the executable
 ##   in the bin directory will be stripped: you should replace it with
 ##   an unstripped binary before you run.
+#export LL_WRAPPER='lldb'
 #export LL_WRAPPER='gdb --args'
 #export LL_WRAPPER='valgrind --smc-check=all --error-limit=no --log-file=secondlife.vg --leak-check=full --suppressions=/usr/lib/valgrind/glibc-2.5.supp --suppressions=secondlife-i686.supp'
 
@@ -87,6 +91,8 @@ export SDL_VIDEO_X11_DGAMOUSE=0
 
 ## - Works around a problem with misconfigured 64-bit systems not finding GL
 exportMutliArchDRIPath "amd64"
+export SDL_VIDEODRIVER=x11
+export mesa_glthread=true
 
 if [ -z ${LIBGL_DRIVERS_PATH} ]
 then

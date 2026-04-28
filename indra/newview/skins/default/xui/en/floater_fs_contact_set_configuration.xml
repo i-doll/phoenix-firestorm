@@ -172,5 +172,13 @@ Custom Colors:
      name="FSContactSetsColorizeChat"
      width="270"
      control_name="FSContactSetsColorizeChat"/>
+    <check_box
+     follows="left|top"
+     height="12"
+     initial_value="false"
+     label="Color friends list entry based on their Contact Set"
+     name="FSContactSetsColorizeFriendsList"
+     width="270"
+     control_name="FSContactSetsColorizeFriendsList"/>
     </panel>
 </floater>

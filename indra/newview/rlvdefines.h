@@ -141,6 +141,8 @@ enum ERlvBehaviour {
     RLV_BHVR_SHOWNAMES,             // "shownames"
     RLV_BHVR_SHOWNAMETAGS,          // "shownametags"
     RLV_BHVR_SHOWNEARBY,
+    RLV_BHVR_SHOWPEOPLE,            // "showpeople"
+    RLV_BHVR_SHOWAREASEARCH,        // "showareasearch"
     RLV_BHVR_SHOWHOVERTEXT,         // "showhovertext"
     RLV_BHVR_SHOWHOVERTEXTHUD,      // "showhovertexthud"
     RLV_BHVR_SHOWHOVERTEXTWORLD,    // "showhovertextworld"
@@ -188,6 +190,12 @@ enum ERlvBehaviour {
     RLV_BHVR_STANDTP,               // "standtp"
     RLV_BHVR_SETDEBUG,              // "setdebug"
     RLV_BHVR_SETENV,                // "setenv"
+    RLV_BHVR_SETPROFILEIMAGE,       // "setprofileimage" // [RLVa:ID]
+    RLV_BHVR_EDITPROFILE,           // "editprofile" // [RLVa:ID]
+    RLV_BHVR_EDITPICKS,             // "editpicks" // [RLVa:ID]
+    RLV_BHVR_EDITDISPLAYNAME,       // "editdisplayname" // [RLVa:ID]
+    RLV_BHVR_EDITPFP,               // "editpfp" // [RLVa:ID]
+    RLV_BHVR_LOCKENV,               // "lockenv"
     RLV_BHVR_ALWAYSRUN,             // "alwaysrun"
     RLV_BHVR_TEMPRUN,               // "temprun"
     RLV_BHVR_DETACHME,              // "detachme"
@@ -406,6 +414,7 @@ namespace RlvSettingNames
     /*inline*/ constexpr std::string_view Debug = make_string_view("RestrainedLoveDebug");
     /*inline*/ constexpr std::string_view CanOoc = make_string_view("RestrainedLoveCanOOC");
     /*inline*/ constexpr std::string_view ForbidGiveToRlv = make_string_view("RestrainedLoveForbidGiveToRLV");
+    /*inline*/ constexpr std::string_view AutoAcceptGiveToRlv = make_string_view("RestrainedLoveAutoAcceptGiveToRLV"); // [ID]
     /*inline*/ constexpr std::string_view NoSetEnv = make_string_view("RestrainedLoveNoSetEnv");
     /*inline*/ constexpr std::string_view ShowEllipsis = make_string_view("RestrainedLoveShowEllipsis");
     /*inline*/ constexpr std::string_view WearAddPrefix = make_string_view("RestrainedLoveStackWhenFolderBeginsWith");
@@ -431,6 +440,7 @@ namespace RlvSettingNames
     constexpr const char Debug[] = "RestrainedLoveDebug";
     constexpr const char CanOoc[] = "RestrainedLoveCanOOC";
     constexpr const char ForbidGiveToRlv[] = "RestrainedLoveForbidGiveToRLV";
+    constexpr const char AutoAcceptGiveToRlv[] = "RestrainedLoveAutoAcceptGiveToRLV"; // [ID]
     constexpr const char NoSetEnv[] = "RestrainedLoveNoSetEnv";
     constexpr const char ShowEllipsis[] = "RestrainedLoveShowEllipsis";
     constexpr const char WearAddPrefix[] = "RestrainedLoveStackWhenFolderBeginsWith";
