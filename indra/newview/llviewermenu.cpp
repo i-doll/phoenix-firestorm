@@ -181,6 +181,7 @@
 #include "llscenemonitor.h"
 #include "llsdserialize.h"
 #include "lltexturecache.h"
+#include "llmeshrepository.h"
 #include "llvovolume.h"
 #include "particleeditor.h"
 #include "permissionstracker.h"
@@ -3446,6 +3447,49 @@ class LLObjectTexRefresh : public view_listener_t
             handle_object_tex_refresh(node->getObject(), node);
         }
 
+        return true;
+    }
+};
+
+class LLObjectReloadMesh : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        std::set<LLUUID> evicted;
+        for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
+             iter != LLSelectMgr::getInstance()->getSelection()->valid_end();
+             ++iter)
+        {
+            LLViewerObject* object = (*iter)->getObject();
+            LLVOVolume* vol = dynamic_cast<LLVOVolume*>(object);
+            if (!vol || !vol->isSculpted())
+                continue;
+
+            LLVolume* volume = vol->getVolume();
+            if (!volume)
+                continue;
+
+            const LLVolumeParams& params = volume->getParams();
+            if ((params.getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_MESH)
+                continue;
+
+            const LLUUID& mesh_id = params.getSculptID();
+            if (mesh_id.isNull())
+                continue;
+
+            // Cache eviction is per asset; do it once even if many selected
+            // volumes share the same mesh.
+            if (evicted.insert(mesh_id).second)
+            {
+                gMeshRepo.reloadMesh(mesh_id);
+            }
+
+            // Per-volume: clear the unavailable flag (which short-circuits
+            // future loadMesh calls) and re-queue the fetch at the current LOD.
+            volume->setMeshAssetUnavaliable(false);
+            gMeshRepo.loadMesh(vol, params, vol->getLOD());
+            vol->markForUpdate();
+        }
         return true;
     }
 };
@@ -13191,6 +13235,7 @@ void initialize_menus()
         "Object.EnableDerender",
         boost::bind(&enable_derender_object)); // <FS:CR> FIRE-10082 - Don't enable derendering own attachments when RLVa is enabled as well
     view_listener_t::addMenu(new LLObjectTexRefresh(), "Object.TexRefresh"); // ## Zi: Texture Refresh
+    view_listener_t::addMenu(new LLObjectReloadMesh(), "Object.ReloadMesh");
     view_listener_t::addMenu(new LLEditParticleSource(), "Object.EditParticles");
     view_listener_t::addMenu(new LLEnableEditParticleSource(), "Object.EnableEditParticles");
 
