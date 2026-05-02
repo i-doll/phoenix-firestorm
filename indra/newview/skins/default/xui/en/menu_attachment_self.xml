@@ -482,6 +482,14 @@ name="Stand Up">
       <menu_item_call.on_click
        function="Object.TexRefresh" />
    </menu_item_call>
+  <menu_item_call
+      enabled="true"
+      label="Reload Mesh"
+      layout="topleft"
+      name="Reload Mesh">
+      <menu_item_call.on_click
+       function="Object.ReloadMesh" />
+   </menu_item_call>
   <menu_item_separator
   layout="topleft" />
   <menu_item_call

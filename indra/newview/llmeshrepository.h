@@ -902,6 +902,11 @@ public:
     //mesh management functions
     S32 loadMesh(LLVOVolume* volume, const LLVolumeParams& mesh_params, S32 new_lod = 0, S32 last_lod = -1);
 
+    // Force-evict every cached trace of a mesh asset (header, LOD bytes,
+    // skin info, decomposition, on-disk blob) so the next loadMesh() call
+    // goes to the network. Idempotent: a no-op if the mesh isn't cached.
+    void reloadMesh(const LLUUID& mesh_id);
+
     void notifyLoadedMeshes();
     void notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVolume* volume, S32 lod);
     void notifyMeshUnavailable(const LLVolumeParams& mesh_params, S32 request_lod, S32 volume_lod);
