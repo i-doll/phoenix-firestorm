@@ -4479,6 +4479,59 @@ void LLMeshRepository::unregisterAllMeshes()
     mLoadingSkins.clear();
 }
 
+void LLMeshRepository::reloadMesh(const LLUUID& mesh_id)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+
+    if (mesh_id.isNull())
+    {
+        return;
+    }
+
+    // Drop main-thread caches keyed by mesh id.
+    {
+        LLMutexLock lock(mMeshMutex);
+        mSkinMap.erase(mesh_id);
+
+        auto decomp_it = mDecompositionMap.find(mesh_id);
+        if (decomp_it != mDecompositionMap.end())
+        {
+            delete decomp_it->second;
+            mDecompositionMap.erase(decomp_it);
+        }
+
+        mLoadingSkins.erase(mesh_id);
+        mLoadingDecompositions.erase(mesh_id);
+        mLoadingPhysicsShapes.erase(mesh_id);
+
+        for (S32 lod = 0; lod < LLVolumeLODGroup::NUM_LODS; ++lod)
+        {
+            mLoadingMeshes[lod].erase(mesh_id);
+        }
+    }
+
+    // Drop worker-thread caches. Mutex order matches the rest of this file:
+    // mMeshMutex is released before mHeaderMutex is acquired.
+    if (mThread)
+    {
+        {
+            LLMutexLock lock(mThread->mHeaderMutex);
+            mThread->mMeshHeader.erase(mesh_id);
+            mThread->mPendingLOD.erase(mesh_id);
+        }
+        if (mThread->mSkinMapMutex)
+        {
+            LLMutexLock lock(mThread->mSkinMapMutex);
+            mThread->mSkinMap.erase(mesh_id);
+        }
+    }
+
+    // Evict the on-disk cache blob (header + every LOD live in one file).
+    LLFileSystem::removeFile(mesh_id, LLAssetType::AT_MESH, 1);
+
+    LL_INFOS("Mesh") << "Forced reload of mesh " << mesh_id << LL_ENDL;
+}
+
 S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_params, S32 new_lod, S32 last_lod)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
