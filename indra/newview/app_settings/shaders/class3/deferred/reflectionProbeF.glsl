@@ -385,9 +385,15 @@ vec3 boxIntersect(vec3 origin, vec3 dir, mat4 i, out float d, float scale)
 
     d = 1.0-max(max(abs(PositionLS.x), abs(PositionLS.y)), abs(PositionLS.z));
 
+    // Keep axis-parallel rays away from 0/0 when the origin lies on a box face.
+    vec3 raySign = vec3(RayLS.x < 0.0 ? -1.0 : 1.0,
+                        RayLS.y < 0.0 ? -1.0 : 1.0,
+                        RayLS.z < 0.0 ? -1.0 : 1.0);
+    vec3 rayDenom = raySign * max(abs(RayLS), vec3(1e-6));
+
     vec3 Unitary = vec3(scale);
-    vec3 FirstPlaneIntersect  = (Unitary - PositionLS) / RayLS;
-    vec3 SecondPlaneIntersect = (-Unitary - PositionLS) / RayLS;
+    vec3 FirstPlaneIntersect  = (Unitary - PositionLS) / rayDenom;
+    vec3 SecondPlaneIntersect = (-Unitary - PositionLS) / rayDenom;
     vec3 FurthestPlane = max(FirstPlaneIntersect, SecondPlaneIntersect);
     float Distance = min(FurthestPlane.x, min(FurthestPlane.y, FurthestPlane.z));
 
@@ -400,6 +406,11 @@ vec3 boxIntersect(vec3 origin, vec3 dir, mat4 i, out float d, float scale)
 vec3 boxIntersect(vec3 origin, vec3 dir, mat4 i, out float d)
 {
     return boxIntersect(origin, dir, i, d, 1.0);
+}
+
+float boxDistanceWeight(float depth, float fade)
+{
+    return clamp(depth, 0.0, 1.0) * fade;
 }
 
 void debugBoxCol(vec3 ro, vec3 rd, float t, vec3 p, inout vec4 col)
@@ -509,6 +520,7 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
         v = boxIntersect(pos, dir, refBox[i], d);
 
         w = max(d, 0.001);
+        dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
     { // sphere probe
@@ -524,8 +536,6 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
     }
 
     v -= c;
-    vec3 d = normalize(v);
-
     v = env_mat * v;
 
     vec4 ret = textureLod(reflectionProbes, vec4(v.xyz, refIndex[i].x), lod) * refParams[i].y;
@@ -548,6 +558,7 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
         float d = 0.0;
         v = boxIntersect(pos, dir, refBox[i], d, 3.0);
         w = max(d, 0.001);
+        dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
     {
@@ -566,7 +577,9 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
     v -= c;
     v = env_mat * v;
 
-    vec3 col = textureLod(irradianceProbes, vec4(v.xyz, refIndex[i].x), 0).rgb * refParams[i].x;
+    float len2 = dot(v, v);
+    vec3 sampleDir = len2 > 1e-12 ? v : env_mat * dir;
+    vec3 col = textureLod(irradianceProbes, vec4(sampleDir, refIndex[i].x), 0).rgb * refParams[i].x;
 
     col = mix(amblit, col, min(refParams[i].x, 1.0));
 

@@ -168,10 +168,14 @@ void LLReflectionMapManager::initCubeFree()
 
 struct CompareProbeDistance
 {
-    LLReflectionMap* mDefaultProbe;
-
-    bool operator()(const LLPointer<LLReflectionMap>& lhs, const LLPointer<LLReflectionMap>& rhs)
+    bool operator()(const LLPointer<LLReflectionMap>& lhs, const LLPointer<LLReflectionMap>& rhs) const
     {
+        // Placed probes get cube slots before automatic fallback probes.
+        if (lhs->mPriority != rhs->mPriority)
+        {
+            return lhs->mPriority > rhs->mPriority;
+        }
+
         return lhs->mDistance < rhs->mDistance;
     }
 };
@@ -193,7 +197,11 @@ static bool check_priority(LLReflectionMap* a, LLReflectionMap* b)
         return true;
     }
     else if (!a->mComplete && !b->mComplete)
-    { //neither probe is complete, use distance
+    { // neither probe is complete, prefer placed probes, then use distance
+        if (a->mPriority != b->mPriority)
+        {
+            return a->mPriority > b->mPriority;
+        }
         return a->mDistance < b->mDistance;
     }
     else if (a->mComplete && b->mComplete)
@@ -347,7 +355,73 @@ void LLReflectionMapManager::update()
         doProbeUpdate();
     }
 
-    // update distance to camera for all probes
+    // Occlusion state is only meaningful while queries are running. Without this, probes that
+    // were occluded when queries stopped remained hidden for the rest of the session.
+    if (LLPipeline::sUseOcclusion <= 1)
+    {
+        for (auto& probe : mProbes)
+        {
+            probe->mOccluded = false;
+        }
+    }
+
+    // Synchronize placed probes first, then suppress automatic probes whose entire influence
+    // volume is already covered by a complete placed probe.
+    {
+        const F32 ECLIPSE_HYSTERESIS = 0.5f;
+        std::vector<LLReflectionMap*> manual_probes;
+
+        for (auto& probe : mProbes)
+        {
+            probe->syncToViewerObject();
+            if (probe != mDefaultProbe && probe->mViewerObject && probe->mComplete &&
+                probe->mCubeIndex != -1 && probe->mFadeIn >= 1.f && probe->isRelevant())
+            {
+                manual_probes.push_back(probe);
+            }
+        }
+
+        for (auto& probe : mProbes)
+        {
+            if (probe == mDefaultProbe || probe->mViewerObject)
+            {
+                continue;
+            }
+
+            const F32 margin = probe->mInsideManualProbe ? ECLIPSE_HYSTERESIS : -ECLIPSE_HYSTERESIS;
+            probe->mInsideManualProbe = false;
+            for (LLReflectionMap* manual : manual_probes)
+            {
+                if (manual->eclipses(probe, margin))
+                {
+                    probe->mInsideManualProbe = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Compute every distance before the sort and slot handout. Irrelevant probes sort last so
+    // their slots can be reclaimed instead of remaining resident indefinitely.
+    for (auto& probe : mProbes)
+    {
+        if (probe == mDefaultProbe)
+        {
+            probe->mDistance = probe->mComplete ? 64.f : -4096.f;
+            continue;
+        }
+
+        if (!probe->isRelevant())
+        {
+            probe->mDistance = FLT_MAX;
+            continue;
+        }
+
+        LLVector4a d;
+        d.setSub(camera_pos, probe->mOrigin);
+        probe->mDistance = d.getLength3().getF32() - probe->mRadius;
+    }
+
     std::sort(mProbes.begin()+1, mProbes.end(), CompareProbeDistance());
     llassert(mProbes[0] == mDefaultProbe);
     llassert(mProbes[0]->mCubeArray == mTexture);
@@ -355,13 +429,15 @@ void LLReflectionMapManager::update()
 
     // make sure we're assigning cube slots to the closest probes
 
-    // first free any cube indices for distant probes
-    for (U32 i = mReflectionProbeCount; i < mProbes.size(); ++i)
+    // First free cube indices for distant or no-longer-relevant probes. Index zero is the
+    // default probe and is never released.
+    for (U32 i = 1; i < mProbes.size(); ++i)
     {
         LLReflectionMap* probe = mProbes[i];
         llassert(probe != nullptr);
 
-        if (probe && probe->mCubeIndex != -1 && mUpdatingProbe != probe)
+        if (probe && probe->mCubeIndex != -1 && mUpdatingProbe != probe &&
+            (i >= mReflectionProbeCount || !probe->isRelevant()))
         { // free this index
             mCubeFree.push_back(probe->mCubeIndex);
 
@@ -369,6 +445,7 @@ void LLReflectionMapManager::update()
             probe->mCubeIndex = -1;
             probe->mComplete = false;
             probe->mFadeIn = 0;
+            probe->mOccluded = false;
         }
     }
 
@@ -380,7 +457,7 @@ void LLReflectionMapManager::update()
         // find the closest probe that needs a cube index
         LLReflectionMap* probe = mProbes[i];
 
-        if (probe->mCubeIndex == -1)
+        if (probe->mCubeIndex == -1 && probe->isRelevant())
         {
             S32 idx = allocateCubeIndex();
             llassert(idx > 0); //if we're still in this loop, mCubeFree should not be empty and allocateCubeIndex should be returning good indices
@@ -407,31 +484,14 @@ void LLReflectionMapManager::update()
             continue;
         }
 
-        LLVector4a d;
-
-        if (probe != mDefaultProbe)
-        {
-            if (probe->mViewerObject) //make sure probes track the viewer objects they are attached to
-            {
-                probe->mOrigin.load3(probe->mViewerObject->getPositionAgent().mV);
-            }
-            d.setSub(camera_pos, probe->mOrigin);
-            probe->mDistance = d.getLength3().getF32() - probe->mRadius;
-        }
-        else if (probe->mComplete)
-        {
-            // make default probe have a distance of 64m for the purposes of prioritization (if it's already been generated once)
-            probe->mDistance = 64.f;
-        }
-        else
-        {
-            probe->mDistance = -4096.f; //boost priority of default probe when it's not complete
-        }
-
         if (probe->mComplete)
         {
             probe->autoAdjustOrigin();
             probe->mFadeIn = llmin((F32) (probe->mFadeIn + gFrameIntervalSeconds), 1.f);
+            if (probe->neighborsAreStale())
+            {
+                updateNeighbors(probe);
+            }
         }
         if (probe->mOccluded && probe->mComplete)
         {
@@ -617,20 +677,20 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
     modelview.loadu(gGLModelView);
     LLVector4a oa; // scratch space for transformed origin
 
+    // Main-camera occlusion does not describe visibility from a cubemap capture camera.
+    const bool honor_occlusion = !gCubeSnapshot;
+
     U32 count = 0;
     U32 lastIdx = 0;
     for (U32 i = 0; count < maps.size() && i < mProbes.size(); ++i)
     {
-        mProbes[i]->mLastBindTime = gFrameTimeSeconds; // something wants to use this probe, indicate it's been requested
-        if (mProbes[i]->mCubeIndex != -1)
+        if (mProbes[i]->mCubeIndex != -1 && mProbes[i]->mComplete &&
+            !(honor_occlusion && mProbes[i]->mOccluded))
         {
-            if (!mProbes[i]->mOccluded && mProbes[i]->mComplete)
-            {
-                maps[count++] = mProbes[i];
-                modelview.affineTransform(mProbes[i]->mOrigin, oa);
-                mProbes[i]->mMinDepth = -oa.getF32ptr()[2] - mProbes[i]->mRadius;
-                mProbes[i]->mMaxDepth = -oa.getF32ptr()[2] + mProbes[i]->mRadius;
-            }
+            maps[count++] = mProbes[i];
+            modelview.affineTransform(mProbes[i]->mOrigin, oa);
+            mProbes[i]->mMinDepth = -oa.getF32ptr()[2] - mProbes[i]->mRadius;
+            mProbes[i]->mMaxDepth = -oa.getF32ptr()[2] + mProbes[i]->mRadius;
         }
         else
         {
@@ -702,6 +762,7 @@ LLReflectionMap* LLReflectionMapManager::registerViewerObject(LLViewerObject* vo
 
     LLReflectionMap* probe = new LLReflectionMap();
     probe->mViewerObject = vobj;
+    probe->mPriority = 1;
     probe->mOrigin.load3(vobj->getPositionAgent().mV);
 
     if (gCubeSnapshot)
@@ -1073,12 +1134,20 @@ void LLReflectionMapManager::shift(const LLVector4a& offset)
     for (auto& probe : mProbes)
     {
         probe->mOrigin.add(offset);
+        if (probe->mNeighborRadius >= 0.f)
+        {
+            probe->mNeighborOrigin.add(offset);
+        }
     }
 }
 
 void LLReflectionMapManager::updateNeighbors(LLReflectionMap* probe)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+
+    probe->mNeighborOrigin = probe->mOrigin;
+    probe->mNeighborRadius = probe->mRadius;
+
     if (mDefaultProbe == probe)
     {
         return;
@@ -1126,6 +1195,11 @@ void LLReflectionMapManager::updateUniforms()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     LL_PROFILE_GPU_ZONE("rmmu - uniforms")
 
+    // Keep the bucket sort and uploaded influence volumes in the same coordinate state.
+    for (auto& probe : mProbes)
+    {
+        probe->syncToViewerObject();
+    }
 
     mReflectionMaps.resize(mReflectionProbeCount);
     getReflectionMaps(mReflectionMaps);
@@ -1197,27 +1271,9 @@ void LLReflectionMapManager::updateUniforms()
 
         llassert(refmap->mCubeIndex >= 0); // should always be  true, if not, getReflectionMaps is bugged
 
-        {
-            if (refmap->mViewerObject && refmap->mViewerObject->getVolume())
-            { // have active manual probes live-track the object they're associated with
-                LLVOVolume* vobj = (LLVOVolume*)refmap->mViewerObject.get();
-
-                refmap->mOrigin.load3(vobj->getPositionAgent().mV);
-
-                if (vobj->getReflectionProbeIsBox())
-                {
-                    LLVector3 s = vobj->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
-                    refmap->mRadius = s.magVec();
-                }
-                else
-                {
-                    refmap->mRadius = refmap->mViewerObject->getScale().mV[0] * 0.5f;
-                }
-            }
-            modelview.affineTransform(refmap->mOrigin, oa);
-            mProbeData.refSphere[count].set(oa.getF32ptr());
-            mProbeData.refSphere[count].mV[3] = refmap->mRadius;
-        }
+        modelview.affineTransform(refmap->mOrigin, oa);
+        mProbeData.refSphere[count].set(oa.getF32ptr());
+        mProbeData.refSphere[count].mV[3] = refmap->mRadius;
 
         mProbeData.refIndex[count][0] = refmap->mCubeIndex;
         llassert(nc % 4 == 0);
@@ -1228,14 +1284,14 @@ void LLReflectionMapManager::updateUniforms()
         // only possibile influence volumes are boxes and spheres, so detect boxes and treat everything else as spheres
         if (refmap->getBox(mProbeData.refBox[count]))
         { // negate priority to indicate this probe has a box influence volume
-            mProbeData.refIndex[count][3] = -mProbeData.refIndex[count][3];
+            mProbeData.refIndex[count][3] = -llmax(mProbeData.refIndex[count][3], 1);
         }
 
         mProbeData.refParams[count].set(
             llmax(minimum_ambiance, refmap->getAmbiance())*ambscale, // ambiance scale
             radscale, // radiance scale
             refmap->mFadeIn, // fade in weight
-            oa.getF32ptr()[2] - refmap->mRadius); // z near
+            0.f); // unused
 
         S32 ni = nc; // neighbor ("index") - index into refNeighbor to write indices for current reflection probe's neighbors
         {
@@ -1252,7 +1308,9 @@ void LLReflectionMapManager::updateUniforms()
                 }
 
                 GLint idx = neighbor->mProbeIndex;
-                if (idx == -1 || neighbor->mOccluded || neighbor->mCubeIndex == -1)
+                // mProbeIndex already describes the exact list the shader will index, including
+                // the special capture path where main-camera occlusion must be ignored.
+                if (idx == -1)
                 {
                     continue;
                 }
@@ -1575,7 +1633,10 @@ void LLReflectionMapManager::initReflectionMaps()
             probe->mCubeArray = nullptr;
             probe->mCubeIndex = -1;
             probe->mNeighbors.clear();
+            probe->mNeighborRadius = -1.f;
             probe->mFadeIn = 0;
+            probe->mOccluded = false;
+            probe->mInsideManualProbe = false;
         }
 
         mCubeFree.clear();
@@ -1668,26 +1729,33 @@ void LLReflectionMapManager::doOcclusion()
 
     for (auto& probe : mProbes)
     {
-        if (probe != nullptr && probe != mDefaultProbe)
+        if (probe.isNull() || probe == mDefaultProbe)
         {
-            probe->doOcclusion(eye);
+            continue;
         }
+
+        if (probe->mCubeIndex == -1 || !probe->isRelevant())
+        {
+            probe->mOccluded = false;
+            continue;
+        }
+
+        probe->doOcclusion(eye);
     }
 }
 
 void LLReflectionMapManager::forceDefaultProbeAndUpdateUniforms(bool force)
 {
-    static std::vector<bool> mProbeWasOccluded;
+    static std::vector<std::pair<LLPointer<LLReflectionMap>, bool> > sSavedOcclusion;
 
     if (force)
     {
-        llassert(mProbeWasOccluded.empty());
+        llassert(sSavedOcclusion.empty());
 
-        for (size_t i = 0; i < mProbes.size(); ++i)
+        for (auto& probe : mProbes)
         {
-            auto& probe = mProbes[i];
-            mProbeWasOccluded.push_back(probe->mOccluded);
-            if (probe != nullptr && probe != mDefaultProbe)
+            sSavedOcclusion.emplace_back(probe, probe->mOccluded);
+            if (probe != mDefaultProbe)
             {
                 probe->mOccluded = true;
             }
@@ -1697,16 +1765,11 @@ void LLReflectionMapManager::forceDefaultProbeAndUpdateUniforms(bool force)
     }
     else
     {
-        llassert(mProbes.size() == mProbeWasOccluded.size());
-
-        const size_t n = llmin(mProbes.size(), mProbeWasOccluded.size());
-        for (size_t i = 0; i < n; ++i)
+        for (auto& saved : sSavedOcclusion)
         {
-            auto& probe = mProbes[i];
-            llassert(probe->mOccluded == (probe != mDefaultProbe));
-            probe->mOccluded = mProbeWasOccluded[i];
+            saved.first->mOccluded = saved.second;
         }
-        mProbeWasOccluded.clear();
-        mProbeWasOccluded.shrink_to_fit();
+        sSavedOcclusion.clear();
+        sSavedOcclusion.shrink_to_fit();
     }
 }

@@ -67,6 +67,17 @@ public:
     // return true if given Reflection Map's influence volume intersect's with this one's
     bool intersects(LLReflectionMap* other) const;
 
+    // True if this probe's influence volume completely swallows other's, to the point where
+    // other cannot change any pixel this one already covers. Stricter than plain containment
+    // for sphere volumes -- see the implementation.
+    bool eclipses(const LLReflectionMap* other, F32 margin) const;
+
+    // Refresh origin and radius from the viewer object this probe is attached to, if any.
+    void syncToViewerObject();
+
+    // True if this probe has moved or resized enough that its neighbor list may be stale.
+    bool neighborsAreStale() const;
+
     // Get the ambiance value to use for this probe
     F32 getAmbiance() const;
 
@@ -117,6 +128,9 @@ public:
     // probe has had at least one full update and is ready to render
     bool mComplete = false;
 
+    // automatic probe completely covered by a manual probe
+    bool mInsideManualProbe = false;
+
     // fade in parameter for this probe
     F32 mFadeIn = 0.f;
 
@@ -126,6 +140,10 @@ public:
 
     // set of any LLReflectionMaps that intersect this map (maintained by LLReflectionMapManager
     std::vector<LLReflectionMap*> mNeighbors;
+
+    // influence volume the neighbor list was built against
+    LLVector4a mNeighborOrigin;
+    F32 mNeighborRadius = -1.f;
 
     // spatial group this probe is tracking (if any)
     LLSpatialGroup* mGroup = nullptr;
@@ -137,6 +155,7 @@ public:
     // currently only 0 or 1
     // 0 - automatic probe
     // 1 - manual probe
+    // Set once when the probe is registered.
     U32 mPriority = 0;
 
     // occlusion culling state
@@ -146,4 +165,3 @@ public:
 
     ProbeType mType;
 };
-
