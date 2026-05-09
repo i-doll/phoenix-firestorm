@@ -260,6 +260,8 @@
                font="SansSerifSmall"
                height="20"
                is_expandable="true"
+               text_pad_left="3"
+               text_pad_right="3"
                text_tentative_color="TextFgTentativeColor"
                name="chat_box"
                max_length="3070"
