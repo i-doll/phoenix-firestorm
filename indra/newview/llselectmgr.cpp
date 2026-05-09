@@ -6952,6 +6952,10 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
                 LLViewerObject* objectp = node->getObject();
                 if (!objectp)
                     continue;
+                // When media-on-a-prim grabs focus outside build mode, avoid drawing
+                // build-style selection highlight for that focused object.
+                if (!LLToolMgr::instance().inBuildMode() && focus_item_id.notNull() && objectp->getID() == focus_item_id)
+                    continue;
 
                 if (objectp->mDrawable
                     && objectp->mDrawable->getVOVolume()
@@ -9341,4 +9345,3 @@ bool LLCheckIdenticalFunctor<class LLFace *>::same(class LLFace* const & a, clas
     (void)tolerance;                                                                \
     return a == b;                                                                  \
 }
-
