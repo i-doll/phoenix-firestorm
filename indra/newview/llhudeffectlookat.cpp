@@ -707,6 +707,13 @@ void LLHUDEffectLookAt::setSourceObject(LLViewerObject* objectp)
 //-----------------------------------------------------------------------------
 void LLHUDEffectLookAt::render()
 {
+    // <FS:Trish> RLVa: Suppress LookAt target rendering while @lookat is active.
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_LOOKAT))
+    {
+        return;
+    }
+    // </FS:Trish>
+
     if (mDebugLookAt && mSourceObject.notNull())
     {
         static LLCachedControl<bool> hide_own(gSavedPerAccountSettings, "DebugLookAtHideOwn", false);

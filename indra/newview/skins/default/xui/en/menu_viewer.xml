@@ -103,6 +103,10 @@
             <menu_item_check.on_check
              function="Floater.Visible"
              parameter="fs_wearable_favorites" />
+            <!-- <FS:Trish> RLVa: Disable Favorite Wearables menu item while @showfavwear is active. -->
+            <menu_item_check.on_enable
+             function="RLV.EnableIfNot"
+             parameter="showfavwear" />
         </menu_item_check>
 
       <menu_item_call

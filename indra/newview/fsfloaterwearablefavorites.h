@@ -31,6 +31,7 @@
 #include "llfloater.h"
 #include "llviewerinventory.h"
 #include "llwearableitemslist.h"
+#include "rlvdefines.h"
 #include <optional>
 
 class LLButton;
@@ -108,12 +109,14 @@ private:
 
     void onOptionsMenuItemClicked(const LLSD& userdata);
     bool onOptionsMenuItemChecked(const LLSD& userdata);
+    void updateRlvRestrictions(ERlvBehaviour behavior);
 
     static std::optional<LLUUID> getWearableFavoritesFolderID();
 
     bool mInitialized;
 
     boost::signals2::connection mDADCallbackConnection;
+    boost::signals2::connection mRlvBehaviorCallbackConnection;
 
     LLInventoryCategoriesObserver*  mCategoriesObserver;
 
