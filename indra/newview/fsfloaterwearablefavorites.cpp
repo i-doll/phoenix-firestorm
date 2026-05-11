@@ -40,6 +40,7 @@
 #include "llviewercontrol.h"        // for gSavedSettings
 #include "llviewermenu.h"           // for gMenuHolder
 #include "rlvactions.h"
+#include "rlvhandler.h"
 #include "rlvlocks.h"
 
 // Hello Kokua! Have fun yoinking! ;)
@@ -89,7 +90,8 @@ FSFloaterWearableFavorites::FSFloaterWearableFavorites(const LLSD& key)
     : LLFloater(key),
     mItemsList(nullptr),
     mInitialized(false),
-    mDADCallbackConnection()
+    mDADCallbackConnection(),
+    mRlvBehaviorCallbackConnection()
 {
     mCategoriesObserver = new LLInventoryCategoriesObserver();
 }
@@ -107,6 +109,11 @@ FSFloaterWearableFavorites::~FSFloaterWearableFavorites()
         mDADCallbackConnection.disconnect();
     }
 
+    if (mRlvBehaviorCallbackConnection.connected())
+    {
+        mRlvBehaviorCallbackConnection.disconnect();
+    }
+
     if (mOptionsMenuHandle.get())
     {
         mOptionsMenuHandle.get()->die();
@@ -116,6 +123,10 @@ FSFloaterWearableFavorites::~FSFloaterWearableFavorites()
 //virtual
 bool FSFloaterWearableFavorites::postBuild()
 {
+    // <FS:Trish> RLVa: Watch @favwear so the floater can be closed when the restriction toggles on.
+    mRlvBehaviorCallbackConnection = gRlvHandler.setBehaviourCallback(boost::bind(&FSFloaterWearableFavorites::updateRlvRestrictions, this, _1));
+    // </FS:Trish>
+
     mItemsList = getChild<FSWearableFavoritesItemsList>("favorites_list");
     mItemsList->setNoFilteredItemsMsg(getString("search_no_items"));
     mItemsList->setDoubleClickCallback(boost::bind(&FSFloaterWearableFavorites::onDoubleClick, this));
@@ -147,6 +158,14 @@ bool FSFloaterWearableFavorites::postBuild()
 //virtual
 void FSFloaterWearableFavorites::onOpen(const LLSD& /*info*/)
 {
+    // <FS:Trish> RLVa: Block Favorite Wearables usage while @favwear is active.
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_FAVWEAR))
+    {
+        closeFloater();
+        return;
+    }
+    // </FS:Trish>
+
     if (!mInitialized)
     {
         if (sFolderID.isNull())
@@ -356,6 +375,16 @@ bool FSFloaterWearableFavorites::onOptionsMenuItemChecked(const LLSD& userdata)
 
     return false;
 }
+
+// <FS:Trish> RLVa: Close Favorite Wearables immediately when @favwear is applied.
+void FSFloaterWearableFavorites::updateRlvRestrictions(ERlvBehaviour behavior)
+{
+    if (behavior == RLV_BHVR_FAVWEAR && gRlvHandler.hasBehaviour(RLV_BHVR_FAVWEAR))
+    {
+        closeFloater();
+    }
+}
+// </FS:Trish>
 
 void FSFloaterWearableFavorites::onDoubleClick()
 {
