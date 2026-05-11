@@ -616,6 +616,8 @@
            tooltip_ref="Command_Wearable_Favorites_Tooltip"
            execute_function="Floater.Toggle"
            execute_parameters="fs_wearable_favorites"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showfavwear"
            is_running_function="Floater.IsOpen"
            is_running_parameters="fs_wearable_favorites"
            />
