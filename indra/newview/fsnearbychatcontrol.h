@@ -80,6 +80,7 @@ private:
     void onKeystroke(LLTextEditor* caller);
 
     void drawBackground();
+    void drawBorderOverlay();
     void drawFullHeightCursor();
     void applyTextPadding();
 
