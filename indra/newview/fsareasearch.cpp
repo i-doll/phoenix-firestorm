@@ -219,6 +219,14 @@ bool FSAreaSearch::postBuild()
 
 void FSAreaSearch::onOpen(const LLSD& key)
 {
+    // <FS:Trish> RLVa: Block Area Search usage while @areasearch is active.
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_AREASEARCH))
+    {
+        closeFloater();
+        return;
+    }
+    // </FS:Trish>
+
     if (key.isMap() && key.size() > 0)
     {
         applySlappParams(key);
@@ -467,6 +475,14 @@ void* FSAreaSearch::createPanelOptions(void* data)
 
 void FSAreaSearch::updateRlvRestrictions(ERlvBehaviour behavior)
 {
+    // <FS:Trish> RLVa: Close Area Search immediately when @areasearch is applied.
+    if (behavior == RLV_BHVR_AREASEARCH && gRlvHandler.hasBehaviour(RLV_BHVR_AREASEARCH))
+    {
+        closeFloater();
+        return;
+    }
+    // </FS:Trish>
+
     if (behavior == RLV_BHVR_SHOWNAMES)
     {
         refreshList(false);
