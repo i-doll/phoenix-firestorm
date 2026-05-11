@@ -37,6 +37,7 @@
 #include "llemojihelper.h"
 #include "llfloaterchatmentionpicker.h"
 #include "llfocusmgr.h"
+#include "lllocalcliprect.h"
 #include "llscrollcontainer.h"
 #include "llworld.h"
 #include "rlvactions.h"
@@ -141,6 +142,7 @@ void FSNearbyChatControl::draw()
     applyTextPadding();
     drawBackground();
     LLChatEntry::draw();
+    drawBorderOverlay();
     drawFullHeightCursor();
 }
 
@@ -175,6 +177,28 @@ void FSNearbyChatControl::drawBackground()
 
     LLRect background_rect = getLocalRect();
     background_rect.stretch(-mBackgroundPad);
+
+    // Match LLLineEditor border alignment.
+    background_rect.mTop -= 1;
+    background_rect.mRight -= 1;
+    if (background_rect.getWidth() <= 0 || background_rect.getHeight() <= 0)
+    {
+        return;
+    }
+
+    const F32 alpha = getCurrentTransparency();
+    LLColor4 image_color = LLColor4::white;
+    image_color.setAlpha(alpha);
+    image->draw(background_rect, image_color);
+}
+
+void FSNearbyChatControl::drawBorderOverlay()
+{
+
+    LLRect background_rect = getLocalRect();
+    background_rect.stretch(-mBackgroundPad);
+    background_rect.mTop += 1;
+    background_rect.mRight += 1;
     if (background_rect.getWidth() <= 0 || background_rect.getHeight() <= 0)
     {
         return;
@@ -184,19 +208,27 @@ void FSNearbyChatControl::drawBackground()
     if (hasFocus())
     {
         LLColor4 focus_color = gFocusMgr.getFocusColor();
-        focus_color.setAlpha(alpha);
-        image->drawBorder(
-            background_rect.mLeft,
-            background_rect.mBottom,
-            background_rect.getWidth(),
-            background_rect.getHeight(),
-            focus_color,
-            gFocusMgr.getFocusFlashWidth());
-    }
+        // Match the color of the usual border tint
+        const F32 focus_tint_scale = 0.82f;
+        const F32 focus_alpha_scale = 0.75f;
+        focus_color.mV[0] *= focus_tint_scale;
+        focus_color.mV[1] *= focus_tint_scale;
+        focus_color.mV[2] *= focus_tint_scale;
+        focus_color.setAlpha(alpha * focus_alpha_scale);
 
-    LLColor4 image_color = LLColor4::white;
-    image_color.setAlpha(alpha);
-    image->draw(background_rect, image_color);
+        // Draw focus outline
+        const S32 focus_width = llmax(1, gFocusMgr.getFocusFlashWidth());
+        for (S32 i = 0; i < focus_width; ++i)
+        {
+            LLRect focus_rect = background_rect;
+            focus_rect.stretch(-i);
+            if (focus_rect.getWidth() <= 0 || focus_rect.getHeight() <= 0)
+            {
+                break;
+            }
+            gl_rect_2d(focus_rect, focus_color, false);
+        }
+    }
 
     // LLLineEditor-style subtle inner shade ring.
     if (background_rect.getWidth() > 2 && background_rect.getHeight() > 2)
@@ -207,14 +239,7 @@ void FSNearbyChatControl::drawBackground()
         LLColor4 inner_shade = LLColor4::black;
         const F32 inner_alpha = getReadOnly() ? 0.12f : (hasFocus() ? 0.10f : 0.16f);
         inner_shade.setAlpha(alpha * inner_alpha);
-
-        image->drawBorder(
-            inner_border_rect.mLeft,
-            inner_border_rect.mBottom,
-            inner_border_rect.getWidth(),
-            inner_border_rect.getHeight(),
-            inner_shade,
-            1);
+        gl_rect_2d(inner_border_rect, inner_shade, false);
     }
 }
 
@@ -238,15 +263,31 @@ void FSNearbyChatControl::drawFullHeightCursor()
     LLRect content_rect = mScroller ? mScroller->getContentWindowRect() : getLocalRect();
     cursor_rect.mTop = content_rect.mTop;
     cursor_rect.mBottom = content_rect.mBottom;
+    cursor_rect.intersectWith(content_rect);
 
     LLColor4 cursor_color = mCursorColor.get() % getDrawContext().mAlpha;
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.color4fv(cursor_color.mV);
+    LLLocalClipRect clip(content_rect, true);
     gl_rect_2d(cursor_rect);
 }
 
 void FSNearbyChatControl::applyTextPadding()
 {
+    const S32 right_overlay_clip = 2;
+
+    if (mScroller)
+    {
+        LLRect desired_scroller_rect = getLocalRect();
+        desired_scroller_rect.mRight = llmax(desired_scroller_rect.mLeft,
+                                             desired_scroller_rect.mRight - right_overlay_clip);
+
+        if (mScroller->getRect() != desired_scroller_rect)
+        {
+            mScroller->setRect(desired_scroller_rect);
+        }
+    }
+
     LLRect base_rect = mScroller ? mScroller->getContentWindowRect() : getLocalRect();
 
     const LLRect local_rect = getLocalRect();
