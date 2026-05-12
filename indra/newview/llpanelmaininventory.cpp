@@ -2777,7 +2777,41 @@ bool LLPanelMainInventory::isActionEnabled(const LLSD& userdata)
     // </FS:Ansariel>
     if (command_name == "delete")
     {
-        return getActivePanel()->isSelectionRemovable();
+        LLInventoryPanel* panel = getActivePanel();
+        if (!panel)
+        {
+            return false;
+        }
+
+        LLFolderView* root = panel->getRootFolder();
+        if (!root)
+        {
+            return false;
+        }
+
+        std::set<LLFolderViewItem*> selection_set = root->getSelectionList();
+        if (selection_set.empty())
+        {
+            return false;
+        }
+
+        for (LLFolderViewItem* item : selection_set)
+        {
+            const LLFolderViewModelItem* listener = item ? item->getViewModelItem() : nullptr;
+            if (!listener)
+            {
+                return false;
+            }
+
+            // Keep delete enablement aligned with context-menu delete:
+            // allow worn items/folders and let the delete flow warn as needed.
+            if (!listener->isItemRemovable(false) || listener->isItemInTrash())
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
     if (command_name == "save_texture")
     {
