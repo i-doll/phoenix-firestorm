@@ -890,6 +890,10 @@ bool rlvMenuMainToggleVisible(LLUICtrl* pMenuCtrl)
     LLMenuItemCheckGL* pMenuItem = dynamic_cast<LLMenuItemCheckGL*>(pMenuCtrl);
     if (pMenuItem)
     {
+#if !LL_ALLOW_DISABLE_RLVA
+        // Locked-on build: keep the item visible but uninteractive.
+        pMenuItem->setEnabled(false);
+#endif
         static std::string strLabel = pMenuItem->getLabel();
         if ((bool)gSavedSettings.get<bool>(RlvSettingNames::Main) == rlv_handler_t::isEnabled())
             pMenuItem->setLabel(strLabel);
