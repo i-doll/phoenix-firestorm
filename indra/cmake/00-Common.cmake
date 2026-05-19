@@ -269,7 +269,10 @@ if (LINUX OR DARWIN)
   endif()
 
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wno-stringop-truncation -Wno-stringop-overflow -Wno-parentheses -Wno-maybe-uninitialized -Wno-unused-local-typedefs)
+    # -Wno-error=array-bounds: GCC 15 emits false positives when it speculatively
+    # inlines sibling inline virtual destructors (e.g. ~LLBoostFuncInventoryCallback
+    # in llviewerinventory.h) through a base-class pointer to a smaller derived type.
+    add_compile_options(-Wno-stringop-truncation -Wno-stringop-overflow -Wno-parentheses -Wno-maybe-uninitialized -Wno-unused-local-typedefs -Wno-error=array-bounds)
   endif ()
 
   if (NOT GCC_DISABLE_FATAL_WARNINGS AND NOT CLANG_DISABLE_FATAL_WARNINGS)
