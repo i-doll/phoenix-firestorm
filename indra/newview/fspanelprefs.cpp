@@ -79,6 +79,18 @@ bool FSPanelPrefs::postBuild()
     mCustomScriptDropTarget = getChild<FSEmbeddedItemDropTarget>("custom_script");
     mCustomScriptDropTarget->setDADCallback(boost::bind(&FSPanelPrefs::onDADCustomScript, this, _1));
 
+#if !LL_ALLOW_DISABLE_RLVA
+    // RLVa is locked on in this build; gray out the toggle and its restart hint.
+    if (LLUICtrl* check = findChild<LLUICtrl>("checkMiscRLVa"))
+    {
+        check->setEnabled(false);
+    }
+    if (LLUICtrl* hint = findChild<LLUICtrl>("textMiscRLVaRestart"))
+    {
+        hint->setEnabled(false);
+    }
+#endif
+
     return LLPanelPreference::postBuild();
 }
 

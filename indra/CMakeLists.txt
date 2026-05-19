@@ -101,6 +101,17 @@ endif (FS_PF_USER_AGENT)
 option(USE_NVJPEG2000 "Use NVIDIA nvJPEG2000 CUDA decoder (Linux only)" OFF)
 # </FS:Thea>
 
+# <FS:Thea> Allow disabling RLVa at runtime via the preferences UI.
+# Default OFF: RLVa is locked on and the toggle UI is grayed out.
+option(ALLOW_DISABLE_RLVA "Expose runtime RLVa disable toggle in the preferences UI" OFF)
+if (ALLOW_DISABLE_RLVA)
+    add_compile_definitions(LL_ALLOW_DISABLE_RLVA=1)
+    message(STATUS "RLVa runtime disable toggle is exposed")
+else (ALLOW_DISABLE_RLVA)
+    message(STATUS "RLVa is locked on; runtime disable toggle is grayed out")
+endif (ALLOW_DISABLE_RLVA)
+# </FS:Thea>
+
 # <FS:Ansariel> [AVX Optimization]
 option(USE_AVX_OPTIMIZATION "AVX optimization support" OFF)
 option(USE_AVX2_OPTIMIZATION "AVX2 optimization support" OFF)
