@@ -3456,39 +3456,64 @@ class LLObjectReloadMesh : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         std::set<LLUUID> evicted;
-        for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
-             iter != LLSelectMgr::getInstance()->getSelection()->valid_end();
-             ++iter)
+        std::set<LLViewerObject*> visited_roots;
+
+        auto refresh_volume = [&evicted](LLViewerObject* object)
         {
-            LLViewerObject* object = (*iter)->getObject();
             LLVOVolume* vol = dynamic_cast<LLVOVolume*>(object);
             if (!vol || !vol->isSculpted())
-                continue;
+                return;
 
             LLVolume* volume = vol->getVolume();
             if (!volume)
-                continue;
+                return;
 
             const LLVolumeParams& params = volume->getParams();
             if ((params.getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_MESH)
-                continue;
+                return;
 
             const LLUUID& mesh_id = params.getSculptID();
             if (mesh_id.isNull())
-                continue;
+                return;
 
-            // Cache eviction is per asset; do it once even if many selected
-            // volumes share the same mesh.
+            // Cache eviction is per asset; do it once per unique mesh even if
+            // many prims (in this or another linkset) share it.
             if (evicted.insert(mesh_id).second)
             {
                 gMeshRepo.reloadMesh(mesh_id);
             }
 
-            // Per-volume: clear the unavailable flag (which short-circuits
-            // future loadMesh calls) and re-queue the fetch at the current LOD.
+            // Per-volume: clear the unavailable flag and notify the volume
+            // its mesh changed. notifyMeshLoaded() flips mSculptChanged and
+            // calls markRebuild(REBUILD_GEOMETRY) which drives the rebuild
+            // through setVolume() → gMeshRepo.loadMesh(), and the now-empty
+            // cache forces a fresh server fetch.
             volume->setMeshAssetUnavaliable(false);
-            gMeshRepo.loadMesh(vol, params, vol->getLOD());
-            vol->markForUpdate();
+            vol->notifyMeshLoaded();
+        };
+
+        for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
+             iter != LLSelectMgr::getInstance()->getSelection()->valid_end();
+             ++iter)
+        {
+            LLViewerObject* selected = (*iter)->getObject();
+            if (!selected)
+                continue;
+
+            LLViewerObject* root = selected->getRootEdit();
+            if (!root || !visited_roots.insert(root).second)
+                continue;
+
+            // Walk root + every child so the whole linkset refreshes from a
+            // single click on any prim.
+            refresh_volume(root);
+            LLViewerObject::const_child_list_t& children = root->getChildren();
+            for (LLViewerObject::const_child_list_t::const_iterator child_it = children.begin();
+                 child_it != children.end();
+                 ++child_it)
+            {
+                refresh_volume(*child_it);
+            }
         }
         return true;
     }

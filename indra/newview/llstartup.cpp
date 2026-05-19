@@ -1460,6 +1460,10 @@ bool idle_startup()
         }
 
 // [RLVa:KB] - Checked: RLVa-0.2.1
+#if !LL_ALLOW_DISABLE_RLVA
+        // Locked-on build: ensure the persisted setting matches the locked state.
+        gSavedSettings.set<bool>(RlvSettingNames::Main, true);
+#endif
         if (gSavedSettings.get<bool>(RlvSettingNames::Main))
         {
             RlvHandler::setEnabled(true);
