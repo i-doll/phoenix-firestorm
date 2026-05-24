@@ -246,7 +246,10 @@ if (LINUX OR DARWIN)
     # -Wno-error=array-bounds: GCC 15 emits false positives when it speculatively
     # inlines sibling inline virtual destructors (e.g. ~LLBoostFuncInventoryCallback
     # in llviewerinventory.h) through a base-class pointer to a smaller derived type.
-    add_compile_options(-Wno-stringop-truncation -Wno-parentheses -Wno-maybe-uninitialized -Wno-error=array-bounds)
+    # -Wno-error=sfinae-incomplete: LLInitParam's Lazy<> forward references touch
+    # IsSortable<T> SFINAE before the referenced types are defined (see llxuiparser.cpp
+    # Sequence/Group/Element); GCC 15 promotes this to an error by default.
+    add_compile_options(-Wno-stringop-truncation -Wno-parentheses -Wno-maybe-uninitialized -Wno-error=array-bounds -Wno-error=sfinae-incomplete)
   endif()
 
   if (NOT GCC_DISABLE_FATAL_WARNINGS AND NOT CLANG_DISABLE_FATAL_WARNINGS)
