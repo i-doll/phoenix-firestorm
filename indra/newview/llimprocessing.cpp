@@ -1864,6 +1864,16 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             // should happen after you get an "invitation"
 // [SL:KB] - Patch: Chat-GroupSnooze | Checked: 2012-06-16 (Catznip-3.3)
             //if ( !gIMMgr->hasSession(session_id) )
+            // <FS:Amalthea> Drop late messages for group chats the user just closed,
+            //               to prevent in-flight server messages from re-opening the floater.
+            if (!gIMMgr->hasSession(session_id) &&
+                gAgent.isInGroup(session_id) &&
+                gIMMgr->isRecentlyClosedGroupSession(session_id))
+            {
+                LL_DEBUGS("Messaging") << "Dropping in-flight group IM for recently-closed session " << session_id << LL_ENDL;
+                return;
+            }
+            // </FS:Amalthea>
             if (!gIMMgr->hasSession(session_id) &&
                  (!gAgent.isInGroup(session_id) || LLAvatarActions::isBlocked(from_id) || (!exoGroupMuteList::instance().restoreDeferredGroupChat(session_id) && (!gIMMgr->checkSnoozeExpiration(session_id) || !gIMMgr->restoreSnoozedSession(session_id)) )))
 // [/SL:KB]
