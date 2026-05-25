@@ -499,6 +499,13 @@ public:
     bool restoreSnoozedSession(const LLUUID& session_id);
 // [/SL:KB]
 
+    // <FS:Amalthea> Recently-closed grace period to prevent in-flight messages
+    //               from reopening a group chat the user just closed.
+    void addRecentlyClosedGroupSession(const LLUUID& session_id);
+    bool isRecentlyClosedGroupSession(const LLUUID& session_id);
+    void clearRecentlyClosedGroupSession(const LLUUID& session_id);
+    // </FS:Amalthea>
+
     static LLUUID computeSessionID(EInstantMessage dialog, const LLUUID& other_participant_id);
 
     void clearPendingInvitation(const LLUUID& session_id);
@@ -587,6 +594,11 @@ private:
 // [SL:KB] - Patch: Chat-GroupSnooze | Checked: 2012-06-16 (Catznip-3.3)
     typedef std::map<LLUUID, F64> snoozed_sessions_t;
     snoozed_sessions_t mSnoozedSessions;
+
+    // <FS:Amalthea> Recently-closed grace period
+    typedef std::map<LLUUID, F64> recently_closed_sessions_t;
+    recently_closed_sessions_t mRecentlyClosedGroupSessions;
+    // </FS:Amalthea>
 // [/SL:KB]
 };
 

@@ -3962,6 +3962,14 @@ LLUUID LLIMMgr::addSession(
         return LLUUID::null;
     }
 
+    // <FS:Amalthea> If the user is explicitly opening this session, drop any
+    //               pending close-grace entry so messages flow normally again.
+    {
+        LLUUID computed_id = computeSessionID(dialog, other_participant_id);
+        clearRecentlyClosedGroupSession(computed_id);
+    }
+    // </FS:Amalthea>
+
     if (name.empty())
     {
         LL_WARNS() << "Session name cannot be null!" << LL_ENDL;
@@ -4101,6 +4109,12 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
     else
     {
         LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+        // <FS:Amalthea> Group close: protect against in-flight messages re-opening the floater
+        if (im_session->isGroupSessionType())
+        {
+            addRecentlyClosedGroupSession(session_id);
+        }
+        // </FS:Amalthea>
     }
 // [/SL:KB]
 //  LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
@@ -4339,6 +4353,43 @@ bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
     return false;
 }
 // [/SL:KB]
+
+// <FS:Amalthea> Recently-closed grace period to prevent in-flight messages
+//               from reopening a group chat the user just closed. See
+//               LLIMMgr::leaveSession and the IM_SESSION_SEND case in
+//               LLIMProcessing::processNewMessage.
+void LLIMMgr::addRecentlyClosedGroupSession(const LLUUID& session_id)
+{
+    static LLCachedControl<S32> grace_period(gSavedSettings, "FSGroupChatCloseGracePeriod", 30);
+    if (grace_period <= 0)
+    {
+        return;
+    }
+    F64 expiration = LLTimer::getTotalSeconds() + F64(grace_period);
+    mRecentlyClosedGroupSessions[session_id] = expiration;
+}
+
+bool LLIMMgr::isRecentlyClosedGroupSession(const LLUUID& session_id)
+{
+    recently_closed_sessions_t::iterator it = mRecentlyClosedGroupSessions.find(session_id);
+    if (it == mRecentlyClosedGroupSessions.end())
+    {
+        return false;
+    }
+    if (it->second <= LLTimer::getTotalSeconds())
+    {
+        // Expired - lazy-prune and report not-recently-closed.
+        mRecentlyClosedGroupSessions.erase(it);
+        return false;
+    }
+    return true;
+}
+
+void LLIMMgr::clearRecentlyClosedGroupSession(const LLUUID& session_id)
+{
+    mRecentlyClosedGroupSessions.erase(session_id);
+}
+// </FS:Amalthea>
 
 void LLIMMgr::clearPendingInvitation(const LLUUID& session_id)
 {

@@ -25509,6 +25509,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>900</integer>
     </map>
+    <key>FSGroupChatCloseGracePeriod</key>
+    <map>
+      <key>Comment</key>
+      <string>Time in seconds after closing a group chat during which incoming messages for that group are dropped instead of reopening the floater (prevents in-flight messages from reopening closed group chats). Set to 0 to disable.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>30</integer>
+    </map>
     <key>FSLastSnapshotToFacebookHeight</key>
     <map>
       <key>Comment</key>
