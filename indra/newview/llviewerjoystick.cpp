@@ -47,6 +47,8 @@
 #include "llagentcamera.h"
 #include "llfocusmgr.h"
 #include "llmoveview.h"
+#include "llvoavatarself.h"
+#include "rlvactions.h"
 
 #if LL_WINDOWS && !LL_MESA_HEADLESS
 // Require DirectInput version 8
@@ -1341,6 +1343,39 @@ void LLViewerJoystick::moveFlycam(bool reset)
     }
 
     sFlycamPosition += LLVector3d(sDelta[VX], sDelta[VY], sDelta[VZ]) * sFlycamRotation;
+
+    // [RLVa:Trish] - Enforce avatar distance clamps while flycam is overriding the camera
+    if (RlvActions::isRlvEnabled() && RlvActions::isCameraDistanceClamped() &&
+        (gAgentCamera.cameraThirdPerson() || gAgentCamera.cameraFollow()))
+    {
+        F32 min_dist = 0.f;
+        F32 max_dist = F32_MAX;
+        if (RlvActions::getCameraAvatarDistanceLimits(min_dist, max_dist))
+        {
+            const LLVector3d avatar_cam_pos = gAgent.getPosGlobalFromAgent(
+                (isAgentAvatarValid() && gAgentAvatarp->mHeadp) ? gAgentAvatarp->mHeadp->getWorldPosition() : gAgent.getPositionAgent());
+
+            LLVector3d camera_offset = sFlycamPosition - avatar_cam_pos;
+            const F32 camera_distance = (F32)camera_offset.magVec();
+
+            if (camera_distance > max_dist)
+            {
+                sFlycamPosition = avatar_cam_pos + (max_dist / camera_distance) * camera_offset;
+            }
+            else if (camera_distance < min_dist)
+            {
+                if (camera_distance > F_APPROXIMATELY_ZERO)
+                {
+                    sFlycamPosition = avatar_cam_pos + (min_dist / camera_distance) * camera_offset;
+                }
+                else
+                {
+                    sFlycamPosition = avatar_cam_pos + LLVector3d(LLViewerCamera::getInstance()->getAtAxis()) * min_dist;
+                }
+            }
+        }
+    }
+    // [/RLVa:Trish]
 
     LLMatrix3 rot_mat(sDelta[3], sDelta[4], sDelta[5]);
     sFlycamRotation = LLQuaternion(rot_mat)*sFlycamRotation;
