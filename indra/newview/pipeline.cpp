@@ -4462,6 +4462,11 @@ void LLPipeline::renderHighlights()
 {
     assertInitialized();
 
+    if (gCubeSnapshot || sReflectionRender)
+    {
+        return;
+    }
+
     // Draw 3D UI elements here (before we clear the Z buffer in POOL_HUD)
     // Render highlighted faces.
     LLGLSPipelineAlpha gls_pipeline_alpha;
@@ -4484,8 +4489,13 @@ void LLPipeline::renderHighlights()
 
         // Paint 'em red!
         static const LLColor4 highlight_face_color(1.f, 0.f, 0.f, 0.5f);
+        std::set<LLFace*> rendered_faces;
         for (auto facep : mHighlightFaces)
         {
+            if (!facep || !rendered_faces.insert(facep).second)
+            {
+                continue;
+            }
             facep->renderSelected(LLViewerTexture::sNullImagep, highlight_face_color);
         }
 
@@ -5582,6 +5592,11 @@ void LLPipeline::renderDebug()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
     assertInitialized();
+
+    if (gCubeSnapshot || sReflectionRender)
+    {
+        return;
+    }
 
     bool hud_only = hasRenderType(LLPipeline::RENDER_TYPE_HUD);
 
