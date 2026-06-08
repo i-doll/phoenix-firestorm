@@ -186,7 +186,7 @@ protected:
     item_ref_t mAddedItems;
     item_ref_t mWatchedAssets;
 
-private:
+protected:
     bool mIsDirty;
 };
 
