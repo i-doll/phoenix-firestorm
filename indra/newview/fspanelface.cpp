@@ -109,6 +109,160 @@ static const U32 MATERIAL_ALPHA_CUTOFF_DIRTY = 0x1 << 10;
 
 FSPanelFace::Selection FSPanelFace::sMaterialOverrideSelection;
 
+static bool get_full_permission(const LLSD& te, const std::string& prefix)
+{
+    return te.has(prefix + "itemfullperm") && te[prefix + "itemfullperm"].asBoolean();
+}
+
+static void set_item_availability(
+    const LLUUID& id,
+    LLSD& dest,
+    const std::string& modifier,
+    bool is_creator,
+    std::map<LLUUID, LLUUID>& asset_item_map,
+    LLViewerObject* objectp)
+{
+    if (id.isNull())
+    {
+        return;
+    }
+
+    LLUUID item_id;
+    bool from_library = get_is_predefined_texture(id);
+    bool full_perm = from_library;
+    full_perm |= is_creator;
+
+    if (!full_perm)
+    {
+        std::map<LLUUID, LLUUID>::iterator iter = asset_item_map.find(id);
+        if (iter != asset_item_map.end())
+        {
+            item_id = iter->second;
+        }
+        else
+        {
+            // What this does is simply searches inventory for item with same asset id,
+            // as result it is highly unreliable, leaves little control to user, borderline hack
+            // but there are little options to preserve permissions - multiple inventory
+            // items might reference same asset and inventory search is expensive.
+            bool no_transfer = false;
+            if (objectp->getInventoryItemByAsset(id))
+            {
+                no_transfer = !objectp->getInventoryItemByAsset(id)->getIsFullPerm();
+            }
+            item_id = get_copy_free_item_by_asset_id(id, no_transfer);
+            // record value to avoid repeating inventory search when possible
+            asset_item_map[id] = item_id;
+        }
+    }
+
+    if (item_id.notNull() && gInventory.isObjectDescendentOf(item_id, gInventory.getLibraryRootFolderID()))
+    {
+        full_perm = true;
+        from_library = true;
+    }
+
+    dest[modifier + "itemfullperm"] = full_perm;
+    dest[modifier + "fromlibrary"] = from_library;
+
+    // If full permission object, texture is free to copy,
+    // but otherwise we need to check inventory and extract permissions
+    //
+    // Normally we care only about restrictions for current user and objects
+    // don't inherit any 'next owner' permissions from texture, so there is
+    // no need to record item id if full_perm==true
+    if (!full_perm && item_id.notNull())
+    {
+        LLViewerInventoryItem* itemp = gInventory.getItem(item_id);
+        if (itemp)
+        {
+            LLPermissions item_permissions = itemp->getPermissions();
+            if (item_permissions.allowOperationBy(PERM_COPY, gAgent.getID(), gAgent.getGroupID()))
+            {
+                dest[modifier + "itemid"] = item_id;
+                dest[modifier + "itemfullperm"] = itemp->getIsFullPerm();
+                if (!itemp->isFinished())
+                {
+                    // needed for dropTextureAllFaces
+                    LLInventoryModelBackgroundFetch::instance().start(item_id, false);
+                }
+            }
+        }
+    }
+}
+
+static void get_item_and_permissions(
+    const LLUUID& id,
+    LLViewerInventoryItem*& itemp,
+    bool& full_perm,
+    bool& from_library,
+    const LLSD& data,
+    const std::string& prefix)
+{
+    full_perm = get_full_permission(data, prefix);
+    from_library = data.has(prefix + "fromlibrary") && data.get(prefix + "fromlibrary").asBoolean();
+    LLViewerInventoryItem* itemp_res = NULL;
+
+    if (data.has(prefix + "itemid"))
+    {
+        LLUUID item_id = data.get(prefix + "itemid").asUUID();
+        if (item_id.notNull())
+        {
+            LLViewerInventoryItem* itemp = gInventory.getItem(item_id);
+            if (itemp && itemp->isFinished())
+            {
+                // dropTextureAllFaces will fail if incomplete
+                itemp_res = itemp;
+            }
+            else
+            {
+                // Theoretically shouldn't happen, but if it does happen, we
+                // might need to add a notification to user that paste will fail
+                // since inventory isn't fully loaded
+                LL_WARNS() << "Item " << item_id << " is incomplete, paste might fail silently." << LL_ENDL;
+            }
+        }
+    }
+
+    // for case when item got removed from inventory after we pressed 'copy'
+    // or texture got pasted into previous object
+    if (!itemp_res && !full_perm)
+    {
+        // Due to checks for imageitemid in FSPanelFace::onPasteTexture() this should no longer be reachable.
+        LL_INFOS() << "Item " << data.get(prefix + "itemid").asUUID() << " no longer in inventory." << LL_ENDL;
+        // Todo: fix this, we are often searching same texture multiple times (equal to number of faces)
+        // Perhaps just mPanelFace->onPasteTexture(objectp, te, &asset_to_item_id_map); ? Not pretty, but will work
+        LLViewerInventoryCategory::cat_array_t cats;
+        LLViewerInventoryItem::item_array_t items;
+        LLAssetIDMatches asset_id_matches(id);
+        gInventory.collectDescendentsIf(
+            LLUUID::null,
+            cats,
+            items,
+            LLInventoryModel::INCLUDE_TRASH,
+            asset_id_matches);
+
+        // Extremely unreliable and perfomance unfriendly.
+        // But we need this to check permissions and it is how texture control finds items
+        for (S32 i = 0; i < items.size(); i++)
+        {
+            LLViewerInventoryItem* itemp = items[i];
+            if (itemp && itemp->isFinished())
+            {
+                // dropTextureAllFaces will fail if incomplete
+                LLPermissions item_permissions = itemp->getPermissions();
+                if (item_permissions.allowOperationBy(PERM_COPY, gAgent.getID(), gAgent.getGroupID()))
+                {
+                    itemp_res = itemp;
+                    break; // first match
+                }
+            }
+        }
+    }
+
+    itemp = itemp_res;
+}
+
 void FSPanelFace::updateSelectedGLTFMaterials(std::function<void(LLGLTFMaterial*)> func)
 {
     struct LLSelectedTEGLTFMaterialFunctor : public LLSelectedTEFunctor
@@ -5069,6 +5223,41 @@ void FSPanelFace::onCopyTexture()
                     }
                 }
 
+                LLUUID pbr_id = te_data["te"]["pbr"].asUUID();
+                if (pbr_id.notNull())
+                {
+                    bool is_creator = false;
+                    if (objectp->permCopy()
+                        && objectp->permTransfer()
+                        && objectp->permModify())
+                    {
+                        // If agent created this object and nothing is limiting permissions, mark as full perm
+                        // If agent was granted permission to edit objects owned and created by somebody else, mark full perm
+                        // This check is not perfect since we can't figure out whom textures belong to so this ended up restrictive
+                        std::string creator_app_link;
+                        LLUUID creator_id;
+                        LLSelectMgr::getInstance()->selectGetCreator(creator_id, creator_app_link);
+                        is_creator = objectp->mOwnerID == creator_id;
+                    }
+
+                    set_item_availability(pbr_id, te_data["te"], "pbr", is_creator, asset_item_map, objectp);
+
+                    LLGLTFMaterial* override = tep->getGLTFMaterialOverride();
+                    if (override != nullptr)
+                    {
+                        for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                        {
+                            LLUUID& texture_id = override->mTextureId[i];
+                            if (texture_id.notNull())
+                            {
+                                const std::string prefix = "pbr" + std::to_string(i);
+                                te_data["te"][prefix + "imageid"] = texture_id;
+                                set_item_availability(texture_id, te_data["te"], prefix, is_creator, asset_item_map, objectp);
+                            }
+                        }
+                    }
+                }
+
                 LLMaterialPtr material_ptr = tep->getMaterialParams();
                 if (!material_ptr.isNull())
                 {
@@ -5387,24 +5576,68 @@ void FSPanelFace::onPasteTexture(LLViewerObject* objectp, S32 te)
             // PBR/GLTF
             if (te_data["te"].has("pbr"))
             {
-                objectp->setRenderMaterialID(te, te_data["te"]["pbr"].asUUID(), false /*managing our own update*/);
-                tep->setGLTFMaterialOverride(nullptr);
+                const LLUUID pbr_id = te_data["te"]["pbr"].asUUID();
+                bool pbr_full_perm = false;
+                bool pbr_from_library = false;
+                LLViewerInventoryItem* pbr_itemp_res = NULL;
 
-                LLSD override_data;
-                override_data["object_id"] = objectp->getID();
-                override_data["side"] = te;
+                get_item_and_permissions(pbr_id, pbr_itemp_res, pbr_full_perm, pbr_from_library, te_data["te"], "pbr");
+
+                bool allow = true;
+
+                // check overrides first since they don't need to be moved to inventory
                 if (te_data["te"].has("pbr_override"))
                 {
-                    override_data["gltf_json"] = te_data["te"]["pbr_override"];
+                    for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                    {
+                        const std::string prefix = "pbr" + std::to_string(i);
+                        if (te_data["te"].has(prefix + "imageid"))
+                        {
+                            LLUUID tex_id = te_data["te"][prefix + "imageid"];
+
+                            bool full_perm = false;
+                            bool from_library = false;
+                            LLViewerInventoryItem* itemp_res = NULL;
+                            get_item_and_permissions(tex_id, itemp_res, full_perm, from_library, te_data["te"], prefix);
+                            allow = full_perm;
+                            if (!allow)
+                            {
+                                break;
+                            }
+                        }
+                    }
                 }
-                else
+
+                if (allow)
                 {
-                    override_data["gltf_json"] = "";
+                    if (pbr_itemp_res)
+                    {
+                        allow = LLToolDragAndDrop::handleDropMaterialProtections(
+                            objectp,
+                            pbr_itemp_res,
+                            pbr_from_library ? LLToolDragAndDrop::SOURCE_LIBRARY : LLToolDragAndDrop::SOURCE_AGENT,
+                            pbr_id);
+                    }
+                    else
+                    {
+                        allow = pbr_full_perm;
+                    }
                 }
 
-                override_data["asset_id"] = te_data["te"]["pbr"].asUUID();
+                if (allow)
+                {
+                    objectp->setRenderMaterialID(te, pbr_id, false /*managing our own update*/);
+                    tep->setGLTFMaterialOverride(nullptr);
 
-                LLGLTFMaterialList::queueUpdate(override_data);
+                    if (te_data["te"].has("pbr_override"))
+                    {
+                        LLGLTFMaterialList::queueApply(objectp, te, pbr_id, te_data["te"]["pbr_override"]);
+                    }
+                    else
+                    {
+                        LLGLTFMaterialList::queueApply(objectp, te, pbr_id);
+                    }
+                }
             }
             else
             {
