@@ -3,7 +3,7 @@
 	<menu_item_call label="Condividi" name="Share"/>
 	<menu_item_call label="Apri" name="Task Open"/>
 	<menu_item_call label="Esegui" name="Task Play"/>
-	<menu_item_call label="Proprietà" name="Task Properties"/>
+	<menu_item_call label="ProprietÃ " name="Task Properties"/>
 	<menu_item_call label="Rinomina" name="Task Rename"/>
 	<menu_item_call label="Elimina" name="Task Remove"/>
 	<menu_item_call label="Svuota Cestino" name="Empty Trash"/>
@@ -73,13 +73,15 @@
 	<menu_item_call label="Ripristina oggetto" name="Restore Item"/>
 	<menu_item_call label="Apri" name="Open"/>
 	<menu_item_call label="Apri originale" name="Open Original"/>
-	<menu_item_call label="Proprietà" name="Properties"/>
+	<menu_item_call label="ProprietÃ " name="Properties"/>
 	<menu_item_call label="Rinomina" name="Rename"/>
 	<menu_item_call label="Immagine..." name="thumbnail" />
 	<menu_item_call label="Proteggi" name="ProtectFolder" />
 	<menu_item_call label="Non proteggere" name="UnprotectFolder" />
 	<menu_item_call label="Ricarica cartella" name="ReloadFolder" />
 	<menu_item_call label="Copia UUID elemento" name="Copy Asset UUID"/>
+    <!-- <FS:Trish> Copy inventory path to clipboard. -->
+    <menu_item_call label="Copy Path" name="Copy Path"/>
 	<menu_item_call label="Ripristina ultima posizione" name="Restore to Last Position"/>
 	<menu_item_call label="Mostra in Tutti gli elementi" name="Show in Main Panel"/>
 	<menu_item_call label="Mostra in una nuova finestra" name="Show in new Window" />

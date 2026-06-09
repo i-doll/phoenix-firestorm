@@ -31,23 +31,23 @@
 		<menu_item_call label="新通用層" name="New Universal" />
 		<menu_item_call label="新身體物理" name="New Physics" />
 	</menu>
-	<menu label="新身體部位" name="New Body Parts">
-		<menu_item_call label="新身形" name="New Shape" />
-		<menu_item_call label="新皮膚" name="New Skin" />
-		<menu_item_call label="新頭髮" name="New Hair" />
-		<menu_item_call label="新眼睛" name="New Eyes" />
+	<menu label="æ–°èº«é«”éƒ¨ä½" name="New Body Parts">
+		<menu_item_call label="æ–°èº«å½¢" name="New Shape" />
+		<menu_item_call label="æ–°çš®è†š" name="New Skin" />
+		<menu_item_call label="æ–°é ­é«®" name="New Hair" />
+		<menu_item_call label="æ–°çœ¼ç›" name="New Eyes" />
 	</menu>
-	<menu label="新的環境設定" name="New Settings">
-		<menu_item_call label="新的天空" name="New Sky" />
-		<menu_item_call label="新的水文" name="New Water" />
-		<menu_item_call label="新的晝夜循環" name="New Day Cycle" />
+	<menu label="æ–°çš„ç’°å¢ƒè¨­å®š" name="New Settings">
+		<menu_item_call label="æ–°çš„å¤©ç©º" name="New Sky" />
+		<menu_item_call label="æ–°çš„æ°´æ–‡" name="New Water" />
+		<menu_item_call label="æ–°çš„æ™å¤œå¾ªç’°" name="New Day Cycle" />
 	</menu>
-	<menu label="預設用作" name="upload_def">
-		<menu_item_check label="圖像上傳" name="Image uploads" />
-		<menu_item_check label="聲音上傳" name="Sound uploads" />
-		<menu_item_check label="動畫上傳" name="Animation uploads" />
-		<menu_item_check label="模型上傳" name="Model uploads" />
-		<menu_item_check label="PBR材質上傳" name="PBR uploads" />
+	<menu label="é è¨­ç”¨ä½œ" name="upload_def">
+		<menu_item_check label="åœ–åƒä¸Šå‚³" name="Image uploads" />
+		<menu_item_check label="è²éŸ³ä¸Šå‚³" name="Sound uploads" />
+		<menu_item_check label="å‹•ç•«ä¸Šå‚³" name="Animation uploads" />
+		<menu_item_check label="æ¨¡åž‹ä¸Šå‚³" name="Model uploads" />
+		<menu_item_check label="PBRæè³ªä¸Šå‚³" name="PBR uploads" />
 	</menu>
 	<menu label="變更類型" name="Change Type">
 		<menu_item_call label="預設" name="Default" />

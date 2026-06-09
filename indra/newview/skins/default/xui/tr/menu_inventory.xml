@@ -1,117 +1,119 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <menu name="Popup">
-	<menu_item_call label="İlan oluştur" name="Marketplace Create Listing"/>
-	<menu_item_call label="İlanı ilişkilendir" name="Marketplace Associate Listing"/>
-	<menu_item_call label="İlanı al (yenile)" name="Marketplace Get Listing"/>
-	<menu_item_call label="Hata kontrolü yap" name="Marketplace Check Listing"/>
-	<menu_item_call label="İlanı düzenle" name="Marketplace Edit Listing"/>
+	<menu_item_call label="Ä°lan oluÅŸtur" name="Marketplace Create Listing"/>
+	<menu_item_call label="Ä°lanÄ± iliÅŸkilendir" name="Marketplace Associate Listing"/>
+	<menu_item_call label="Ä°lanÄ± al (yenile)" name="Marketplace Get Listing"/>
+	<menu_item_call label="Hata kontrolÃ¼ yap" name="Marketplace Check Listing"/>
+	<menu_item_call label="Ä°lanÄ± dÃ¼zenle" name="Marketplace Edit Listing"/>
 	<menu_item_call label="Listele" name="Marketplace List"/>
-	<menu_item_call label="Listeden kaldır" name="Marketplace Unlist"/>
-	<menu_item_call label="Etkinleştir" name="Marketplace Activate"/>
-	<menu_item_call label="Devre Dışı Bırak" name="Marketplace Deactivate"/>
-	<menu_item_call label="Paylaş" name="Share"/>
-	<menu_item_call label="Aç" name="Task Open"/>
+	<menu_item_call label="Listeden kaldÄ±r" name="Marketplace Unlist"/>
+	<menu_item_call label="EtkinleÅŸtir" name="Marketplace Activate"/>
+	<menu_item_call label="Devre DÄ±ÅŸÄ± BÄ±rak" name="Marketplace Deactivate"/>
+	<menu_item_call label="PaylaÅŸ" name="Share"/>
+	<menu_item_call label="AÃ§" name="Task Open"/>
 	<menu_item_call label="Oyna" name="Task Play"/>
-	<menu_item_call label="Özellikler" name="Task Properties"/>
-	<menu_item_call label="Yeniden Adlandır" name="Task Rename"/>
+	<menu_item_call label="Ã–zellikler" name="Task Properties"/>
+	<menu_item_call label="Yeniden AdlandÄ±r" name="Task Rename"/>
 	<menu_item_call label="Sil" name="Task Remove"/>
-	<menu_item_call label="Çöpü Boşalt" name="Empty Trash"/>
-	<menu_item_call label="Kaybedip Bulduklarımı Boşalt" name="Empty Lost And Found"/>
-	<menu_item_call label="Yeni Klasör" name="New Folder"/>
-	<menu_item_call label="Yeni Komut Dosyası" name="New Script"/>
-	<menu_item_call label="Yeni Not Kartı" name="New Note"/>
+	<menu_item_call label="Ã‡Ã¶pÃ¼ BoÅŸalt" name="Empty Trash"/>
+	<menu_item_call label="Kaybedip BulduklarÄ±mÄ± BoÅŸalt" name="Empty Lost And Found"/>
+	<menu_item_call label="Yeni KlasÃ¶r" name="New Folder"/>
+	<menu_item_call label="Yeni Komut DosyasÄ±" name="New Script"/>
+	<menu_item_call label="Yeni Not KartÄ±" name="New Note"/>
 	<menu_item_call label="Yeni Mimik" name="New Gesture"/>
 	<menu label="Yeni Giysiler" name="New Clothes">
-		<menu_item_call label="Yeni Gömlek" name="New Shirt"/>
+		<menu_item_call label="Yeni GÃ¶mlek" name="New Shirt"/>
 		<menu_item_call label="Yeni Pantolon" name="New Pants"/>
-		<menu_item_call label="Yeni Ayakkabılar" name="New Shoes"/>
-		<menu_item_call label="Yeni Çoraplar" name="New Socks"/>
+		<menu_item_call label="Yeni AyakkabÄ±lar" name="New Shoes"/>
+		<menu_item_call label="Yeni Ã‡oraplar" name="New Socks"/>
 		<menu_item_call label="Yeni Ceket" name="New Jacket"/>
 		<menu_item_call label="Yeni Etek" name="New Skirt"/>
 		<menu_item_call label="Yeni Eldivenler" name="New Gloves"/>
 		<menu_item_call label="Yeni Fanila" name="New Undershirt"/>
-		<menu_item_call label="Yeni Külot" name="New Underpants"/>
+		<menu_item_call label="Yeni KÃ¼lot" name="New Underpants"/>
 		<menu_item_call label="Yeni Alfa Maskesi" name="New Alpha Mask"/>
-		<menu_item_call label="Yeni Dövme" name="New Tattoo"/>
+		<menu_item_call label="Yeni DÃ¶vme" name="New Tattoo"/>
 		<menu_item_call label="Yeni Evrensel" name="New Universal"/>
 		<menu_item_call label="Yeni Fizik" name="New Physics"/>
 	</menu>
-	<menu label="Yeni Vücut Bölümleri" name="New Body Parts">
-		<menu_item_call label="Yeni Şekil" name="New Shape"/>
-		<menu_item_call label="Yeni Dış Katman" name="New Skin"/>
-		<menu_item_call label="Yeni Saç" name="New Hair"/>
-		<menu_item_call label="Yeni Gözler" name="New Eyes"/>
+	<menu label="Yeni VÃ¼cut BÃ¶lÃ¼mleri" name="New Body Parts">
+		<menu_item_call label="Yeni Åžekil" name="New Shape"/>
+		<menu_item_call label="Yeni DÄ±ÅŸ Katman" name="New Skin"/>
+		<menu_item_call label="Yeni SaÃ§" name="New Hair"/>
+		<menu_item_call label="Yeni GÃ¶zler" name="New Eyes"/>
 	</menu>
 	<menu label="Yeni Ayarlar" name="New Settings">
-		<menu_item_call label="Yeni Gökyüzü" name="New Sky"/>
+		<menu_item_call label="Yeni GÃ¶kyÃ¼zÃ¼" name="New Sky"/>
 		<menu_item_call label="Yeni Su" name="New Water"/>
-		<menu_item_call label="Yeni Gün Döngüsü" name="New Day Cycle"/>
+		<menu_item_call label="Yeni GÃ¼n DÃ¶ngÃ¼sÃ¼" name="New Day Cycle"/>
 	</menu>
-	<menu label="Şunun için varsayılan olarak kullan" name="upload_def">
-		<menu_item_check label="Karşıya yüklenen görüntüler" name="Image uploads"/>
-		<menu_item_check label="Karşıya yüklenen sesler" name="Sound uploads"/>
-		<menu_item_check label="Karşıya yüklenen animasyonlar" name="Animation uploads"/>
-		<menu_item_check label="Karşıya yüklenen modeller" name="Model uploads"/>
+	<menu label="Åžunun iÃ§in varsayÄ±lan olarak kullan" name="upload_def">
+		<menu_item_check label="KarÅŸÄ±ya yÃ¼klenen gÃ¶rÃ¼ntÃ¼ler" name="Image uploads"/>
+		<menu_item_check label="KarÅŸÄ±ya yÃ¼klenen sesler" name="Sound uploads"/>
+		<menu_item_check label="KarÅŸÄ±ya yÃ¼klenen animasyonlar" name="Animation uploads"/>
+		<menu_item_check label="KarÅŸÄ±ya yÃ¼klenen modeller" name="Model uploads"/>
 	</menu>
-	<menu label="Türü Değiştir" name="Change Type">
-		<menu_item_call label="Varsayılan" name="Default"/>
+	<menu label="TÃ¼rÃ¼ DeÄŸiÅŸtir" name="Change Type">
+		<menu_item_call label="VarsayÄ±lan" name="Default"/>
 		<menu_item_call label="Eldivenler" name="Gloves"/>
 		<menu_item_call label="Ceket" name="Jacket"/>
 		<menu_item_call label="Pantolon" name="Pants"/>
-		<menu_item_call label="Şekil" name="Shape"/>
-		<menu_item_call label="Ayakkabılar" name="Shoes"/>
-		<menu_item_call label="Gömlek" name="Shirt"/>
+		<menu_item_call label="Åžekil" name="Shape"/>
+		<menu_item_call label="AyakkabÄ±lar" name="Shoes"/>
+		<menu_item_call label="GÃ¶mlek" name="Shirt"/>
 		<menu_item_call label="Etek" name="Skirt"/>
-		<menu_item_call label="Külot" name="Underpants"/>
+		<menu_item_call label="KÃ¼lot" name="Underpants"/>
 		<menu_item_call label="Fanila" name="Undershirt"/>
 	</menu>
-	<menu_item_call label="Işınla" name="Landmark Open"/>
-	<menu_item_call label="Aç" name="Animation Open"/>
-	<menu_item_call label="Aç" name="Sound Open"/>
-	<menu_item_call label="Mevcut Dış Görünümü Değiştir" name="Replace Outfit"/>
-	<menu_item_call label="Mevcut Dış Görünüme Ekle" name="Add To Outfit"/>
-	<menu_item_call label="Mevcut Dış Görünümden Kaldır" name="Remove From Outfit"/>
-	<menu_item_call label="Dış görünüm listesini panoya kopyala" name="Copy outfit list to clipboard"/>
+	<menu_item_call label="IÅŸÄ±nla" name="Landmark Open"/>
+	<menu_item_call label="AÃ§" name="Animation Open"/>
+	<menu_item_call label="AÃ§" name="Sound Open"/>
+	<menu_item_call label="Mevcut DÄ±ÅŸ GÃ¶rÃ¼nÃ¼mÃ¼ DeÄŸiÅŸtir" name="Replace Outfit"/>
+	<menu_item_call label="Mevcut DÄ±ÅŸ GÃ¶rÃ¼nÃ¼me Ekle" name="Add To Outfit"/>
+	<menu_item_call label="Mevcut DÄ±ÅŸ GÃ¶rÃ¼nÃ¼mden KaldÄ±r" name="Remove From Outfit"/>
+	<menu_item_call label="DÄ±ÅŸ gÃ¶rÃ¼nÃ¼m listesini panoya kopyala" name="Copy outfit list to clipboard"/>
 	<menu_item_call label="Orijinali Bul" name="Find Original"/>
-	<menu_item_call label="Öğeyi Temizle" name="Purge Item"/>
-	<menu_item_call label="Öğeyi Geri Yükle" name="Restore Item"/>
-	<menu_item_call label="Aç" name="Open"/>
-	<menu_item_call label="Orijinali Aç" name="Open Original"/>
-	<menu_item_call label="Özellikler" name="Properties"/>
-	<menu_item_call label="Yeniden Adlandır" name="Rename"/>
-	<menu_item_call label="Varlık UUID&apos;sini Kopyala" name="Copy Asset UUID"/>
-	<menu_item_call label="Ana Bölmede Göster" name="Show in Main Panel"/>
+	<menu_item_call label="Ã–ÄŸeyi Temizle" name="Purge Item"/>
+	<menu_item_call label="Ã–ÄŸeyi Geri YÃ¼kle" name="Restore Item"/>
+	<menu_item_call label="AÃ§" name="Open"/>
+	<menu_item_call label="Orijinali AÃ§" name="Open Original"/>
+	<menu_item_call label="Ã–zellikler" name="Properties"/>
+	<menu_item_call label="Yeniden AdlandÄ±r" name="Rename"/>
+	<menu_item_call label="VarlÄ±k UUID&apos;sini Kopyala" name="Copy Asset UUID"/>
+    <!-- <FS:Trish> Copy inventory path to clipboard. -->
+    <menu_item_call label="Copy Path" name="Copy Path"/>
+	<menu_item_call label="Ana BÃ¶lmede GÃ¶ster" name="Show in Main Panel"/>
 	<menu_item_call label="Kes" name="Cut"/>
 	<menu_item_call label="Kopyala" name="Copy"/>
-	<menu_item_call label="Yapıştır" name="Paste"/>
-	<menu_item_call label="Bağlantı Olarak Yapıştır" name="Paste As Link"/>
-	<menu_item_call label="Bağlantıları Değiştir" name="Replace Links"/>
+	<menu_item_call label="YapÄ±ÅŸtÄ±r" name="Paste"/>
+	<menu_item_call label="BaÄŸlantÄ± Olarak YapÄ±ÅŸtÄ±r" name="Paste As Link"/>
+	<menu_item_call label="BaÄŸlantÄ±larÄ± DeÄŸiÅŸtir" name="Replace Links"/>
 	<menu_item_call label="Sil" name="Delete"/>
-	<menu_item_call label="Sistem Klasörünü Sil" name="Delete System Folder"/>
-	<menu_item_call label="Konferans Sohbeti Başlat" name="Conference Chat Folder"/>
+	<menu_item_call label="Sistem KlasÃ¶rÃ¼nÃ¼ Sil" name="Delete System Folder"/>
+	<menu_item_call label="Konferans Sohbeti BaÅŸlat" name="Conference Chat Folder"/>
 	<menu_item_call label="Oyna" name="Sound Play"/>
 	<menu_item_call label="SLurl&apos;i Kopyala" name="url_copy"/>
-	<menu_item_call label="Yer İmi Hakkında" name="About Landmark"/>
-	<menu_item_call label="Haritada Göster" name="show_on_map"/>
-	<menu_item_call label="SL Dünyasında Oynat" name="Animation Play"/>
+	<menu_item_call label="Yer Ä°mi HakkÄ±nda" name="About Landmark"/>
+	<menu_item_call label="Haritada GÃ¶ster" name="show_on_map"/>
+	<menu_item_call label="SL DÃ¼nyasÄ±nda Oynat" name="Animation Play"/>
 	<menu_item_call label="Yerel Olarak Oynat" name="Animation Audition"/>
-	<menu_item_call label="Anlık İleti Gönder" name="Send Instant Message"/>
-	<menu_item_call label="Işınlama Teklif Et..." name="Offer Teleport..."/>
-	<menu_item_call label="Konferans Sohbeti Başlat" name="Conference Chat"/>
-	<menu_item_call label="Etkinleştir" name="Activate"/>
-	<menu_item_call label="Devre Dışı Bırak" name="Deactivate"/>
-	<menu_item_call label="Farklı Kaydet" name="Save As"/>
-	<menu_item_call label="Kendinizden Ayırın" name="Detach From Yourself"/>
+	<menu_item_call label="AnlÄ±k Ä°leti GÃ¶nder" name="Send Instant Message"/>
+	<menu_item_call label="IÅŸÄ±nlama Teklif Et..." name="Offer Teleport..."/>
+	<menu_item_call label="Konferans Sohbeti BaÅŸlat" name="Conference Chat"/>
+	<menu_item_call label="EtkinleÅŸtir" name="Activate"/>
+	<menu_item_call label="Devre DÄ±ÅŸÄ± BÄ±rak" name="Deactivate"/>
+	<menu_item_call label="FarklÄ± Kaydet" name="Save As"/>
+	<menu_item_call label="Kendinizden AyÄ±rÄ±n" name="Detach From Yourself"/>
 	<menu_item_call label="Giy" name="Wearable And Object Wear"/>
-	<menu label="Şuna Ekle:" name="Attach To"/>
-	<menu label="BÜG&apos;e Ekle" name="Attach To HUD"/>
+	<menu label="Åžuna Ekle:" name="Attach To"/>
+	<menu label="BÃœG&apos;e Ekle" name="Attach To HUD"/>
 	<menu_item_call label="Dokun" name="Attachment Touch" />
-	<menu_item_call label="Düzenle" name="Wearable Edit"/>
+	<menu_item_call label="DÃ¼zenle" name="Wearable Edit"/>
 	<menu_item_call label="Ekle" name="Wearable Add"/>
-	<menu_item_call label="Çıkar" name="Take Off"/>
+	<menu_item_call label="Ã‡Ä±kar" name="Take Off"/>
 	<menu_item_call label="Sadece Kendime Uygula" name="Settings Apply Local"/>
 	<menu_item_call label="Parsele Uygula" name="Settings Apply Parcel"/>
-	<menu_item_call label="Pazaryeri İlanlarına Kopyala" name="Marketplace Copy"/>
-	<menu_item_call label="Pazaryeri İlanlarına Taşı" name="Marketplace Move"/>
-	<menu_item_call label="--seçenek yok--" name="--no options--"/>
+	<menu_item_call label="Pazaryeri Ä°lanlarÄ±na Kopyala" name="Marketplace Copy"/>
+	<menu_item_call label="Pazaryeri Ä°lanlarÄ±na TaÅŸÄ±" name="Marketplace Move"/>
+	<menu_item_call label="--seÃ§enek yok--" name="--no options--"/>
 </menu>
