@@ -31,28 +31,28 @@
 		<menu_item_call label="新しいユニバーサル" name="New Universal"/>
 		<menu_item_call label="新しい物理作用" name="New Physics"/>
 	</menu>
-	<menu label="新しい身体部位" name="New Body Parts">
-		<menu_item_call label="新しいシェイプ（体型）" name="New Shape"/>
-		<menu_item_call label="新しいスキン" name="New Skin"/>
-		<menu_item_call label="新しい髪" name="New Hair"/>
-		<menu_item_call label="新しい目" name="New Eyes"/>
+	<menu label="æ–°ã—ã„èº«ä½“éƒ¨ä½" name="New Body Parts">
+		<menu_item_call label="æ–°ã—ã„ã‚·ã‚§ã‚¤ãƒ—ï¼ˆä½“åž‹ï¼‰" name="New Shape"/>
+		<menu_item_call label="æ–°ã—ã„ã‚¹ã‚­ãƒ³" name="New Skin"/>
+		<menu_item_call label="æ–°ã—ã„é«ª" name="New Hair"/>
+		<menu_item_call label="æ–°ã—ã„ç›®" name="New Eyes"/>
 	</menu>
-	<menu label="新しい自然環境の設定" name="New Settings">
-		<menu_item_call label="新しい空" name="New Sky"/>
-		<menu_item_call label="新しい水面" name="New Water"/>
-		<menu_item_call label="新しいデイサイクル" name="New Day Cycle"/>
+	<menu label="æ–°ã—ã„è‡ªç„¶ç’°å¢ƒã®è¨­å®š" name="New Settings">
+		<menu_item_call label="æ–°ã—ã„ç©º" name="New Sky"/>
+		<menu_item_call label="æ–°ã—ã„æ°´é¢" name="New Water"/>
+		<menu_item_call label="æ–°ã—ã„ãƒ‡ã‚¤ã‚µã‚¤ã‚¯ãƒ«" name="New Day Cycle"/>
 	</menu>
-	<menu label="種類を変更" name="Change Type">
-		<menu_item_call label="デフォルト" name="Default"/>
-		<menu_item_call label="手袋" name="Gloves"/>
-		<menu_item_call label="ジャケット" name="Jacket"/>
-		<menu_item_call label="ズボン" name="Pants"/>
-		<menu_item_call label="シェイプ" name="Shape"/>
-		<menu_item_call label="靴" name="Shoes"/>
-		<menu_item_call label="シャツ" name="Shirt"/>
-		<menu_item_call label="スカート" name="Skirt"/>
-		<menu_item_call label="下着（上半身）" name="Underpants"/>
-		<menu_item_call label="下着（下半身）" name="Undershirt"/>
+	<menu label="ç¨®é¡žã‚’å¤‰æ›´" name="Change Type">
+		<menu_item_call label="ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆ" name="Default"/>
+		<menu_item_call label="æ‰‹è¢‹" name="Gloves"/>
+		<menu_item_call label="ã‚¸ãƒ£ã‚±ãƒƒãƒˆ" name="Jacket"/>
+		<menu_item_call label="ã‚ºãƒœãƒ³" name="Pants"/>
+		<menu_item_call label="ã‚·ã‚§ã‚¤ãƒ—" name="Shape"/>
+		<menu_item_call label="é´" name="Shoes"/>
+		<menu_item_call label="ã‚·ãƒ£ãƒ„" name="Shirt"/>
+		<menu_item_call label="ã‚¹ã‚«ãƒ¼ãƒˆ" name="Skirt"/>
+		<menu_item_call label="ä¸‹ç€ï¼ˆä¸ŠåŠèº«ï¼‰" name="Underpants"/>
+		<menu_item_call label="ä¸‹ç€ï¼ˆä¸‹åŠèº«ï¼‰" name="Undershirt"/>
 	</menu>
 	<menu_item_call label="テレポート" name="Landmark Open"/>
 	<menu_item_call label="開く" name="Animation Open"/>
