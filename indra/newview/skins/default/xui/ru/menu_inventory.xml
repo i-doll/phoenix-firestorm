@@ -30,35 +30,35 @@
 		<menu_item_call label="Новый универсальный" name="New Universal"/>
 		<menu_item_call label="Новая физика" name="New Physics"/>
 	</menu>
-	<menu label="Новая часть тела" name="New Body Parts">
-		<menu_item_call label="Новая фигура" name="New Shape"/>
-		<menu_item_call label="Новая кожа" name="New Skin"/>
-		<menu_item_call label="Новые волосы" name="New Hair"/>
-		<menu_item_call label="Новые глаза" name="New Eyes"/>
+	<menu label="ÐÐ¾Ð²Ð°Ñ Ñ‡Ð°ÑÑ‚ÑŒ Ñ‚ÐµÐ»Ð°" name="New Body Parts">
+		<menu_item_call label="ÐÐ¾Ð²Ð°Ñ Ñ„Ð¸Ð³ÑƒÑ€Ð°" name="New Shape"/>
+		<menu_item_call label="ÐÐ¾Ð²Ð°Ñ ÐºÐ¾Ð¶Ð°" name="New Skin"/>
+		<menu_item_call label="ÐÐ¾Ð²Ñ‹Ðµ Ð²Ð¾Ð»Ð¾ÑÑ‹" name="New Hair"/>
+		<menu_item_call label="ÐÐ¾Ð²Ñ‹Ðµ Ð³Ð»Ð°Ð·Ð°" name="New Eyes"/>
 	</menu>
-	<menu label="Новые Настройки" name="New Settings">
-		<menu_item_call label="Новое Небо" name="New Sky"/>
-		<menu_item_call label="Новая Вода" name="New Water"/>
-		<menu_item_call label="Новый Цикл дня" name="New Day Cycle"/>
+	<menu label="ÐÐ¾Ð²Ñ‹Ðµ ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸" name="New Settings">
+		<menu_item_call label="ÐÐ¾Ð²Ð¾Ðµ ÐÐµÐ±Ð¾" name="New Sky"/>
+		<menu_item_call label="ÐÐ¾Ð²Ð°Ñ Ð’Ð¾Ð´Ð°" name="New Water"/>
+		<menu_item_call label="ÐÐ¾Ð²Ñ‹Ð¹ Ð¦Ð¸ÐºÐ» Ð´Ð½Ñ" name="New Day Cycle"/>
 	</menu>
-	<menu label="Использовать для" name="upload_def">
-		<menu_item_check label="загрузок Изображений" name="Image uploads"/>
-		<menu_item_check label="загрузок Звуков" name="Sound uploads"/>
-		<menu_item_check label="загрузок Анимаций" name="Animation uploads"/>
-		<menu_item_check label="загрузок Моделей" name="Model uploads"/>
-		<menu_item_check label="загрузок Материалов PBR" name="PBR uploads"/>
+	<menu label="Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ð´Ð»Ñ" name="upload_def">
+		<menu_item_check label="Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¾Ðº Ð˜Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ð¹" name="Image uploads"/>
+		<menu_item_check label="Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¾Ðº Ð—Ð²ÑƒÐºÐ¾Ð²" name="Sound uploads"/>
+		<menu_item_check label="Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¾Ðº ÐÐ½Ð¸Ð¼Ð°Ñ†Ð¸Ð¹" name="Animation uploads"/>
+		<menu_item_check label="Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¾Ðº ÐœÐ¾Ð´ÐµÐ»ÐµÐ¹" name="Model uploads"/>
+		<menu_item_check label="Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¾Ðº ÐœÐ°Ñ‚ÐµÑ€Ð¸Ð°Ð»Ð¾Ð² PBR" name="PBR uploads"/>
 	</menu>
-	<menu label="Изменить тип" name="Change Type">
-		<menu_item_call label="По умолчанию" name="Default"/>
-		<menu_item_call label="Перчатки" name="Gloves"/>
-		<menu_item_call label="Куртка" name="Jacket"/>
-		<menu_item_call label="Штаны" name="Pants"/>
-		<menu_item_call label="Фигура" name="Shape"/>
-		<menu_item_call label="Обувь" name="Shoes"/>
-		<menu_item_call label="Рубашка" name="Shirt"/>
-		<menu_item_call label="Юбка" name="Skirt"/>
-		<menu_item_call label="Трусы" name="Underpants"/>
-		<menu_item_call label="Майка" name="Undershirt"/>
+	<menu label="Ð˜Ð·Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ñ‚Ð¸Ð¿" name="Change Type">
+		<menu_item_call label="ÐŸÐ¾ ÑƒÐ¼Ð¾Ð»Ñ‡Ð°Ð½Ð¸ÑŽ" name="Default"/>
+		<menu_item_call label="ÐŸÐµÑ€Ñ‡Ð°Ñ‚ÐºÐ¸" name="Gloves"/>
+		<menu_item_call label="ÐšÑƒÑ€Ñ‚ÐºÐ°" name="Jacket"/>
+		<menu_item_call label="Ð¨Ñ‚Ð°Ð½Ñ‹" name="Pants"/>
+		<menu_item_call label="Ð¤Ð¸Ð³ÑƒÑ€Ð°" name="Shape"/>
+		<menu_item_call label="ÐžÐ±ÑƒÐ²ÑŒ" name="Shoes"/>
+		<menu_item_call label="Ð ÑƒÐ±Ð°ÑˆÐºÐ°" name="Shirt"/>
+		<menu_item_call label="Ð®Ð±ÐºÐ°" name="Skirt"/>
+		<menu_item_call label="Ð¢Ñ€ÑƒÑÑ‹" name="Underpants"/>
+		<menu_item_call label="ÐœÐ°Ð¹ÐºÐ°" name="Undershirt"/>
 	</menu>
 	<menu_item_call label="Телепорт" name="Landmark Open"/>
 	<menu_item_call label="Проиграть" name="Animation Open"/>

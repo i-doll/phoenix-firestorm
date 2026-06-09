@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <menu name="Popup">
 	<menu_item_call label="Teilen" name="Share"/>
-	<menu_item_call label="Öffnen" name="Task Open"/>
+	<menu_item_call label="Ã–ffnen" name="Task Open"/>
 	<menu_item_call label="Abspielen" name="Task Play"/>
 	<menu_item_call label="Eigenschaften" name="Task Properties"/>
 	<menu_item_call label="Umbenennen" name="Task Rename"/>
-	<menu_item_call label="Löschen" name="Task Remove"/>
+	<menu_item_call label="LÃ¶schen" name="Task Remove"/>
 	<menu_item_call label="Papierkorb ausleeren" name="Empty Trash"/>
-	<menu_item_call label="Fundstücke ausleeren" name="Empty Lost And Found"/>
+	<menu_item_call label="FundstÃ¼cke ausleeren" name="Empty Lost And Found"/>
 	<menu_item_call label="Neuer Ordner" name="New Folder"/>
 	<menu_item_call label="Neuer Ordner" name="New Listing Folder"/>
 	<menu_item_call label="Neuer Ordner" name="New Outfit Folder"/>
@@ -27,11 +27,11 @@
 		<menu_item_call label="Neues Unterhemd" name="New Undershirt"/>
 		<menu_item_call label="Neue Unterhose" name="New Underpants"/>
 		<menu_item_call label="Neue Alpha-Maske" name="New Alpha Mask"/>
-		<menu_item_call label="Neue Tätowierung" name="New Tattoo"/>
+		<menu_item_call label="Neue TÃ¤towierung" name="New Tattoo"/>
 		<menu_item_call label="Neues Universal" name="New Universal"/>
 		<menu_item_call label="Neue Physik" name="New Physics"/>
 	</menu>
-	<menu label="Neue Körperteile" name="New Body Parts">
+	<menu label="Neue KÃ¶rperteile" name="New Body Parts">
 		<menu_item_call label="Neue Form/Gestalt" name="New Shape"/>
 		<menu_item_call label="Neue Haut" name="New Skin"/>
 		<menu_item_call label="Neues Haar" name="New Hair"/>
@@ -42,7 +42,7 @@
 		<menu_item_call label="Neues Wasser" name="New Water"/>
 		<menu_item_call label="Neuer Tageszyklus" name="New Day Cycle"/>
 	</menu>
-	<menu label="Als Standard verwenden für" name="upload_def">
+	<menu label="Als Standard verwenden fÃ¼r" name="upload_def">
 		<menu_item_check label="Hochgeladene Bilder" name="Image uploads"/>
 		<menu_item_check label="Hochgeladene Sounds" name="Sound uploads"/>
 		<menu_item_check label="Hochgeladene Animationen" name="Animation uploads"/>
@@ -50,8 +50,8 @@
 		<menu_item_check label="Hochgeladene PBR-Materialien" name="PBR uploads"/>
 	</menu>
 	<menu_item_call label="Als Favoriten-Ordner verwenden" name="Set Favorites folder"/>
-	<menu_item_call label="Favoriten-Ordner zurücksetzen" name="Reset Favorites folder"/>
-	<menu label="Typ ändern" name="Change Type">
+	<menu_item_call label="Favoriten-Ordner zurÃ¼cksetzen" name="Reset Favorites folder"/>
+	<menu label="Typ Ã¤ndern" name="Change Type">
 		<menu_item_call label="Standard" name="Default"/>
 		<menu_item_call label="Handschuhe" name="Gloves"/>
 		<menu_item_call label="Jacke" name="Jacket"/>
@@ -64,25 +64,27 @@
 		<menu_item_call label="Unterhemd" name="Undershirt"/>
 	</menu>
 	<menu_item_call label="Teleportieren" name="Landmark Open"/>
-	<menu_item_call label="Öffnen" name="Animation Open"/>
-	<menu_item_call label="Öffnen" name="Sound Open"/>
+	<menu_item_call label="Ã–ffnen" name="Animation Open"/>
+	<menu_item_call label="Ã–ffnen" name="Sound Open"/>
 	<menu_item_call label="Aktuelles Outfit ersetzen" name="Replace Outfit"/>
-	<menu_item_call label="Zum aktuellen Outfit hinzufügen" name="Add To Outfit"/>
+	<menu_item_call label="Zum aktuellen Outfit hinzufÃ¼gen" name="Add To Outfit"/>
     <menu_item_call label="Objekte anziehen" name="Wear Items"/>
 	<menu_item_call label="Vom aktuellen Outfit entfernen" name="Remove From Outfit"/>
 	<menu_item_call label="Outfitliste in Zwischenablage kopieren" name="Copy outfit list to clipboard"/>
 	<menu_item_call label="Original suchen" name="Find Original"/>
-	<menu_item_call label="Objekt löschen" name="Purge Item"/>
+	<menu_item_call label="Objekt lÃ¶schen" name="Purge Item"/>
 	<menu_item_call label="Objekt wiederherstellen" name="Restore Item"/>
-	<menu_item_call label="Öffnen" name="Open"/>
-	<menu_item_call label="Original öffnen" name="Open Original"/>
+	<menu_item_call label="Ã–ffnen" name="Open"/>
+	<menu_item_call label="Original Ã¶ffnen" name="Open Original"/>
 	<menu_item_call label="Eigenschaften" name="Properties"/>
 	<menu_item_call label="Umbenennen" name="Rename"/>
 	<menu_item_call label="Abbildung..." name="thumbnail"/>
-	<menu_item_call label="Schützen" name="ProtectFolder"/>
+	<menu_item_call label="SchÃ¼tzen" name="ProtectFolder"/>
 	<menu_item_call label="Schutz aufheben" name="UnprotectFolder"/>
 	<menu_item_call label="Ordner neu laden" name="ReloadFolder"/>
 	<menu_item_call label="Asset-UUID kopieren" name="Copy Asset UUID"/>
+    <!-- <FS:Trish> Copy inventory path to clipboard. -->
+    <menu_item_call label="Copy Path" name="Copy Path"/>
 	<menu_item_call label="UUID kopieren" name="Copy UUID"/>
 	<menu_item_call label="Wiederherstellen an letzter Position" name="Restore to Last Position"/>
 	<menu_item_call label="Kopieren" name="Copy"/>
@@ -97,11 +99,11 @@
 	</menu>
 	<menu_item_call label="Löschen" name="Delete"/>
 	<menu_item_call label="In Standardordner verschieben" name="Move to Default Folder"/>
-	<menu_item_call label="In Fundbüro verschieben" name="Move to Lost And Found"/>
-	<menu_item_call label="Systemordner löschen" name="Delete System Folder"/>
+	<menu_item_call label="In FundbÃ¼ro verschieben" name="Move to Lost And Found"/>
+	<menu_item_call label="Systemordner lÃ¶schen" name="Delete System Folder"/>
 	<menu_item_call label="Neuen Ordner aus Auswahl erstellen" name="New folder from selected"/>
 	<menu_item_call label="Gruppierung durch den Ordner aufheben" name="Ungroup folder items"/>
-	<menu_item_call label="Zu Favoriten hinzufügen" name="Add to Favorites"/>
+	<menu_item_call label="Zu Favoriten hinzufÃ¼gen" name="Add to Favorites"/>
 	<menu_item_call label="Aus Favoriten entfernen" name="Remove from Favorites"/>
 	<menu_item_call label="Konferenz-Chat starten" name="Conference Chat Folder"/>
 	<menu_item_call label="Abspielen" name="PlayGesture"/>
@@ -119,17 +121,17 @@
 	<menu_item_call label="Deaktivieren" name="Deactivate"/>
 	<menu_item_call label="Speichern unter" name="Save As"/>
 	<menu_item_call label="Speichern nach" name="Save Selected As"/>
-	<menu_item_call label="Von Körper abnehmen" name="Detach From Yourself"/>
+	<menu_item_call label="Von KÃ¶rper abnehmen" name="Detach From Yourself"/>
 	<menu_item_call label="Anziehen" name="Wearable And Object Wear"/>
-	<menu label="Anhängen an" name="Attach To"/>
-	<menu label="An HUD hängen" name="Attach To HUD"/>
-	<menu_item_call label="Berühren" name="Attachment Touch" />
+	<menu label="AnhÃ¤ngen an" name="Attach To"/>
+	<menu label="An HUD hÃ¤ngen" name="Attach To HUD"/>
+	<menu_item_call label="BerÃ¼hren" name="Attachment Touch" />
 	<menu_item_call label="Bearbeiten" name="Wearable Edit"/>
 	<menu_item_call label="In Gesamtansicht anzeigen" name="Show in Main Panel"/>
 	<menu_item_call label="In neuem Fenster anzeigen" name="Show in new Window"/>
-	<menu_item_call label="Öffnen" name="open_in_current_window"/>
-	<menu_item_call label="In neuem Fenster öffnen" name="open_in_new_window"/>
-	<menu_item_call label="Hinzufügen" name="Wearable Add"/>
+	<menu_item_call label="Ã–ffnen" name="open_in_current_window"/>
+	<menu_item_call label="In neuem Fenster Ã¶ffnen" name="open_in_new_window"/>
+	<menu_item_call label="HinzufÃ¼gen" name="Wearable Add"/>
 	<menu_item_call label="Texturen aktualisieren" name="Texture Refresh Attachment"/>
 	<menu_item_call label="Ausziehen" name="Take Off"/>
 	<menu_item_call label="Nur auf mich anwenden" name="Settings Apply Local"/>

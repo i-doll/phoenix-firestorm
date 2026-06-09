@@ -171,6 +171,75 @@ bool isPanelActive(const std::string& panel_name)
     return (active_panel && (active_panel->getName() == panel_name));
 }
 
+// <FS:Trish> Build a clipboard-friendly inventory path for folders and items.
+std::string getInventoryPathString(const LLInventoryObject* object)
+{
+    if (!object)
+    {
+        return std::string();
+    }
+
+    const LLUUID root_id = gInventory.getRootFolderID();
+    const LLUUID library_root_id = gInventory.getLibraryRootFolderID();
+    if (object->getUUID() == root_id || object->getUUID() == library_root_id)
+    {
+        return std::string();
+    }
+
+    std::vector<std::string> components;
+    std::set<LLUUID> visited_ids;
+    const LLInventoryObject* current = object;
+
+    while (current)
+    {
+        if (!visited_ids.insert(current->getUUID()).second)
+        {
+            break;
+        }
+
+        const std::string& name = current->getName();
+        if (!name.empty())
+        {
+            components.push_back(name);
+        }
+
+        const LLUUID parent_id = current->getParentUUID();
+        if (parent_id.isNull() || parent_id == root_id || parent_id == library_root_id)
+        {
+            break;
+        }
+
+        current = gInventory.getObject(parent_id);
+    }
+
+    if (components.empty())
+    {
+        return std::string();
+    }
+
+    std::string path;
+    for (std::vector<std::string>::const_reverse_iterator it = components.rbegin(); it != components.rend(); ++it)
+    {
+        if (!path.empty())
+        {
+            path.push_back('/');
+        }
+        path += *it;
+    }
+
+    return path;
+}
+
+void copyInventoryPathToClipboard(const LLInventoryObject* object)
+{
+    const std::string path = getInventoryPathString(object);
+    if (!path.empty())
+    {
+        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(path));
+    }
+}
+// </FS:Trish>
+
 // Used by LLFolderBridge as callback for directory fetching recursion
 class LLRightClickInventoryFetchDescendentsObserver : public LLInventoryFetchDescendentsObserver
 {
@@ -1030,6 +1099,21 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                     disabled_items.push_back(std::string("Copy Asset UUID"));
                 }
             }
+
+            // <FS:Trish> Copy the selected item's inventory path.
+            if (obj->getType() != LLAssetType::AT_CATEGORY)
+            {
+                const std::string path = getInventoryPathString(obj);
+                if (!path.empty())
+                {
+                    items.push_back(std::string("Copy Path"));
+                    if ((flags & FIRST_SELECTED_ITEM) == 0)
+                    {
+                        disabled_items.push_back(std::string("Copy Path"));
+                    }
+                }
+            }
+            // </FS:Trish>
 
             if(!single_folder_root)
             {
@@ -2034,6 +2118,13 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         return;
     }
     // </FS:MJR> [FIRE-36793]
+    // <FS:Trish> Copy the selected item's inventory path.
+    else if ("copy_path" == action)
+    {
+        copyInventoryPathToClipboard(getInventoryObject());
+        return;
+    }
+    // </FS:Trish>
     else if ("show_in_main_panel" == action)
     {
         LLInventoryPanel::openInventoryPanelAndSetSelection(true, mUUID, true);
@@ -4204,6 +4295,13 @@ void LLFolderBridge::performAction(LLInventoryModel* model, std::string action)
         gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(mUUID.asString()));
         return;
     }
+    // <FS:Trish> Copy the selected folder's inventory path.
+    else if ("copy_path" == action)
+    {
+        copyInventoryPathToClipboard(getInventoryObject());
+        return;
+    }
+    // </FS:Trish>
     // <FS:Ansariel> FIRE-29342: Protect folder option
     else if ("protect_folder" == action)
     {
@@ -5307,6 +5405,18 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
             items.push_back(std::string("Copy UUID"));
         }
     }
+
+    // <FS:Trish> Offer path copy for selectable folders/items.
+    const std::string path = getInventoryPathString(getInventoryObject());
+    if (!path.empty())
+    {
+        items.push_back(std::string("Copy Path"));
+        if ((flags & FIRST_SELECTED_ITEM) == 0)
+        {
+            disabled_items.push_back(std::string("Copy Path"));
+        }
+    }
+    // </FS:Trish>
 
     // <FS:AH/SJ> Don't offer sharing of trash folder (FIRE-1642, FIRE-6547)
     //if (isAgentInventory() && !isMarketplaceListingsFolder())
