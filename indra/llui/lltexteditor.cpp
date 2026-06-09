@@ -921,7 +921,7 @@ bool LLTextEditor::handleRightMouseDown(S32 x, S32 y, MASK mask)
 
     if (show_menu && getShowContextMenu())
     {
-        showContextMenu(x, y);
+        showContextMenu(x, y, true);
     }
 
     return true;
