@@ -283,7 +283,6 @@ public:
 
     /*virtual*/ bool            canEdit() const { return false; }
 
-
     /*virtual*/ bool            handleHover(S32 x, S32 y, MASK mask)
     {
         LLUI::getInstance()->getWindow()->setCursor(UI_CURSOR_HAND);
@@ -1473,4 +1472,3 @@ bool LLViewerTextEditor::exportBuffer( std::string& buffer )
 
     return true;
 }
-
