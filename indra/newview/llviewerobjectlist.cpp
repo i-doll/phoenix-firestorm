@@ -562,7 +562,7 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
         objectp->setLastUpdateType(OUT_FULL_COMPRESSED); //newly cached
         objectp->setLastUpdateCached(true);
     }
-    LLVOAvatar::cullAvatarsByPixelArea();
+    LLVOAvatar::setCullNeedsUpdate();
 
     // <FS:Trish> Parcel derender
     if (justCreated)
@@ -950,7 +950,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         // </FS:Trish>
     }
 
-    LLVOAvatar::cullAvatarsByPixelArea();
+    LLVOAvatar::setCullNeedsUpdate();
 }
 
 void LLViewerObjectList::processCompressedObjectUpdate(LLMessageSystem *mesgsys,
