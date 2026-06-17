@@ -1715,10 +1715,21 @@ F32 LLAgent::clampYawToLimits(F32 angle)
 // [RLVa:KB] - @setcam_yaw + sitting mouselook yaw limit
     if (isAgentAvatarValid() && gAgentAvatarp->getParent() && gAgentCamera.cameraMouselook())
     {
-        // Determine the effective yaw half-range: hardcoded 90° or RLVa value, whichever is tighter
-        F32 yaw_limit = F_PI_BY_TWO;
+        // The hardcoded 90° seated-yaw cap is user-gateable; RLVa @setcam_yaw is always enforced.
+        static LLCachedControl<bool> limitSeatedYaw(gSavedSettings, "IDLimitSeatedYaw", true);
+
         F32 rlvYawHalfRange = 0.f;
-        if (RlvActions::getCameraYawLimit(rlvYawHalfRange))
+        bool hasRlvLimit = RlvActions::getCameraYawLimit(rlvYawHalfRange);
+
+        // With the seated-yaw cap disabled and no RLVa restriction, there is nothing to clamp.
+        if (!limitSeatedYaw && !hasRlvLimit)
+        {
+            return angle;
+        }
+
+        // Effective half-range: the 90° cap (when enabled) tightened by any RLVa limit.
+        F32 yaw_limit = limitSeatedYaw ? F_PI_BY_TWO : rlvYawHalfRange;
+        if (hasRlvLimit)
         {
             yaw_limit = llmin(yaw_limit, rlvYawHalfRange);
         }
