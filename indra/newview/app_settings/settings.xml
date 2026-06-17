@@ -25,6 +25,17 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
+  <key>IDLimitSeatedYaw</key>
+  <map>
+    <key>Comment</key>
+    <string>If true, limit avatar yaw to ±90° from the initial facing direction while seated in mouselook. Turn off to allow free seated yaw. RLVa @setcam_yaw restrictions are always enforced regardless of this setting.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
   <!-- </ID> -->
   <key>FSTrishMouseLookFix</key>
   <map>
