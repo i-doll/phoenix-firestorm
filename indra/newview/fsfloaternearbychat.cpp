@@ -959,7 +959,31 @@ void FSFloaterNearbyChat::onChatBoxCommit()
 
 void FSFloaterNearbyChat::onChatTypeChanged()
 {
-    mSendChatButton->setLabel(mChatTypeCombo->getSelectedItemLabel());
+    updateChatTypeButtonLabel();
+}
+
+void FSFloaterNearbyChat::updateChatTypeButtonLabel()
+{
+    if (!mChatTypeCombo || !mSendChatButton)
+    {
+        return;
+    }
+
+    const std::string chat_type_label = mChatTypeCombo->getSelectedItemLabel();
+    if (chat_type_label != mChatTypeButtonLabel)
+    {
+        mChatTypeButtonLabel = chat_type_label;
+        mChatTypeCombo->setLabel(chat_type_label);
+        mSendChatButton->setLabel(chat_type_label);
+    }
+}
+
+void FSFloaterNearbyChat::draw()
+{
+    // Keep the split-button label synchronized even if the combo commit path
+    // misses a mouse-driven selection change.
+    updateChatTypeButtonLabel();
+    LLFloater::draw();
 }
 
 void FSFloaterNearbyChat::sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate)

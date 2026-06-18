@@ -36,6 +36,8 @@
 #include "fschatparticipants.h"
 #include "rlvhandler.h"
 
+#include <string>
+
 class FSChatHistory;
 class LLChatEntry;
 class LLComboBox;
@@ -95,6 +97,7 @@ public:
     S32 getMessageArchiveLength() { return static_cast<S32>(mMessageArchive.size()); }
 
     bool handleKeyHere(KEY key, MASK mask) override;
+    void draw() override;
 
     static void stopChat();
 
@@ -118,6 +121,7 @@ protected:
     void sendChatFromViewer(const std::string& utf8text, EChatType type, bool animate);
     void onChatBoxCommit();
     void onChatTypeChanged();
+    void updateChatTypeButtonLabel();
 
     void reshapeChatLayoutPanel();
 
@@ -151,6 +155,7 @@ private:
     LLPanelEmojiComplete* mEmojiRecentIconsCtrl;
     LLButton*             mSendChatButton;
     LLComboBox*           mChatTypeCombo;
+    std::string           mChatTypeButtonLabel;
 
     LLLayoutPanel* mChatLayoutPanel;
     LLLayoutStack* mInputPanels;
