@@ -1164,7 +1164,7 @@ void LLScriptEdCore::setScriptText(const std::string& text, bool is_valid)
     {
         // NaCl - LSL Preprocessor
         std::string ntext = text;
-        if (!isLuaCompileTarget() && gSavedSettings.getBOOL("_NACL_LSLPreprocessor") && mLSLProc)
+        if (!isLuauLanguageTarget() && gSavedSettings.getBOOL("_NACL_LSLPreprocessor") && mLSLProc)
         {
             if (mPostEditor)
             {
@@ -1182,7 +1182,7 @@ void LLScriptEdCore::setScriptText(const std::string& text, bool is_valid)
 // NaCl - LSL Preprocessor
 std::string LLScriptEdCore::getScriptText()
 {
-    if (isLuaCompileTarget() && mEditor)
+    if (isLuauLanguageTarget() && mEditor)
     {
         return mEditor->getText();
     }
@@ -1293,7 +1293,7 @@ void LLScriptEdCore::sync()
         if (LLFile::stat(tmp_file, &s) == 0) // file exists
         {
             mLiveFile->ignoreNextUpdate();
-            writeToFile(tmp_file, isLuaCompileTarget() ? true : gSavedSettings.getBOOL("_NACL_LSLPreprocessor"));
+            writeToFile(tmp_file, isLuauLanguageTarget() ? true : gSavedSettings.getBOOL("_NACL_LSLPreprocessor"));
         }
     }
 }
@@ -1711,7 +1711,7 @@ void LLScriptEdCore::doSave(bool close_after_save, bool sync /*= true*/)
 
     updateIndicators(true, false); //<FS:Kadah> Compile Indicators
 
-    if (!isLuaCompileTarget() && gSavedSettings.getBOOL("_NACL_LSLPreprocessor") && mLSLProc)
+    if (!isLuauLanguageTarget() && gSavedSettings.getBOOL("_NACL_LSLPreprocessor") && mLSLProc)
     {
         LL_INFOS() << "passing to preproc" << LL_ENDL;
         mLSLProc->preprocess_script(close_after_save, sync);
@@ -1779,14 +1779,14 @@ void LLScriptEdCore::openInExternalEditor()
         std::string filename = mContainer->getTmpFileName(script_name);
 
         // Save the script to a temporary file.
-        if (!writeToFile(filename, isLuaCompileTarget() ? true : gSavedSettings.getBOOL("_NACL_LSLPreprocessor")))
+        if (!writeToFile(filename, isLuauLanguageTarget() ? true : gSavedSettings.getBOOL("_NACL_LSLPreprocessor")))
         {
             // In case some characters from script name are forbidden
             // and not accounted for, name is too long or some other issue,
             // try file that doesn't include script name
             script_name.clear();
             filename = mContainer->getTmpFileName(script_name);
-            writeToFile(filename, isLuaCompileTarget() ? true : gSavedSettings.getBOOL("_NACL_LSLPreprocessor"));
+            writeToFile(filename, isLuauLanguageTarget() ? true : gSavedSettings.getBOOL("_NACL_LSLPreprocessor"));
         }
 
         // Start watching file changes.
