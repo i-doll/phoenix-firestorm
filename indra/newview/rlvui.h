@@ -96,7 +96,9 @@ protected:
     typedef std::multimap<ERlvBehaviour, behaviour_handler_t> behaviour_handler_map_t;
     behaviour_handler_map_t m_Handlers;
 
-    std::map<std::string, std::function<void()>, std::less<>> m_FilteredFloaterMap;
+    // Reference-counted by floater name: multiple behaviours (e.g. @setenv and @lockenv) can lock the same floater,
+    // so duplicate entries are allowed and each release removes exactly one of them.
+    std::multimap<std::string, std::function<void()>, std::less<>> m_FilteredFloaterMap;
 };
 
 // ============================================================================
