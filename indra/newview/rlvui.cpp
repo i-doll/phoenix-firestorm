@@ -361,10 +361,8 @@ bool RlvUIEnabler::addGenericFloaterFilter(const std::string& strFloaterName, co
 
 bool RlvUIEnabler::addGenericFloaterFilter(const std::string& strFloaterName, const std::function<void()>& fn)
 {
-    // NOTE: we don't currently support multiple filters for the same floater (due to the need to remove the correct one at the end of it all)
-    if (m_FilteredFloaterMap.end() != m_FilteredFloaterMap.find(strFloaterName))
-        return false;
-
+    // Reference-counted by floater name: a floater can be locked by more than one behaviour (e.g. @setenv and @lockenv
+    // share the environment floaters). Allow duplicate entries; removeGenericFloaterFilter() erases exactly one of them.
     m_FilteredFloaterMap.insert(std::make_pair(strFloaterName, fn));
 
     if (!m_ConnFloaterGeneric.connected())
@@ -381,7 +379,7 @@ bool RlvUIEnabler::removeGenericFloaterFilter(const std::string& strFloaterName)
     if (m_FilteredFloaterMap.end() == itFloater)
         return false;
 
-    m_FilteredFloaterMap.erase(itFloater);
+    m_FilteredFloaterMap.erase(itFloater);  // erase a single registration; any other behaviours locking this floater stay in effect
 
     RLV_ASSERT_DBG(m_ConnFloaterGeneric.connected());
     if (m_FilteredFloaterMap.empty())
