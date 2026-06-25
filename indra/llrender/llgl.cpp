@@ -1475,6 +1475,8 @@ void LLGLManager::initExtensions()
     {
         mHasAnisotropic = ExtensionExists("GL_EXT_texture_filter_anisotropic", gGLHExts.mSysExts);
     }
+    mHasDSA = (mGLVersion >= 4.49f) || (gGLHExts.mSysExts && ExtensionExists("GL_ARB_direct_state_access", gGLHExts.mSysExts));
+
 
     // Misc
     glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
