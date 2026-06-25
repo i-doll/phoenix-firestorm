@@ -98,6 +98,7 @@ public:
     bool mHasDebugOutput = false;
     bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
+    bool mHasDSA = false;
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
