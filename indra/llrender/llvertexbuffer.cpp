@@ -276,14 +276,28 @@ static GLuint gen_buffer()
 #if !LL_DARWIN
         if (!gGLManager.mIsAMD)
         {
-            glGenBuffers(pool_size, sNamePool);
+            if (gGLManager.mHasDSA)
+            {
+                glCreateBuffers(pool_size, sNamePool);
+            }
+            else
+            {
+                glGenBuffers(pool_size, sNamePool);
+            }
         }
         else
 #endif
         { // work around for AMD driver bug
             for (U32 i = 0; i < pool_size; ++i)
             {
-                glGenBuffers(1, sNamePool + i);
+                if (gGLManager.mHasDSA)
+                {
+                    glCreateBuffers(1, sNamePool + i);
+                }
+                else
+                {
+                    glGenBuffers(1, sNamePool + i);
+                }
             }
         }
     }
@@ -455,15 +469,22 @@ public:
 
             mMisses++;
             name = gen_buffer();
-            glBindBuffer(type, name);
-            glBufferData(type, size, nullptr, GL_DYNAMIC_DRAW);
-            if (type == GL_ELEMENT_ARRAY_BUFFER)
+            if (gGLManager.mHasDSA)
             {
-                LLVertexBuffer::sGLRenderIndices = name;
+                glNamedBufferData(name, size, nullptr, GL_DYNAMIC_DRAW);
             }
             else
             {
-                LLVertexBuffer::sGLRenderBuffer = name;
+                glBindBuffer(type, name);
+                glBufferData(type, size, nullptr, GL_DYNAMIC_DRAW);
+                if (type == GL_ELEMENT_ARRAY_BUFFER)
+                {
+                    LLVertexBuffer::sGLRenderIndices = name;
+                }
+                else
+                {
+                    LLVertexBuffer::sGLRenderBuffer = name;
+                }
             }
 
             data = (U8*)ll_aligned_malloc_16(size);
@@ -1415,7 +1436,15 @@ void LLVertexBuffer::flush_vbo(GLenum target, U32 start, U32 end, void* data, U8
                 //LL_PROFILE_GPU_ZONE("glBufferSubData");
                 U32 tend = llmin(i + block_size, end);
                 U32 size = tend - i + 1;
-                glBufferSubData(target, i, size, (U8*) data + (i-start));
+                if (gGLManager.mHasDSA)
+                {
+                    GLuint buffer_name = (target == GL_ARRAY_BUFFER) ? mGLBuffer : mGLIndices;
+                    glNamedBufferSubData(buffer_name, i, size, (U8*) data + (i-start));
+                }
+                else
+                {
+                    glBufferSubData(target, i, size, (U8*) data + (i-start));
+                }
             }
         }
     }
@@ -1462,9 +1491,16 @@ void LLVertexBuffer::_unmapBuffer()
                 delete_buffers(1, &mGLBuffer);
             }
             mGLBuffer = gen_buffer();
-            glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
-            sGLRenderBuffer = mGLBuffer;
-            glBufferData(GL_ARRAY_BUFFER, mSize, mMappedData, GL_STATIC_DRAW);
+            if (gGLManager.mHasDSA)
+            {
+                glNamedBufferData(mGLBuffer, mSize, mMappedData, GL_STATIC_DRAW);
+            }
+            else
+            {
+                glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
+                sGLRenderBuffer = mGLBuffer;
+                glBufferData(GL_ARRAY_BUFFER, mSize, mMappedData, GL_STATIC_DRAW);
+            }
         }
         else if (mGLBuffer != sGLRenderBuffer)
         {
@@ -1481,10 +1517,17 @@ void LLVertexBuffer::_unmapBuffer()
             }
 
             mGLIndices = gen_buffer();
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
-            sGLRenderIndices = mGLIndices;
+            if (gGLManager.mHasDSA)
+            {
+                glNamedBufferData(mGLIndices, mIndicesSize, mMappedIndexData, GL_STATIC_DRAW);
+            }
+            else
+            {
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
+                sGLRenderIndices = mGLIndices;
 
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mMappedIndexData, GL_STATIC_DRAW);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mMappedIndexData, GL_STATIC_DRAW);
+            }
         }
         else if (mGLIndices != sGLRenderIndices)
         {

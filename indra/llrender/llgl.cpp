@@ -1638,6 +1638,8 @@ void LLGLManager::initExtensions()
     {
         mHasAnisotropic = mGLExtensions.contains("GL_EXT_texture_filter_anisotropic");
     }
+    mHasDSA = (mGLVersion >= 4.49f) || mGLExtensions.contains("GL_ARB_direct_state_access");
+
 
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
