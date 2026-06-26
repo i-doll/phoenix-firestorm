@@ -571,6 +571,12 @@ void LLFollowCam::reset( const LLVector3 p, const LLVector3 f , const LLVector3 
     mUpVector   = u;
 }
 
+void LLFollowCam::resetZoom()
+{
+    mSimulatedDistance = mDistance;
+    mZoomedToMinimumDistance = false;
+}
+
 //---------------------------------------------------------
 void LLFollowCam::setMaxCameraDistantFromSubject( F32 m )
 {
