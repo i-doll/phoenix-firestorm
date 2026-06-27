@@ -555,7 +555,7 @@ void LLGLTexMemBar::draw()
    const F32 usage_bias = llclamp(tex_mem_usage_bias(), 0.25f, 4.0f);
    F64 texture_bytes_alloc = (LLImageGL::getTextureBytesAllocated() / 1024.0 / 1024.0) * usage_bias;
    F64 vertex_bytes_alloc = (LLVertexBuffer::getBytesAllocated() / 1024.0 / 1024.0) * usage_bias;
-   F64 render_bytes_alloc = LLRenderTarget::sBytesAllocated / 1024.0 / 512.0;
+   F64 render_bytes_alloc = LLRenderTarget::sBytesAllocated / 1024.0 / 1024.0;
 
     //----------------------------------------------------------------------------
     LLGLSUIDefault gls_ui;
@@ -587,9 +587,10 @@ void LLGLTexMemBar::draw()
     gGL.color4f(0.f, 0.f, 0.f, 0.25f);
     gl_rect_2d(-10, getRect().getHeight() + line_height*2 + 1, getRect().getWidth()+2, getRect().getHeight()+2);
 
-    text = llformat("Est. Free: %d MB Sys Free: %d MB GL Tex: %d MB FBO: %d MB Probe#: %d Probe Mem: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
+    text = llformat("Budget Free: %d MB Heap Free: %d MB RSS: %d MB GL Tex: %d MB FBO: %d MB Probe#: %d Probe Mem: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
                     (S32)LLViewerTexture::sFreeVRAMMegabytes,
                     LLMemory::getAvailableMemKB()/1024,
+                    LLMemory::getAllocatedMemKB()/1024,
                     LLImageGL::getTextureBytesAllocated() / 1024 / 1024,
                     LLRenderTarget::sBytesAllocated/(1024*1024),
                     gPipeline.mReflectionMapManager.probeCount(),
@@ -1178,4 +1179,3 @@ bool LLTextureView::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
     return false;
 }
-
