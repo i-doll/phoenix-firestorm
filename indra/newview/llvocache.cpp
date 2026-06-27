@@ -485,7 +485,7 @@ void LLVOCacheEntry::updateDebugSettings()
     // <FS:Beq> FIRE-32688 Area search and other visibility issues
     // If this machine has limited RAM, then restore the LL defaults.
     // So long as we have at least 8GB of RAM, then we will use our values.
-    if( LLMemory::getAvailableMemKB() * KB_to_MB < 8096 )
+    if( LLMemory::getMaxMemKB() * KB_to_MB < 8096 )
     {
         if( (U32)low_mem_bound_MB > 768 )
         {
