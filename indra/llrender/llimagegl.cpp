@@ -1069,7 +1069,7 @@ bool should_stagger_image_set(bool compressed)
 
 // Equivalent to calling glSetSubImage2D(target, miplevel, x_offset, y_offset, width, height, pixformat, pixtype, src), assuming the total width of the image is data_width
 // However, instead there are multiple calls to glSetSubImage2D on smaller slices of the image
-void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 width, S32 height, U32 pixformat, U32 pixtype, const U8* src, S32 data_width)
+void sub_image_lines(U32 target, LLGLuint texname, S32 miplevel, S32 x_offset, S32 y_offset, S32 width, S32 height, U32 pixformat, U32 pixtype, const U8* src, S32 data_width)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
@@ -1104,7 +1104,14 @@ void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 w
         {
             // If this keeps crashing, pass down data_size, looks like it is using
             // imageraw->getData(); for data, but goes way over allocated size limit
-            glTexSubImage2D(target, miplevel, x_offset, y_pos, width, batch_size, pixformat, pixtype, src);
+            if (gGLManager.mHasDSA && texname != 0)
+            {
+                glTextureSubImage2D(texname, miplevel, x_offset, y_pos, width, batch_size, pixformat, pixtype, src);
+            }
+            else
+            {
+                glTexSubImage2D(target, miplevel, x_offset, y_pos, width, batch_size, pixformat, pixtype, src);
+            }
             src += line_width * batch_size;
         }
     }
@@ -1115,7 +1122,14 @@ void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 w
         {
             // If this keeps crashing, pass down data_size, looks like it is using
             // imageraw->getData(); for data, but goes way over allocated size limit
-            glTexSubImage2D(target, miplevel, x_offset, y_pos, width, 1, pixformat, pixtype, src);
+            if (gGLManager.mHasDSA && texname != 0)
+            {
+                glTextureSubImage2D(texname, miplevel, x_offset, y_pos, width, 1, pixformat, pixtype, src);
+            }
+            else
+            {
+                glTexSubImage2D(target, miplevel, x_offset, y_pos, width, 1, pixformat, pixtype, src);
+            }
             src += line_width;
         }
     }
@@ -1204,15 +1218,18 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         const bool use_sub_image = should_stagger_image_set(isCompressed());
         if (!use_sub_image)
         {
-            // *TODO: Why does this work here, in setSubImage, but not in
-            // setManualImage? Maybe because it only gets called with the
-            // dimensions of the full image?  Or because the image is never
-            // compressed?
-            glTexSubImage2D(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap);
+            if (gGLManager.mHasDSA)
+            {
+                glTextureSubImage2D(tex_name, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap);
+            }
+            else
+            {
+                glTexSubImage2D(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap);
+            }
         }
         else
         {
-            sub_image_lines(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap, data_width);
+            sub_image_lines(mTarget, tex_name, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap, data_width);
         }
         gGL.getTexUnit(0)->disable();
         stop_glerror();
@@ -1253,9 +1270,19 @@ bool LLImageGL::setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_
 }
 
 // static
-void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
+void LLImageGL::generateTextures(S32 numTextures, U32 *textures, LLGLenum target)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+
+    // Do not pool glCreateTextures. Unlike glGenTextures which just reserves names,
+    // glCreateTextures fully instantiates the texture objects in the driver. Creating
+    // 1024 objects at once can cause severe driver instability and heap corruption.
+    if (gGLManager.mHasDSA)
+    {
+        glCreateTextures(target, numTextures, textures);
+        return;
+    }
+
     static constexpr U32 pool_size = 1024;
     static thread_local U32 name_pool[pool_size]; // pool of texture names
     static thread_local U32 name_count = 0; // number of available names in the pool
@@ -1485,7 +1512,7 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
             if (src)
             {
                 LL_PROFILE_ZONE_NAMED("glTexImage2D copy");
-                sub_image_lines(target, miplevel, 0, 0, width, height, pixformat, pixtype, src, width);
+                sub_image_lines(target, 0, miplevel, 0, 0, width, height, pixformat, pixtype, src, width);
             }
         }
         alloc_tex_image(width, height, intformat, 1);
@@ -1518,7 +1545,7 @@ bool LLImageGL::createGLTexture()
     }
 
 
-    LLImageGL::generateTextures(1, &mTexName);
+    LLImageGL::generateTextures(1, &mTexName, mTarget);
     stop_glerror();
     if (!mTexName)
     {
@@ -1678,7 +1705,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     }
     else
     {
-        LLImageGL::generateTextures(1, &new_texname);
+        LLImageGL::generateTextures(1, &new_texname, mTarget);
         {
             gGL.getTexUnit(0)->bind(this, false, false, new_texname);
             glTexParameteri(LLTexUnit::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
