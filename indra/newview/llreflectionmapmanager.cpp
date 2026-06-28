@@ -54,6 +54,7 @@
 #endif
 
 LLPointer<LLImageGL> gEXRImage;
+static S32 frame_skip_counter = 0;
 
 void load_exr(const std::string& filename)
 {
@@ -730,6 +731,11 @@ void LLReflectionMapManager::deleteProbe(U32 i)
 
 void LLReflectionMapManager::doProbeUpdate()
 {
+    if (frame_skip_counter++ % 10 != 0) 
+    {
+        return;
+    }
+
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     llassert(mUpdatingProbe != nullptr);
 
