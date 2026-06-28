@@ -227,7 +227,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
     }
 
     U32 tex;
-    LLImageGL::generateTextures(1, &tex);
+    LLImageGL::generateTextures(1, &tex, LLTexUnit::getInternalType(mUsage));
     gGL.getTexUnit(0)->bindManual(mUsage, tex);
 
     stop_glerror();
@@ -298,7 +298,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
 bool LLRenderTarget::allocateDepth()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    LLImageGL::generateTextures(1, &mDepth);
+    LLImageGL::generateTextures(1, &mDepth, LLTexUnit::getInternalType(mUsage));
     gGL.getTexUnit(0)->bindManual(mUsage, mDepth);
 
     U32 internal_type = LLTexUnit::getInternalType(mUsage);
