@@ -72,7 +72,7 @@ public:
     static U64 getTextureBytesAllocated();
 
     // These 2 functions replace glGenTextures() and glDeleteTextures()
-    static void generateTextures(S32 numTextures, U32 *textures);
+    static void generateTextures(S32 numTextures, U32 *textures, LLGLenum target = GL_TEXTURE_2D);
     static void deleteTextures(S32 numTextures, const U32 *textures);
 
     // Size calculation

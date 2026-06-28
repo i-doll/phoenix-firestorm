@@ -74,7 +74,7 @@ void LLCubeMap::initGL()
         {
             U32 texname = 0;
 
-            LLImageGL::generateTextures(1, &texname);
+            LLImageGL::generateTextures(1, &texname, GL_TEXTURE_CUBE_MAP);
 
             for (int i = 0; i < 6; i++)
             {
@@ -177,7 +177,7 @@ void LLCubeMap::initReflectionMap(U32 resolution, U32 components)
 {
     U32 texname = 0;
 
-    LLImageGL::generateTextures(1, &texname);
+    LLImageGL::generateTextures(1, &texname, GL_TEXTURE_CUBE_MAP);
 
     mImages[0] = new LLImageGL(resolution, resolution, components, true);
     mImages[0]->setTexName(texname);
@@ -192,7 +192,7 @@ void LLCubeMap::initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& ra
 
     U32 texname = 0;
 
-    LLImageGL::generateTextures(1, &texname);
+    LLImageGL::generateTextures(1, &texname, GL_TEXTURE_CUBE_MAP);
 
     U32 resolution = rawimages[0]->getWidth();
     U32 components = rawimages[0]->getComponents();
