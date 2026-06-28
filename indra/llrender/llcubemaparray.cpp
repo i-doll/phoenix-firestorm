@@ -147,7 +147,7 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
 
     mHDR = hdr;
 
-    LLImageGL::generateTextures(1, &texname);
+    LLImageGL::generateTextures(1, &texname, GL_TEXTURE_CUBE_MAP_ARRAY);
 
     mImage = new LLImageGL(resolution, resolution, components, use_mips);
     mImage->setTexName(texname);
