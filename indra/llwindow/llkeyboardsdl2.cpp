@@ -134,24 +134,13 @@ void LLKeyboardSDL::resetMaskKeys()
 {
     SDL_Keymod mask = SDL_GetModState();
 
-    // MBW -- XXX -- This mirrors the operation of the Windows version of resetMaskKeys().
-    //    It looks a bit suspicious, as it won't correct for keys that have been released.
-    //    Is this the way it's supposed to work?
-
-    if(mask & KMOD_SHIFT)
-    {
-        mKeyLevel[KEY_SHIFT] = true;
-    }
-
-    if(mask & KMOD_CTRL)
-    {
-        mKeyLevel[KEY_CONTROL] = true;
-    }
-
-    if(mask & KMOD_ALT)
-    {
-        mKeyLevel[KEY_ALT] = true;
-    }
+    // <ID> Assign instead of only setting: the old code never cleared a
+    // modifier whose key-up we missed (e.g. consumed by the window manager
+    // during alt-tab), so KEY_ALT could stay latched across focus cycles.
+    mKeyLevel[KEY_SHIFT] = (mask & KMOD_SHIFT) != 0;
+    mKeyLevel[KEY_CONTROL] = (mask & KMOD_CTRL) != 0;
+    mKeyLevel[KEY_ALT] = (mask & KMOD_ALT) != 0;
+    // </ID>
 }
 
 
