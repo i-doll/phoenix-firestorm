@@ -1468,6 +1468,34 @@ void LLWindowSDL::gatherInput()
                     // which confuses the focus code [SL-24071].
                     mHaveInputFocus = true;
 
+                    // <ID> Reconcile SDL's modifier state with the actually
+                    // pressed keys. When the WM consumes a modifier key-up
+                    // (classic case: alt-tabbing into the viewer), SDL's mod
+                    // state keeps KMOD_ALT & co. latched forever, poisoning
+                    // the mask of every subsequent click and hover. SDL
+                    // reconciles its per-scancode array with the real
+                    // keyboard on focus gain, so rebuild the mod state from
+                    // that array; keep the toggle-style lock/AltGr bits.
+                    {
+                        int numkeys = 0;
+                        const Uint8* keystate = SDL_GetKeyboardState(&numkeys);
+                        if (keystate && numkeys > SDL_SCANCODE_RGUI)
+                        {
+                            int mod = KMOD_NONE;
+                            if (keystate[SDL_SCANCODE_LSHIFT]) mod |= KMOD_LSHIFT;
+                            if (keystate[SDL_SCANCODE_RSHIFT]) mod |= KMOD_RSHIFT;
+                            if (keystate[SDL_SCANCODE_LCTRL])  mod |= KMOD_LCTRL;
+                            if (keystate[SDL_SCANCODE_RCTRL])  mod |= KMOD_RCTRL;
+                            if (keystate[SDL_SCANCODE_LALT])   mod |= KMOD_LALT;
+                            if (keystate[SDL_SCANCODE_RALT])   mod |= KMOD_RALT;
+                            if (keystate[SDL_SCANCODE_LGUI])   mod |= KMOD_LGUI;
+                            if (keystate[SDL_SCANCODE_RGUI])   mod |= KMOD_RGUI;
+                            mod |= (SDL_GetModState() & (KMOD_NUM | KMOD_CAPS | KMOD_MODE));
+                            SDL_SetModState((SDL_Keymod)mod);
+                        }
+                    }
+                    // </ID>
+
                     mCallbacks->handleFocus(this);
                 }
                 else if( event.window.event == SDL_WINDOWEVENT_FOCUS_LOST ) // <FS:ND> What about SDL_WINDOWEVENT_LEAVE (mouse focus)
