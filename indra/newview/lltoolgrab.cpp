@@ -193,18 +193,45 @@ void LLToolGrabBase::pickCallback(const LLPickInfo& pick_info)
     if ( (!objectp) || ((RlvActions::isRlvEnabled()) && (!RlvActions::canTouch(objectp, pick_info.mObjectOffset))) )
 // [/RLVa:KB]
     {
-        LLToolGrab::getInstance()->setMouseCapture(true);
-        LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
-        LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
+        // <ID> Only capture while the button is still down; a late async pick
+        // arriving after mouse-up must not steal capture (it would strand the
+        // grab tool as the current tool: stuck visible cursor and dead
+        // mouselook steering). Mirror the transient-kill in handleObjectHit.
+        if (gViewerWindow->getLeftMouseDown())
+        {
+            LLToolGrab::getInstance()->setMouseCapture(true);
+            LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
+            LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
+        }
+        else if (gGrabTransientTool)
+        {
+            // Only reselect while still in mouselook; if the user already left,
+            // the toolset switch has selected the right tool.
+            if (gAgentCamera.cameraMouselook())
+            {
+                LLToolMgr::getInstance()->getCurrentToolset()->selectTool( gGrabTransientTool );
+            }
+            gGrabTransientTool = NULL;
+        }
+        // </ID>
     }
     // <ID> Block drag in mouselook unless ALT is held
     else if (gAgentCamera.cameraMouselook() &&
              gSavedSettings.getBOOL("IDMouselookRequireAltForDrag") &&
              !(pick_info.mKeyMask & MASK_ALT))
     {
-        LLToolGrab::getInstance()->setMouseCapture(true);
-        LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
-        LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
+        if (gViewerWindow->getLeftMouseDown())
+        {
+            LLToolGrab::getInstance()->setMouseCapture(true);
+            LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
+            LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
+        }
+        else if (gGrabTransientTool)
+        {
+            // Enclosing condition guarantees we're still in mouselook here.
+            LLToolMgr::getInstance()->getCurrentToolset()->selectTool( gGrabTransientTool );
+            gGrabTransientTool = NULL;
+        }
     }
     // </ID>
     else
@@ -233,7 +260,7 @@ bool LLToolGrabBase::handleObjectHit(const LLPickInfo& info)
     {
         if (gGrabTransientTool)
         {
-            gBasicToolset->selectTool( gGrabTransientTool );
+            LLToolMgr::getInstance()->getCurrentToolset()->selectTool( gGrabTransientTool ); // <ID> was gBasicToolset; restoring there poisons gMouselookToolset's selection for grabs started in mouselook
             gGrabTransientTool = NULL;
         }
         return true;
@@ -338,7 +365,7 @@ bool LLToolGrabBase::handleObjectHit(const LLPickInfo& info)
         && gGrabTransientTool
         && (mMode == GRAB_NONPHYSICAL || mMode == GRAB_LOCKED))
     {
-        gBasicToolset->selectTool( gGrabTransientTool );
+        LLToolMgr::getInstance()->getCurrentToolset()->selectTool( gGrabTransientTool ); // <ID> was gBasicToolset; restoring there poisons gMouselookToolset's selection for grabs started in mouselook
         gGrabTransientTool = NULL;
     }
 
@@ -469,7 +496,7 @@ bool LLToolGrabBase::handleHover(S32 x, S32 y, MASK mask)
         if (gGrabTransientTool)
         {
             // Prevent the grab tool from popping up as soon as we kill the drag operation
-            gBasicToolset->selectTool(gGrabTransientTool);
+            LLToolMgr::getInstance()->getCurrentToolset()->selectTool(gGrabTransientTool); // <ID> was gBasicToolset; see other restore sites
             gGrabTransientTool = NULL;
         }
         setMouseCapture(false);
@@ -1035,7 +1062,7 @@ bool LLToolGrabBase::handleMouseUp(S32 x, S32 y, MASK mask)
         // HACK: Make some grabs temporary
         if (gGrabTransientTool)
         {
-            gBasicToolset->selectTool( gGrabTransientTool );
+            LLToolMgr::getInstance()->getCurrentToolset()->selectTool( gGrabTransientTool ); // <ID> was gBasicToolset; restoring there poisons gMouselookToolset's selection for grabs started in mouselook
             gGrabTransientTool = NULL;
         }
     }
@@ -1060,7 +1087,14 @@ void LLToolGrabBase::onMouseCaptureLost()
     LLViewerObject* objectp = mGrabPick.getObject();
     if (!objectp)
     {
-        gViewerWindow->showCursor();
+        // <ID> Don't show the cursor while still in mouselook (mirrors the
+        // !cameraMouselook() guard on the object path below); the gun tool
+        // owns cursor visibility there.
+        if (!gAgentCamera.cameraMouselook())
+        {
+            gViewerWindow->showCursor();
+        }
+        // </ID>
         return;
     }
     // First, fix cursor placement

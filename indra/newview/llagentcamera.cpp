@@ -2514,8 +2514,6 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
     // unpause avatar animation
     gAgent.unpauseAnimation();
 
-    LLToolMgr::getInstance()->setCurrentToolset(gMouselookToolset);
-
     if (isAgentAvatarValid())
     {
         gAgentAvatarp->stopMotion(ANIM_AGENT_BODY_NOISE);
@@ -2529,6 +2527,14 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
 
     if (mCameraMode != CAMERA_MODE_MOUSELOOK)
     {
+        // <ID> Moved inside the mode check: re-selecting an already-current
+        // toolset skips selectFirstTool() and re-selects its remembered tool,
+        // so redundant calls while already in mouselook (RLVa force-mouselook,
+        // forced-mouselook sits, menu/keybind) could re-select a stale grab
+        // tool and strand the cursor visible with steering dead.
+        LLToolMgr::getInstance()->setCurrentToolset(gMouselookToolset);
+        // </ID>
+
         gFocusMgr.setKeyboardFocus(NULL);
 
         updateLastCamera();

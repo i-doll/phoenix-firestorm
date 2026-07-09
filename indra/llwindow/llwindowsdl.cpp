@@ -1420,9 +1420,37 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mCallbacks->handleMouseLeave(this);
             break;
         case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        {
             //SDL_SetWindowKeyboardGrab(mWindow, true);
+
+            // <ID> Reconcile SDL's modifier state with the actually
+            // pressed keys. When the WM consumes a modifier key-up
+            // (classic case: alt-tabbing into the viewer), SDL's mod
+            // state can keep SDL_KMOD_ALT & co. latched, poisoning
+            // the mask of every subsequent click and hover. Rebuild
+            // the mod state from the per-scancode array; keep the
+            // toggle-style lock/AltGr bits.
+            int numkeys = 0;
+            const bool* keystate = SDL_GetKeyboardState(&numkeys);
+            if (keystate && numkeys > SDL_SCANCODE_RGUI)
+            {
+                SDL_Keymod mod = SDL_KMOD_NONE;
+                if (keystate[SDL_SCANCODE_LSHIFT]) mod |= SDL_KMOD_LSHIFT;
+                if (keystate[SDL_SCANCODE_RSHIFT]) mod |= SDL_KMOD_RSHIFT;
+                if (keystate[SDL_SCANCODE_LCTRL])  mod |= SDL_KMOD_LCTRL;
+                if (keystate[SDL_SCANCODE_RCTRL])  mod |= SDL_KMOD_RCTRL;
+                if (keystate[SDL_SCANCODE_LALT])   mod |= SDL_KMOD_LALT;
+                if (keystate[SDL_SCANCODE_RALT])   mod |= SDL_KMOD_RALT;
+                if (keystate[SDL_SCANCODE_LGUI])   mod |= SDL_KMOD_LGUI;
+                if (keystate[SDL_SCANCODE_RGUI])   mod |= SDL_KMOD_RGUI;
+                mod |= (SDL_GetModState() & (SDL_KMOD_NUM | SDL_KMOD_CAPS | SDL_KMOD_MODE | SDL_KMOD_SCROLL));
+                SDL_SetModState(mod);
+            }
+            // </ID>
+
             mCallbacks->handleFocus(this);
             break;
+        }
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             mCallbacks->handleFocusLost(this);
             //SDL_SetWindowKeyboardGrab(mWindow, false);
