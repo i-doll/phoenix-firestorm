@@ -789,26 +789,15 @@ bool LLToolCompGun::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool LLToolCompGun::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
-    // if the left button is grabbed, don't put up the pie menu
-    if (gAgent.leftButtonGrabbed() && gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
-    {
-        gAgent.setControlFlags(AGENT_CONTROL_ML_LBUTTON_DOWN);
-        return false;
-    }
-
-    // <ID> Block drag in mouselook unless ALT is held
-    if (gSavedSettings.getBOOL("IDMouselookRequireAltForDrag") &&
-        !(mask & MASK_ALT))
-    {
-        return true;
-    }
+    // <ID> Treat a double-click exactly like a mouse-down. The old code armed
+    // gGrabTransientTool and selected the grab tool, then forwarded to
+    // LLToolGrab::handleDoubleClick — which does nothing and returns false —
+    // so no pick and no mouse-up bookkeeping ever healed the armed switch.
+    // The next capture loss then stranded the grab tool as the current tool:
+    // cursor stuck visible, mouselook steering dead. handleMouseDown runs the
+    // same guards plus the full grab/pick/heal machinery.
+    return handleMouseDown(x, y, mask);
     // </ID>
-
-    // On mousedown, start grabbing
-    gGrabTransientTool = this;
-    LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
-
-    return LLToolGrab::getInstance()->handleDoubleClick(x, y, mask);
 }
 
 
