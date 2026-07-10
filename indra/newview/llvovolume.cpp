@@ -1466,6 +1466,50 @@ void LLVOVolume::notifySkinInfoUnavailable()
     mSkinInfo = nullptr;
 }
 
+void LLVOVolume::reloadMesh()
+{
+    LLVolume* volume = getVolume();
+    if (!volume || !isMesh())
+    {
+        return;
+    }
+
+    const LLVolumeParams& params = volume->getParams();
+
+    // LLVolume instances are shared by mesh id and LOD. Invalidate every LOD,
+    // not just the one currently displayed, so a later LOD transition cannot
+    // switch back to geometry retained by the volume manager. Mark each one
+    // as not loaded before clearing unavailable: setMeshAssetUnavaliable()
+    // deliberately ignores changes while an asset is considered loaded.
+    for (S32 lod = 0; lod < LLVolumeLODGroup::NUM_LODS; ++lod)
+    {
+        LLVolume* system_volume = LLPrimitive::getVolumeManager()->refVolume(params, lod);
+        if (system_volume)
+        {
+            system_volume->setMeshAssetLoaded(false);
+            system_volume->setMeshAssetUnavaliable(false);
+            LLPrimitive::getVolumeManager()->unrefVolume(system_volume);
+        }
+    }
+
+    // Unique volumes do not come from the shared volume manager.
+    volume->setMeshAssetLoaded(false);
+    volume->setMeshAssetUnavaliable(false);
+
+    // Skin info is cached independently from the LOD data. Clear the object's
+    // reference and failure state so the freshly fetched header/skin data can
+    // make a worn attachment rigged again.
+    mSkinInfo = nullptr;
+    mSkinInfoUnavaliable = false;
+    mJointRiggingInfoTab.clear();
+    mLastRiggingInfoLOD = -1;
+
+    // Queue explicitly rather than relying on a geometry rebuild: there is no
+    // useful visual change until the replacement data arrives, and the load
+    // completion callbacks will schedule the required geometry/rigging rebuild.
+    gMeshRepo.loadMesh(this, params, mLOD);
+}
+
 // sculpt replaces generate() for sculpted surfaces
 void LLVOVolume::sculpt()
 {

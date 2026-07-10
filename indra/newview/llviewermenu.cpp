@@ -3483,13 +3483,10 @@ class LLObjectReloadMesh : public view_listener_t
                 gMeshRepo.reloadMesh(mesh_id);
             }
 
-            // Per-volume: clear the unavailable flag and notify the volume
-            // its mesh changed. notifyMeshLoaded() flips mSculptChanged and
-            // calls markRebuild(REBUILD_GEOMETRY) which drives the rebuild
-            // through setVolume() → gMeshRepo.loadMesh(), and the now-empty
-            // cache forces a fresh server fetch.
-            volume->setMeshAssetUnavaliable(false);
-            vol->notifyMeshLoaded();
+            // Per-volume: invalidate the shared loaded state, reset cached
+            // skin state, and explicitly queue the current LOD. Completion of
+            // the mesh and skin requests will rebuild static or rigged faces.
+            vol->reloadMesh();
         };
 
         for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
