@@ -396,6 +396,7 @@ public:
     void notifyMeshLoaded();
     void notifySkinInfoLoaded(const LLMeshSkinInfo* skin);
     void notifySkinInfoUnavailable();
+    void reloadMesh();
 
     // Returns 'true' iff the media data for this object is in flight
     bool isMediaDataBeingFetched() const;
@@ -512,4 +513,3 @@ protected:
 };
 
 #endif // LL_LLVOVOLUME_H
-
