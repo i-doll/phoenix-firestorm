@@ -4517,6 +4517,9 @@ void LLMeshRepository::reloadMesh(const LLUUID& mesh_id)
         {
             LLMutexLock lock(mThread->mHeaderMutex);
             mThread->mMeshHeader.erase(mesh_id);
+        }
+        {
+            LLMutexLock lock(mThread->mPendingMutex);
             mThread->mPendingLOD.erase(mesh_id);
         }
         if (mThread->mSkinMapMutex)
