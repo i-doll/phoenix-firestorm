@@ -127,8 +127,13 @@ LLOutfitsList::LLOutfitsList()
     :   LLOutfitListBase()
     ,   mAccordion(NULL)
     ,   mListCommands(NULL)
-    ,   mItemSelected(false)
+// <ID:i.doll> [COF worn-state refresh performance]
+    ,   mCOFRefreshPending(false)
+// </ID:i.doll>
     ,   mSortMenu(nullptr)
+// <ID:i.doll> [COF worn-state refresh performance]
+    ,   mItemSelected(false)
+// </ID:i.doll>
 {
     LLControlVariable* ctrl = gSavedSettings.getControl("InventoryFavoritesColorText");
     if (ctrl)
@@ -178,6 +183,14 @@ void LLOutfitsList::onOpen(const LLSD& info)
     }
 
     LLOutfitListBase::onOpen(info);
+
+// <ID:i.doll> [COF worn-state refresh performance]
+    if (mCOFRefreshPending)
+    {
+        mCOFRefreshPending = false;
+        onCOFChanged();
+    }
+// </ID:i.doll>
 
     LLAccordionCtrlTab* selected_tab = mAccordion->getSelectedTab();
     if (!selected_tab) return;
@@ -800,6 +813,14 @@ void LLOutfitsList::onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 
 void LLOutfitsList::onCOFChanged()
 {
+// <ID:i.doll> [COF worn-state refresh performance]
+    if (!isInVisibleChain())
+    {
+        mCOFRefreshPending = true;
+        return;
+    }
+// </ID:i.doll>
+
     LLInventoryModel::cat_array_t cat_array;
     LLInventoryModel::item_array_t item_array;
 

@@ -62,9 +62,34 @@ void LLOutfitObserver::notifyCOFChanged()
         return;
     }
 
+// <ID:i.doll> [COF worn-state refresh performance]
+    queueCOFChanged();
+}
+
+void LLOutfitObserver::queueCOFChanged()
+{
+    if (mCOFChangedPending)
+    {
+        return;
+    }
+
+    mCOFChangedPending = true;
+    doOnIdleOneTime([this]() { emitCOFChanged(); });
+}
+
+void LLOutfitObserver::emitCOFChanged()
+{
+    mCOFChangedPending = false;
+
+    if (!gInventory.isInventoryUsable() || LLApp::isExiting())
+    {
+        return;
+    }
+
     LLAppearanceMgr::getInstance()->updateIsDirty();
     mCOFChanged();
 }
+// </ID:i.doll>
 
 // static
 S32 LLOutfitObserver::getCategoryVersion(const LLUUID& cat_id)
@@ -110,9 +135,12 @@ bool LLOutfitObserver::checkCOF()
     if (!cof_changed)
         return false;
 
-    // dirtiness state should be updated before sending signal
-    LLAppearanceMgr::getInstance()->updateIsDirty();
-    mCOFChanged();
+// <ID:i.doll> [COF worn-state refresh performance]
+    // Inventory operations commonly produce several observer notifications for
+    // one logical outfit change. Update dirtiness and UI listeners once, after
+    // the inventory model has finished the current batch.
+    queueCOFChanged();
+// </ID:i.doll>
 
     return true;
 }

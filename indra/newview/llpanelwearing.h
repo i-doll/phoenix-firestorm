@@ -94,6 +94,9 @@ public:
     void updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity);
 
 private:
+// <ID:i.doll> [COF worn-state refresh performance]
+    void onCOFChanged();
+// </ID:i.doll>
     void onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y);
     void onTempAttachmentsListRightClick(LLUICtrl* ctrl, S32 x, S32 y);
 
@@ -125,6 +128,9 @@ private:
     LLFrameTimer                    mUpdateTimer;
 
     bool                            mIsInitialized;
+// <ID:i.doll> [COF worn-state refresh performance]
+    bool                            mCOFRefreshPending;
+// </ID:i.doll>
 };
 
 #endif //LL_LLPANELWEARING_H

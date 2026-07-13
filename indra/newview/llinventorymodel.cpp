@@ -2490,10 +2490,12 @@ void LLInventoryModel::addChangedMask(U32 mask, const LLUUID& referent)
 
         // Update all linked items.  Starting with just LABEL because I'm
         // not sure what else might need to be accounted for this.
-        if (mask & LLInventoryObserver::LABEL)
+// <ID:i.doll> [COF worn-state refresh performance]
+        if (mask & (LLInventoryObserver::LABEL | LLInventoryObserver::WORN))
         {
-            addChangedMaskForLinks(referent, LLInventoryObserver::LABEL);
+            addChangedMaskForLinks(referent, mask & (LLInventoryObserver::LABEL | LLInventoryObserver::WORN));
         }
+// </ID:i.doll>
     }
 }
 
@@ -5765,4 +5767,3 @@ void LLInventoryModel::FetchItemHttpHandler::processFailure(const char * const r
                       << LLCoreHttpUtil::responseToString(response) << "]" << LL_ENDL;
     gInventory.notifyObservers();
 }
-

@@ -266,6 +266,9 @@ LLPanelWearing::LLPanelWearing()
     ,   mCOFItemsList(NULL)
     ,   mAvatarComplexityLabel(NULL) // <FS:Ansariel> Show avatar complexity in appearance floater
     ,   mIsInitialized(false)
+// <ID:i.doll> [COF worn-state refresh performance]
+    ,   mCOFRefreshPending(false)
+// </ID:i.doll>
     ,   mAttachmentsChangedConnection()
 {
     mGearMenu = new LLWearingGearMenu(this);
@@ -337,7 +340,9 @@ void LLPanelWearing::onOpen(const LLSD& /*info*/)
             return;
 
         // Start observing changes in Current Outfit category.
-        LLOutfitObserver::instance().addCOFChangedCallback(boost::bind(&LLWearableItemsList::updateList, mCOFItemsList, cof));
+// <ID:i.doll> [COF worn-state refresh performance]
+        LLOutfitObserver::instance().addCOFChangedCallback(boost::bind(&LLPanelWearing::onCOFChanged, this));
+// </ID:i.doll>
 
         // Fetch Current Outfit contents and refresh the list to display
         // initially fetched items. If not all items are fetched now
@@ -349,7 +354,25 @@ void LLPanelWearing::onOpen(const LLSD& /*info*/)
 
         mIsInitialized = true;
     }
+// <ID:i.doll> [COF worn-state refresh performance]
+    else if (mCOFRefreshPending)
+    {
+        mCOFRefreshPending = false;
+        mCOFItemsList->updateList(LLAppearanceMgr::instance().getCOF());
+    }
 }
+
+void LLPanelWearing::onCOFChanged()
+{
+    if (!isInVisibleChain())
+    {
+        mCOFRefreshPending = true;
+        return;
+    }
+
+    mCOFItemsList->updateList(LLAppearanceMgr::instance().getCOF());
+}
+// </ID:i.doll>
 
 void LLPanelWearing::draw()
 {

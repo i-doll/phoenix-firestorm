@@ -61,6 +61,9 @@ public:
         // unfortunately a particular message is still associated with some unique semantics.
         UPDATE_CREATE   = 1024,  // With ADD, item added via UpdateCreateInventoryItem
         UPDATE_FAVORITE = 2048,  // With ADD, item added via UpdateCreateInventoryItem
+// <ID:i.doll> [COF worn-state refresh performance]
+        WORN            = 4096,  // Worn state changed; name and sort key are unchanged
+// </ID:i.doll>
         ALL             = 0xffffffff
     };
     LLInventoryObserver();

@@ -460,6 +460,9 @@ private:
     // IDs of original items which are worn and linked in COF.
     // Used to monitor COF changes for updating items worn state. See EXT-8636.
     uuid_vec_t                      mCOFLinkedItems;
+// <ID:i.doll> [COF worn-state refresh performance]
+    bool                            mCOFRefreshPending;
+// </ID:i.doll>
 
     LLOutfitListSortMenu*         mSortMenu;
 

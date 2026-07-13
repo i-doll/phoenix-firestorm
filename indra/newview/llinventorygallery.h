@@ -274,6 +274,9 @@ private:
     typedef std::map<LLUUID, LLInventoryGalleryItem*> gallery_item_map_t;
     gallery_item_map_t mItemMap;
     uuid_vec_t mCOFLinkedItems;
+// <ID:i.doll> [COF worn-state refresh performance]
+    bool mCOFRefreshPending;
+// </ID:i.doll>
     uuid_vec_t mActiveGestures;
     uuid_set_t mItemBuildQuery;
     std::map<LLInventoryGalleryItem*, S32> mItemIndexMap;

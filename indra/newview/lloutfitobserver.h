@@ -66,6 +66,12 @@ protected:
 
     bool checkCOF();
 
+// <ID:i.doll> [COF worn-state refresh performance]
+    void queueCOFChanged();
+
+    void emitCOFChanged();
+// </ID:i.doll>
+
     void checkBaseOutfit();
 
     //last version number of a COF category
@@ -79,6 +85,10 @@ protected:
     bool mLastOutfitDirtiness;
 
     LLUUID mItemNameHash;
+
+// <ID:i.doll> [COF worn-state refresh performance]
+    bool mCOFChangedPending = false;
+// </ID:i.doll>
 
 private:
     signal_t mBOFReplaced;
