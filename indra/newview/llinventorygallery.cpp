@@ -111,6 +111,9 @@ LLInventoryGallery::LLInventoryGallery(const LLInventoryGallery::Params& p)
       mRootDirty(false),
       mLoadThumbnailsImmediately(true),
       mNeedsArrange(false),
+// <ID:i.doll> [COF worn-state refresh performance]
+      mCOFRefreshPending(false),
+// </ID:i.doll>
       mSearchType(LLInventoryFilter::SEARCHTYPE_NAME),
       mSortOrder(LLInventoryFilter::SO_DATE)
 {
@@ -372,6 +375,13 @@ void LLInventoryGallery::onVisibilityChange(bool new_visibility)
 {
     if (new_visibility)
     {
+// <ID:i.doll> [COF worn-state refresh performance]
+        if (mCOFRefreshPending)
+        {
+            mCOFRefreshPending = false;
+            onCOFChanged();
+        }
+// </ID:i.doll>
         if (mRootDirty)
         {
             updateRootFolder();
@@ -2421,6 +2431,14 @@ void LLInventoryGallery::computeDifference(
 
 void LLInventoryGallery::onCOFChanged()
 {
+// <ID:i.doll> [COF worn-state refresh performance]
+    if (!isInVisibleChain())
+    {
+        mCOFRefreshPending = true;
+        return;
+    }
+// </ID:i.doll>
+
     LLInventoryModel::cat_array_t cat_array;
     LLInventoryModel::item_array_t item_array;
 

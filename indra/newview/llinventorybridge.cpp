@@ -298,6 +298,18 @@ const std::string& LLInvFVBridge::getDisplayName() const
     return mDisplayName;
 }
 
+// <ID:i.doll> [COF worn-state refresh performance]
+void LLInvFVBridge::refreshWornState()
+{
+    // Worn state only affects label style/suffix and the searchable suffix. It
+    // does not change the displayed name or sort key, so avoid buildDisplayName()
+    // and the parent-folder sort it requests.
+    mSearchableName = mDisplayName.empty() ? getName() : mDisplayName;
+    mSearchableName.append(getLabelSuffix());
+    LLStringUtil::toUpper(mSearchableName);
+}
+// </ID:i.doll>
+
 std::string LLInvFVBridge::getSearchableDescription() const
 {
     return get_searchable_description(getInventoryModel(), mUUID);
