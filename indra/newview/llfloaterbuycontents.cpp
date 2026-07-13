@@ -52,6 +52,11 @@
 #include "lluictrlfactory.h"
 #include "llviewerwindow.h"
 
+// <ID:i.doll> [Received inventory destination controls]
+#include "idinventoryofferredirect.h"
+#include "idpanelinventoryacceptin.h"
+// </ID:i.doll>
+
 LLFloaterBuyContents::LLFloaterBuyContents(const LLSD& key)
 :   LLFloater(key)
 {
@@ -118,6 +123,13 @@ void LLFloaterBuyContents::show(const LLSaleInfo& sale_info)
     }
 
     floater->mSaleInfo = sale_info;
+// <ID:i.doll> [Per-purchase inventory destination]
+    if (IDPanelInventoryAcceptIn* panel =
+            floater->findChild<IDPanelInventoryAcceptIn>("id_panel_inventory_accept_in"))
+    {
+        panel->refresh();
+    }
+// </ID:i.doll>
 
     // Update the display
     LLSelectNode* node = selection->getFirstRootNode();
@@ -283,8 +295,22 @@ void LLFloaterBuyContents::onClickBuy()
     }
 
     // Put the items where we put new folders.
-    LLUUID category_id;
-    category_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_ROOT_INVENTORY);
+// <ID:i.doll> [Per-purchase inventory destination]
+    LLUUID category_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_ROOT_INVENTORY);
+    if (const IDPanelInventoryAcceptIn* panel =
+            findChild<IDPanelInventoryAcceptIn>("id_panel_inventory_accept_in"))
+    {
+        const LLUUID selected = panel->getSelectedFolder();
+        if (panel->getAcceptIn() && selected.notNull())
+        {
+            category_id = selected;
+        }
+    }
+    else
+    {
+        category_id = IDInventoryOfferRedirect::resolveDestination(category_id);
+    }
+// </ID:i.doll>
 
     // *NOTE: doesn't work for multiple object buy, which UI does not
     // currently support sale info is used for verification only, if

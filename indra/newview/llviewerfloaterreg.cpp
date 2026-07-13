@@ -193,6 +193,9 @@
 #include "animationexplorer.h"
 #include "ao.h"
 #include "daeexport.h"
+// <ID:i.doll> [Inventory destination manager]
+#include "idfloaterinventorydestinationconfig.h"
+// </ID:i.doll>
 #include "idfloaterkeywordcolors.h"
 #include "floatermedialists.h"
 #include "fsareasearch.h"
@@ -486,6 +489,9 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("im_well_window", "floater_sys_well.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLIMWellWindow>);
     LLFloaterReg::add("incoming_call", "floater_incoming_call.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLIncomingCallDialog>);
     LLFloaterReg::add("inventory", "floater_my_inventory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSidePanelContainer>);
+    // <ID:i.doll> [Inventory destination manager]
+    LLFloaterReg::add("id_inventory_destinations", "floater_id_inventory_destination_config.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<IDFloaterInventoryDestinationConfig>);
+    // </ID:i.doll>
     LLFloaterReg::add("inspect", "floater_inspect.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterInspect>);
     LLFloaterReg::add("inventory_thumbnails_helper", "floater_inventory_thumbnails_helper.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterInventoryThumbnailsHelper>);
     LLFloaterReg::add("item_properties", "floater_item_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterItemProperties>);

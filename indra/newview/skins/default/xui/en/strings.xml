@@ -3385,4 +3385,10 @@ Your current position: [AVATAR_POS]
 
   <!-- <FS:TJ> Launch new instance option from macOS dock> -->
   <string name="FSMacOSNewViewerInstance">New Viewer Instance</string>
+
+  <!-- <ID:i.doll> [Temporary received inventory redirect] -->
+  <string name="InventoryReceivedItemsRedirectSuffix">(receiving items)</string>
+  <string name="InventoryReceivedItemsRedirectSet">Received items will be redirected to "[FOLDER]" until you stop redirecting or log out.</string>
+  <string name="InventoryReceivedItemsRedirectCleared">Received items will use their normal inventory destinations again.</string>
+  <!-- </ID:i.doll> -->
 </strings>

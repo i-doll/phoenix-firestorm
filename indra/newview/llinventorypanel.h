@@ -238,6 +238,10 @@ public:
     bool beginIMSession();
     void fileUploadLocation(const LLSD& userdata);
     bool isUploadLocationSelected(const LLSD& userdata);
+// <ID:i.doll> [Temporary received inventory redirect]
+    void setReceivedItemsRedirect();
+    void clearReceivedItemsRedirect();
+// </ID:i.doll>
     void openSingleViewInventory(LLUUID folder_id = LLUUID());
     void purgeSelectedItems();
     bool attachObject(const LLSD& userdata);

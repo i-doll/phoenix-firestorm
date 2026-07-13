@@ -6,6 +6,7 @@
 * $LicenseInfo:firstyear=2008&license=viewerlgpl$
 * Second Life Viewer Source Code
 * Copyright (C) 2010, Linden Research, Inc.
+* Portions Copyright (c) 2017, Kitty Barnett
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -184,6 +185,17 @@ public:
         FormIgnore();
     };
 
+// <ID:i.doll> [Notification form panels for inventory offers]
+    struct FormPanel : public LLInitParam::Block<FormPanel, FormElementBase>
+    {
+        Mandatory<std::string>  type;
+        Optional<std::string>   class_name;
+        Optional<std::string>   filename;
+
+        FormPanel();
+    };
+// </ID:i.doll>
+
     struct FormButton : public LLInitParam::Block<FormButton, FormElementBase>
     {
         Mandatory<S32>          index;
@@ -214,6 +226,9 @@ public:
     {
         Alternative<FormButton> button;
         Alternative<FormInput>  input;
+// <ID:i.doll> [Notification form panels for inventory offers]
+        Alternative<FormPanel>  panel;
+// </ID:i.doll>
 
         FormElement();
     };
@@ -1141,4 +1156,3 @@ private:
 };
 
 #endif//LL_LLNOTIFICATIONS_H
-

@@ -76,6 +76,9 @@
 //#include "llfloaterimnearbychat.h"
 #include "fsfloaternearbychat.h"
 // </FS:Ansariel> [FS communication UI]
+// <ID:i.doll> [Received inventory destination controls]
+#include "idinventoryofferredirect.h"
+// </ID:i.doll>
 #include "llmarketplacefunctions.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
@@ -1897,6 +1900,35 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
     // accept goes to proper folder, decline gets accepted to trash, muted gets declined
     bool accept_to_trash = true;
 
+// <ID:i.doll> [Per-offer inventory destination]
+    const bool accepts_offer = button == IOR_SHOW || button == IOR_SHOW_SILENT ||
+                               button == IOR_ACCEPT || button == IOR_ACCEPT_SILENT;
+// [RLVa:ID] - Preserve #RLV offer routing precedence
+    const bool is_rlv_folder_offer =
+        rlv_handler_t::isEnabled() &&
+        LLAssetType::AT_CATEGORY == mType &&
+        mDesc.find(RLV_PUTINV_PREFIX) == 0;
+// [/RLVa:ID]
+    if (accepts_offer && mIM == IM_INVENTORY_OFFERED && !is_rlv_folder_offer)
+    {
+        LLUUID destination = mFolderID;
+        if (response.has("accept_in"))
+        {
+            const LLUUID selected = response["accept_in_folder"].asUUID();
+            if (response["accept_in"].asBoolean() &&
+                IDInventoryOfferRedirect::isValidOfferDestination(selected))
+            {
+                destination = selected;
+            }
+        }
+        else
+        {
+            destination = IDInventoryOfferRedirect::resolveDestination(destination);
+        }
+        IDInventoryOfferRedirect::redirectAgentOffer(mObjectID, destination);
+    }
+// </ID:i.doll>
+
     LLNotificationFormPtr modified_form(notification_ptr ? new LLNotificationForm(*notification_ptr->getForm()) : new LLNotificationForm());
 
     switch(button)
@@ -1956,7 +1988,9 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
         case IM_GROUP_NOTICE:
         case IM_GROUP_NOTICE_REQUESTED:
             opener = new LLOpenTaskGroupOffer;
-            sendReceiveResponse(true, mFolderID);
+// <ID:i.doll> [Temporary received inventory redirect]
+            sendReceiveResponse(true, IDInventoryOfferRedirect::resolveDestination(mFolderID));
+// </ID:i.doll>
             break;
         case IM_TASK_INVENTORY_OFFERED:
             // This is an offer from a task or group.
@@ -2011,7 +2045,9 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
         if (mIM == IM_GROUP_NOTICE || mIM == IM_GROUP_NOTICE_REQUESTED)
         {
             opener = new LLOpenTaskGroupOffer;
-            sendReceiveResponse(true, mFolderID);
+// <ID:i.doll> [Temporary received inventory redirect]
+            sendReceiveResponse(true, IDInventoryOfferRedirect::resolveDestination(mFolderID));
+// </ID:i.doll>
         }
         else if (mIM == IM_INVENTORY_OFFERED)
         {
@@ -2241,6 +2277,7 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
     switch(button)
     {
         case IOR_ACCEPT:
+        {
 // [RLVa:KB] - Checked: 2010-09-23 (RLVa-1.2.1)
             // Only treat the offer as 'Give to #RLV' if:
             //   - the user has enabled the feature
@@ -2269,6 +2306,38 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
             }
 // [/RLVa:KB]
 
+// <ID:i.doll> [Temporary received inventory redirect]
+// [RLVa:ID] - Preserve #RLV offer routing precedence
+            const bool can_redirect_offer =
+                !(rlv_handler_t::isEnabled() &&
+                  IM_TASK_INVENTORY_OFFERED == mIM &&
+                  LLAssetType::AT_CATEGORY == mType &&
+                  mDesc.find(RLV_PUTINV_PREFIX) == 1);
+// [/RLVa:ID]
+            if (can_redirect_offer)
+            {
+                LLUUID redirect;
+                if (response.has("accept_in"))
+                {
+                    const LLUUID selected = response["accept_in_folder"].asUUID();
+                    if (response["accept_in"].asBoolean() &&
+                        IDInventoryOfferRedirect::isValidOfferDestination(selected))
+                    {
+                        redirect = selected;
+                    }
+                }
+                else
+                {
+                    redirect = IDInventoryOfferRedirect::resolveDestination(LLUUID::null);
+                }
+                if (redirect.notNull())
+                {
+                    mFolderID = redirect;
+                    IDInventoryOfferRedirect::redirectTaskOffer(mDesc, mTransactionID, redirect);
+                }
+            }
+// </ID:i.doll>
+
             destination = mFolderID;
             //don't spam user if flooded
             if (check_offer_throttle(mFromName, true))
@@ -2282,6 +2351,7 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
                 LLNotificationsUtil::add("SystemMessageTip", args);
             }
             break;
+        }
         case IOR_MUTE:
             // MUTE falls through to decline
             accept = false;
