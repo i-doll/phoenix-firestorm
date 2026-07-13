@@ -48,6 +48,10 @@
 #include "llviewerobject.h"
 #include "lluictrlfactory.h"
 #include "llviewerwindow.h"
+// <ID:i.doll> [Received inventory destination controls]
+#include "idinventoryofferredirect.h"
+#include "idpanelinventoryacceptin.h"
+// </ID:i.doll>
 // [RLVa:KB] - @edit
 #include "rlvactions.h"
 // [/RLVa:KB]
@@ -81,6 +85,13 @@ bool LLFloaterOpenObject::postBuild()
 
 void LLFloaterOpenObject::onOpen(const LLSD& key)
 {
+// <ID:i.doll> [Per-unpack inventory destination]
+    if (IDPanelInventoryAcceptIn* panel =
+            findChild<IDPanelInventoryAcceptIn>("id_panel_inventory_accept_in"))
+    {
+        panel->refresh();
+    }
+// </ID:i.doll>
     LLObjectSelectionHandle object_selection = LLSelectMgr::getInstance()->getSelection();
     if (object_selection->getRootObjectCount() != 1)
     {
@@ -119,11 +130,25 @@ void LLFloaterOpenObject::refresh()
     {
         name = node->mName;
         enabled = true;
+// <ID:i.doll> [Per-unpack inventory destination]
+        if (IDPanelInventoryAcceptIn* panel =
+                findChild<IDPanelInventoryAcceptIn>("id_panel_inventory_accept_in"))
+        {
+            panel->setObjectFolder(node->mFolderID);
+        }
+// </ID:i.doll>
     }
     else
     {
         name = "";
         enabled = false;
+// <ID:i.doll> [Per-unpack inventory destination]
+        if (IDPanelInventoryAcceptIn* panel =
+                findChild<IDPanelInventoryAcceptIn>("id_panel_inventory_accept_in"))
+        {
+            panel->setObjectFolder(LLUUID::null);
+        }
+// </ID:i.doll>
     }
 
     getChild<LLUICtrl>("object_name")->setTextArg("[DESC]", name);
@@ -179,6 +204,21 @@ void LLFloaterOpenObject::moveToInventory(bool wear, bool replace)
     {
         parent_category_id = gInventory.getRootFolderID();
     }
+// <ID:i.doll> [Per-unpack inventory destination]
+    if (const IDPanelInventoryAcceptIn* panel =
+            findChild<IDPanelInventoryAcceptIn>("id_panel_inventory_accept_in"))
+    {
+        const LLUUID selected = panel->getSelectedFolder();
+        if (panel->getAcceptIn() && selected.notNull())
+        {
+            parent_category_id = selected;
+        }
+    }
+    else
+    {
+        parent_category_id = IDInventoryOfferRedirect::resolveDestination(parent_category_id);
+    }
+// </ID:i.doll>
 
     inventory_func_type func = boost::bind(LLFloaterOpenObject::callbackCreateInventoryCategory,_1,object_id,wear,replace);
     // D567 copy thumbnail info

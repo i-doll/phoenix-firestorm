@@ -25,7 +25,11 @@
  */
 
 #include "llviewerprecompiledheaders.h"
+
 #include "llinventorypanel.h"
+// <ID:i.doll> [Temporary received inventory redirect]
+#include "idinventoryofferredirect.h"
+// </ID:i.doll>
 
 #include <utility> // for std::pair<>
 
@@ -200,6 +204,10 @@ LLInventoryPanel::LLInventoryPanel(const LLInventoryPanel::Params& p) :
     mCommitCallbackRegistrar.add("Inventory.Share",  boost::bind(&LLAvatarActions::shareWithAvatars, this));
     mCommitCallbackRegistrar.add("Inventory.FileUploadLocation", boost::bind(&LLInventoryPanel::fileUploadLocation, this, _2));
     mEnableCallbackRegistrar.add("Inventory.FileUploadLocation.Check", boost::bind(&LLInventoryPanel::isUploadLocationSelected, this, _2));
+// <ID:i.doll> [Temporary received inventory redirect]
+    mCommitCallbackRegistrar.add("Inventory.SetReceivedItemsRedirect", boost::bind(&LLInventoryPanel::setReceivedItemsRedirect, this));
+    mCommitCallbackRegistrar.add("Inventory.ClearReceivedItemsRedirect", boost::bind(&LLInventoryPanel::clearReceivedItemsRedirect, this));
+// </ID:i.doll>
     mCommitCallbackRegistrar.add("Inventory.OpenNewFolderWindow", boost::bind(&LLInventoryPanel::openSingleViewInventory, this, LLUUID()));
     mCommitCallbackRegistrar.add("Inventory.CustomAction", boost::bind(&LLInventoryPanel::onCustomAction, this, _2)); // <FS:Ansariel> Prevent warning "No callback found for: 'Inventory.CustomAction' in control: Find Links"
 }
@@ -2067,6 +2075,21 @@ bool LLInventoryPanel::isUploadLocationSelected(const LLSD& userdata)
     const LLUUID dest = LLFolderBridge::sSelf.get()->getUUID();
     return LLInventoryAction::isFileUploadLocation(dest, param);
 }
+
+// <ID:i.doll> [Temporary received inventory redirect]
+void LLInventoryPanel::setReceivedItemsRedirect()
+{
+    if (LLFolderBridge* folder = LLFolderBridge::sSelf.get())
+    {
+        IDInventoryOfferRedirect::setDestination(folder->getUUID());
+    }
+}
+
+void LLInventoryPanel::clearReceivedItemsRedirect()
+{
+    IDInventoryOfferRedirect::clearDestination();
+}
+// </ID:i.doll>
 
 void LLInventoryPanel::openSingleViewInventory(LLUUID folder_id)
 {

@@ -2,7 +2,7 @@
 <floater
  legacy_header_height="18"
  can_resize="true"
- height="310"
+ height="340"
  layout="topleft"
  min_height="150"
  min_width="225"
@@ -118,6 +118,17 @@ Buy for L$[AMOUNT] from:
      width="260">
     [NAME]?
   </text>
+    <!-- <ID:i.doll> [Per-purchase inventory destination] -->
+    <panel
+     class="id_panel_inventory_accept_in"
+     follows="left|right|bottom"
+     height="24"
+     layout="topleft"
+     left="10"
+     name="id_panel_inventory_accept_in"
+     top_pad="6"
+     width="260" />
+    <!-- </ID:i.doll> -->
     <button
      follows="right|bottom"
      height="23"
@@ -126,7 +137,7 @@ Buy for L$[AMOUNT] from:
      layout="topleft"
      left="65"
      name="buy_btn"
-     top_pad="10"
+     top_pad="8"
      width="100" />
     <button
      follows="right|bottom"
