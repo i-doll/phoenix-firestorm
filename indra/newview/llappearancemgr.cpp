@@ -1032,7 +1032,9 @@ void recovered_item_link_cb(const LLUUID& item_id, LLWearableType::EType type, L
 
     if (linked_item)
     {
-        gInventory.addChangedMask(LLInventoryObserver::LABEL, linked_item->getUUID());
+// <ID:i.doll> [COF worn-state refresh performance]
+        gInventory.addChangedMask(LLInventoryObserver::WORN, linked_item->getUUID());
+// </ID:i.doll>
 
         if (item)
         {
@@ -3390,7 +3392,9 @@ void LLAppearanceMgr::addCOFItemLink(const LLInventoryItem *item,
         return;
     }
 
-    gInventory.addChangedMask(LLInventoryObserver::LABEL, vitem->getLinkedUUID());
+// <ID:i.doll> [COF worn-state refresh performance]
+    gInventory.addChangedMask(LLInventoryObserver::WORN, vitem->getLinkedUUID());
+// </ID:i.doll>
 
     LLInventoryModel::cat_array_t cat_array;
     LLInventoryModel::item_array_t item_array;
@@ -3533,7 +3537,9 @@ public:
     /* virtual */ void fire(const LLUUID& item_id)
     {
         // just removed cof link, "(wear)" suffix depends on presence of link, so update label
-        gInventory.addChangedMask(LLInventoryObserver::LABEL, mItemID);
+// <ID:i.doll> [COF worn-state refresh performance]
+        gInventory.addChangedMask(LLInventoryObserver::WORN, mItemID);
+// </ID:i.doll>
         if (mCB.notNull())
         {
             mCB->fire(item_id);
@@ -3550,7 +3556,9 @@ private:
 void LLAppearanceMgr::removeCOFItemLinks(const LLUUID& item_id, LLPointer<LLInventoryCallback> cb, bool immediate_delete)
 // [/SL:KB]
 {
-    gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+// <ID:i.doll> [COF worn-state refresh performance]
+    gInventory.addChangedMask(LLInventoryObserver::WORN, item_id);
+// </ID:i.doll>
 
     LLInventoryModel::cat_array_t cat_array;
     LLInventoryModel::item_array_t item_array;
@@ -4945,7 +4953,9 @@ void LLAppearanceMgr::registerAttachment(const LLUUID& item_id)
     LLViewerInventoryItem *item = gInventory.getItem(item_id);
     LL_DEBUGS("Avatar") << "ATT registering attachment "
                         << (item ? item->getName() : "UNKNOWN") << " " << item_id << LL_ENDL;
-    gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+// <ID:i.doll> [COF worn-state refresh performance]
+    gInventory.addChangedMask(LLInventoryObserver::WORN, item_id);
+// </ID:i.doll>
 
     LLAttachmentsMgr::instance().onAttachmentArrived(item_id);
 
@@ -4959,7 +4969,9 @@ void LLAppearanceMgr::unregisterAttachment(const LLUUID& item_id)
     LLViewerInventoryItem *item = gInventory.getItem(item_id);
     LL_DEBUGS("Avatar") << "ATT unregistering attachment "
                         << (item ? item->getName() : "UNKNOWN") << " " << item_id << LL_ENDL;
-    gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+// <ID:i.doll> [COF worn-state refresh performance]
+    gInventory.addChangedMask(LLInventoryObserver::WORN, item_id);
+// </ID:i.doll>
 
     LLAttachmentsMgr::instance().onDetachCompleted(item_id);
     if (mAttachmentInvLinkEnabled && isLinkedInCOF(item_id))

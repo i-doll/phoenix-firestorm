@@ -1401,14 +1401,15 @@ void LLPanelOutfitEdit::getSelectedItemsUUID(uuid_vec_t& uuid_list)
 
 void LLPanelOutfitEdit::onCOFChanged()
 {
-    //the panel is only updated when is visible to a user
-
-    // BAP - this check has to be removed because otherwise item name
-    // changes made when the panel is not visible will not be
-    // propagated to the panel.
-    // if (!isInVisibleChain()) return;
-
-    update();
+// <ID:i.doll> [COF worn-state refresh performance]
+    // onVisibilityChanged() performs a full refresh when the editor becomes
+    // visible. Avoid constructing every COF row while this panel is hidden (or
+    // before it has ever been opened), and coalesce bursts of COF changes.
+    if (mInitialized && isInVisibleChain())
+    {
+        mCOFWearables->queueRefresh();
+    }
+// </ID:i.doll>
 }
 
 void LLPanelOutfitEdit::updateWearablesPanelVerbButtons()

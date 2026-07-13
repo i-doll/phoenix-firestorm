@@ -328,7 +328,9 @@ void LLAgentWearables::addWearabletoAgentInventoryDone(const LLWearableType::ETy
 
         if (old_item_id.notNull())
         {
-            gInventory.addChangedMask(LLInventoryObserver::LABEL, old_item_id);
+// <ID:i.doll> [COF worn-state refresh performance]
+            gInventory.addChangedMask(LLInventoryObserver::WORN, old_item_id);
+// </ID:i.doll>
             setWearable(type,index,wearable);
         }
         else
@@ -337,7 +339,9 @@ void LLAgentWearables::addWearabletoAgentInventoryDone(const LLWearableType::ETy
         }
     }
 
-    gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+// <ID:i.doll> [COF worn-state refresh performance]
+    gInventory.addChangedMask(LLInventoryObserver::WORN, item_id);
+// </ID:i.doll>
 
     LLViewerInventoryItem* item = gInventory.getItem(item_id);
     if (item && wearable)
@@ -1223,7 +1227,9 @@ void LLAgentWearables::setWearableOutfit(const LLInventoryItem::item_array_t& it
                 {
                     // we changed id before setting wearable, update old item manually
                     // to complete the swap.
-                    gInventory.addChangedMask(LLInventoryObserver::LABEL, old_wearable_id);
+// <ID:i.doll> [COF worn-state refresh performance]
+                    gInventory.addChangedMask(LLInventoryObserver::WORN, old_wearable_id);
+// </ID:i.doll>
                 }
             }
             else
@@ -1898,8 +1904,10 @@ void LLAgentWearables::sendAgentWearablesUpdate()
                 }
                 else
                 {
-                    gInventory.addChangedMask(LLInventoryObserver::LABEL,
+// <ID:i.doll> [COF worn-state refresh performance]
+                    gInventory.addChangedMask(LLInventoryObserver::WORN,
                                               wearable->getItemID());
+// </ID:i.doll>
                 }
             }
         }
