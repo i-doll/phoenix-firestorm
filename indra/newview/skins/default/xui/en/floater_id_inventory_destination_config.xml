@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_minimize="false"
+ can_resize="true"
+ height="330"
+ layout="topleft"
+ min_height="300"
+ min_width="420"
+ name="id_inventory_destination_config"
+ positioning="centered"
+ title="Inventory Destinations"
+ width="520">
+    <floater.string name="label_required">Enter a label for this destination.</floater.string>
+    <floater.string name="label_duplicate">Destination labels must be unique.</floater.string>
+    <text
+     follows="left|top|right"
+     height="18"
+     layout="topleft"
+     left="10"
+     name="description"
+     right="-10"
+     top="8">
+        Labels configured here appear in every Accept in dropdown.
+    </text>
+    <scroll_list
+     column_padding="6"
+     draw_heading="true"
+     follows="all"
+     height="190"
+     layout="topleft"
+     left="10"
+     name="destination_list"
+     right="-10"
+     top_pad="4">
+        <scroll_list.columns
+         label="Label"
+         name="label"
+         relative_width="0.35" />
+        <scroll_list.columns
+         label="Inventory Folder"
+         name="folder"
+         relative_width="0.65" />
+    </scroll_list>
+    <button
+     follows="left|bottom"
+     height="23"
+     label="Add Folder..."
+     layout="topleft"
+     left="10"
+     name="add_button"
+     top_pad="5"
+     width="105" />
+    <button
+     follows="left|bottom"
+     height="23"
+     label="Remove"
+     layout="topleft"
+     left_pad="5"
+     name="remove_button"
+     top_delta="0"
+     width="80" />
+    <text
+     follows="left|bottom"
+     height="18"
+     layout="topleft"
+     left="10"
+     name="label_text"
+     top_pad="10"
+     width="45">
+        Label:
+    </text>
+    <line_editor
+     commit_on_focus_lost="false"
+     follows="left|right|bottom"
+     height="23"
+     layout="topleft"
+     left_pad="4"
+     max_length_bytes="255"
+     name="label_editor"
+     right="-105"
+     top_delta="-3" />
+    <button
+     follows="right|bottom"
+     height="23"
+     label="Save Label"
+     layout="topleft"
+     name="save_label_button"
+     right="-10"
+     top_delta="0"
+     width="90" />
+    <text
+     follows="left|right|bottom"
+     height="16"
+     layout="topleft"
+     left="59"
+     name="validation_text"
+     text_color="EmphasisColor"
+     top_pad="2"
+     visible="false"
+     width="330" />
+    <button
+     follows="right|bottom"
+     height="23"
+     label="Close"
+     layout="topleft"
+     name="close_button"
+     right="-10"
+     bottom="-8"
+     width="90" />
+</floater>

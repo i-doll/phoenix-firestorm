@@ -4,7 +4,7 @@
  legacy_header_height="18"
  can_resize="true"
  default_tab_group="1"
- height="322"
+ height="350"
  layout="topleft"
  min_height="160"
  min_width="285"
@@ -37,6 +37,18 @@
      name="object_contents"
      top_pad="0"
      width="284" />
+
+    <!-- <ID:i.doll> [Per-unpack inventory destination] -->
+    <panel
+     class="id_panel_inventory_accept_in"
+     follows="left|right|bottom"
+     height="24"
+     layout="topleft"
+     left="10"
+     name="id_panel_inventory_accept_in"
+     top_pad="5"
+     width="284" />
+    <!-- </ID:i.doll> -->
 
     <layout_stack
      follows="bottom|left|right"

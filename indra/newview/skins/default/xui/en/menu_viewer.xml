@@ -60,6 +60,18 @@
            function="Floater.Toggle"
            parameter="inventory" />
         </menu_item_check>
+        <!-- <ID:i.doll> [Inventory destination manager] -->
+        <menu_item_check
+         label="Inventory Destinations"
+         name="Inventory Destinations">
+          <menu_item_check.on_check
+           function="Floater.Visible"
+           parameter="id_inventory_destinations" />
+          <menu_item_check.on_click
+           function="Floater.Toggle"
+           parameter="id_inventory_destinations" />
+        </menu_item_check>
+        <!-- </ID:i.doll> -->
         <menu_item_call
          label="New Inventory Window"
          name="NewInventoryWindow"

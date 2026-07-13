@@ -2,7 +2,7 @@
 <floater
  legacy_header_height="18"
  can_resize="true"
- height="290"
+ height="320"
  layout="topleft"
  min_height="150"
  min_width="224"
@@ -78,6 +78,17 @@
      left="10"
      name="wear_check"
      width="250" />
+    <!-- <ID:i.doll> [Per-purchase inventory destination] -->
+    <panel
+     class="id_panel_inventory_accept_in"
+     follows="left|right|bottom"
+     height="24"
+     layout="topleft"
+     left="10"
+     name="id_panel_inventory_accept_in"
+     top_pad="5"
+     width="260" />
+    <!-- </ID:i.doll> -->
     <button
      follows="right|bottom"
      height="23"
