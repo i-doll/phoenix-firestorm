@@ -537,6 +537,17 @@ void LLCOFWearables::onCOFInventoryChanged()
         return;
     }
 
+// <ID:i.doll> [COF worn-state refresh performance]
+    queueRefresh();
+}
+
+void LLCOFWearables::queueRefresh()
+{
+    if (mRefreshQueued)
+    {
+        return;
+    }
+
     mRefreshQueued = true;
     doOnIdleOneTime([this]()
         {
@@ -547,6 +558,7 @@ void LLCOFWearables::onCOFInventoryChanged()
             }
         });
 }
+// </ID:i.doll>
 
 void LLCOFWearables::refresh()
 {

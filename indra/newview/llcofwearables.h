@@ -95,6 +95,9 @@ public:
 
     void setAttachmentsTitle();
     void onCOFInventoryChanged();
+// <ID:i.doll> [COF worn-state refresh performance]
+    void queueRefresh();
+// </ID:i.doll>
 
 protected:
 

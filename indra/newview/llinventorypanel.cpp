@@ -662,6 +662,34 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
         }
     }
 
+// <ID:i.doll> [COF worn-state refresh performance]
+    //////////////////////////////
+    // WORN Operation
+    // Update only the visual suffix/style. A worn-state change is not a rename
+    // and must not force sorting and refiltering of the whole parent subtree.
+    if ((mask & LLInventoryObserver::WORN) && view_item)
+    {
+        LLInvFVBridge* bridge = static_cast<LLInvFVBridge*>(view_item->getViewModelItem());
+        if (bridge)
+        {
+            bridge->refreshWornState();
+        }
+        view_item->refreshSuffix();
+
+        // Worn-only and text filters genuinely depend on this state. Keep the
+        // expensive invalidation for those modes, but not the normal inventory.
+        if (getFilter().getFilterWorn() || !getFilter().getFilterSubString().empty())
+        {
+            view_item->getViewModelItem()->dirtyFilter();
+            LLFolderViewFolder* parent = view_item->getParentFolder();
+            if (parent && parent->getViewModelItem())
+            {
+                parent->getViewModelItem()->dirtyDescendantsFilter();
+            }
+        }
+    }
+// </ID:i.doll>
+
     //////////////////////////////
     // REBUILD Operation
     // Destroy and regenerate the UI.
