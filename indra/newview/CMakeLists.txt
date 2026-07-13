@@ -120,6 +120,12 @@ set(viewer_SOURCE_FILES
     fsfloateraddtocontactset.cpp
     fsfavoritegroups.cpp
     fsinventorycustomtabs.cpp
+    # <ID:i.doll> [Received inventory destination controls]
+    idfloaterinventorydestinationconfig.cpp
+    idfloaterinventoryfolderbrowse.cpp
+    idinventoryofferredirect.cpp
+    idpanelinventoryacceptin.cpp
+    # </ID:i.doll>
     fsfloaterassetblacklist.cpp
     fsfloateravataralign.cpp
     fsfloateravatarrendersettings.cpp
@@ -984,6 +990,12 @@ set(viewer_HEADER_FILES
     fsfloateraddtocontactset.h
     fsfavoritegroups.h
     fsinventorycustomtabs.h
+    # <ID:i.doll> [Received inventory destination controls]
+    idfloaterinventorydestinationconfig.h
+    idfloaterinventoryfolderbrowse.h
+    idinventoryofferredirect.h
+    idpanelinventoryacceptin.h
+    # </ID:i.doll>
     fsfloaterassetblacklist.h
     fsfloateravatarrendersettings.h
     fsfloaterbigpreview.h

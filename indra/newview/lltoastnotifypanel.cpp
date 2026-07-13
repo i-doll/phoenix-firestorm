@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Portions Copyright (c) 2017, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,6 +28,10 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "lltoastnotifypanel.h"
+
+// <ID:i.doll> [Inventory offer destination panel]
+#include "idpanelinventoryacceptin.h"
+// </ID:i.doll>
 
 // project includes
 #include "llviewercontrol.h"
@@ -136,6 +141,21 @@ LLButton* LLToastNotifyPanel::createButton(const LLSD& form_element, bool is_opt
     return btn;
 }
 
+// <ID:i.doll> [Inventory offer destination panel]
+LLPanel* LLToastNotifyPanel::createPanel(const LLSD& form_element)
+{
+    LLPanel* panel = LLRegisterPanelClass::instance().createPanelClass(form_element["class"].asString());
+    if (panel)
+    {
+        const std::string panel_file = panel->getXMLFilename();
+        panel->setXMLFilename(LLStringUtil::null);
+        panel->buildFromFile(panel_file);
+        panel->reshape(mControlPanel->getRect().getWidth(), panel->getRect().getHeight());
+    }
+    return panel;
+}
+// </ID:i.doll>
+
 LLToastNotifyPanel::~LLToastNotifyPanel()
 {
     mButtonClickConnection.disconnect();
@@ -221,6 +241,21 @@ void LLToastNotifyPanel::updateButtonsLayout(const std::vector<index_button_pair
     }
 }
 
+// <ID:i.doll> [Inventory offer destination panel]
+void LLToastNotifyPanel::updateControlsLayout(const std::vector<LLPanel*>& controls, S32 bottom_offset)
+{
+    for (LLPanel* panel : controls)
+    {
+        LLRect rect(panel->getRect());
+        rect.setOriginAndSize(rect.mLeft, bottom_offset + VPAD,
+                              rect.getWidth(), rect.getHeight());
+        panel->setRect(rect);
+        mControlPanel->addChild(panel);
+        bottom_offset += panel->getRect().getHeight() + VPAD;
+    }
+}
+// </ID:i.doll>
+
 void LLToastNotifyPanel::adjustPanelForScriptNotice(S32 button_panel_width, S32 button_panel_height)
 {
     //adjust layout
@@ -257,6 +292,15 @@ void LLToastNotifyPanel::onClickButton(void* data)
     {
         response[button_name] = true;
     }
+
+// <ID:i.doll> [Inventory offer destination panel]
+    if (const IDPanelInventoryAcceptIn* panel =
+            self->mControlPanel->findChild<const IDPanelInventoryAcceptIn>("id_panel_inventory_accept_in", true))
+    {
+        response["accept_in"] = panel->getAcceptIn();
+        response["accept_in_folder"] = panel->getSelectedFolder();
+    }
+// </ID:i.doll>
 
     // disable all buttons
     self->mControlPanel->setEnabled(false);
@@ -364,6 +408,10 @@ void LLToastNotifyPanel::init( LLRect rect, bool show_images )
     }
     else
     {
+// <ID:i.doll> [Inventory offer destination panel]
+        std::vector<LLPanel*> controls;
+        S32 controls_height = 0;
+// </ID:i.doll>
         std::vector<index_button_pair_t> buttons;
         buttons.reserve(mNumOptions);
         S32 buttons_width = 0;
@@ -371,6 +419,17 @@ void LLToastNotifyPanel::init( LLRect rect, bool show_images )
         for (S32 i = 0; i < mNumOptions; i++)
         {
             LLSD form_element = form->getElement(i);
+// <ID:i.doll> [Inventory offer destination panel]
+            if (form_element["type"].asString() == "panel")
+            {
+                if (LLPanel* panel = createPanel(form_element))
+                {
+                    controls.push_back(panel);
+                    controls_height += panel->getRect().getHeight() + VPAD;
+                }
+                continue;
+            }
+// </ID:i.doll>
             if (form_element["type"].asString() != "button")
             {
                 // not a button.
@@ -443,9 +502,17 @@ void LLToastNotifyPanel::init( LLRect rect, bool show_images )
                 button_panel_height = button_rows * (BTN_HEIGHT + VPAD) + BOTTOM_PAD;
             }
 
+// <ID:i.doll> [Inventory offer destination panel]
+            const S32 controls_bottom = button_panel_height;
+            button_panel_height += controls_height;
+// </ID:i.doll>
+
             // we need to keep min width and max height to make visible all buttons, because width of the toast can not be changed
             adjustPanelForScriptNotice(button_panel_width, button_panel_height);
             updateButtonsLayout(buttons, h_pad);
+// <ID:i.doll> [Inventory offer destination panel]
+            updateControlsLayout(controls, controls_bottom);
+// </ID:i.doll>
             // save buttons for later use in disableButtons()
             //mButtons.assign(buttons.begin(), buttons.end());
         }
@@ -622,4 +689,3 @@ void LLIMToastNotifyPanel::init( LLRect rect, bool show_images )
 }
 
 // EOF
-

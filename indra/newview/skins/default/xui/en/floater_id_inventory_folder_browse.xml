@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_minimize="false"
+ can_resize="true"
+ height="360"
+ layout="topleft"
+ min_height="300"
+ min_width="360"
+ name="id_inventory_folder_browse"
+ positioning="centered"
+ title="Choose Inventory Folder"
+ width="420">
+    <filter_editor
+     follows="left|top|right"
+     height="23"
+     label="Filter Inventory"
+     layout="topleft"
+     left="10"
+     name="inventory_filter"
+     right="-10"
+     top="8" />
+    <inventory_panel
+     allow_multi_select="false"
+     bg_visible="true"
+     bg_alpha_color="DkGray2"
+     border="false"
+     follows="all"
+     height="285"
+     layout="topleft"
+     left="10"
+     name="inventory_panel"
+     right="-10"
+     show_items="false"
+     top_pad="4" />
+    <button
+     follows="bottom|left"
+     height="23"
+     label="Select"
+     layout="topleft"
+     left="10"
+     name="select_button"
+     top_pad="5"
+     width="90" />
+    <button
+     follows="bottom|left"
+     height="23"
+     label="Cancel"
+     layout="topleft"
+     left_pad="5"
+     name="cancel_button"
+     top_delta="0"
+     width="90" />
+    <button
+     follows="bottom|right"
+     height="23"
+     label="Close All"
+     layout="topleft"
+     name="close_all_button"
+     right="-10"
+     top_delta="0"
+     width="90" />
+</floater>

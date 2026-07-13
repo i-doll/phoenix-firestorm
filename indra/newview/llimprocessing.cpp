@@ -73,6 +73,9 @@
 #include "exogroupmutelist.h"
 #include "fscommon.h"
 #include "fsdata.h"
+// <ID:i.doll> [Temporary received inventory redirect]
+#include "idinventoryofferredirect.h"
+// </ID:i.doll>
 #include "fskeywords.h"
 #include "lggcontactsets.h" // <FS:PP> FIRE-17006 Autoresponse based on Contact Set
 #include "llagentui.h"
@@ -455,6 +458,23 @@ void inventory_offer_handler(LLOfferInfo* info)
         {
             gInventory.addObserver(fetch_item);
         }
+
+// <ID:i.doll> [Temporary received inventory redirect]
+        // Auto-accepted agent offers have no destination panel. Move them
+        // after their local record arrives; interactive offers are routed by
+        // their notification response.
+        // RLVa's #RLV routing remains authoritative for its special offers.
+// [RLVa:ID] - Preserve #RLV offer routing precedence
+        const bool is_rlv_folder_offer =
+            rlv_handler_t::isEnabled() &&
+            LLAssetType::AT_CATEGORY == info->mType &&
+            info->mDesc.find(RLV_PUTINV_PREFIX) == 0;
+// [/RLVa:ID]
+        if (bAutoAccept && !is_rlv_folder_offer)
+        {
+            IDInventoryOfferRedirect::redirectAgentOffer(info->mObjectID);
+        }
+// </ID:i.doll>
 
         // In viewer 2 we're now auto receiving inventory offers and messaging as such (not sending reject messages).
         // <FS:Ansariel> Optional V1-like inventory accept messages
@@ -2625,4 +2645,3 @@ void LLIMProcessing::requestOfflineMessagesLegacy()
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     gAgent.sendReliableMessage();
 }
-

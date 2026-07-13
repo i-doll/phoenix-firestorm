@@ -155,6 +155,25 @@
     <menu_item_separator
      layout="topleft"
      name="Open Folder Separator" />
+<!-- <ID:i.doll> [Temporary received inventory redirect] -->
+    <menu_item_separator
+     layout="topleft"
+     name="Received Items Redirect Separator" />
+    <menu_item_call
+     label="Redirect Received Items Here"
+     layout="topleft"
+     name="Set Received Items Redirect">
+        <menu_item_call.on_click
+         function="Inventory.SetReceivedItemsRedirect" />
+    </menu_item_call>
+    <menu_item_call
+     label="Stop Redirecting Received Items"
+     layout="topleft"
+     name="Clear Received Items Redirect">
+        <menu_item_call.on_click
+         function="Inventory.ClearReceivedItemsRedirect" />
+    </menu_item_call>
+<!-- </ID:i.doll> -->
     <menu_item_call
      label="Rename"
      layout="topleft"

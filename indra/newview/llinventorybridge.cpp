@@ -25,7 +25,11 @@
  */
 
 #include "llviewerprecompiledheaders.h"
+
 #include "llinventorybridge.h"
+// <ID:i.doll> [Temporary received inventory redirect]
+#include "idinventoryofferredirect.h"
+// </ID:i.doll>
 
 // external projects
 #include "lltransfersourceasset.h"
@@ -2804,6 +2808,13 @@ std::string LLFolderBridge::getLabelSuffix() const
         // </FS:Ansariel>
     }
 
+// <ID:i.doll> [Temporary received inventory redirect]
+    if (IDInventoryOfferRedirect::isDestination(getUUID()))
+    {
+        suffix += " " + LLTrans::getString("InventoryReceivedItemsRedirectSuffix");
+    }
+// </ID:i.doll>
+
     return LLInvFVBridge::getLabelSuffix() + suffix;
 }
 
@@ -5331,6 +5342,21 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
 
     // <FS:Ansariel> Show folder in new window option
     items.push_back((std::string("Show in new Window")));
+
+// <ID:i.doll> [Temporary received inventory redirect]
+    if (!(flags & ITEM_IN_MULTI_SELECTION) && IDInventoryOfferRedirect::isValidDestination(mUUID))
+    {
+        items.push_back(std::string("Received Items Redirect Separator"));
+        if (!IDInventoryOfferRedirect::isDestination(mUUID))
+        {
+            items.push_back(std::string("Set Received Items Redirect"));
+        }
+        if (IDInventoryOfferRedirect::destination().notNull())
+        {
+            items.push_back(std::string("Clear Received Items Redirect"));
+        }
+    }
+// </ID:i.doll>
 
     // <FS:Zi> Add "Reload folder" action to inventory
     // only allow reload for a single, non-root folder to prevent misuse

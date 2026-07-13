@@ -5,6 +5,7 @@
 * $LicenseInfo:firstyear=2008&license=viewerlgpl$
 * Second Life Viewer Source Code
 * Copyright (C) 2010, Linden Research, Inc.
+* Portions Copyright (c) 2017, Kitty Barnett
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -71,6 +72,16 @@ LLNotificationForm::FormIgnore::FormIgnore()
     checkbox_only("checkbox_only", false)
 {}
 
+// <ID:i.doll> [Notification form panels for inventory offers]
+LLNotificationForm::FormPanel::FormPanel()
+:   type("type"),
+    class_name("class"),
+    filename("filename")
+{
+    type = "panel";
+}
+// </ID:i.doll>
+
 LLNotificationForm::FormButton::FormButton()
 :   index("index"),
     text("text"),
@@ -96,6 +107,9 @@ LLNotificationForm::FormInput::FormInput()
 LLNotificationForm::FormElement::FormElement()
 :   button("button"),
     input("input")
+// <ID:i.doll> [Notification form panels for inventory offers]
+    , panel("panel")
+// </ID:i.doll>
 {}
 
 LLNotificationForm::FormElements::FormElements()

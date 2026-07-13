@@ -27,6 +27,9 @@
 
 #include "llinventorygallery.h"
 #include "llinventorygallerymenu.h"
+// <ID:i.doll> [Temporary received inventory redirect]
+#include "idinventoryofferredirect.h"
+// </ID:i.doll>
 
 #include "llagent.h"
 #include "llappearancemgr.h"
@@ -92,6 +95,19 @@ LLContextMenu* LLInventoryGalleryContextMenu::createMenu()
 
     registrar.add("Inventory.DoToSelected", boost::bind(&LLInventoryGalleryContextMenu::doToSelected, this, _2));
     registrar.add("Inventory.FileUploadLocation", boost::bind(&LLInventoryGalleryContextMenu::fileUploadLocation, this, _2));
+// <ID:i.doll> [Temporary received inventory redirect]
+    registrar.add("Inventory.SetReceivedItemsRedirect", [this](LLUICtrl*, const LLSD&)
+                  {
+                      if (mUUIDs.size() == 1)
+                      {
+                          IDInventoryOfferRedirect::setDestination(mUUIDs.front());
+                      }
+                  });
+    registrar.add("Inventory.ClearReceivedItemsRedirect", [](LLUICtrl*, const LLSD&)
+                  {
+                      IDInventoryOfferRedirect::clearDestination();
+                  });
+// </ID:i.doll>
     registrar.add("Inventory.EmptyTrash", boost::bind(&LLInventoryModel::emptyFolderType, &gInventory, "ConfirmEmptyTrash", LLFolderType::FT_TRASH));
     registrar.add("Inventory.EmptyLostAndFound", boost::bind(&LLInventoryModel::emptyFolderType, &gInventory, "ConfirmEmptyLostAndFound", LLFolderType::FT_LOST_AND_FOUND));
     registrar.add("Inventory.DoCreate", [this](LLUICtrl*, const LLSD& data)
@@ -663,6 +679,21 @@ void LLInventoryGalleryContextMenu::updateMenuItemsVisibility(LLContextMenu* men
 
     if (is_folder)
     {
+// <ID:i.doll> [Temporary received inventory redirect]
+        if (mUUIDs.size() == 1 && IDInventoryOfferRedirect::isValidDestination(selected_id))
+        {
+            items.push_back(std::string("Received Items Redirect Separator"));
+            if (!IDInventoryOfferRedirect::isDestination(selected_id))
+            {
+                items.push_back(std::string("Set Received Items Redirect"));
+            }
+            if (IDInventoryOfferRedirect::destination().notNull())
+            {
+                items.push_back(std::string("Clear Received Items Redirect"));
+            }
+        }
+// </ID:i.doll>
+
         if(!isRootFolder())
         {
             items.push_back(std::string("Copy Separator"));
@@ -1116,4 +1147,3 @@ void LLInventoryGalleryContextMenu::updateMenuItemsVisibility(LLContextMenu* men
 
     hide_context_entries(*menu, items, disabled_items);
 }
-

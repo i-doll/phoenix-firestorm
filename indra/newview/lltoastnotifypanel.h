@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Portions Copyright (c) 2017, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -74,6 +75,9 @@ public:
 
 protected:
     LLButton* createButton(const LLSD& form_element, bool is_option);
+// <ID:i.doll> [Inventory offer destination panel]
+    LLPanel* createPanel(const LLSD& form_element);
+// </ID:i.doll>
 
     // Used for callbacks
     struct InstanceAndS32
@@ -94,6 +98,9 @@ protected:
      * @param buttons vector of button to be added.
      */
     void updateButtonsLayout(const std::vector<index_button_pair_t>& buttons, S32 h_pad);
+// <ID:i.doll> [Inventory offer destination panel]
+    void updateControlsLayout(const std::vector<LLPanel*>& controls, S32 bottom_offset);
+// </ID:i.doll>
 
     /**
      * Disable specific button(s) based on notification name and clicked button

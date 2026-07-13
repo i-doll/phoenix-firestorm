@@ -8613,6 +8613,9 @@ No valid parcel could be found.
 An object named &lt;nolink&gt;[OBJECTFROMNAME]&lt;/nolink&gt; owned by [NAME_SLURL] has given you this [OBJECTTYPE]:
 &lt;nolink&gt;[ITEM_SLURL]&lt;/nolink&gt;
     <form name="form">
+      <!-- <ID:i.doll> [Inventory offer destination panel] -->
+      <panel class="id_panel_inventory_accept_in" />
+      <!-- </ID:i.doll> -->
       <button
        index="0"
        name="Keep"
@@ -8635,6 +8638,9 @@ An object named &lt;nolink&gt;[OBJECTFROMNAME]&lt;/nolink&gt; owned by [NAME_SLU
 Your object named &lt;nolink&gt;[OBJECTFROMNAME]&lt;/nolink&gt; has given you this [OBJECTTYPE]:
 &lt;nolink&gt;[ITEM_SLURL]&lt;/nolink&gt;
     <form name="form">
+      <!-- <ID:i.doll> [Inventory offer destination panel] -->
+      <panel class="id_panel_inventory_accept_in" />
+      <!-- </ID:i.doll> -->
       <button
        index="0"
        name="Keep"
@@ -8658,6 +8664,9 @@ Your object named &lt;nolink&gt;[OBJECTFROMNAME]&lt;/nolink&gt; has given you th
 [ITEM_SLURL]
 Do you want to keep it? "Mute" will block all future offers or messages from [NAME_SLURL].
     <form name="form">
+      <!-- <ID:i.doll> [Inventory offer destination panel] -->
+      <panel class="id_panel_inventory_accept_in" />
+      <!-- </ID:i.doll> -->
       <button
        index="3"
        name="Show"
@@ -8688,6 +8697,9 @@ Do you want to keep it? "Mute" will block all future offers or messages from [NA
 [ITEM_SLURL]
 Do you want to keep it? "Mute" will block all future offers or messages from [NAME_SLURL].
     <form name="form">
+      <!-- <ID:i.doll> [Inventory offer destination panel] -->
+      <panel class="id_panel_inventory_accept_in" />
+      <!-- </ID:i.doll> -->
       <button
        index="3"
        name="Show"
