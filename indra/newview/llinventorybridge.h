@@ -90,6 +90,9 @@ public:
     virtual const LLUUID& getThumbnailUUID() const { return LLUUID::null; }
     virtual bool isFavorite() const { return false; }
     virtual void clearDisplayName() { mDisplayName.clear(); }
+// <ID:i.doll> [COF worn-state refresh performance]
+    void refreshWornState();
+// </ID:i.doll>
     virtual void restoreItem() {}
     virtual void restoreToWorld() {}
 
