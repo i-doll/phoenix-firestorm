@@ -438,6 +438,8 @@ void LLViewerObject::markDead()
         LL_PROFILE_ZONE_SCOPED;
         //LL_INFOS() << "Marking self " << mLocalID << " as dead." << LL_ENDL;
 
+        gObjectList.cacheMotionState(this);
+
         // Root object of this hierarchy unlinks itself.
         if (getParent())
         {
