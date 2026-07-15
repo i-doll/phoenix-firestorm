@@ -156,6 +156,11 @@ const F32 PHYSICS_TIMESTEP = 1.f / 45.f;
 const U32 MAX_INV_FILE_READ_FAILS = 25;
 const S32 MAX_OBJECT_BINARY_DATA_SIZE = 60 + 16;
 
+constexpr F32 SMALL_ANGULAR_VELOCITY_SPEED = 0.01f;
+constexpr F32 SMALL_ANGULAR_VELOCITY_SQUARED = SMALL_ANGULAR_VELOCITY_SPEED * SMALL_ANGULAR_VELOCITY_SPEED;
+constexpr F32 FULL_ANGULAR_VELOCITY_SPEED = 0.5f;
+constexpr U8 SMALL_ANGULAR_VELOCITY_UPDATE_COUNT = 3;
+
 const F64 INVENTORY_UPDATE_WAIT_TIME_DESYNC = 5; // seconds
 const F64 INVENTORY_UPDATE_WAIT_TIME_OUTDATED = 1;
 
@@ -318,6 +323,8 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     mRotTime(0.f),
     mAngularVelocityRot(),
     mPreviousRotation(),
+    mLastMessageAngularVelocity(LLVector3::zero),
+    mSmallAngularVelocityUpdateCount(0),
     mAttachmentState(0),
     mMedia(NULL),
     mClickAction(0),
@@ -2444,6 +2451,40 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     llassert(accel_mag_sq >= 0.f);
     llassert(getAngularVelocity().magVecSquared() >= 0.f);
 
+    // A vehicle should settle residual angular motion.
+    const LLVector3 message_angular_velocity = getAngularVelocity();
+    const F32 message_angular_velocity_squared = message_angular_velocity.magVecSquared();
+    if (flagUsePhysics() &&
+        mExtrap.ismovingssaton(*this) &&
+        message_angular_velocity_squared > 0.f &&
+        message_angular_velocity_squared <= SMALL_ANGULAR_VELOCITY_SQUARED)
+    {
+        if (dist_vec_squared(message_angular_velocity, mLastMessageAngularVelocity) <=
+            F_APPROXIMATELY_ZERO)
+        {
+            mSmallAngularVelocityUpdateCount = llmin<U8>(
+                static_cast<U8>(mSmallAngularVelocityUpdateCount + 1),
+                SMALL_ANGULAR_VELOCITY_UPDATE_COUNT);
+        }
+        else
+        {
+            mSmallAngularVelocityUpdateCount = 1;
+        }
+    }
+    else
+    {
+        mSmallAngularVelocityUpdateCount = 0;
+    }
+    mLastMessageAngularVelocity = message_angular_velocity;
+
+    if (mSmallAngularVelocityUpdateCount >= SMALL_ANGULAR_VELOCITY_UPDATE_COUNT)
+    {
+        setAngularVelocity(LLVector3::zero);
+        resetRot();
+        setRotation(mPreviousRotation);
+        setChanged(MOVED | SILHOUETTE);
+    }
+
     if ((MAG_CUTOFF >= vel_mag_sq) &&
         (MAG_CUTOFF >= accel_mag_sq) &&
         (MAG_CUTOFF >= getAngularVelocity().magVecSquared()))
@@ -2546,6 +2587,36 @@ void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
     {
         if (!mStatic && sVelocityInterpolate && !isSelected())
         {
+            // A vehicle should settle residual angular motion.
+            const F64Seconds time_since_last_update = (F64Seconds)frame_time - mLastMessageUpdateSecs;
+            const bool seated_physical_vehicle = flagUsePhysics() && mExtrap.ismovingssaton(*this);
+            const F32 angular_velocity_squared = getAngularVelocity().magVecSquared();
+            F64Seconds angular_motion_phase_out = sMaxUpdateInterpolationTime;
+            if (seated_physical_vehicle)
+            {
+                angular_motion_phase_out = std::min(
+                    angular_motion_phase_out,
+                    F64Seconds(PHYSICS_TIMESTEP));
+            }
+
+            if (seated_physical_vehicle &&
+                angular_motion_phase_out > (F64Seconds)0.0 &&
+                time_since_last_update > angular_motion_phase_out &&
+                angular_velocity_squared > 0.f)
+            {
+                setAngularVelocity(LLVector3::zero);
+                resetRot();
+
+                setRotation(mPreviousRotation);
+                setChanged(MOVED | SILHOUETTE);
+
+                if (getVelocity().magVecSquared() <= F_APPROXIMATELY_ZERO &&
+                    getAcceleration().magVecSquared() <= F_APPROXIMATELY_ZERO)
+                {
+                    mStatic = true;
+                }
+            }
+
             // calculate dt from last update
             F32 time_dilation = mRegionp ? mRegionp->getTimeDilation() : 1.0f;
             F32 dt_raw = (F32)((F64Seconds)frame_time - mLastInterpUpdateSecs).value();
@@ -7395,7 +7466,27 @@ void LLViewerObject::applyAngularVelocity(F32 dt)
     if (omega > 0.00001f)
     {
         omega = sqrt(omega);
+
+        // A vehicle should settle residual angular motion.
+        F32 interpolation_scale = 1.f;
+        if (flagUsePhysics() &&
+            mExtrap.ismovingssaton(*this) &&
+            omega < FULL_ANGULAR_VELOCITY_SPEED)
+        {
+            interpolation_scale = llclamp(
+                (omega - SMALL_ANGULAR_VELOCITY_SPEED) /
+                    (FULL_ANGULAR_VELOCITY_SPEED - SMALL_ANGULAR_VELOCITY_SPEED),
+                0.f,
+                1.f);
+        }
+
         angle = omega * dt;
+        angle *= interpolation_scale;
+
+        if (angle <= 0.f)
+        {
+            return;
+        }
 
         ang_vel *= 1.f/omega;
 
@@ -8196,4 +8287,3 @@ public:
 
 LLHTTPRegistration<ObjectPhysicsProperties>
     gHTTPRegistrationObjectPhysicsProperties("/message/ObjectPhysicsProperties");
-
