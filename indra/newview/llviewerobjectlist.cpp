@@ -135,6 +135,61 @@ void LLViewerObjectList::destroy()
     mDeadObjects.clear();
     mMapObjects.clear();
     mUUIDObjectMap.clear();
+    mCachedMotionStates.clear();
+}
+
+void LLViewerObjectList::cacheMotionState(LLViewerObject* objectp)
+{
+    if (!objectp || objectp->getID().isNull())
+    {
+        return;
+    }
+
+    const LLVector3& velocity = objectp->getVelocity();
+    const LLVector3& acceleration = objectp->getAcceleration();
+    const LLVector3& angular_velocity = objectp->getAngularVelocity();
+
+    auto iter = mCachedMotionStates.find(objectp->getID());
+    if (iter == mCachedMotionStates.end() &&
+        velocity.isExactlyZero() &&
+        acceleration.isExactlyZero() &&
+        angular_velocity.isExactlyZero())
+    {
+        // Avoid retaining an entry for every static object in the session.
+        return;
+    }
+
+    CachedMotionState& state = mCachedMotionStates[objectp->getID()];
+    state.mVelocity = velocity;
+    state.mAcceleration = acceleration;
+    state.mAngularVelocity = angular_velocity;
+}
+
+void LLViewerObjectList::restoreMotionState(LLViewerObject* objectp)
+{
+    if (!objectp)
+    {
+        return;
+    }
+
+    auto iter = mCachedMotionStates.find(objectp->getID());
+    if (iter == mCachedMotionStates.end())
+    {
+        return;
+    }
+
+    const CachedMotionState& state = iter->second;
+    objectp->setVelocity(state.mVelocity);
+    objectp->setAcceleration(state.mAcceleration);
+    objectp->setAngularVelocity(state.mAngularVelocity);
+
+    // processUpdateMessage() makes its static decision before cached motion
+    // is restored. Recompute it here so a cached nonzero omega can put the
+    // object back on the active list and resume interpolation.
+    objectp->mStatic =
+        state.mVelocity.magVecSquared() <= F_APPROXIMATELY_ZERO &&
+        state.mAcceleration.magVecSquared() <= F_APPROXIMATELY_ZERO &&
+        state.mAngularVelocity.magVecSquared() <= F_APPROXIMATELY_ZERO;
 }
 
 
@@ -264,6 +319,16 @@ void LLViewerObjectList::processUpdateCore(LLViewerObject* objectp,
     {
         // The update failed
         return;
+    }
+
+    if (from_cache)
+    {
+        restoreMotionState(objectp);
+        cacheMotionState(objectp);
+    }
+    else
+    {
+        cacheMotionState(objectp);
     }
 
     updateActive(objectp);
@@ -546,6 +611,42 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 }
                 else if ((flags & FLAGS_TEMPORARY_ON_REZ) == 0)
                 {
+                    U32 special_code = 0;
+                    LLViewerObject::unpackU32(&compressed_dp, special_code, "SpecialCode");
+                    if (special_code & 0x80)
+                    {
+                        LLVector3 angular_velocity;
+                        LLViewerObject::unpackVector3(&compressed_dp, angular_velocity, "Omega");
+                        mCachedMotionStates[fullid].mAngularVelocity = angular_velocity;
+
+                        LLViewerObject* existing_objectp = findObject(fullid);
+                        if (existing_objectp && !existing_objectp->isDead())
+                        {
+                            const LLVector3 old_angular_velocity = existing_objectp->getAngularVelocity();
+                            if (angular_velocity != old_angular_velocity)
+                            {
+                                if (existing_objectp->flagUsePhysics())
+                                {
+                                    existing_objectp->resetRot();
+                                }
+                                else
+                                {
+                                    existing_objectp->resetRotTime();
+                                }
+                            }
+
+                            existing_objectp->setAngularVelocity(angular_velocity);
+                            existing_objectp->mStatic =
+                                existing_objectp->getVelocity().magVecSquared() <= F_APPROXIMATELY_ZERO &&
+                                existing_objectp->getAcceleration().magVecSquared() <= F_APPROXIMATELY_ZERO &&
+                                angular_velocity.magVecSquared() <= F_APPROXIMATELY_ZERO;
+                            existing_objectp->mLastInterpUpdateSecs = LLFrameTimer::getElapsedSeconds();
+                            existing_objectp->mLastMessageUpdateSecs = existing_objectp->mLastInterpUpdateSecs;
+                            existing_objectp->setChanged(LLXform::MOVED | LLXform::SILHOUETTE);
+                            updateActive(existing_objectp);
+                        }
+                    }
+
                     //send to object cache
                     regionp->cacheFullUpdate(compressed_dp, flags);
                     continue;

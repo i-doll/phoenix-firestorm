@@ -29,6 +29,7 @@
 
 #include <map>
 #include <set>
+#include <unordered_map>
 
 // common includes
 #include "llstring.h"
@@ -201,6 +202,17 @@ public:
     S32 mNumUnknownUpdates;
     S32 mNumDeadObjectUpdates;
     S32 mNumDeadObjects;
+
+    struct CachedMotionState
+    {
+        LLVector3 mVelocity = LLVector3::zero;
+        LLVector3 mAcceleration = LLVector3::zero;
+        LLVector3 mAngularVelocity = LLVector3::zero;
+    };
+
+    void cacheMotionState(LLViewerObject* objectp);
+    void restoreMotionState(LLViewerObject* objectp);
+
 protected:
     std::vector<U64>    mOrphanParents; // LocalID/ip,port of orphaned objects
     std::vector<OrphanInfo> mOrphanChildren;    // UUID's of orphaned objects
@@ -220,6 +232,8 @@ protected:
     // </FS:Beq>
 
     std::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+
+    std::unordered_map<LLUUID, CachedMotionState> mCachedMotionStates;
 
     //set of objects that need to update their cost
     uuid_set_t   mStaleObjectCost;
