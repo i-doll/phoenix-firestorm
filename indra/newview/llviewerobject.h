@@ -1002,6 +1002,8 @@ protected:
     F32             mRotTime;                   // Amount (in seconds) that object has rotated according to angular velocity (llSetTargetOmega)
     LLQuaternion    mAngularVelocityRot;        // accumulated rotation from the angular velocity computations
     LLQuaternion    mPreviousRotation;
+    LLVector3       mLastMessageAngularVelocity;
+    U8              mSmallAngularVelocityUpdateCount;
 
     U8              mAttachmentState;   // this encodes the attachment id in a somewhat complex way. 0 if not an attachment.
     LLViewerObjectMedia* mMedia;    // NULL if no media associated
