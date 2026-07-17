@@ -1817,23 +1817,15 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
     LLViewerObject* objectp = node ? node->getObject() : NULL;
 
     if (objectp
-        && objectp->getPCode() == LL_PCODE_VOLUME
-        && objectp->permModify())
+        && objectp->getPCode() == LL_PCODE_VOLUME)
     {
-        // TODO: Find out what "permanent" objects are supposed to allow to be edited. Right now this will
-        //       completely blank out the texture panel, so we could just move that into the if() above -Zi
-        bool editable = !objectp->isPermanentEnforced();
+        // Keep the panel visible for read-only objects so their material properties can still be inspected.
+        bool editable = objectp->permModify() && !objectp->isPermanentEnforced();
         bool attachment = objectp->isAttachment();
 
-        // this object's faces can potentially be edited by us, so display the edit controls unless this is
-        // a "permanent" pathfinding(?) object -Zi
-        gSavedSettings.setBOOL("FSInternalCanEditObjectFaces", editable);
-        LL_DEBUGS("ENABLEDISABLETOOLS") << "show face edit controls: " << editable << LL_ENDL;
-
-        // TODO: editable always true here so we don't have to go through all the following code and strip it out
-        //       until we know what the permanent thing abobe is supposed to do and we know if blanking out all
-        //       controls has any unforseen side effects to editing. -Zi
-        editable = true;
+        // This controls visibility, not edit permission. Individual controls are disabled below when needed.
+        gSavedSettings.setBOOL("FSInternalCanEditObjectFaces", true);
+        LL_DEBUGS("ENABLEDISABLETOOLS") << "show face edit controls, editable: " << editable << LL_ENDL;
 
         bool has_pbr_material;
         bool has_faces_without_pbr;
@@ -1866,8 +1858,9 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
         LLSelectedTEMaterial::getNormalID(normmap_id, identical_norm);
         LLSelectedTEMaterial::getSpecularID(specmap_id, identical_spec);
 
-        mTabsMatChannel->setEnabled(editable);
-        mTabsPBRChannel->setEnabled(editable);
+        // Keep channel tabs usable for inspecting read-only material values.
+        mTabsMatChannel->setEnabled(true);
+        mTabsPBRChannel->setEnabled(true);
 
         mCheckSyncMaterials->setEnabled(editable);
         mCheckSyncMaterials->setValue(gSavedSettings.getBOOL("SyncMaterialSettings"));
@@ -1888,7 +1881,7 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
         mColorSwatch->setCanApplyImmediately( editable );
 
         F32 transparency = (1.f - color.mV[VALPHA]) * 100.f;
-        mCtrlColorTransp->setValue(editable ? transparency : 0);
+        mCtrlColorTransp->setValue(transparency);
         mCtrlColorTransp->setEnabled(editable );
         mColorTransPercent->setMouseOpaque(editable );
 
@@ -2122,28 +2115,21 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
             LLSelectedTEMaterial::getSpecularRepeatX(spec_scale_s, identical_spec_scale_s);
             LLSelectedTEMaterial::getNormalRepeatX(norm_scale_s, identical_norm_scale_s);
 
-            diff_scale_s = editable ? diff_scale_s : 1.0f;
             diff_scale_s *= identical_planar_texgen ? 2.0f : 1.0f;
 
-            norm_scale_s = editable ? norm_scale_s : 1.0f;
             norm_scale_s *= identical_planar_texgen ? 2.0f : 1.0f;
 
-            spec_scale_s = editable ? spec_scale_s : 1.0f;
             spec_scale_s *= identical_planar_texgen ? 2.0f : 1.0f;
 
             mCtrlTexScaleU->setValue(diff_scale_s);
             mCtrlShinyScaleU->setValue(spec_scale_s);
             mCtrlBumpyScaleU->setValue(norm_scale_s);
 
-            // TODO: do we need to enable/disable all these manually anymore? -Zi
-            /*
-            mCtrlTexScaleU->setEnabled(editable && has_material);
-
-            mCtrlShinyScaleU->setEnabled(editable && has_material && specmap_id.notNull() && enable_material_controls);
-            mCtrlBumpyScaleU->setEnabled(editable && has_material && normmap_id.notNull() && enable_material_controls);
+            mCtrlTexScaleU->setEnabled(editable && !has_pbr_material);
+            mCtrlShinyScaleU->setEnabled(editable && !has_pbr_material && specmap_id.notNull() && enable_material_controls);
+            mCtrlBumpyScaleU->setEnabled(editable && !has_pbr_material && normmap_id.notNull() && enable_material_controls);
             childSetEnabled("flipTextureScaleSU", mCtrlShinyScaleU->getEnabled());
             childSetEnabled("flipTextureScaleNU", mCtrlBumpyScaleU->getEnabled());
-            */
 
             bool diff_scale_tentative = !(identical && identical_diff_scale_s);
             bool norm_scale_tentative = !(identical && identical_norm_scale_s);
@@ -2169,28 +2155,21 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
             LLSelectedTEMaterial::getSpecularRepeatY(spec_scale_t, identical_spec_scale_t);
             LLSelectedTEMaterial::getNormalRepeatY(norm_scale_t, identical_norm_scale_t);
 
-            diff_scale_t = editable ? diff_scale_t : 1.0f;
             diff_scale_t *= identical_planar_texgen ? 2.0f : 1.0f;
 
-            norm_scale_t = editable ? norm_scale_t : 1.0f;
             norm_scale_t *= identical_planar_texgen ? 2.0f : 1.0f;
 
-            spec_scale_t = editable ? spec_scale_t : 1.0f;
             spec_scale_t *= identical_planar_texgen ? 2.0f : 1.0f;
 
             bool diff_scale_tentative = !identical_diff_scale_t;
             bool norm_scale_tentative = !identical_norm_scale_t;
             bool spec_scale_tentative = !identical_spec_scale_t;
 
-            // TODO: do we need to enable/disable all these manually anymore? -Zi
-            /*
-            mCtrlTexScaleV->setEnabled(editable && has_material);
-
-            mCtrlShinyScaleV->setEnabled(editable && has_material && specmap_id.notNull() && enable_material_controls);
-            mCtrlBumpyScaleV->setEnabled(editable && has_material && normmap_id.notNull() && enable_material_controls);
+            mCtrlTexScaleV->setEnabled(editable && !has_pbr_material);
+            mCtrlShinyScaleV->setEnabled(editable && !has_pbr_material && specmap_id.notNull() && enable_material_controls);
+            mCtrlBumpyScaleV->setEnabled(editable && !has_pbr_material && normmap_id.notNull() && enable_material_controls);
             childSetEnabled("flipTextureScaleSV", mCtrlShinyScaleU->getEnabled());
             childSetEnabled("flipTextureScaleNV", mCtrlBumpyScaleU->getEnabled());
-            */
 
             if (force_set_values)
             {
@@ -2226,21 +2205,17 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
             bool norm_offset_u_tentative = !(align_planar ? identical_planar_aligned : identical_norm_offset_s);
             bool spec_offset_u_tentative = !(align_planar ? identical_planar_aligned : identical_spec_offset_s);
 
-            mCtrlTexOffsetU->setValue(  editable ? diff_offset_s : 0.0f);
-            mCtrlBumpyOffsetU->setValue(editable ? norm_offset_s : 0.0f);
-            mCtrlShinyOffsetU->setValue(editable ? spec_offset_s : 0.0f);
+            mCtrlTexOffsetU->setValue(diff_offset_s);
+            mCtrlBumpyOffsetU->setValue(norm_offset_s);
+            mCtrlShinyOffsetU->setValue(spec_offset_s);
 
             mCtrlTexOffsetU->setTentative(LLSD(diff_offset_u_tentative));
             mCtrlBumpyOffsetU->setTentative(LLSD(norm_offset_u_tentative));
             mCtrlShinyOffsetU->setTentative(LLSD(spec_offset_u_tentative));
 
-            // TODO: do we need to enable/disable all these manually anymore? -Zi
-            /*
-            mCtrlTexOffsetU->setEnabled(editable && has_material);
-
-            mCtrlShinyOffsetU->setEnabled(editable && has_material && specmap_id.notNull() && enable_material_controls);
-            mCtrlBumpyOffsetU->setEnabled(editable && has_material && normmap_id.notNull() && enable_material_controls);
-            */
+            mCtrlTexOffsetU->setEnabled(editable && !has_pbr_material);
+            mCtrlShinyOffsetU->setEnabled(editable && !has_pbr_material && specmap_id.notNull() && enable_material_controls);
+            mCtrlBumpyOffsetU->setEnabled(editable && !has_pbr_material && normmap_id.notNull() && enable_material_controls);
         }
 
         {
@@ -2260,21 +2235,17 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
             bool norm_offset_v_tentative = !(align_planar ? identical_planar_aligned : identical_norm_offset_t);
             bool spec_offset_v_tentative = !(align_planar ? identical_planar_aligned : identical_spec_offset_t);
 
-            mCtrlTexOffsetV->setValue(  editable ? diff_offset_t : 0.0f);
-            mCtrlBumpyOffsetV->setValue(editable ? norm_offset_t : 0.0f);
-            mCtrlShinyOffsetV->setValue(editable ? spec_offset_t : 0.0f);
+            mCtrlTexOffsetV->setValue(diff_offset_t);
+            mCtrlBumpyOffsetV->setValue(norm_offset_t);
+            mCtrlShinyOffsetV->setValue(spec_offset_t);
 
             mCtrlTexOffsetV->setTentative(LLSD(diff_offset_v_tentative));
             mCtrlBumpyOffsetV->setTentative(LLSD(norm_offset_v_tentative));
             mCtrlShinyOffsetV->setTentative(LLSD(spec_offset_v_tentative));
 
-            // TODO: do we need to enable/disable all these manually anymore? -Zi
-            /*
-            mCtrlTexOffsetV->setEnabled(editable && has_material);
-
-            mCtrlShinyOffsetV->setEnabled(editable && has_material && specmap_id.notNull() && enable_material_controls);
-            mCtrlBumpyOffsetV->setEnabled(editable && has_material && normmap_id.notNull() && enable_material_controls);
-            */
+            mCtrlTexOffsetV->setEnabled(editable && !has_pbr_material);
+            mCtrlShinyOffsetV->setEnabled(editable && !has_pbr_material && specmap_id.notNull() && enable_material_controls);
+            mCtrlBumpyOffsetV->setEnabled(editable && !has_pbr_material && normmap_id.notNull() && enable_material_controls);
         }
 
         // Texture rotation
@@ -2299,21 +2270,17 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
             F32 norm_rot_deg = norm_rotation * RAD_TO_DEG;
             F32 spec_rot_deg = spec_rotation * RAD_TO_DEG;
 
-            // TODO: do we need to enable/disable all these manually anymore? -Zi
-            /*
-            mCtrlTexRot->setEnabled(editable && has_material);
-
-            mCtrlShinyRot->setEnabled(editable && has_material && specmap_id.notNull() && enable_material_controls);
-            mCtrlBumpyRot->setEnabled(editable && has_material && normmap_id.notNull() && enable_material_controls);
-            */
+            mCtrlTexRot->setEnabled(editable && !has_pbr_material);
+            mCtrlShinyRot->setEnabled(editable && !has_pbr_material && specmap_id.notNull() && enable_material_controls);
+            mCtrlBumpyRot->setEnabled(editable && !has_pbr_material && normmap_id.notNull() && enable_material_controls);
 
             mCtrlTexRot->setTentative(LLSD(diff_rot_tentative));
             mCtrlBumpyRot->setTentative(LLSD(norm_rot_tentative));
             mCtrlShinyRot->setTentative(LLSD(spec_rot_tentative));
 
-            mCtrlTexRot->setValue(  editable ? diff_rot_deg : 0.0f);
-            mCtrlShinyRot->setValue(editable ? spec_rot_deg : 0.0f);
-            mCtrlBumpyRot->setValue(editable ? norm_rot_deg : 0.0f);
+            mCtrlTexRot->setValue(diff_rot_deg);
+            mCtrlShinyRot->setValue(spec_rot_deg);
+            mCtrlBumpyRot->setValue(norm_rot_deg);
         }
 
         {
@@ -2468,11 +2435,11 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
             if (force_set_values || material_selection == MATMEDIA_PBR)
             {
                 //onCommit, previosly edited element updates related ones
-                mCtrlRpt->forceSetValue(editable ? repeats : 1.0f);
+                mCtrlRpt->forceSetValue(repeats);
             }
             else
             {
-                mCtrlRpt->setValue(editable ? repeats : 1.0f);
+                mCtrlRpt->setValue(repeats);
             }
             mCtrlRpt->setTentative(LLSD(repeats_tentative));
             mCtrlRpt->setEnabled(!identical_planar_texgen && enabled);
@@ -2487,8 +2454,11 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
             mCtrlGlossiness->setTentative(!identical_spec);
             mCtrlEnvironment->setTentative(!identical_spec);
             mShinyColorSwatch->setTentative(!identical_spec);
+            mCtrlGlossiness->setEnabled(editable && specmap_id.notNull() && enable_material_controls);
+            mCtrlEnvironment->setEnabled(editable && specmap_id.notNull() && enable_material_controls);
+            mShinyColorSwatch->setEnabled(editable && specmap_id.notNull());
 
-            if (material && editable)
+            if (material)
             {
                 LL_DEBUGS("Materials") << material->asLLSD() << LL_ENDL;
 
@@ -2718,7 +2688,7 @@ void FSPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
     LL_DEBUGS("ENABLEDISABLETOOLS") << "PBR controls overall:  " << editable << LL_ENDL;
 
     mBaseTexturePBR->setEnabled(editable);
-    mBaseTexturePBR->setImageAssetID(editable ? func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR] : LLUUID::null);
+    mBaseTexturePBR->setImageAssetID(func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
     mBaseTexturePBR->setTentative(!func.mIdenticalMap[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
 
     mBaseTintPBR->setEnabled(editable);
@@ -2730,15 +2700,15 @@ void FSPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
     mBaseTintPBR->setFallbackImage(LLUI::getUIImage("locked_image.j2c") );
 
     mNormalTexturePBR->setEnabled(editable);
-    mNormalTexturePBR->setImageAssetID(editable ? func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL] : LLUUID::null);
+    mNormalTexturePBR->setImageAssetID(func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL]);
     mNormalTexturePBR->setTentative(!func.mIdenticalMap[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL]);
 
     mORMTexturePBR->setEnabled(editable);
-    mORMTexturePBR->setImageAssetID(editable ? func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS] : LLUUID::null);
+    mORMTexturePBR->setImageAssetID(func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS]);
     mORMTexturePBR->setTentative(!func.mIdenticalMap[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS]);
 
     mEmissiveTexturePBR->setEnabled(editable);
-    mEmissiveTexturePBR->setImageAssetID(editable ? func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE] : LLUUID::null);
+    mEmissiveTexturePBR->setImageAssetID(func.mMaterialSummary.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE]);
     mEmissiveTexturePBR->setTentative(!func.mIdenticalMap[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE]);
 
     mEmissiveTintPBR->setEnabled(editable);
@@ -2856,7 +2826,6 @@ void FSPanelFace::refreshMedia()
 
     if (!(first_object
         && first_object->getPCode() == LL_PCODE_VOLUME
-        && first_object->permModify()
         ))
     {
         mBtnAddMedia->setEnabled(false);
@@ -2997,7 +2966,7 @@ void FSPanelFace::refreshMedia()
             }
         }
 
-        mBtnDeleteMedia->setEnabled(true);
+        mBtnDeleteMedia->setEnabled(editable);
     }
 
     S32 materials_media = getCurrentMaterialType();
