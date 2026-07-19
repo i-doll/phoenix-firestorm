@@ -29,6 +29,17 @@ Pick: Material
      name="pick_texture">
 Pick: Texture
     </floater.string>
+    <!-- <ID:i.doll> [Copy selected material to inventory] -->
+    <floater.string name="material_copy_suffix" value=" Copy"/>
+    <floater.string name="new_material_copy">New Material Copy</floater.string>
+    <floater.string name="material_copy_tooltip">Copy this material to your inventory.</floater.string>
+    <floater.string name="material_copy_inventory_only">Select a material from Inventory or Library to copy it.</floater.string>
+    <floater.string name="material_copy_pending">A material copy is already in progress.</floater.string>
+    <floater.string name="material_copy_no_cap">Not connected to a materials-capable region.</floater.string>
+    <floater.string name="material_copy_loading">The selected material is still loading.</floater.string>
+    <floater.string name="material_copy_no_modify">This material cannot be copied because it is no-modify.</floater.string>
+    <floater.string name="material_copy_no_copy">This material cannot be copied because it is no-copy.</floater.string>
+    <!-- </ID:i.doll> -->
 
     <view
      left="4"
@@ -162,6 +173,21 @@ Pick: Texture
      name="save_png_btn"
      top_pad="0"
      width="73" />
+    <!-- <ID:i.doll> [Copy selected material to inventory] -->
+    <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="Copy"
+     label_selected="Copy"
+     layout="topleft"
+     left_delta="0"
+     name="copy_material_btn"
+     tool_tip="Copy this material to your inventory."
+     top_delta="0"
+     visible="false"
+     width="73" />
+    <!-- </ID:i.doll> -->
     <button
      enabled="false"
      follows="left|top"

@@ -7834,6 +7834,37 @@ Please try again.
     Not connected to a materials capable region.
   </notification>
 
+  <!-- <ID:i.doll> [Copy selected material to inventory] -->
+  <notification
+   icon="notifytip.tga"
+   name="FSMaterialCopiedToInventory"
+   type="notifytip">
+Material copied to inventory as "[NAME]".
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FSMaterialCopyFailed"
+   type="alertmodal">
+Could not copy "[NAME]" to inventory.[DETAIL]
+    <tag>fail</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FSMaterialCopyTimeout"
+   type="alertmodal">
+The request to copy "[NAME]" timed out. Check your inventory before retrying.
+    <tag>fail</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+  <!-- </ID:i.doll> -->
+
   <notification
    icon="alertmodal.tga"
    name="CantSelectReflectionProbe"
