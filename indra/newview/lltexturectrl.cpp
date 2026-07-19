@@ -70,6 +70,8 @@
 #include "lluictrlfactory.h"
 #include "lltrans.h"
 
+#include "llcallbacklist.h"
+#include "llfloaterperms.h"
 #include "llradiogroup.h"
 #include "llfloaterreg.h"
 #include "llgltfmaterialpreviewmgr.h"
@@ -465,7 +467,11 @@ bool LLFloaterTexturePicker::updateImageStats()
         mPipetteBtn->setVisible(result);
         // <FS> Special additions
         mTransparentBtn->setVisible(result);
-        mSavePNGBtn->setVisible(result);
+        // <ID:i.doll> [Copy selected material to inventory]
+        const bool material_picker = mInventoryPickType == PICK_MATERIAL;
+        mSavePNGBtn->setVisible(result && !material_picker);
+        mCopyMaterialBtn->setVisible(result && material_picker);
+        // </ID:i.doll>
         mCopyUUIDBtn->setVisible(result);
     }
     return result;
@@ -648,6 +654,9 @@ bool LLFloaterTexturePicker::postBuild()
     mUUIDEditor = getChild<LLLineEditor>("TextureKey");
     mSavePNGBtn = getChild<LLButton>("save_png_btn");
     mCopyUUIDBtn = getChild<LLButton>("copy_uuid_btn");
+    // <ID:i.doll> [Copy selected material to inventory]
+    mCopyMaterialBtn = getChild<LLButton>("copy_material_btn");
+    // </ID:i.doll>
 
     mDefaultBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnSetToDefault,this));
     mNoneBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnNone, this));
@@ -660,6 +669,10 @@ bool LLFloaterTexturePicker::postBuild()
     mUUIDBtn->setClickedCallback(boost::bind(LLFloaterTexturePicker::onBtnApplyTexture, this));
     mSavePNGBtn->setClickedCallback(boost::bind(&LLFloaterTexturePicker::onBtnSavePNG, this));
     mCopyUUIDBtn->setClickedCallback(boost::bind(&LLFloaterTexturePicker::onBtnCopyUUID, this));
+    // <ID:i.doll> [Copy selected material to inventory]
+    mCopyMaterialBtn->setClickedCallback(
+        boost::bind(&LLFloaterTexturePicker::onBtnCopyMaterialToInventory, this));
+    // </ID:i.doll>
 
     mFilterEdit = getChild<LLFilterEditor>("inventory search editor");
     mFilterEdit->setCommitCallback(boost::bind(&LLFloaterTexturePicker::onFilterEdit, this, _2));
@@ -744,6 +757,10 @@ bool LLFloaterTexturePicker::postBuild()
     getChild<LLComboBox>("l_bake_use_texture_combo_box")->setCommitCallback(onBakeTextureSelect, this);
 
     setBakeTextureEnabled(mInventoryPickType != PICK_MATERIAL);
+    // <ID:i.doll> [Copy selected material to inventory]
+    changeMode();
+    updateCopyMaterialButton();
+    // </ID:i.doll>
     return true;
 }
 
@@ -831,6 +848,9 @@ void LLFloaterTexturePicker::draw()
             && mInventoryPickType != PICK_MATERIAL
             && !LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID));
         mCopyUUIDBtn->setEnabled(mImageAssetID.notNull());
+        // <ID:i.doll> [Copy selected material to inventory]
+        updateCopyMaterialButton();
+        // </ID:i.doll>
 
         LLFloater::draw();
 
@@ -1084,6 +1104,137 @@ void LLFloaterTexturePicker::commitCallback(LLTextureCtrl::ETexturePickOp op)
 
     mOnFloaterCommitCallback(op, mode, asset_id, inventory_id, tracking_id);
 }
+
+// <ID:i.doll> [Copy selected material to inventory]
+LLViewerInventoryItem* LLFloaterTexturePicker::getSelectedMaterialItem() const
+{
+    if (!mInventoryPanel || !mInventoryPanel->getRootFolder())
+    {
+        return nullptr;
+    }
+
+    LLFolderViewItem* selected = mInventoryPanel->getRootFolder()->getCurSelectedItem();
+    if (!selected)
+    {
+        return nullptr;
+    }
+
+    auto* inventory_view = static_cast<LLFolderViewModelItemInventory*>(
+        selected->getViewModelItem());
+    LLViewerInventoryItem* item = gInventory.getItem(inventory_view->getUUID());
+    if (!item || item->getAssetUUID() != mImageAssetID)
+    {
+        return nullptr;
+    }
+    return item;
+}
+
+bool LLFloaterTexturePicker::canCopySelectedMaterial(std::string* disabled_reason) const
+{
+    const auto reject = [disabled_reason](const std::string& reason)
+    {
+        if (disabled_reason)
+        {
+            *disabled_reason = reason;
+        }
+        return false;
+    };
+
+    if (mInventoryPickType != PICK_MATERIAL
+        || !mModeSelector
+        || mModeSelector->getSelectedIndex() != PICKER_INVENTORY)
+    {
+        return reject(getString("material_copy_inventory_only"));
+    }
+    if (mCopyMaterialPending)
+    {
+        return reject(getString("material_copy_pending"));
+    }
+    if (!LLMaterialEditor::agentInventoryCapAvailable())
+    {
+        return reject(getString("material_copy_no_cap"));
+    }
+    if (mImageAssetID == BLANK_MATERIAL_ASSET_ID)
+    {
+        return true;
+    }
+    if (mGLTFMaterial.isNull() || !mGLTFMaterial->isLoaded())
+    {
+        return reject(getString("material_copy_loading"));
+    }
+
+    LLViewerInventoryItem* item = getSelectedMaterialItem();
+    if (!item)
+    {
+        return reject(getString("material_copy_inventory_only"));
+    }
+    
+    return true;
+}
+
+bool LLFloaterTexturePicker::getMaterialCopyPermissions(
+    const LLViewerInventoryItem* item,
+    LLPermissions& permissions) const
+{
+    const PermissionMask everyone = LLFloaterPerms::getEveryonePerms("Materials");
+    const PermissionMask group = LLFloaterPerms::getGroupPerms("Materials");
+    const PermissionMask next_owner = LLFloaterPerms::getNextOwnerPerms("Materials");
+
+    if (!item)
+    {
+        permissions.init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+        permissions.initMasks(PERM_ALL, PERM_ALL, everyone, group, next_owner);
+        return true;
+    }
+
+    const LLPermissions& source = item->getPermissions();
+    const bool self_created_no_copy = !source.allowCopyBy(gAgent.getID())
+        && source.allowModifyBy(gAgent.getID())
+        && source.getCreator() == gAgent.getID()
+        && source.getOwner() == gAgent.getID();
+
+    if (self_created_no_copy)
+    {
+        permissions.init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+        permissions.initMasks(
+            PERM_ALL,
+            PERM_ALL,
+            source.getMaskEveryone() & everyone,
+            source.getMaskGroup() & group,
+            source.getMaskNextOwner() & next_owner);
+        return true;
+    }
+
+    permissions = source;
+    if (!permissions.setOwnerAndGroup(
+            LLUUID::null, gAgent.getID(), LLUUID::null, true))
+    {
+        return false;
+    }
+
+    LLPermissions configured;
+    configured.init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+    configured.initMasks(PERM_ALL, PERM_ALL, everyone, group, next_owner);
+    permissions.accumulate(configured);
+    return true;
+}
+
+std::string LLFloaterTexturePicker::getMaterialCopyName(
+    const LLViewerInventoryItem* item) const
+{
+    std::string name = item
+        ? item->getName() + getString("material_copy_suffix")
+        : getString("new_material_copy");
+    LLInventoryObject::correctInventoryName(name);
+    if (name.empty())
+    {
+        name = getString("new_material_copy");
+        LLInventoryObject::correctInventoryName(name);
+    }
+    return name;
+}
+// </ID:i.doll>
+
 void LLFloaterTexturePicker::commitCancel()
 {
     if (!mNoCopyTextureSelected && mOnFloaterCommitCallback && mCanApply)
@@ -1176,6 +1327,124 @@ void LLFloaterTexturePicker::onBtnCopyUUID()
     std::string uuid = mImageAssetID.asString();
     LLClipboard::instance().copyToClipboard(utf8str_to_wstring(uuid), 0, static_cast<S32>(uuid.size()));
 }
+
+// <ID:i.doll> [Copy selected material to inventory]
+void LLFloaterTexturePicker::onBtnCopyMaterialToInventory()
+{
+    std::string disabled_reason;
+    if (!canCopySelectedMaterial(&disabled_reason))
+    {
+        return;
+    }
+
+    const bool blank = mImageAssetID == BLANK_MATERIAL_ASSET_ID;
+    LLViewerInventoryItem* item = blank ? nullptr : getSelectedMaterialItem();
+
+    LLPermissions permissions;
+    if (!getMaterialCopyPermissions(item, permissions))
+    {
+        LLSD args;
+        args["NAME"] = getMaterialCopyName(item);
+        args["DETAIL"] = "";
+        LLNotificationsUtil::add("FSMaterialCopyFailed", args);
+        return;
+    }
+
+    const std::string name = getMaterialCopyName(item);
+    LLGLTFMaterial material;
+    if (!blank)
+    {
+        material = *mGLTFMaterial;
+    }
+
+    mCopyMaterialPending = true;
+    const U32 request_id = ++mCopyMaterialRequestId;
+    updateCopyMaterialButton();
+
+    const LLHandle<LLFloater> handle = getHandle();
+    LLMaterialEditor::createInventoryItemFromMaterial(
+        material,
+        name,
+        "",
+        permissions,
+        LLUUID::null,
+        [handle, name, request_id](bool success, const LLUUID& item_id)
+        {
+            LLSD args;
+            args["NAME"] = name;
+            if (success)
+            {
+                LLNotificationsUtil::add("FSMaterialCopiedToInventory", args);
+            }
+            else
+            {
+                args["DETAIL"] = item_id.notNull()
+                    ? "\nAn incomplete item may remain in inventory."
+                    : "";
+                LLNotificationsUtil::add("FSMaterialCopyFailed", args);
+            }
+
+            if (!handle.isDead())
+            {
+                auto* picker = static_cast<LLFloaterTexturePicker*>(handle.get());
+                picker->onMaterialCopyFinished(request_id);
+            }
+        });
+
+    doAfterInterval(
+        [handle, name, request_id]()
+        {
+            if (!handle.isDead())
+            {
+                auto* picker = static_cast<LLFloaterTexturePicker*>(handle.get());
+                picker->onMaterialCopyTimeout(request_id, name);
+            }
+        },
+        60.f);
+}
+
+void LLFloaterTexturePicker::updateCopyMaterialButton()
+{
+    if (!mCopyMaterialBtn)
+    {
+        return;
+    }
+
+    std::string disabled_reason;
+    const bool enabled = canCopySelectedMaterial(&disabled_reason);
+    mCopyMaterialBtn->setEnabled(enabled);
+    mCopyMaterialBtn->setToolTip(
+        enabled ? getString("material_copy_tooltip") : disabled_reason);
+}
+
+void LLFloaterTexturePicker::onMaterialCopyFinished(U32 request_id)
+{
+    if (request_id != mCopyMaterialRequestId)
+    {
+        return;
+    }
+    mCopyMaterialPending = false;
+    updateCopyMaterialButton();
+}
+
+void LLFloaterTexturePicker::onMaterialCopyTimeout(
+    U32 request_id,
+    const std::string& name)
+{
+    if (request_id != mCopyMaterialRequestId || !mCopyMaterialPending)
+    {
+        return;
+    }
+
+    mCopyMaterialPending = false;
+    ++mCopyMaterialRequestId;
+    updateCopyMaterialButton();
+
+    LLSD args;
+    args["NAME"] = name;
+    LLNotificationsUtil::add("FSMaterialCopyTimeout", args);
+}
+// </ID:i.doll>
 
 struct SavePNGData
 {
@@ -1680,7 +1949,12 @@ void LLFloaterTexturePicker::changeMode()
     mBlankBtn->setVisible(index == PICKER_INVENTORY);
     mNoneBtn->setVisible(index == PICKER_INVENTORY);
     mTransparentBtn->setVisible(index == PICKER_INVENTORY); // <FS:PP> FIRE-5082: "Transparent" button in Texture Panel
-    mSavePNGBtn->setVisible(index == PICKER_INVENTORY);
+    // <ID:i.doll> [Copy selected material to inventory]
+    const bool inventory_mode = index == PICKER_INVENTORY;
+    const bool material_picker = mInventoryPickType == PICK_MATERIAL;
+    mSavePNGBtn->setVisible(inventory_mode && !material_picker);
+    mCopyMaterialBtn->setVisible(inventory_mode && material_picker);
+    // </ID:i.doll>
     mCopyUUIDBtn->setVisible(index == PICKER_INVENTORY);
     mFilterEdit->setVisible(index == PICKER_INVENTORY);
     mInventoryPanel->setVisible(index == PICKER_INVENTORY);
@@ -1884,6 +2158,11 @@ void LLFloaterTexturePicker::setInventoryPickType(EPickInventoryType type)
     {
         mInventoryPanel->setSelection(findItemID(mImageAssetID, false), TAKE_FOCUS_NO);
     }
+
+    // <ID:i.doll> [Copy selected material to inventory]
+    changeMode();
+    updateCopyMaterialButton();
+    // </ID:i.doll>
 }
 
 void LLFloaterTexturePicker::setImmediateFilterPermMask(PermissionMask mask)

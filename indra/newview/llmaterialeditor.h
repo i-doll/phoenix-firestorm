@@ -145,6 +145,19 @@ class LLMaterialEditor : public LLPreview, public LLVOInventoryListener
 
     static void finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, LLUUID newItemId);
 
+    // <ID:i.doll> [Copy selected material to inventory]
+    using material_inventory_callback_t = std::function<void(bool success, const LLUUID& item_id)>;
+
+    static bool agentInventoryCapAvailable();
+    static void createInventoryItemFromMaterial(
+        const LLGLTFMaterial& material,
+        const std::string& name,
+        const std::string& desc,
+        const LLPermissions& permissions,
+        const LLUUID& upload_folder,
+        material_inventory_callback_t callback);
+    // </ID:i.doll>
+
     static void finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUID taskId);
 
     static void finishSaveAs(
@@ -240,7 +253,13 @@ private:
     static void saveObjectsMaterialAs(const LLGLTFMaterial *render_material, const LLLocalGLTFMaterial *local_material, const LLPermissions& permissions, const LLUUID& object_id /* = LLUUID::null */, const LLUUID& item /* = LLUUID::null */);
 
     static bool updateInventoryItem(const std::string &buffer, const LLUUID &item_id, const LLUUID &task_id);
-    static void createInventoryItem(const std::string &buffer, const std::string &name, const std::string &desc, const LLPermissions& permissions, const LLUUID& upload_folder);
+    static void createInventoryItem(
+        const std::string& buffer,
+        const std::string& name,
+        const std::string& desc,
+        const LLPermissions& permissions,
+        const LLUUID& upload_folder,
+        material_inventory_callback_t callback = nullptr);
 
     void setFromGLTFMaterial(LLGLTFMaterial* mat);
     bool setFromSelection();

@@ -407,6 +407,12 @@ public:
     static void     onBtnNone(void* userdata);
     void            onBtnSavePNG();
     void            onBtnCopyUUID();
+    // <ID:i.doll> [Copy selected material to inventory]
+    void onBtnCopyMaterialToInventory();
+    void updateCopyMaterialButton();
+    void onMaterialCopyFinished(U32 request_id);
+    void onMaterialCopyTimeout(U32 request_id, const std::string& name);
+    // </ID:i.doll>
     void            onSavePNGFileSelected(const std::vector<std::string>& filenames);
     static void     onFileLoadedForSavePNG(bool success, LLViewerFetchedTexture* src_vi, LLImageRaw* src, LLImageRaw* aux_src, S32 discard_level, bool final, void* userdata);
     void            onSelectionChange(const std::deque<LLFolderViewItem*> &items, bool user_action);
@@ -435,6 +441,13 @@ protected:
     void refreshInventoryFilter();
     void setImageIDFromItem(const LLInventoryItem* itemp, bool set_selection = true);
     LLViewerInventoryItem* findInvItem(const LLUUID& asset_id, bool copyable_only, bool ignore_library = false) const;
+
+    // <ID:i.doll> [Copy selected material to inventory]
+    LLViewerInventoryItem* getSelectedMaterialItem() const;
+    bool canCopySelectedMaterial(std::string* disabled_reason = nullptr) const;
+    bool getMaterialCopyPermissions(const LLViewerInventoryItem* item, LLPermissions& permissions) const;
+    std::string getMaterialCopyName(const LLViewerInventoryItem* item) const;
+    // </ID:i.doll>
 
     LLPointer<LLViewerTexture> mTexturep;
     LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
@@ -486,6 +499,9 @@ protected:
     LLButton*           mTransparentBtn{ nullptr };
     LLButton*           mSavePNGBtn{ nullptr };
     LLButton*           mCopyUUIDBtn{ nullptr };
+    // <ID:i.doll> [Copy selected material to inventory]
+    LLButton*           mCopyMaterialBtn{ nullptr };
+    // </ID:i.doll>
 
 private:
     bool mCanApply;
@@ -507,6 +523,10 @@ private:
     bool mLocalTextureEnabled;
 
     bool mLoadingFullImage{ false };
+    // <ID:i.doll> [Copy selected material to inventory]
+    bool mCopyMaterialPending{ false };
+    U32 mCopyMaterialRequestId{ 0 };
+    // </ID:i.doll>
     std::string mSaveFileName;
     LLLoadedCallbackEntry::source_callback_list_t mCallbackTextureList;
 

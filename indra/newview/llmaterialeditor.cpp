@@ -1520,15 +1520,34 @@ bool LLMaterialEditor::updateInventoryItem(const std::string &buffer, const LLUU
     return true;
 }
 
+// <ID:i.doll> [Copy selected material to inventory]
+static std::string encode_material_asset(const std::string& material_json)
+{
+    LLSD asset;
+    asset["version"] = LLGLTFMaterial::ASSET_VERSION;
+    asset["type"] = LLGLTFMaterial::ASSET_TYPE;
+    asset["data"] = material_json;
+
+    std::ostringstream output;
+    LLSDSerialize::serialize(asset, output, LLSDSerialize::LLSD_BINARY);
+    return output.str();
+}
+// </ID:i.doll>
+
 // Callback intended for when a material is saved from an object and needs to
 // be modified to reflect the new asset/name.
 class LLObjectsMaterialItemCallback : public LLInventoryCallback
 {
 public:
-    LLObjectsMaterialItemCallback(const LLPermissions& permissions, const std::string& asset_data, const std::string& new_name)
+    LLObjectsMaterialItemCallback(
+        const LLPermissions& permissions,
+        const std::string& asset_data,
+        const std::string& new_name,
+        LLMaterialEditor::material_inventory_callback_t callback)
         : mPermissions(permissions),
-        mAssetData(asset_data),
-        mNewName(new_name)
+          mAssetData(asset_data),
+          mNewName(new_name),
+          mCallback(std::move(callback))
     {
     }
 
@@ -1559,56 +1578,133 @@ public:
             update_inventory_item(inv_item_id, updates, NULL);
         }
 
+        // <ID:i.doll> [Copy selected material to inventory]
         // from reference in LLSettingsVOBase::createInventoryItem()/updateInventoryItem()
-        LLResourceUploadInfo::ptr_t uploadInfo =
+        const LLMaterialEditor::material_inventory_callback_t callback = mCallback;
+        LLResourceUploadInfo::ptr_t upload_info =
             std::make_shared<LLBufferedAssetUploadInfo>(
                 inv_item_id,
                 LLAssetType::AT_MATERIAL,
                 mAssetData,
-                [changed, updates](LLUUID item_id, LLUUID new_asset_id, LLUUID new_item_id, LLSD response)
+                [changed, updates, callback](LLUUID item_id, LLUUID new_asset_id, LLUUID new_item_id, LLSD response)
                 {
-                    // done callback
-                    LL_INFOS("Material") << "inventory item uploaded.  item: " << item_id << " new_item_id: " << new_item_id << " response: " << response << LL_ENDL;
+                    LL_INFOS("Material")
+                        << "inventory item uploaded. item: " << item_id
+                        << " new_item_id: " << new_item_id
+                        << " response: " << response << LL_ENDL;
 
                     // *HACK: Sometimes permissions do not stick in the UI. They are correct on the server-side, though.
+                    const LLUUID final_item_id = new_item_id.notNull() ? new_item_id : item_id;
                     if (changed)
                     {
-                        update_inventory_item(new_item_id, updates, NULL);
+                        update_inventory_item(final_item_id, updates, nullptr);
+                    }
+                    if (callback)
+                    {
+                        callback(true, final_item_id);
                     }
                 },
-                nullptr // failure callback, floater already closed
-            );
+                [callback](LLUUID item_id, LLUUID task_id, LLSD response, std::string reason)
+                {
+                    if (callback)
+                    {
+                        callback(false, item_id);
+                        return true;
+                    }
+                    return false;
+                });
 
         const LLViewerRegion* region = gAgent.getRegion();
-        if (region)
+        const std::string agent_url = region
+            ? region->getCapability("UpdateMaterialAgentInventory")
+            : std::string();
+        if (agent_url.empty())
         {
-            std::string agent_url(region->getCapability("UpdateMaterialAgentInventory"));
-            if (agent_url.empty())
+            LL_WARNS("MaterialEditor")
+                << "Missing UpdateMaterialAgentInventory capability for item "
+                << inv_item_id << LL_ENDL;
+            if (mCallback)
             {
-                LL_ERRS("MaterialEditor") << "missing required agent inventory cap url" << LL_ENDL;
+                mCallback(false, inv_item_id);
             }
-            LLViewerAssetUpload::EnqueueInventoryUpload(agent_url, uploadInfo);
+            else
+            {
+                LLNotificationsUtil::add("MissingMaterialCaps");
+            }
+            return;
         }
+
+        LLViewerAssetUpload::EnqueueInventoryUpload(agent_url, upload_info);
+        // </ID:i.doll>
     }
 private:
     LLPermissions mPermissions;
     std::string mAssetData;
     std::string mNewName;
+    LLMaterialEditor::material_inventory_callback_t mCallback;
 };
 
-void LLMaterialEditor::createInventoryItem(const std::string &buffer, const std::string &name, const std::string &desc, const LLPermissions& permissions, const LLUUID& upload_folder)
+void LLMaterialEditor::createInventoryItem(
+    const std::string& buffer,
+    const std::string& name,
+    const std::string& desc,
+    const LLPermissions& permissions,
+    const LLUUID& upload_folder,
+    material_inventory_callback_t callback)
 {
-    // gen a new uuid for this asset
     LLTransactionID tid;
-    tid.generate();     // timestamp-based randomization + uniquification
-    LLUUID parent = upload_folder.isNull() ? gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_MATERIAL) : upload_folder;
+    tid.generate();
+    const LLUUID parent = upload_folder.isNull()
+        ? gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_MATERIAL)
+        : upload_folder;
     const U8 subtype = NO_INV_SUBTYPE;  // TODO maybe use AT_SETTINGS and LLSettingsType::ST_MATERIAL ?
 
-    LLPointer<LLObjectsMaterialItemCallback> cb = new LLObjectsMaterialItemCallback(permissions, buffer, name);
-    create_inventory_item(gAgent.getID(), gAgent.getSessionID(), parent, tid, name, desc,
-        LLAssetType::AT_MATERIAL, LLInventoryType::IT_MATERIAL, subtype, permissions.getMaskNextOwner(),
-        cb);
+    LLPointer<LLObjectsMaterialItemCallback> cb = new LLObjectsMaterialItemCallback(
+        permissions, buffer, name, std::move(callback));
+    create_inventory_item(
+        gAgent.getID(), gAgent.getSessionID(), parent, tid, name, desc,
+        LLAssetType::AT_MATERIAL, LLInventoryType::IT_MATERIAL,
+        subtype, permissions.getMaskNextOwner(), cb);
 }
+
+// <ID:i.doll> [Copy selected material to inventory]
+bool LLMaterialEditor::agentInventoryCapAvailable()
+{
+    const LLViewerRegion* region = gAgent.getRegion();
+    return region
+        && !region->getCapability("UpdateMaterialAgentInventory").empty();
+}
+
+void LLMaterialEditor::createInventoryItemFromMaterial(
+    const LLGLTFMaterial& material,
+    const std::string& name,
+    const std::string& desc,
+    const LLPermissions& permissions,
+    const LLUUID& upload_folder,
+    material_inventory_callback_t callback)
+{
+    if (!agentInventoryCapAvailable())
+    {
+        LL_WARNS("MaterialEditor")
+            << "Cannot create material inventory item without UpdateMaterialAgentInventory"
+            << LL_ENDL;
+        if (callback)
+        {
+            callback(false, LLUUID::null);
+        }
+        else
+        {
+            LLNotificationsUtil::add("MissingMaterialCaps");
+        }
+        return;
+    }
+
+    LLGLTFMaterial asset_material = material;
+    asset_material.sanitizeAssetMaterial();
+    const std::string buffer = encode_material_asset(asset_material.asJSON());
+    createInventoryItem(buffer, name, desc, permissions, upload_folder, std::move(callback));
+}
+// </ID:i.doll>
 
 void LLMaterialEditor::finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, LLUUID newItemId)
 {
@@ -2435,14 +2531,10 @@ void LLMaterialEditor::onSaveObjectsMaterialAsMsgCallback(const LLSD& notificati
         return;
     }
 
-    LLSD asset;
-    asset["version"] = LLGLTFMaterial::ASSET_VERSION;
-    asset["type"] = LLGLTFMaterial::ASSET_TYPE;
+    // <ID:i.doll> [Copy selected material to inventory]
     // This is the string serialized from LLGLTFMaterial::asJSON
-    asset["data"] = notification["payload"]["data"];
-
-    std::ostringstream str;
-    LLSDSerialize::serialize(asset, str, LLSDSerialize::LLSD_BINARY);
+    const std::string buffer = encode_material_asset(notification["payload"]["data"].asString());
+    // </ID:i.doll>
 
     std::string new_name = response["message"].asString();
     LLInventoryObject::correctInventoryName(new_name);
@@ -2451,7 +2543,7 @@ void LLMaterialEditor::onSaveObjectsMaterialAsMsgCallback(const LLSD& notificati
         return;
     }
 
-    createInventoryItem(str.str(), new_name, std::string(), permissions, LLUUID::null);
+    createInventoryItem(buffer, new_name, std::string(), permissions, LLUUID::null);
 }
 
 void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type, bool allow_2k, const LLUUID& dest);
