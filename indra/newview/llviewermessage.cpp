@@ -8946,63 +8946,71 @@ void invalid_message_callback(LLMessageSystem* msg,
 
 void LLOfferInfo::forceResponse(InventoryOfferResponse response)
 {
-    // <FS:Ansariel> Now this is a hell of piece of... forceResponse() will look for the
-    //               ELEMENT index, and NOT the button index. So if we want to force a
-    //               response of IOR_ACCEPT, we need to pass the correct element
-    //               index of the button.
-    //LLNotification::Params params("UserGiveItem");
-    //params.functor.function(boost::bind(&LLOfferInfo::inventory_offer_callback, this, _1, _2));
-    //LLNotifications::instance().forceResponse(params, response);
+    // <FS:Ansariel> forceResponse() looks up by form ELEMENT index, not button index.
+    // <ID:i.doll> Resolve by button name so non-button form elements (e.g. the
+    // Accept In destination panel) do not shift Accept/Decline/Mute under hard-
+    // coded positions. Group-notice OK/close declines via IOR_DECLINE here.
+    // </ID:i.doll>
+    const bool task_offer = (IM_TASK_INVENTORY_OFFERED == mIM);
+    const char* notification_name = task_offer ? "ObjectGiveItem" : "UserGiveItem";
+    const char* button_name = nullptr;
 
-// [RLVa:ID] - Route to proper callback based on IM type
-    // Element indices are different between notification types:
-    // - ObjectGiveItem: 0=Accept, 1=Discard, 2=Mute
-    // - UserGiveItem:   0=Show, 1=Accept, 2=Discard, 3=Mute
-    if (IM_TASK_INVENTORY_OFFERED == mIM)
+    switch (response)
     {
-        S32 element_index;
-        switch (response)
-        {
-            case IOR_ACCEPT:
-                element_index = 0;  // Accept is element 0 for ObjectGiveItem
-                break;
-            case IOR_DECLINE:
-                element_index = 1;  // Discard is element 1
-                break;
-            case IOR_MUTE:
-                element_index = 2;  // Mute is element 2
-                break;
-            default:
-                element_index = -1;
-                break;
-        }
-        LLNotification::Params params("ObjectGiveItem");
+        case IOR_ACCEPT:
+        case IOR_ACCEPT_SILENT:
+            // ObjectGiveItem/UserGiveItem both name Accept "Keep"
+            button_name = "Keep";
+            break;
+        case IOR_DECLINE:
+        case IOR_DECLINE_SILENT:
+            button_name = "Discard";
+            break;
+        case IOR_MUTE:
+            button_name = "Mute";
+            break;
+        case IOR_SHOW:
+        case IOR_SHOW_SILENT:
+            // Only present on UserGiveItem
+            button_name = task_offer ? nullptr : "Show";
+            break;
+        default:
+            button_name = nullptr;
+            break;
+    }
+
+    if (!button_name)
+    {
+        LL_WARNS("Messaging") << "forceResponse: unsupported response "
+                              << (S32)response << " for " << notification_name << LL_ENDL;
+        return;
+    }
+
+    LLNotification::Params params(notification_name);
+    if (task_offer)
+    {
         params.functor.function(boost::bind(&LLOfferInfo::inventory_task_offer_callback, this, _1, _2));
-        LLNotifications::instance().forceResponse(params, element_index);
     }
     else
     {
-        S32 element_index;
-        switch (response)
-        {
-            case IOR_ACCEPT:
-                element_index = 1;  // Accept is element 1 for UserGiveItem (after Show)
-                break;
-            case IOR_DECLINE:
-                element_index = 2;  // Discard is element 2
-                break;
-            case IOR_MUTE:
-                element_index = 3;  // Mute is element 3
-                break;
-            default:
-                element_index = -1;
-                break;
-        }
-        LLNotification::Params params("UserGiveItem");
         params.functor.function(boost::bind(&LLOfferInfo::inventory_offer_callback, this, _1, _2));
-        LLNotifications::instance().forceResponse(params, element_index);
     }
-// [/RLVa:ID]
+
+    // Respond by button name (not form element index). Same end state as
+    // LLNotifications::forceResponse, but stable when non-button form
+    // elements are prepended to the offer templates.
+    LLNotificationPtr temp_notify = std::make_shared<LLNotification>(params);
+    if (!temp_notify->getForm() ||
+        temp_notify->getForm()->getElement(button_name).isUndefined())
+    {
+        LL_WARNS("Messaging") << "forceResponse: button \"" << button_name
+                              << "\" not found in " << notification_name << LL_ENDL;
+        return;
+    }
+
+    LLSD response = temp_notify->getResponseTemplate();
+    response[button_name] = true;
+    temp_notify->respond(response);
     // </FS:Ansariel>
 }
 
