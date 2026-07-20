@@ -181,8 +181,9 @@ class LLQueuedScriptAssetUpload : public LLScriptAssetUpload
 {
 public:
     LLQueuedScriptAssetUpload(LLUUID taskId, LLUUID itemId, LLUUID assetId, std::string compileTarget, bool isRunning,
-                              std::string scriptName, LLUUID queueId, LLUUID exerienceId, taskUploadFinish_f finish) :
-        LLScriptAssetUpload(taskId, itemId, std::move(compileTarget), isRunning, exerienceId, std::string(), finish, nullptr),
+                              std::string scriptName, LLUUID queueId, LLUUID exerienceId, taskUploadFinish_f finish,
+                              uploadFailed_f failed) :
+        LLScriptAssetUpload(taskId, itemId, std::move(compileTarget), isRunning, exerienceId, std::string(), finish, failed),
         mScriptName(scriptName),
         mQueueId(queueId)
     {
@@ -450,6 +451,21 @@ bool LLFloaterCompileQueue::hasExperience(const LLUUID& id) const
 void LLFloaterCompileQueue::handleHTTPResponse(std::string pumpName, const LLSD& expresult)
 {
     LLEventPumps::instance().post(pumpName, expresult);
+}
+
+// Upload failures normally result in a notification only. A compile queue
+// is also waiting on its event pump, so make sure HTTP-level compiler errors
+// wake that queue up instead of forcing it to wait for the inventory timeout.
+bool LLFloaterCompileQueue::handleHTTPFailureResponse(std::string pumpName, LLSD response, std::string reason)
+{
+    response["compiled"] = false;
+    if (!response.has("errors") || !response["errors"].isArray())
+    {
+        response["errors"] = LLSD::emptyArray();
+    }
+    response["errors"].append(reason);
+    LLEventPumps::instance().post(pumpName, response);
+    return true;
 }
 
 // *TODO: handleSCriptRetrieval is passed into the cache via a legacy C function pointer
@@ -732,9 +748,10 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             compile_target,
             true,
             inventory->getName(),
-            LLUUID(),
+            floater->getKey().asUUID(),
             experienceId,
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4));
+            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4),
+            boost::bind(&LLFloaterCompileQueue::handleHTTPFailureResponse, pump.getName(), _3, _4));
 
         LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
     }
