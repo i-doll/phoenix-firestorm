@@ -185,6 +185,21 @@ S32 LLToolBarView::enableCommand(const LLCommandId& commandId, bool enabled)
     return command_location;
 }
 
+S32 LLToolBarView::setCommandVisible(const LLCommandId& commandId, bool visible)
+{
+    S32 command_location = LLToolBarEnums::TOOLBAR_NONE;
+
+    for (S32 loc = LLToolBarEnums::TOOLBAR_FIRST; loc <= LLToolBarEnums::TOOLBAR_LAST; loc++)
+    {
+        if (mToolbars[loc]->setCommandVisible(commandId, visible))
+        {
+            command_location = loc;
+        }
+    }
+
+    return command_location;
+}
+
 S32 LLToolBarView::stopCommandInProgress(const LLCommandId& commandId)
 {
     S32 command_location = hasCommand(commandId);
@@ -843,5 +858,4 @@ bool LLToolBarView::isModified() const
 
     return modified;
 }
-
 
