@@ -31,8 +31,36 @@
 #include "llaudioengine_openal.h"
 #include "lllistener_openal.h"
 
+#include <cstring>
+
 
 const float LLAudioEngine_OpenAL::WIND_BUFFER_SIZE_SEC = 0.05f;
+
+namespace
+{
+    std::string getOpenALDeviceList(ALCdevice* device)
+    {
+        if (!device || alcIsExtensionPresent(device, "ALC_ENUMERATE_ALL_EXT") != ALC_TRUE)
+        {
+            return std::string();
+        }
+
+        const ALCchar* devices = alcGetString(nullptr, ALC_ALL_DEVICES_SPECIFIER);
+        if (!devices)
+        {
+            return std::string();
+        }
+
+        std::string result;
+        for (const ALCchar* device_name = devices; *device_name;
+            device_name += std::strlen(device_name) + 1)
+        {
+            result.append(device_name);
+            result.push_back('\n');
+        }
+        return result;
+    }
+}
 
 LLAudioEngine_OpenAL::LLAudioEngine_OpenAL()
     :
@@ -42,7 +70,10 @@ LLAudioEngine_OpenAL::LLAudioEngine_OpenAL()
     mWindBufSamples(0),
     mWindBufBytes(0),
     mWindSource(AL_NONE),
-    mNumEmptyWindALBuffers(MAX_NUM_WIND_BUFFERS)
+    mNumEmptyWindALBuffers(MAX_NUM_WIND_BUFFERS),
+    mDefaultDeviceSpecifier(),
+    mDeviceList(),
+    mDeviceReopenSupported(false)
 {
 }
 
@@ -86,6 +117,14 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
         << ll_safe_string(alcGetString(device,
                            ALC_DEFAULT_DEVICE_SPECIFIER))
         << LL_ENDL;
+
+    mDefaultDeviceSpecifier = ll_safe_string(alcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER));
+    mDeviceList = getOpenALDeviceList(device);
+    mDeviceReopenSupported = device &&
+        alcIsExtensionPresent(device, "ALC_SOFT_reopen_device") == ALC_TRUE;
+
+    LL_INFOS() << "OpenAL device recovery: "
+        << (mDeviceReopenSupported ? "available" : "unavailable") << LL_ENDL;
 
     return true;
 }
@@ -173,6 +212,99 @@ void LLAudioEngine_OpenAL::setInternalGain(F32 gain)
     alListenerf(AL_GAIN, gain);
 }
 
+bool LLAudioEngine_OpenAL::reopenDevice()
+{
+    ALCcontext *context = alcGetCurrentContext();
+    ALCdevice *device = context ? alcGetContextsDevice(context) : nullptr;
+    if (!device || !mDeviceReopenSupported)
+    {
+        return false;
+    }
+
+    LPALCREOPENDEVICESOFT reopen_device = reinterpret_cast<LPALCREOPENDEVICESOFT>(
+        alcGetProcAddress(device, "alcReopenDeviceSOFT"));
+    if (!reopen_device)
+    {
+        LL_WARNS("OpenAL") << "ALC_SOFT_reopen_device is advertised but alcReopenDeviceSOFT is unavailable" << LL_ENDL;
+        mDeviceReopenSupported = false;
+        return false;
+    }
+
+    if (reopen_device(device, nullptr, nullptr) != ALC_TRUE)
+    {
+        LL_WARNS("OpenAL") << "Unable to reopen the output device: "
+            << alcGetError(device) << LL_ENDL;
+        return false;
+    }
+
+    mDefaultDeviceSpecifier = ll_safe_string(alcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER));
+    mDeviceList = getOpenALDeviceList(device);
+
+    for (LLAudioChannel* channel : mChannels)
+    {
+        if (auto openal_channel = dynamic_cast<LLAudioChannelOpenAL*>(channel))
+        {
+            openal_channel->resumeAfterDeviceReopen();
+        }
+    }
+
+    LL_INFOS("OpenAL") << "Output device reopened successfully" << LL_ENDL;
+    return true;
+}
+
+void LLAudioEngine_OpenAL::idle()
+{
+    if (mDeviceCheckTimer.checkExpirationAndReset(1.0f))
+    {
+        // OpenAL Soft marks the device disconnected when its endpoint is
+        // removed and does not reconnect it automatically.  Reopen the
+        // existing device so all OpenAL buffers and sources survive the swap.
+        std::unique_lock lock(gAudioDeviceMutex, std::chrono::seconds(1));
+        if (lock.owns_lock())
+        {
+            ALCcontext *context = alcGetCurrentContext();
+            ALCdevice *device = context ? alcGetContextsDevice(context) : nullptr;
+            bool device_lost = false;
+
+            if (device && alcIsExtensionPresent(device, "ALC_EXT_disconnect") == ALC_TRUE)
+            {
+                ALCint connected = ALC_TRUE;
+                alcGetIntegerv(device, ALC_CONNECTED, 1, &connected);
+                device_lost = connected == ALC_FALSE;
+            }
+
+            const char *default_device = device
+                ? alcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER)
+                : nullptr;
+            const std::string current_default = ll_safe_string(default_device);
+            const bool default_device_changed = !current_default.empty() &&
+                current_default != mDefaultDeviceSpecifier;
+            const std::string current_device_list = getOpenALDeviceList(device);
+            const bool device_list_changed = current_device_list != mDeviceList;
+
+            if (device_lost || default_device_changed || device_list_changed)
+            {
+                LL_INFOS("OpenAL") << (device_lost
+                    ? "Output device disconnected"
+                    : (default_device_changed
+                        ? "Windows default output device changed"
+                        : "OpenAL device list changed"))
+                    << "; attempting recovery" << LL_ENDL;
+                // Leave the old snapshot in place when recovery fails so the
+                // next poll retries even if the device list has stopped
+                // changing while Windows is still bringing the endpoint back.
+                reopenDevice();
+            }
+            else
+            {
+                mDeviceList = current_device_list;
+            }
+        }
+    }
+
+    LLAudioEngine::idle();
+}
+
 LLAudioChannelOpenAL::LLAudioChannelOpenAL()
     :
     mALSource(AL_NONE),
@@ -185,6 +317,14 @@ LLAudioChannelOpenAL::~LLAudioChannelOpenAL()
 {
     cleanup();
     alDeleteSources(1, &mALSource);
+}
+
+void LLAudioChannelOpenAL::resumeAfterDeviceReopen()
+{
+    if (mCurrentSourcep && !isWaiting())
+    {
+        play();
+    }
 }
 
 void LLAudioChannelOpenAL::cleanup()
@@ -567,4 +707,3 @@ void LLAudioEngine_OpenAL::updateWind(LLVector3 wind_vec, F32 camera_altitude)
         LL_DEBUGS() << "Wind had stopped - probably ran out of buffers - restarting: " << (unprocessed+mNumEmptyWindALBuffers) << " now queued." << LL_ENDL;
     }
 }
-
