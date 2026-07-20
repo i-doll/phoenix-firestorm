@@ -286,14 +286,17 @@ std::string LLAvatarList::getAvatarName(LLAvatarName av_name)
 // <FS:Ansariel> Update voice volume slider on RLVa shownames restriction update
 void LLAvatarList::updateRlvRestrictions(ERlvBehaviour behavior, ERlvParamType type)
 {
-    if (behavior == RLV_BHVR_SHOWNAMES)
+    if (behavior == RLV_BHVR_SHOWNAMES || behavior == RLV_BHVR_SHOWCONTACTS)
     {
         std::vector<LLPanel*> items;
         getItems(items);
         for (auto panel : items)
         {
             LLAvatarListItem* item = static_cast<LLAvatarListItem*>(panel);
-            item->updateRlvRestrictions();
+            if (behavior == RLV_BHVR_SHOWNAMES)
+                item->updateRlvRestrictions();
+            else
+                item->setOnline(mIgnoreOnlineStatus || LLAvatarTracker::instance().isBuddyOnline(item->getAvatarId()));
         }
     }
 }

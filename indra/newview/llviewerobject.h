@@ -482,6 +482,7 @@ public:
     // Owner id is this object's owner
     void setAttachedSound(const LLUUID &audio_uuid, const LLUUID& owner_id, const F32 gain, const U8 flags);
     void adjustAudioGain(const F32 gain);
+    void updateAudioSourceRlvRestriction();
     F32  getSoundCutOffRadius() const { return mSoundCutOffRadius; }
     void clearAttachedSound()                               { mAudioSourcep = NULL; }
 
