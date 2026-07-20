@@ -165,6 +165,7 @@ protected:
 
     // bool checkAssetId(const LLUUID &assetId);
     static void handleHTTPResponse(std::string pumpName, const LLSD& expresult);
+    static bool handleHTTPFailureResponse(std::string pumpName, LLSD response, std::string reason);
     static void handleScriptRetrieval(const LLUUID& assetId, LLAssetType::EType type, void* userData, S32 status, LLExtStat extStatus);
 
 private:
