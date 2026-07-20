@@ -409,6 +409,22 @@ bool LLToolBar::enableCommand(const LLCommandId& commandId, bool enabled)
     return (command_button != NULL);
 }
 
+bool LLToolBar::setCommandVisible(const LLCommandId& commandId, bool visible)
+{
+    if (commandId != LLCommandId::null)
+    {
+        command_id_map::iterator it = mButtonMap.find(commandId.uuid());
+        if (it != mButtonMap.end())
+        {
+            it->second->setVisible(visible);
+            mNeedsLayout = true;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool LLToolBar::stopCommandInProgress(const LLCommandId& commandId)
 {
     //

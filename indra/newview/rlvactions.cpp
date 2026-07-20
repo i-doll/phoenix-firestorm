@@ -299,6 +299,129 @@ bool RlvActions::canShowNearbyAgents()
     return !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNEARBY);
 }
 
+namespace
+{
+bool hasUnboundedSoundRestriction(ERlvBehaviour behaviour, ERlvBehaviourModifier modifier)
+{
+    const RlvBehaviourModifier* pModifier = RlvBehaviourDictionary::instance().getModifier(modifier);
+    if (!pModifier)
+        return true;
+
+    for (const auto& object_entry : gRlvHandler.getObjectMap())
+    {
+        if (object_entry.second.hasBehaviour(behaviour, false) && !pModifier->hasValue(object_entry.first))
+            return true;
+    }
+
+    return false;
+}
+
+ERlvBehaviour getAvatarSoundBehaviour(const LLUUID& idAvatar)
+{
+    return (idAvatar == gAgentID) ? RLV_BHVR_SOUNDSELF : RLV_BHVR_SOUNDOTHERS;
+}
+
+bool hasSoundSourceException(ERlvBehaviour behaviour, const LLViewerObject* pSource)
+{
+    if (!pSource)
+        return false;
+
+    if (gRlvHandler.isException(behaviour, pSource->getID()))
+        return true;
+
+    const LLViewerObject* pRoot = pSource->getRootEdit();
+    return pRoot && pRoot != pSource && gRlvHandler.isException(behaviour, pRoot->getID());
+}
+
+bool canHearRestrictedSound(ERlvBehaviour behaviour, ERlvBehaviourModifier modifier, const LLVector3d& position_global)
+{
+    if (!gRlvHandler.hasBehaviour(behaviour))
+        return true;
+
+    // A plain @worldsounds=n/@soundothers=n remains an unrestricted block. A
+    // distance modifier only relaxes the restriction that supplied that modifier.
+    if (hasUnboundedSoundRestriction(behaviour, modifier))
+        return false;
+
+    const RlvBehaviourModifier* pModifier = RlvBehaviourDictionary::instance().getModifier(modifier);
+    if (!pModifier || !pModifier->hasValue() || position_global.isExactlyZero())
+        return false;
+
+    const F32 radius = pModifier->getValue<F32>();
+    return radius >= 0.f && (position_global - gAgent.getPositionGlobal()).lengthSquared() <= radius * radius;
+}
+}
+
+bool RlvActions::canPlayAvatarSound(const LLUUID& idAvatar)
+{
+    if (!isRlvEnabled())
+        return true;
+
+    const ERlvBehaviour behaviour = getAvatarSoundBehaviour(idAvatar);
+    return !gRlvHandler.hasBehaviour(behaviour) || gRlvHandler.isException(behaviour, idAvatar);
+}
+
+bool RlvActions::canPlayAvatarSound(const LLUUID& idAvatar, const LLVector3d& position_global)
+{
+    if (!isRlvEnabled() || idAvatar == gAgentID)
+        return canPlayAvatarSound(idAvatar);
+
+    return gRlvHandler.isException(RLV_BHVR_SOUNDOTHERS, idAvatar) ||
+        canHearRestrictedSound(RLV_BHVR_SOUNDOTHERS, RLV_MODIFIER_SOUNDOTHERSDIST, position_global);
+}
+
+bool RlvActions::canPlayWorldSound(const LLVector3d& position_global, const LLUUID& idSource)
+{
+    return !isRlvEnabled() ||
+        (idSource.notNull() && gRlvHandler.isException(RLV_BHVR_WORLDSOUNDS, idSource)) ||
+        canHearRestrictedSound(RLV_BHVR_WORLDSOUNDS, RLV_MODIFIER_WORLDSOUNDSDIST, position_global);
+}
+
+bool RlvActions::canPlaySound(const LLViewerObject* pSource, const LLUUID& idOwner)
+{
+    if (!isRlvEnabled() || !pSource)
+        return true;
+
+    // HUD audio is local UI/avatar audio from the user's HUD and is never covered by soundself.
+    if (pSource->isHUDAttachment())
+        return true;
+
+    if (pSource->isAvatar())
+        return canPlayAvatarSound(pSource->getID(), pSource->getPositionGlobal());
+
+    if (pSource->isAttachment())
+    {
+        const LLUUID idAvatar = pSource->getAvatar() ? pSource->getAvatar()->getID() : idOwner;
+        if (hasSoundSourceException(getAvatarSoundBehaviour(idAvatar), pSource))
+            return true;
+
+        if (const LLVOAvatar* pAvatar = pSource->getAvatar())
+            return canPlayAvatarSound(pAvatar->getID(), pAvatar->getPositionGlobal());
+
+        // If the attachment owner is all we know, apply the avatar restriction to it.
+        return canPlayAvatarSound(idOwner);
+    }
+
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_WORLDSOUNDS))
+    {
+        // Sounds from the object the user is sitting on remain audible. Compare linkset
+        // roots so child prims of the sitting object are included.
+        const LLViewerObject* pSittingObject = nullptr;
+        if (isAgentAvatarValid() && gAgentAvatarp->isSitting() && gAgentAvatarp->getParent())
+            pSittingObject = static_cast<const LLViewerObject*>(gAgentAvatarp->getParent());
+
+        if (pSittingObject && pSource->getRootEdit() == pSittingObject->getRootEdit())
+            return true;
+
+        if (hasSoundSourceException(RLV_BHVR_WORLDSOUNDS, pSource))
+            return true;
+
+        return canPlayWorldSound(pSource->getPositionGlobal(), pSource->getID());
+    }
+
+    return true;
+}
+
 // Handles: @chatwhisper, @chatnormal and @chatshout
 EChatType RlvActions::checkChatVolume(EChatType chatType)
 {

@@ -163,6 +163,15 @@ public:
     static bool canShowNearbyAgents();
 
     /*
+     * Returns true when a sound from the specified avatar or viewer object may be played.
+     * HUD attachments are intentionally exempt from soundself.
+     */
+    static bool canPlayAvatarSound(const LLUUID& idAvatar);
+    static bool canPlayAvatarSound(const LLUUID& idAvatar, const LLVector3d& position_global);
+    static bool canPlayWorldSound(const LLVector3d& position_global, const LLUUID& idSource = LLUUID::null);
+    static bool canPlaySound(const LLViewerObject* pSource, const LLUUID& idOwner);
+
+    /*
      * Checks if the user is allowed to use the specified volume in (main) chat and returns the appropriate chat volume type
      */
     static EChatType checkChatVolume(EChatType chatType);
