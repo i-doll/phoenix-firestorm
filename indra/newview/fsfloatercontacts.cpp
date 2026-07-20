@@ -691,6 +691,15 @@ void FSFloaterContacts::addFriend(const LLUUID& agent_id)
     online_status_column["column"]      = "icon_online_status";
     online_status_column["type"]        = "icon";
     online_status_column["halign"]      = "center";
+    const bool show_online = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWCONTACTS);
+    if (show_online && relationInfo->isOnline())
+    {
+        online_status_column["value"] = "icon_avatar_online";
+    }
+    else if (show_online && LLVoiceClient::getInstance()->isOnlineSIP(agent_id))
+    {
+        online_status_column["value"] = "slim_icon_16_viewer";
+    }
 
     LLSD& online_column                     = element["columns"][LIST_VISIBLE_ONLINE];
     online_column["column"]                 = "icon_visible_online";
@@ -749,8 +758,9 @@ void FSFloaterContacts::updateFriendItem(const LLUUID& agent_id, const LLRelatio
         return;
     }
 
-    bool isOnlineSIP = LLVoiceClient::getInstance()->isOnlineSIP(itemp->getUUID());
-    bool isOnline = info->isOnline();
+    const bool show_online = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWCONTACTS);
+    bool isOnlineSIP = show_online && LLVoiceClient::getInstance()->isOnlineSIP(itemp->getUUID());
+    bool isOnline = show_online && info->isOnline();
 
     LLAvatarName av_name;
     if (!LLAvatarNameCache::get(agent_id, &av_name))
@@ -1141,7 +1151,18 @@ void FSFloaterContacts::childShowTab(std::string_view id, std::string_view tabna
 
 void FSFloaterContacts::updateRlvRestrictions(ERlvBehaviour behavior)
 {
-    if (behavior == RLV_BHVR_SHOWLOC ||
+    if (behavior == RLV_BHVR_SHOWCONTACTS)
+    {
+        if (!mFriendsList)
+            return;
+
+        LLAvatarTracker::buddy_map_t all_buddies;
+        LLAvatarTracker::instance().copyBuddyList(all_buddies);
+        for (const auto& [id, relationship] : all_buddies)
+            updateFriendItem(id, relationship);
+        refreshUI();
+    }
+    else if (behavior == RLV_BHVR_SHOWLOC ||
         behavior == RLV_BHVR_SHOWWORLDMAP ||
         behavior == RLV_BHVR_PAY)
     {

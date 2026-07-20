@@ -6707,6 +6707,9 @@ void LLViewerObject::setAttachedSound(const LLUUID &audio_uuid, const LLUUID& ow
         return;
     }
 
+    if (!RlvActions::canPlaySound(this, owner_id))
+        return;
+
     // <FS:Ansariel> Asset blacklist
     FSAssetBlacklist& blacklist = FSAssetBlacklist::instance();
     if (blacklist.isBlacklisted(audio_uuid, LLAssetType::AT_SOUND))
@@ -6799,6 +6802,12 @@ void LLViewerObject::adjustAudioGain(const F32 gain)
         mAudioGain = gain;
         mAudioSourcep->setGain(mAudioGain);
     }
+}
+
+void LLViewerObject::updateAudioSourceRlvRestriction()
+{
+    if (mAudioSourcep && !RlvActions::canPlaySound(this, mAudioSourcep->getOwnerID()))
+        mAudioSourcep->stop();
 }
 
 //----------------------------------------------------------------------------

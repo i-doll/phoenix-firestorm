@@ -5070,6 +5070,24 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
         return;
     }
 
+    LLViewerObject* source_object = gObjectList.findObject(object_id);
+    if (source_object)
+    {
+        if (!RlvActions::canPlaySound(source_object, owner_id))
+            return;
+    }
+    else if (object_id == owner_id)
+    {
+        LLVector3d avatar_position;
+        if (!LLWorld::getInstance()->getAvatar(owner_id, avatar_position) ||
+            !RlvActions::canPlayAvatarSound(owner_id, avatar_position))
+            return;
+    }
+    else if (!RlvActions::canPlayWorldSound(pos_global, object_id))
+    {
+        return;
+    }
+
     // <FS:AO> Hack for legacy radar script interface compatibility. Interpret certain
     // sound assets as a request for a full radar update to a channel
     if ((owner_id == gAgentID) && (sound_id.asString() == gSavedSettings.getString("RadarLegacyChannelAlertRefreshUUID")))

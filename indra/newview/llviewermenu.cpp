@@ -8273,6 +8273,9 @@ class LLAvatarToggleSearch : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
+        if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSEARCH))
+            return true;
+
         // <FS:Ansariel> Legacy search toggle
         const std::string instance_name = gSavedSettings.getBOOL("FSUseFSLegacySearch") ? "search" : "legacy_search";
 

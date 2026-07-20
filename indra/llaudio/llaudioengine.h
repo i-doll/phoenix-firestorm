@@ -345,6 +345,7 @@ public:
     virtual void setGain(const F32 gain)                            { mGain = llclamp(gain, 0.f, 1.f); }
 
     const LLUUID &getID() const     { return mID; }
+    const LLUUID &getOwnerID() const { return mOwnerID; }
     // NaCl - Sound Explorer
     const LLUUID &getLogID() const { return mLogID; }
     // NaCl End

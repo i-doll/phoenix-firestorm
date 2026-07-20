@@ -280,6 +280,7 @@ public:
     int  removeCommand(const LLCommandId& commandId);       // Returns the rank the removed command was at, RANK_NONE if not found
     bool hasCommand(const LLCommandId& commandId) const;    // is this command bound to a button in this toolbar
     bool enableCommand(const LLCommandId& commandId, bool enabled); // enable/disable button bound to the specified command, if it exists in this toolbar
+    bool setCommandVisible(const LLCommandId& commandId, bool visible); // show/hide button bound to the specified command
     bool stopCommandInProgress(const LLCommandId& commandId);   // stop command if it is currently active
     bool flashCommand(const LLCommandId& commandId, bool flash, bool force_flashing = false); // flash button associated with given command, if in this toolbar
 

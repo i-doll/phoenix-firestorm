@@ -5153,7 +5153,8 @@ void LLVOAvatar::updateFootstepSounds()
             LLVector3d foot_pos_global = gAgent.getPosGlobalFromAgent(foot_pos_agent);
 
             if (LLViewerParcelMgr::getInstance()->canHearSound(foot_pos_global)
-                && !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds))
+                && !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds)
+                && RlvActions::canPlayAvatarSound(getID()))
             {
                 gAudiop->triggerSound(step_sound_id, getID(), STEP_VOLUME, LLAudioEngine::AUDIO_TYPE_AMBIENT, foot_pos_global);
             }
@@ -7043,7 +7044,8 @@ bool LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, bool 
             {
                 LLVector3d char_pos_global = gAgent.getPosGlobalFromAgent(getCharacterPosition());
                 if (LLViewerParcelMgr::getInstance()->canHearSound(char_pos_global)
-                    && !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds))
+                    && !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds)
+                    && RlvActions::canPlayAvatarSound(getID()))
                 {
                     // RN: uncomment this to play on typing sound at fixed volume once sound engine is fixed
                     // to support both spatialized and non-spatialized instances of the same sound

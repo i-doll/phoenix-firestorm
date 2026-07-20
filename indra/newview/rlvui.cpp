@@ -18,17 +18,22 @@
 #include "llagent.h"
 #include "llavataractions.h"            // LLAvatarActions::profileVisible()
 #include "llchatmentionhelper.h"
+#include "llcallingcard.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llhudtext.h"                  // LLHUDText::refreshAllObjectText()
 #include "llimview.h"                   // LLIMMgr::computeSessionID()
+#include "lllayoutstack.h"
 #include "llmoveview.h"                 // Movement panel (contains "Stand" and "Stop Flying" buttons)
 #include "llnavigationbar.h"            // Navigation bar
 #include "llparcel.h"
+#include "lltabcontainer.h"
+#include "lltoolbarview.h"
 // <FS:Zi> We don't use the mini location panel in Firestorm
 // #include "llpaneltopinfobar.h"
 #include "llteleporthistory.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+#include "llviewerobjectlist.h"
 #include "llvoavatar.h"
 #include "roles_constants.h"            // Group "powers"
 
@@ -67,6 +72,11 @@ RlvUIEnabler::RlvUIEnabler()
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWPEOPLE, boost::bind(&RlvUIEnabler::onToggleShowPeople, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_AREASEARCH, boost::bind(&RlvUIEnabler::onToggleShowAreaSearch, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWWORLDMAP, boost::bind(&RlvUIEnabler::onToggleShowWorldMap, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWCONTACTS, boost::bind(&RlvUIEnabler::onToggleShowContacts, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWSEARCH, boost::bind(&RlvUIEnabler::onToggleShowSearch, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_WORLDSOUNDS, boost::bind(&RlvUIEnabler::onToggleSoundRestrictions, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SOUNDOTHERS, boost::bind(&RlvUIEnabler::onToggleSoundRestrictions, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SOUNDSELF, boost::bind(&RlvUIEnabler::onToggleSoundRestrictions, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_UNSIT, boost::bind(&RlvUIEnabler::onToggleUnsit, this)));
 
     // onToggleTp
@@ -295,6 +305,98 @@ void RlvUIEnabler::onToggleShowAreaSearch()
     else
     {
         RLV_VERIFY(removeGenericFloaterFilter("area_search"));
+    }
+}
+
+void RlvUIEnabler::onToggleShowSearch()
+{
+    const bool fEnable = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSEARCH);
+
+    for (const std::string& floater_name : { std::string("search"), std::string("legacy_search") })
+    {
+        if (!fEnable && LLFloaterReg::instanceVisible(floater_name))
+            LLFloaterReg::hideInstance(floater_name);
+
+        if (!fEnable)
+        {
+            RLV_VERIFY(addGenericFloaterFilter(floater_name));
+        }
+        else
+        {
+            RLV_VERIFY(removeGenericFloaterFilter(floater_name));
+        }
+    }
+
+    // Hide the navigation-bar search input while retaining the user's normal
+    // ShowSearchTopBar preference for when the restriction is released.
+    if (LLView* nav_view = LLNavigationBar::instance().getView())
+    {
+        if (LLLayoutPanel* search_panel = nav_view->findChild<LLLayoutPanel>("search_bar_visibility_panel"))
+        {
+            search_panel->setMakeVisibleControlVariable(
+                fEnable ? gSavedSettings.getControl("ShowSearchTopBar").get() : nullptr);
+            if (!fEnable)
+                search_panel->setVisible(false);
+        }
+    }
+
+    // The same search command can also be placed on a user toolbar.
+    if (gToolBarView)
+        gToolBarView->setCommandVisible(LLCommandId("search"), fEnable);
+}
+
+void RlvUIEnabler::onToggleShowContacts()
+{
+    const bool fEnable = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWCONTACTS);
+
+    // Hide and filter the legacy Contacts floater, including when it is hosted
+    // in the Conversations window.
+    if (!fEnable && LLFloaterReg::instanceVisible("imcontacts"))
+        LLFloaterReg::hideInstance("imcontacts");
+    if (!fEnable)
+    {
+        RLV_VERIFY(addGenericFloaterFilter("imcontacts"));
+    }
+    else
+    {
+        RLV_VERIFY(removeGenericFloaterFilter("imcontacts"));
+    }
+
+    // Hide the friends tab in the People side panel when the V2 contacts UI is
+    // enabled. Groups and the other People tabs remain available.
+    if (LLPanel* people_panel = LLFloaterSidePanelContainer::getPanel("people", "panel_people"))
+    {
+        if (LLTabContainer* tabs = people_panel->findChild<LLTabContainer>("tabs"))
+        {
+            if (LLPanel* friends_panel = people_panel->findChild<LLPanel>("friends_panel"))
+            {
+                tabs->setTabButtonVisible(friends_panel, fEnable);
+                tabs->setTabVisibility(friends_panel, fEnable);
+            }
+        }
+    }
+
+    // Force every friend-list observer to repaint the online indicator. The
+    // tracker state itself remains unchanged; this is only a UI refresh.
+    LLAvatarTracker& tracker = LLAvatarTracker::instance();
+    LLAvatarTracker::buddy_map_t all_buddies;
+    tracker.copyBuddyList(all_buddies);
+    for (const auto& buddy : all_buddies)
+        tracker.addChangedMask(LLFriendObserver::ONLINE, buddy.first);
+    tracker.notifyObservers();
+}
+
+void RlvUIEnabler::onToggleSoundRestrictions()
+{
+    refreshSoundRestrictions();
+}
+
+void RlvUIEnabler::refreshSoundRestrictions()
+{
+    for (S32 index = 0; index < gObjectList.getNumObjects(); ++index)
+    {
+        if (LLViewerObject* objectp = gObjectList.getObject(index))
+            objectp->updateAudioSourceRlvRestriction();
     }
 }
 

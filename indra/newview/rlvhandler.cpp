@@ -271,6 +271,9 @@ bool RlvHandler::ownsBehaviour(const LLUUID& idObj, ERlvBehaviour eBhvr) const
 void RlvHandler::addException(const LLUUID& idObj, ERlvBehaviour eBhvr, const RlvExceptionOption& varOption)
 {
     m_Exceptions.insert(std::make_pair(eBhvr, RlvException(idObj, eBhvr, varOption)));
+
+    if (eBhvr == RLV_BHVR_WORLDSOUNDS || eBhvr == RLV_BHVR_SOUNDOTHERS || eBhvr == RLV_BHVR_SOUNDSELF)
+        RlvUIEnabler::instance().refreshSoundRestrictions();
 }
 
 bool RlvHandler::isException(ERlvBehaviour eBhvr, const RlvExceptionOption& varOption, ERlvExceptionCheck eCheckType) const
@@ -323,6 +326,9 @@ void RlvHandler::removeException(const LLUUID& idObj, ERlvBehaviour eBhvr, const
         if ( (itException->second.idObject == idObj) && (itException->second.varOption == varOption) )
         {
             m_Exceptions.erase(itException);
+
+            if (eBhvr == RLV_BHVR_WORLDSOUNDS || eBhvr == RLV_BHVR_SOUNDOTHERS || eBhvr == RLV_BHVR_SOUNDSELF)
+                RlvUIEnabler::instance().refreshSoundRestrictions();
             break;
         }
     }
@@ -1894,6 +1900,26 @@ ERlvCmdRet RlvBehaviourGenericHandler<RLV_OPTION_NONE_OR_MODIFIER>::onCommand(co
     return RLV_RET_SUCCESS;
 }
 
+// Handles: @bhvr=n, @bhvr:<uuid>=n|y and @bhvr:<global modifier>=n|y
+template<>
+ERlvCmdRet RlvBehaviourGenericHandler<RLV_OPTION_NONE_OR_EXCEPTION_OR_MODIFIER>::onCommand(const RlvCommand& rlvCmd, bool& fRefCount)
+{
+    if (rlvCmd.hasOption())
+    {
+        LLUUID idException;
+        if (RlvCommandOptionHelper::parseOption(rlvCmd.getOption(), idException))
+        {
+            ERlvCmdRet eRet = RlvBehaviourGenericHandler<RLV_OPTION_EXCEPTION>::onCommand(rlvCmd, fRefCount);
+            fRefCount = false;
+            return eRet;
+        }
+
+        return RlvBehaviourGenericHandler<RLV_OPTION_NONE_OR_MODIFIER>::onCommand(rlvCmd, fRefCount);
+    }
+
+    return RlvBehaviourGenericHandler<RLV_OPTION_NONE_OR_MODIFIER>::onCommand(rlvCmd, fRefCount);
+}
+
 // Handles: @addattach[:<attachpt>]=n|y and @remattach[:<attachpt>]=n|y
 template<> template<>
 ERlvCmdRet RlvBehaviourAddRemAttachHandler::onCommand(const RlvCommand& rlvCmd, bool& fRefCount)
@@ -2802,6 +2828,18 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SHOWNAMETAGS>::onCommand(const RlvComman
         return eRet;
     }
     return RlvBehaviourGenericHandler<RLV_OPTION_NONE_OR_MODIFIER>::onCommand(rlvCmd, fRefCount);
+}
+
+template<>
+void RlvBehaviourModifierHandler<RLV_MODIFIER_WORLDSOUNDSDIST>::onValueChange() const
+{
+    RlvUIEnabler::instance().refreshSoundRestrictions();
+}
+
+template<>
+void RlvBehaviourModifierHandler<RLV_MODIFIER_SOUNDOTHERSDIST>::onValueChange() const
+{
+    RlvUIEnabler::instance().refreshSoundRestrictions();
 }
 
 // Handles: @shownearby=n|y toggles
