@@ -285,6 +285,9 @@ void LLAvatarListItem::changed(U32 mask)
 
 void LLAvatarListItem::setOnline(bool online)
 {
+    if (RlvActions::hasBehaviour(RLV_BHVR_SHOWCONTACTS))
+        online = false;
+
     // *FIX: setName() overrides font style set by setOnline(). Not an issue ATM.
 
     if (mOnlineStatus != E_UNKNOWN && (bool) mOnlineStatus == online)

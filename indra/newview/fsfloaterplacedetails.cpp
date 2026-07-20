@@ -575,6 +575,9 @@ void FSFloaterPlaceDetails::setItem(LLInventoryItem* item)
 // static
 void FSFloaterPlaceDetails::showPlaceDetails(const LLSD& key)
 {
+    if (RlvActions::hasBehaviour(RLV_BHVR_SHOWSEARCH))
+        return;
+
     if (gSavedSettings.getBOOL("FSUseStandalonePlaceDetailsFloater"))
     {
         LLFloaterReg::showInstance("fs_placedetails", key);

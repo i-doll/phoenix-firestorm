@@ -58,6 +58,7 @@
 #include "lggcontactsets.h"
 #include "llfloaterreg.h"
 #include "llnotificationmanager.h"
+#include "rlvhandler.h"
 
 ///----------------------------------------------------------------------------
 /// Local function declarations, constants, enums, and typedefs
@@ -849,6 +850,9 @@ static void on_avatar_name_cache_notify(const LLUUID& agent_id,
                                         bool online,
                                         LLSD payload)
 {
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWCONTACTS))
+        return;
+
     // Popup a notify box with online status of this agent
     // Use display name only because this user is your friend
     LLSD args;

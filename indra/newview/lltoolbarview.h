@@ -78,6 +78,7 @@ public:
     S32 addCommand(const LLCommandId& commandId, LLToolBarEnums::EToolBarLocation toolbar, int rank = LLToolBar::RANK_NONE);
     S32 removeCommand(const LLCommandId& commandId, int& rank); // Sets the rank the removed command was at, RANK_NONE if not found
     S32 enableCommand(const LLCommandId& commandId, bool enabled);
+    S32 setCommandVisible(const LLCommandId& commandId, bool visible);
     S32 stopCommandInProgress(const LLCommandId& commandId);
     S32 flashCommand(const LLCommandId& commandId, bool flash, bool force_flashing = false);
 
