@@ -34,8 +34,35 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <cstring>
 
 const float LLAudioEngine_OpenAL::WIND_BUFFER_SIZE_SEC = 0.05f;
+
+namespace
+{
+    std::string getOpenALDeviceList(ALCdevice* device)
+    {
+        if (!device || alcIsExtensionPresent(device, "ALC_ENUMERATE_ALL_EXT") != ALC_TRUE)
+        {
+            return std::string();
+        }
+
+        const ALCchar* devices = alcGetString(nullptr, ALC_ALL_DEVICES_SPECIFIER);
+        if (!devices)
+        {
+            return std::string();
+        }
+
+        std::string result;
+        for (const ALCchar* device_name = devices; *device_name;
+            device_name += std::strlen(device_name) + 1)
+        {
+            result.append(device_name);
+            result.push_back('\n');
+        }
+        return result;
+    }
+}
 
 LLAudioEngine_OpenAL::LLAudioEngine_OpenAL()
     :
@@ -45,7 +72,9 @@ LLAudioEngine_OpenAL::LLAudioEngine_OpenAL()
     mWindBufSamples(0),
     mWindBufBytes(0),
     mWindSource(AL_NONE),
-    mNumEmptyWindALBuffers(MAX_NUM_WIND_BUFFERS)
+    mNumEmptyWindALBuffers(MAX_NUM_WIND_BUFFERS),
+    mDefaultDeviceSpecifier(),
+    mDeviceList()
 {
 }
 
@@ -98,6 +127,12 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
 
     // <FS:Ansariel> Output device selection
     setupDeviceEvents(device);
+
+    mDefaultDeviceSpecifier = ll_safe_string(alcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER));
+    mDeviceList = getOpenALDeviceList(device);
+
+    LL_INFOS() << "OpenAL device recovery: "
+        << (device && alcIsExtensionPresent(device, "ALC_SOFT_reopen_device") == ALC_TRUE ? "available" : "unavailable") << LL_ENDL;
 
     return true;
 }
@@ -185,6 +220,66 @@ void LLAudioEngine_OpenAL::setInternalGain(F32 gain)
     alListenerf(AL_GAIN, gain);
 }
 
+void LLAudioEngine_OpenAL::idle()
+{
+    if (mDeviceCheckTimer.checkExpirationAndReset(1.0f))
+    {
+        // OpenAL Soft marks the device disconnected when its endpoint is
+        // removed and does not reconnect it automatically.  Reopen the
+        // existing device so all OpenAL buffers and sources survive the swap.
+        std::unique_lock lock(gAudioDeviceMutex, std::chrono::seconds(1));
+        if (lock.owns_lock())
+        {
+            ALCcontext *context = alcGetCurrentContext();
+            ALCdevice *device = context ? alcGetContextsDevice(context) : nullptr;
+            bool device_lost = false;
+
+            if (device && alcIsExtensionPresent(device, "ALC_EXT_disconnect") == ALC_TRUE)
+            {
+                ALCint connected = ALC_TRUE;
+                alcGetIntegerv(device, ALC_CONNECTED, 1, &connected);
+                device_lost = connected == ALC_FALSE;
+            }
+
+            const char *default_device = device
+                ? alcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER)
+                : nullptr;
+            const std::string current_default = ll_safe_string(default_device);
+            const bool default_device_changed = !current_default.empty() &&
+                current_default != mDefaultDeviceSpecifier;
+            const std::string current_device_list = getOpenALDeviceList(device);
+            const bool device_list_changed = current_device_list != mDeviceList;
+
+            if (device_lost || default_device_changed || device_list_changed)
+            {
+                LL_INFOS("OpenAL") << (device_lost
+                    ? "Output device disconnected"
+                    : (default_device_changed
+                        ? "Windows default output device changed"
+                        : "OpenAL device list changed"))
+                    << "; attempting recovery" << LL_ENDL;
+                // Leave the old snapshot in place when recovery fails so the
+                // next poll retries even if the device list has stopped
+                // changing while Windows is still bringing the endpoint back.
+                mDeviceListChanged = true;
+            }
+            else
+            {
+                mDeviceList = current_device_list;
+            }
+        }
+    }
+
+    if (mDeviceListChanged)
+    {
+        mDeviceListChanged = false;
+        changeDevice();
+        OnOutputDeviceListChanged(getDevices());
+    }
+
+    LLAudioEngine::idle();
+}
+
 LLAudioChannelOpenAL::LLAudioChannelOpenAL()
     :
     mALSource(AL_NONE),
@@ -197,6 +292,14 @@ LLAudioChannelOpenAL::~LLAudioChannelOpenAL()
 {
     cleanup();
     alDeleteSources(1, &mALSource);
+}
+
+void LLAudioChannelOpenAL::resumeAfterDeviceReopen()
+{
+    if (mCurrentSourcep && !isWaiting())
+    {
+        play();
+    }
 }
 
 void LLAudioChannelOpenAL::cleanup()
@@ -684,13 +787,23 @@ void LLAudioEngine_OpenAL::changeDevice()
         }
     }
 
-    if (alcReopenDeviceSOFT(mCurrentDevice, device_name.has_value() ? device_name.value().c_str() : nullptr, nullptr))
-    {
-        alcMakeContextCurrent(mCurrentContext);
-    }
-    else
+    if (!alcReopenDeviceSOFT(mCurrentDevice, device_name.has_value() ? device_name.value().c_str() : nullptr, nullptr))
     {
         LL_WARNS() << "LLAudioEngine_OpenAL::setDevice() error: Reopen failed" << LL_ENDL;
+        return;
+    }
+
+    alcMakeContextCurrent(mCurrentContext);
+
+    mDefaultDeviceSpecifier = ll_safe_string(alcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER));
+    mDeviceList = getOpenALDeviceList(mCurrentDevice);
+
+    for (LLAudioChannel* channel : mChannels)
+    {
+        if (auto openal_channel = dynamic_cast<LLAudioChannelOpenAL*>(channel))
+        {
+            openal_channel->resumeAfterDeviceReopen();
+        }
     }
 }
 
@@ -722,16 +835,4 @@ void LLAudioEngine_OpenAL::setDevice(const LLUUID& device_uuid)
 {
     mSelectedDeviceUUID = device_uuid;
     changeDevice();
-}
-
-void LLAudioEngine_OpenAL::idle()
-{
-    if (mDeviceListChanged)
-    {
-        mDeviceListChanged = false;
-        changeDevice();
-        OnOutputDeviceListChanged(getDevices());
-    }
-
-    LLAudioEngine::idle();
 }

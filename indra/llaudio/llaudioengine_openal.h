@@ -75,6 +75,10 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         ALuint mWindSource;
         int mNumEmptyWindALBuffers;
 
+        std::string mDefaultDeviceSpecifier;
+        std::string mDeviceList;
+        LLFrameTimer mDeviceCheckTimer;
+
         static const int MAX_NUM_WIND_BUFFERS = 80;
         static const float WIND_BUFFER_SIZE_SEC; // 1/20th sec
 
@@ -92,6 +96,7 @@ class LLAudioChannelOpenAL : public LLAudioChannel
     public:
         LLAudioChannelOpenAL();
         virtual ~LLAudioChannelOpenAL();
+        void resumeAfterDeviceReopen();
     protected:
         /*virtual*/ void play();
         /*virtual*/ void playSynced(LLAudioChannel *channelp);
