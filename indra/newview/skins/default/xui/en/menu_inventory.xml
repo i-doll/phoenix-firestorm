@@ -29,6 +29,13 @@
          parameter="task_play" />
     </menu_item_call>
     <menu_item_call
+     label="Stop Scripts"
+     layout="topleft"
+     name="Task Stop Scripts">
+        <menu_item_call.on_click
+         function="Inventory.StopScripts" />
+    </menu_item_call>
+    <menu_item_call
      label="Properties"
      layout="topleft"
      name="Task Properties">
