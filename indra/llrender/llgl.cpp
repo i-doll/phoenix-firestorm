@@ -62,7 +62,7 @@
 #include "SDL2/SDL_video.h"
 
 #define GLH_EXT_GET_PROC_ADDRESS SDL_GL_GetProcAddress
-#define ExtensionExists(exten, unused) SDL_GL_ExtensionSupported(exten);
+#define ExtensionExists(exten, unused) SDL_GL_ExtensionSupported(exten)
 #endif
 
 #ifdef _DEBUG
