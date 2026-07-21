@@ -555,6 +555,7 @@ private:
     //--------------------------------------------------------------------
 public:
     bool            leftButtonGrabbed() const;
+    bool            leftButtonBlocked() const;
     bool            rotateGrabbed() const;
     bool            forwardGrabbed() const;
     bool            backwardGrabbed() const;

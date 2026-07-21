@@ -40,7 +40,7 @@
   <key>FSTrishMouseLookFix</key>
   <map>
     <key>Comment</key>
-    <string>Fixes touch in mouselook while cam is controlled. Can break some poorly scripted weapons.</string>
+    <string>Allow passed-on mouselook controls to reach viewer picking and HUD touch. Disable to restore legacy behavior (fixes touch in mouselook while cam is controlled; can break some poorly scripted weapons).</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
