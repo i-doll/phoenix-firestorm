@@ -2321,7 +2321,7 @@
 				</text>
 				<combo_box
 				 control_name="RenderTonemapType"
-				 enabled_control="VertexShaderEnable"
+				 enabled_control="RenderDisableVintageMode"
 				 height="20"
 				 layout="topleft"
 				 left_pad="0"
@@ -2334,11 +2334,45 @@
 					 name="0"
 					 value="0"/>
 					<combo_box.item
-					 label="ACES"
+					 label="ACES (Hill)"
 					 name="1"
 					 value="1"/>
-					<combo_box.commit_callback
-					 function="Quickprefs.ShaderChanged"/>
+					<combo_box.item
+					 label="ACES (Narkowicz)"
+					 name="2"
+					 value="2"/>
+					<combo_box.item
+					 label="Reinhard"
+					 name="3"
+					 value="3"/>
+					<combo_box.item
+					 label="Uncharted 2"
+					 name="4"
+					 value="4"/>
+					<combo_box.item
+					 label="AgX"
+					 name="5"
+					 value="5"/>
+					<combo_box.item
+					 label="AgX Punchy"
+					 name="6"
+					 value="6"/>
+					<combo_box.item
+					 label="AgX Golden"
+					 name="7"
+					 value="7"/>
+					<combo_box.item
+					 label="Gran Turismo"
+					 name="8"
+					 value="8"/>
+					<combo_box.item
+					 label="GT7"
+					 name="9"
+					 value="9"/>
+					<combo_box.item
+					 label="Lottes"
+					 name="10"
+					 value="10"/>
 				</combo_box>
 				<text
 				 name="T_Tonemap_Type"
