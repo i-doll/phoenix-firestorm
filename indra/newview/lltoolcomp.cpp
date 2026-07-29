@@ -765,11 +765,17 @@ bool LLToolCompGun::handleHover(S32 x, S32 y, MASK mask)
 bool LLToolCompGun::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     // if the left button is grabbed, don't put up the pie menu
-    if (gAgent.leftButtonGrabbed() && gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
+    // <ID> Use leftButtonBlocked(), not leftButtonGrabbed(): with FSTrishMouseLookFix,
+    // controls a script only passes on (llTakeControls(CONTROL_ML_LBUTTON, FALSE, TRUE))
+    // must not consume the click here — the pick/touch path below (and the grab tool's own
+    // leftButtonBlocked() check) is never reached when this gate early-returns, which left
+    // HUDs untouchable in mouselook. Fully taken controls still block as before.
+    if (gAgent.leftButtonBlocked() && gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
     {
         gAgent.setControlFlags(AGENT_CONTROL_ML_LBUTTON_DOWN);
         return false;
     }
+    // </ID>
 
     // <ID> Block drag in mouselook unless ALT is held
     if (gSavedSettings.getBOOL("IDMouselookRequireAltForDrag") &&
