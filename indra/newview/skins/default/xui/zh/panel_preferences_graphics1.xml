@@ -230,7 +230,7 @@
 			</text>
 			<combo_box name="TonemapType">
 				<combo_box.item label="Khronos中性" name="0"/>
-				<combo_box.item label="ACES" name="1"/>
+				<combo_box.item label="ACES (Hill)" name="1"/>
 			</combo_box>
 			<slider label="色調映射混合：" tool_tip="在線性與色調映射顏色之間進行混合" name="TonemapMix"/>
 		</panel>

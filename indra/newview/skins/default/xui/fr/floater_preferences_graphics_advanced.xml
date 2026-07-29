@@ -188,7 +188,7 @@
 	</text>
 	<combo_box name="TonemapType">
 		<combo_box.item label="Khronos Neutral" name="0"/>
-		<combo_box.item label="ACES" name="1"/>
+		<combo_box.item label="ACES (Hill)" name="1"/>
 	</combo_box>
 	<slider label="Mélange mappage tonal :" tool_tip="Mélange de couleurs linéaires et de couleurs à tons" name="TonemapMix"/>
 	<button label="Réinitialiser les paramètres recommandés" name="Defaults"/>

@@ -250,7 +250,7 @@
 				</text>
 				<combo_box name="CB_Tonemap_Type">
 					<combo_box.item label="Khronos中性" name="0"/>
-					<combo_box.item label="ACES" name="1"/>
+					<combo_box.item label="ACES (Hill)" name="1"/>
 				</combo_box>
 				<text name="T_Tonemap_Type" tool_tip="在所選的 HDR 色調映射風格和原始線性光照之間混合。值為 1.0 時，應用所選色調映射（Khronos中性或ACES）的全部效果。值為 0.0 時，禁用色調映射，顯示未經後期處理調整的原始線性光照。調整此滑塊以微調自然真實感和電影對比度之間的平衡。較高的值強調色調映射效果，而較低的值產生更平坦、未經處理的外觀。">
 					色調混合
