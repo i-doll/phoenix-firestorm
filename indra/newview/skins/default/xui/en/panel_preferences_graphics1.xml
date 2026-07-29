@@ -1757,6 +1757,10 @@ If you do not understand the distinction then leave this control alone."
           label="Lottes"
           name="10"
           value="10"/>
+         <combo_box.item
+          label="Hable 2017"
+          name="11"
+          value="11"/>
         </combo_box>
         <slider
          control_name="RenderTonemapMix"
