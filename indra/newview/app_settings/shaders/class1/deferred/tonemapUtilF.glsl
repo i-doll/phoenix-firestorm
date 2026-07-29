@@ -427,6 +427,55 @@ vec3 toneMapLottes(vec3 x)
 }
 
 
+// Hable 2017 piecewise power curve.
+// see http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/
+//
+// The curve is three power segments joined at x0/x1. Solving them depends only
+// on the (constant) user parameters, so it is done offline and the results are
+// baked below - derived from toeStrength 0.3, toeLength 0.5, shoulderStrength
+// 2.0, shoulderLength 0.5, shoulderAngle 0.0, gamma 1.0.
+#define HABLE_X0     0.026984473708127066
+#define HABLE_X1     0.14152799014622783
+#define HABLE_INV_W  0.24797616447189044
+
+float hableSegment(float x, float offsetX, float offsetY,
+                   float scaleX, float scaleY, float lnA, float B)
+{
+    float x0 = (x - offsetX) * scaleX;
+
+    // log(0) is undefined; the segment should evaluate to zero there.
+    float y0 = x0 > 0.0 ? exp(lnA + B * log(x0)) : 0.0;
+
+    return y0 * scaleY + offsetY;
+}
+
+float hable2017Eval(float x)
+{
+    float n = x * HABLE_INV_W;
+
+    if (n < HABLE_X0) // toe
+    {
+        return hableSegment(n, 0.0, 0.0, 1.0, 1.0,
+                            2.5859592585956994, 1.4285714285714286);
+    }
+    if (n < HABLE_X1) // linear
+    {
+        return hableSegment(n, 0.008095342112438121, 0.0, 1.0, 1.0,
+                            1.3944226484365547, 1.0);
+    }
+    // shoulder; mirrored, so beyond white it saturates to 1.0
+    return hableSegment(n, 1.0, 1.0, -1.0, -1.0,
+                        0.3713260305432139, 7.4947237220335365);
+}
+
+vec3 toneMapHable2017(vec3 color)
+{
+    return clamp(vec3(hable2017Eval(color.r),
+                      hable2017Eval(color.g),
+                      hable2017Eval(color.b)), 0.0, 1.0);
+}
+
+
 uniform float exposure;
 uniform float tonemap_mix;
 uniform int tonemap_type;
@@ -452,6 +501,7 @@ vec3 applyTonemap(vec3 color)
     case 8:  return toneMapUchimura(color);
     case 9:  return toneMapGT7(color);
     case 10: return toneMapLottes(color);
+    case 11: return toneMapHable2017(color);
     }
 
     return clamp(color, 0.0, 1.0);
