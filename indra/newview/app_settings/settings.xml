@@ -14045,7 +14045,7 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>RenderTonemapType</key>
     <map>
         <key>Comment</key>
-        <string>What tonemapper to use: 0 = Khronos Neutral, 1 = ACES (Hill), 2 = ACES (Narkowicz), 3 = Reinhard, 4 = Uncharted 2, 5 = AgX, 6 = AgX Punchy, 7 = AgX Golden, 8 = Gran Turismo, 9 = GT7, 10 = Lottes</string>
+        <string>What tonemapper to use: 0 = Khronos Neutral, 1 = ACES (Hill), 2 = ACES (Narkowicz), 3 = Reinhard, 4 = Uncharted 2, 5 = AgX, 6 = AgX Punchy, 7 = AgX Golden, 8 = Gran Turismo, 9 = GT7, 10 = Lottes, 11 = Hable 2017</string>
         <key>Persist</key>
         <integer>1</integer>
         <key>Type</key>
