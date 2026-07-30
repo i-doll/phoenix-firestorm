@@ -476,6 +476,33 @@ vec3 toneMapHable2017(vec3 color)
 }
 
 
+// Tony McMapface.
+// see https://github.com/h3r2tic/tony-mc-mapface (dual MIT / Apache-2.0)
+//
+// This operator has no closed form; it ships as a 48^3 lookup table, uploaded
+// by the viewer from app_settings/tony_mc_mapface.dds. If the LUT failed to
+// load the sampler is unbound and this returns black, so the caller checks
+// availability before selecting it.
+uniform sampler3D tonyMcMapfaceLut;
+
+vec3 toneMapTonyMcMapface(vec3 stimulus)
+{
+    const float LUT_DIMS = 48.0;
+
+    // Non-linear encoding the LUT was baked with.
+    vec3 encoded = stimulus / (stimulus + 1.0);
+
+    // Align the encoded range to texel centers.
+    vec3 uv = encoded * ((LUT_DIMS - 1.0) / LUT_DIMS) + 0.5 / LUT_DIMS;
+
+    // Upstream notes that OpenGL needs uv.y flipped. That applies when the DDS
+    // is loaded through an image path that flips rows into GL's bottom-up
+    // convention. The viewer uploads the payload verbatim via glTexImage3D, so
+    // the green axis is already in LUT order.
+    return clamp(texture(tonyMcMapfaceLut, uv).rgb, 0.0, 1.0);
+}
+
+
 uniform float exposure;
 uniform float tonemap_mix;
 uniform int tonemap_type;
@@ -502,6 +529,7 @@ vec3 applyTonemap(vec3 color)
     case 9:  return toneMapGT7(color);
     case 10: return toneMapLottes(color);
     case 11: return toneMapHable2017(color);
+    case 12: return toneMapTonyMcMapface(color);
     }
 
     return clamp(color, 0.0, 1.0);

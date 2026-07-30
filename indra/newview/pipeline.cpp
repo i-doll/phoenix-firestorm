@@ -1424,6 +1424,8 @@ void LLPipeline::releaseLUTBuffers()
 
     mPbrBrdfLut.release();
 
+    releaseTonyMcMapfaceLut();
+
     mExposureMap.release();
     mLuminanceMap.release();
     mLastExposure.release();
@@ -8128,9 +8130,134 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
 
 extern LLPointer<LLImageGL> gEXRImage;
 
+// RenderTonemapType value for Tony McMapface; must match the case label in
+// tonemapUtilF.glsl and the combo entries in the graphics panels.
+static constexpr U32 TONEMAP_TYPE_TONY_MC_MAPFACE = 12;
+
+// Tony McMapface ships only as a baked 48^3 LUT; there is no closed form.
+// The file is the upstream artifact unmodified: a DDS with a DX10 header
+// describing a DXGI_FORMAT_R9G9B9E5_SHAREDEXP volume, which maps directly onto
+// GL_RGB9_E5 / GL_UNSIGNED_INT_5_9_9_9_REV, so the payload uploads verbatim.
+void LLPipeline::createTonyMcMapfaceLut()
+{
+    if (mTonyLutTexName != 0 || mTonyLutFailed)
+    {
+        return;
+    }
+
+    // Only retry on an explicit shader reload.
+    mTonyLutFailed = true;
+
+    constexpr U32 dim = 48;
+    constexpr size_t header_size = 148; // 4 magic + 124 DDS_HEADER + 20 DDS_HEADER_DXT10
+    constexpr size_t payload_size = (size_t)dim * dim * dim * 4; // 4 bytes/texel
+
+    const std::string path =
+        gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "tony_mc_mapface.dds");
+
+    LLFILE* fp = LLFile::fopen(path, "rb");
+    if (!fp)
+    {
+        LL_WARNS("Pipeline") << "Could not open " << path
+                             << "; Tony McMapface tone mapping unavailable." << LL_ENDL;
+        return;
+    }
+
+    std::vector<U8> header(header_size);
+    std::vector<U8> payload(payload_size);
+
+    const bool read_ok = fread(header.data(), 1, header_size, fp) == header_size
+                      && fread(payload.data(), 1, payload_size, fp) == payload_size;
+    fclose(fp);
+
+    if (!read_ok)
+    {
+        LL_WARNS("Pipeline") << path << " is truncated; expected " << (header_size + payload_size)
+                             << " bytes. Tony McMapface tone mapping unavailable." << LL_ENDL;
+        return;
+    }
+
+    auto read_u32 = [&header](size_t offset)
+    {
+        return (U32)header[offset]
+             | ((U32)header[offset + 1] << 8)
+             | ((U32)header[offset + 2] << 16)
+             | ((U32)header[offset + 3] << 24);
+    };
+
+    // Validate rather than trusting the offsets blind: magic, dimensions,
+    // the DX10 fourCC, and the pixel format must all be what we expect.
+    constexpr U32 DXGI_FORMAT_R9G9B9E5_SHAREDEXP = 67;
+    const bool header_ok = header[0] == 'D' && header[1] == 'D' && header[2] == 'S'
+                        && header[3] == ' '
+                        && read_u32(12) == dim   // height
+                        && read_u32(16) == dim   // width
+                        && read_u32(24) == dim   // depth
+                        && header[84] == 'D' && header[85] == 'X'
+                        && header[86] == '1' && header[87] == '0'
+                        && read_u32(128) == DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
+
+    if (!header_ok)
+    {
+        LL_WARNS("Pipeline") << path << " is not a 48^3 R9G9B9E5 volume; "
+                             << "Tony McMapface tone mapping unavailable." << LL_ENDL;
+        return;
+    }
+
+    U32 tex_name = 0;
+    glGenTextures(1, &tex_name);
+    if (tex_name == 0)
+    {
+        LL_WARNS("Pipeline") << "glGenTextures failed for Tony McMapface LUT." << LL_ENDL;
+        return;
+    }
+
+    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, tex_name);
+
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB9_E5, dim, dim, dim, 0,
+                 GL_RGB, GL_UNSIGNED_INT_5_9_9_9_REV, payload.data());
+
+    // Trilinear between texels, clamped at the edges, no mips.
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAX_LEVEL, 0);
+
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
+
+    mTonyLutTexName = tex_name;
+    mTonyLutFailed = false;
+
+    LL_INFOS("Pipeline") << "Loaded Tony McMapface tone mapping LUT from " << path << LL_ENDL;
+}
+
+void LLPipeline::releaseTonyMcMapfaceLut()
+{
+    if (mTonyLutTexName != 0)
+    {
+        LLImageGL::deleteTextures(1, &mTonyLutTexName);
+        mTonyLutTexName = 0;
+    }
+    mTonyLutFailed = false;
+}
+
 void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_correct)
 {
     LL_PROFILE_GPU_ZONE("tonemap");
+
+    {
+        // Load the Tony McMapface LUT before anything binds a render target or
+        // texture unit: uploading it needs unit 0, which the tone mapping
+        // shader binds the diffuse buffer to below. No-op after the first call.
+        static LLCachedControl<U32> tonemap_type_preload(gSavedSettings, "RenderTonemapType", 0U);
+        if (tonemap_type_preload == TONEMAP_TYPE_TONY_MC_MAPFACE)
+        {
+            createTonyMcMapfaceLut();
+        }
+    }
 
     dst->bindTarget();
     // gamma correct lighting
@@ -8185,11 +8312,43 @@ void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_co
         shader->uniform1f(s_exposure, e);
 
         static LLCachedControl<U32> tonemap_type_setting(gSavedSettings, "RenderTonemapType", 0U);
-        shader->uniform1i(tonemap_type, tonemap_type_setting);
+        U32 tonemap_type_value = tonemap_type_setting;
+
+        // Tony McMapface is LUT-driven; bind the volume, or fall back rather
+        // than sampling an unbound texture if the LUT is unavailable. The LUT
+        // itself is loaded before this shader binds any textures - creating it
+        // here would clobber the diffuse binding on unit 0.
+        S32 tony_channel = -1;
+        if (tonemap_type_value == TONEMAP_TYPE_TONY_MC_MAPFACE)
+        {
+            if (mTonyLutTexName != 0)
+            {
+                tony_channel = shader->enableTexture(LLShaderMgr::TONY_MC_MAPFACE_LUT,
+                                                     LLTexUnit::TT_TEXTURE_3D);
+                if (tony_channel > -1)
+                {
+                    gGL.getTexUnit(tony_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D,
+                                                             mTonyLutTexName);
+                }
+            }
+
+            if (tony_channel < 0)
+            {
+                tonemap_type_value = 0; // Khronos Neutral
+            }
+        }
+
+        shader->uniform1i(tonemap_type, tonemap_type_value);
         shader->uniform1f(tonemap_mix, psky->getTonemapMix(should_auto_adjust()));
 
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+        if (tony_channel > -1)
+        {
+            gGL.getTexUnit(tony_channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+            shader->disableTexture(LLShaderMgr::TONY_MC_MAPFACE_LUT, LLTexUnit::TT_TEXTURE_3D);
+        }
 
         gGL.getTexUnit(channel)->unbind(src->getUsage());
         shader->unbind();

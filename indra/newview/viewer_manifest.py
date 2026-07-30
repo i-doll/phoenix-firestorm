@@ -104,6 +104,9 @@ class ViewerManifest(LLManifest,FSViewerManifest):
                 self.path("*.ini")
                 self.path("*.xml")
 
+                # Tony McMapface tone mapping LUT (48^3 R9G9B9E5 volume)
+                self.path("tony_mc_mapface.dds")
+
                 # include the entire shaders directory recursively
                 self.path("shaders")
                 # include the extracted list of contributors
