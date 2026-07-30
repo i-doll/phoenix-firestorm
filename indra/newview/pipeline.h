@@ -752,6 +752,14 @@ public:
     LLRenderTarget          mPbrBrdfLut;
     LLRenderTarget          mWaterExclusionMask;
 
+    // Tony McMapface tone mapping LUT: a 48^3 GL_RGB9_E5 volume loaded from
+    // app_settings. Loaded lazily on first use; mTonyLutFailed latches so a
+    // missing or malformed file is not retried every frame.
+    U32                     mTonyLutTexName = 0;
+    bool                    mTonyLutFailed = false;
+    void                    createTonyMcMapfaceLut();
+    void                    releaseTonyMcMapfaceLut();
+
     // copy of the color/depth buffer just before gamma correction
     // for use by SSR
     LLRenderTarget          mSceneMap;

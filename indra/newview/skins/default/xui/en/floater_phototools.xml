@@ -2377,6 +2377,10 @@
 					 label="Hable 2017"
 					 name="11"
 					 value="11"/>
+					<combo_box.item
+					 label="Tony McMapface"
+					 name="12"
+					 value="12"/>
 				</combo_box>
 				<text
 				 name="T_Tonemap_Type"
