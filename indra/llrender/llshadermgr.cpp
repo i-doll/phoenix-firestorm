@@ -1637,6 +1637,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("frame_rect");
     // </FS:Beq>
 
+    mReservedUniforms.push_back("tonyMcMapfaceLut");
+
     llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
 
     std::set<std::string> dupe_check;
