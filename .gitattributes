@@ -3,6 +3,7 @@
 # Images
 *.bmp binary
 *.BMP binary
+*.dds binary
 *.gif binary
 *.icns binary
 *.ico binary
