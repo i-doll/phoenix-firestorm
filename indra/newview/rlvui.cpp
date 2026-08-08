@@ -340,9 +340,9 @@ void RlvUIEnabler::onToggleShowSearch()
         }
     }
 
-    // The same search command can also be placed on a user toolbar.
-    if (gToolBarView)
-        gToolBarView->setCommandVisible(LLCommandId("search"), fEnable);
+    // The same search command can also be placed on a user toolbar. Leave the
+    // button visible but let its is_enabled_function (RLV.EnableIfNot showsearch)
+    // gray it out while the restriction is active, rather than removing it.
 }
 
 void RlvUIEnabler::onToggleShowContacts()
