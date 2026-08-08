@@ -233,6 +233,8 @@
            tooltip_ref="Command_Search_Tooltip"
            execute_function="Avatar.ToggleSearch"
            is_running_function="Avatar.SearchVisible"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showsearch"
            />
   <command name="snapshot"
            available_in_toybox="true"
