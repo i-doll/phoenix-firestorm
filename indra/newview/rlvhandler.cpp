@@ -1651,19 +1651,27 @@ ERlvCmdRet RlvHandler::processAddRemCommand(const RlvCommand& rlvCmd)
                 }
             }
             break;
-        case RLV_BHVR_SHAREDWEAR:           // @sharedwear=n|y                  - Checked: 2011-03-28 (RLVa-1.3.0g) | Added: RLVa-1.3.0g
-        case RLV_BHVR_SHAREDUNWEAR:         // @sharedunwear=n|y                - Checked: 2011-03-28 (RLVa-1.3.0g) | Added: RLVa-1.3.0g
+        case RLV_BHVR_SHAREDWEAR:           // @sharedwear[:<path>]=n|y         - Checked: 2011-03-28 (RLVa-1.3.0g) | Added: RLVa-1.3.0g
+        case RLV_BHVR_SHAREDUNWEAR:         // @sharedunwear[:<path>]=n|y       - Checked: 2011-03-28 (RLVa-1.3.0g) | Added: RLVa-1.3.0g
             {
-                VERIFY_OPTION_REF(strOption.empty());
+                // Without an option the entire #RLV shared subtree is locked; an
+                // optional shared folder path (e.g. @sharedwear:Hats/Party=add)
+                // carves that subtree out as a PERM_ALLOW exception - the same
+                // mechanism @unsharedwear uses to except the shared root. The path
+                // resolves lazily, so it need not exist when the command arrives,
+                // and (like all folder locks) the exception only lifts a
+                // restriction imposed by this same object.
+                RlvFolderLocks::ELockPermission eLockPerm = (strOption.empty()) ? RlvFolderLocks::PERM_DENY : RlvFolderLocks::PERM_ALLOW;
+                fRefCount = strOption.empty();  // Only reference count the global lock, not per-folder exceptions
 
-                RlvFolderLocks::folderlock_source_t lockSource(RlvFolderLocks::ST_SHAREDPATH, LLStringUtil::null);
+                RlvFolderLocks::folderlock_source_t lockSource(RlvFolderLocks::ST_SHAREDPATH, strOption);
                 RlvFolderLocks::ELockScope eLockScope = RlvFolderLocks::SCOPE_SUBTREE;
                 ERlvLockMask eLockType = (RLV_BHVR_SHAREDUNWEAR == eBhvr) ? RLV_LOCK_REMOVE : RLV_LOCK_ADD;
 
                 if (RLV_TYPE_ADD == eType)
-                    RlvFolderLocks::instance().addFolderLock(lockSource, RlvFolderLocks::PERM_DENY, eLockScope, rlvCmd.getObjectID(), eLockType);
+                    RlvFolderLocks::instance().addFolderLock(lockSource, eLockPerm, eLockScope, rlvCmd.getObjectID(), eLockType);
                 else
-                    RlvFolderLocks::instance().removeFolderLock(lockSource, RlvFolderLocks::PERM_DENY, eLockScope, rlvCmd.getObjectID(), eLockType);
+                    RlvFolderLocks::instance().removeFolderLock(lockSource, eLockPerm, eLockScope, rlvCmd.getObjectID(), eLockType);
             }
             break;
         case RLV_BHVR_UNSHAREDWEAR:         // @unsharedwear=n|y                - Checked: 2011-03-28 (RLVa-1.3.0g) | Added: RLVa-1.3.0g
