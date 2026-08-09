@@ -49,6 +49,7 @@
 #include "llfloatertools.h"
 #include "llglheaders.h"
 #include "pipeline.h"
+#include "rlvhandler.h"
 
 
 static constexpr U8  OVERLAY_IMG_COMPONENTS = 4;
@@ -678,7 +679,10 @@ void LLViewerParcelOverlay::renderPropertyLines()
 {
     static LLCachedControl<bool> show(gSavedSettings, "ShowPropertyLines");
 
-    if (!show)
+    // RLV @showpropertylines suppresses the draw here (checked every frame) so
+    // the restriction can't be defeated by toggling ShowPropertyLines, and the
+    // user's own setting is left untouched.
+    if (!show || gRlvHandler.hasBehaviour(RLV_BHVR_SHOWPROPERTYLINES))
         return;
 
     LLSurface& land = mRegion->getLand();

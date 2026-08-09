@@ -177,6 +177,7 @@ enum ERlvBehaviour {
     RLV_BHVR_EDITWORLD,
     RLV_BHVR_VIEWTRANSPARENT,
     RLV_BHVR_VIEWWIREFRAME,
+    RLV_BHVR_SHOWPROPERTYLINES,     // "showpropertylines"
     RLV_BHVR_PAY,                   // "pay"
     RLV_BHVR_REZ,                   // "rez"
     RLV_BHVR_FARTOUCH,              // "fartouch"
