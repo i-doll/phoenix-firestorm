@@ -1296,6 +1296,9 @@
              shortcut="control|alt|shift|P">
             <menu_item_check.on_check
                control="ShowPropertyLines" />
+            <menu_item_check.on_enable
+               function="RLV.EnableIfNot"
+               parameter="showpropertylines" />
             <menu_item_check.on_click
                function="ToggleControl"
                parameter="ShowPropertyLines" />

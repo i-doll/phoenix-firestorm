@@ -111,6 +111,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("editworld", RLV_BHVR_EDITWORLD));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_VIEWTRANSPARENT, RLV_OPTION_NONE>("viewtransparent", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_VIEWWIREFRAME, RLV_OPTION_NONE>("viewwireframe", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showpropertylines", RLV_BHVR_SHOWPROPERTYLINES, RlvBehaviourInfo::BHVR_EXTENDED));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("emote", RLV_BHVR_EMOTE));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_MODIFIER>("fartouch", RLV_BHVR_FARTOUCH));
     addModifier(RLV_BHVR_FARTOUCH, RLV_MODIFIER_FARTOUCHDIST, new RlvBehaviourModifier("Fartouch Distance", RLV_MODIFIER_FARTOUCH_DEFAULT, true, new RlvBehaviourModifierCompMin));
