@@ -868,7 +868,7 @@ bool RlvActions::canHighlightTransparent()
     // User cannot highlight transparent faces if:
     //   - prevented from editing (exceptions are not taken into account)
     //   - specifically prevented from highlight transparent faces
-    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDIT) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC);
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_EDIT) && !gRlvHandler.hasBehaviour(RLV_BHVR_VIEWTRANSPARENT);
 }
 
 bool RlvActions::canViewWireframe()
