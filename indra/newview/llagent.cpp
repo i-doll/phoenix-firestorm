@@ -495,6 +495,7 @@ LLAgent::LLAgent() :
     mAutoPilotCallbackData(nullptr),
 
     mMovementKeysLocked(false),
+    mAutoWalk(false),                                       // <ID:AutoWalk>
 
     mEffectColor(new LLUIColor(LLColor4(0.f, 1.f, 1.f, 1.f))),
 
@@ -789,6 +790,33 @@ void LLAgent::moveAt(S32 direction, bool reset)
 // </FS:CR>
     }
 }
+
+// <ID:AutoWalk>
+// Called once per frame (from the main loop, after the keyboard scan). While auto
+// walk is active this asserts forward movement, exactly like a held forward key.
+// It is a pure toggle - only setAutoWalk (the bound key) turns it off - except that
+// it self-cancels when walking no longer makes sense (sitting, flying, teleporting).
+void LLAgent::propagateAutoWalk()
+{
+    if (!mAutoWalk)
+        return;
+
+    if ( getFlying() || (getTeleportState() != TELEPORT_NONE) ||
+         (isAgentAvatarValid() && gAgentAvatarp->isSitting()) )
+    {
+        setAutoWalk(false);
+        return;
+    }
+
+    if (isMovementLocked())
+        return;                                     // paused while movement is RLV-locked
+
+    if (getControlFlags() & AGENT_CONTROL_AT_NEG)
+        return;                                     // yield to a manual "walk back" this frame
+
+    moveAt(1, false);                               // hands-free forward; don't reset the camera
+}
+// </ID:AutoWalk>
 
 //-----------------------------------------------------------------------------
 // moveAtNudge()

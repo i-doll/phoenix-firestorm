@@ -906,6 +906,15 @@ bool toggle_run(EKeystate s)
     return true;
 }
 
+// <ID:AutoWalk> toggle hands-free forward walking
+bool auto_walk(EKeystate s)
+{
+    if (KEYSTATE_DOWN != s) return true;
+    gAgent.toggleAutoWalk();
+    return true;
+}
+// </ID:AutoWalk>
+
 bool toggle_sit(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
@@ -1090,6 +1099,7 @@ REGISTER_KEYBOARD_ACTION("run_backward", run_backward);
 REGISTER_KEYBOARD_ACTION("run_left", run_left);
 REGISTER_KEYBOARD_ACTION("run_right", run_right);
 REGISTER_KEYBOARD_ACTION("toggle_run", toggle_run);
+REGISTER_KEYBOARD_ACTION("auto_walk", auto_walk); // <ID:AutoWalk>
 REGISTER_KEYBOARD_ACTION("toggle_sit", toggle_sit);
 REGISTER_KEYBOARD_ACTION("toggle_pause_media", toggle_pause_media);
 REGISTER_KEYBOARD_ACTION("toggle_enable_media", toggle_enable_media);
