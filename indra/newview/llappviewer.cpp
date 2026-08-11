@@ -1737,6 +1737,10 @@ bool LLAppViewer::doFrame()
                         gAgent.moveUp(-1);
                     }
                     // </FS:Ansariel>
+
+                    // <ID:AutoWalk> assert hands-free forward movement while auto walk is active
+                    gAgent.propagateAutoWalk();
+                    // </ID:AutoWalk>
                 }
             }
 

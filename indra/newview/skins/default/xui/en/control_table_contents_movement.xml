@@ -165,6 +165,18 @@
          name="lst_action"
          value="Toggle Run" />
     </rows>
+    <!-- <ID:AutoWalk> -->
+    <rows
+     name="auto_walk"
+     value="auto_walk">
+        <columns
+         column="lst_action"
+         font="SansSerif"
+         halign="left"
+         name="lst_action"
+         value="Auto Walk" />
+    </rows>
+    <!-- </ID:AutoWalk> -->
     <rows
      name="toggle_fly"
      value="toggle_fly">

@@ -836,12 +836,14 @@ void LLKeyConflictHandler::generatePlaceholders(ESourceMode load_mode)
         // no autopilot or teleport
         registerTemporaryControl("walk_to");
         registerTemporaryControl("teleport_to");
+        registerTemporaryControl("auto_walk"); // <ID:AutoWalk> first/third person only
     }
 
     if (load_mode == MODE_SITTING)
     {
         // no autopilot
         registerTemporaryControl("walk_to");
+        registerTemporaryControl("auto_walk"); // <ID:AutoWalk> first/third person only
     }
     else
     {
