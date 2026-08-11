@@ -162,18 +162,18 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWNEARBY, RLV_OPTION_NONE>("shownearby", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showpeople", RLV_BHVR_SHOWPEOPLE));
     // <FS:Trish> RLVa: Register Firestorm-specific visibility and floater restrictions.
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showareasearch", RLV_BHVR_AREASEARCH));
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showlookat", RLV_BHVR_LOOKAT));
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showfavwear", RLV_BHVR_FAVWEAR));
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showcontacts", RLV_BHVR_SHOWCONTACTS));
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showsearch", RLV_BHVR_SHOWSEARCH));
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION_OR_MODIFIER>("worldsounds", RLV_BHVR_WORLDSOUNDS, RlvBehaviourInfo::BHVR_STRICT));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showareasearch", RLV_BHVR_AREASEARCH, RlvBehaviourInfo::BHVR_EXTENDED));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showlookat", RLV_BHVR_LOOKAT, RlvBehaviourInfo::BHVR_EXTENDED));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showfavwear", RLV_BHVR_FAVWEAR, RlvBehaviourInfo::BHVR_EXTENDED));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showcontacts", RLV_BHVR_SHOWCONTACTS, RlvBehaviourInfo::BHVR_EXTENDED));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showsearch", RLV_BHVR_SHOWSEARCH, RlvBehaviourInfo::BHVR_EXTENDED));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION_OR_MODIFIER>("worldsounds", RLV_BHVR_WORLDSOUNDS, RlvBehaviourInfo::BHVR_STRICT | RlvBehaviourInfo::BHVR_EXTENDED));
     // Accept the singular spelling as an alias since it is commonly used in RLV scripts.
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION_OR_MODIFIER>("worldsound", RLV_BHVR_WORLDSOUNDS, RlvBehaviourInfo::BHVR_SYNONYM | RlvBehaviourInfo::BHVR_STRICT));
     addModifier(RLV_BHVR_WORLDSOUNDS, RLV_MODIFIER_WORLDSOUNDSDIST, new RlvBehaviourModifierHandler<RLV_MODIFIER_WORLDSOUNDSDIST>("World Sounds Distance", 0.0f, false, new RlvBehaviourModifierCompMin));
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION_OR_MODIFIER>("soundothers", RLV_BHVR_SOUNDOTHERS, RlvBehaviourInfo::BHVR_STRICT));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION_OR_MODIFIER>("soundothers", RLV_BHVR_SOUNDOTHERS, RlvBehaviourInfo::BHVR_STRICT | RlvBehaviourInfo::BHVR_EXTENDED));
     addModifier(RLV_BHVR_SOUNDOTHERS, RLV_MODIFIER_SOUNDOTHERSDIST, new RlvBehaviourModifierHandler<RLV_MODIFIER_SOUNDOTHERSDIST>("Other Avatar Sounds Distance", 0.0f, false, new RlvBehaviourModifierCompMin));
-    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION>("soundself", RLV_BHVR_SOUNDSELF, RlvBehaviourInfo::BHVR_STRICT));
+    addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE_OR_EXCEPTION>("soundself", RLV_BHVR_SOUNDSELF, RlvBehaviourInfo::BHVR_STRICT | RlvBehaviourInfo::BHVR_EXTENDED));
     // </FS:Trish>
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWSELF, RLV_OPTION_NONE, RlvBehaviourShowSelfToggleHandler>("showself", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWSELFHEAD, RLV_OPTION_NONE, RlvBehaviourShowSelfToggleHandler>("showselfhead", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
