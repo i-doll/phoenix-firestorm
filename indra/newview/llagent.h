@@ -647,6 +647,12 @@ public:
 
     bool            isMovementLocked() const                { return mMovementKeysLocked; }
     void            setMovementLocked(bool set_locked)  { mMovementKeysLocked = set_locked; }
+    // <ID:AutoWalk> hands-free continuous forward movement, toggled by a bound key
+    void            setAutoWalk(bool enable)                { mAutoWalk = enable; }
+    void            toggleAutoWalk()                        { setAutoWalk(!mAutoWalk); }
+    bool            getAutoWalk() const                     { return mAutoWalk; }
+    void            propagateAutoWalk();
+    // </ID:AutoWalk>
 
     //--------------------------------------------------------------------
     // Move the avatar's frame
@@ -703,6 +709,7 @@ private:
     void*           mAutoPilotCallbackData;
     LLUUID          mLeaderID;
     bool            mMovementKeysLocked;
+    bool            mAutoWalk;                              // <ID:AutoWalk>
 
 /**                    Movement
  **                                                                            **
