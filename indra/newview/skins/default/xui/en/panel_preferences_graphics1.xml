@@ -1230,6 +1230,32 @@ If you do not understand the distinction then leave this control alone."
          width="100">
             Second(s)
         </text>
+
+        <!-- <ID:i.doll> [Full-res own avatar textures] -->
+        <text
+         type="string"
+         length="1"
+         follows="left|top"
+         height="12"
+         layout="topleft"
+         left="10"
+         name="own_avatar_texture_settings"
+         top_pad="14"
+         width="308">
+            My Avatar:
+        </text>
+        <check_box
+         control_name="IDSelfAvatarFullResTextures"
+         height="16"
+         initial_value="false"
+         label="Always keep my own avatar at full texture resolution"
+         layout="topleft"
+         left="15"
+         name="IDSelfAvatarFullResTextures"
+         tool_tip="Keeps your own baked layers and everything you are wearing pinned at full resolution, no matter where the camera is. Uses noticeably more texture memory; still capped by the maximum texture resolution on the Rendering tab."
+         top_pad="8"
+         width="400" />
+        <!-- </ID:i.doll> -->
     </panel>
 
 <!--Rendering-->
