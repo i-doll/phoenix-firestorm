@@ -55,6 +55,7 @@
 #include "llviewernetwork.h"
 #include "llviewerregion.h"
 #include "llviewerstats.h"
+#include "llvoavatarself.h" // <ID:i.doll> [Full-res own avatar textures]
 #include "pipeline.h"
 #include "llappviewer.h"
 #include "llxuiparser.h"
@@ -924,6 +925,31 @@ void LLViewerTextureList::clearFetchingRequests()
 
 extern bool gCubeSnapshot;
 
+// <ID:i.doll> [Full-res own avatar textures]
+// True if this object is, or hangs off, something worn by our own avatar. Attachment
+// roots carry an attachment state, but linked child prims do not, so walk the parent
+// chain rather than trusting isAttachment() alone. Note that LLViewerObject::getAvatar()
+// is no good here: for animesh it answers with the control avatar, not the wearer.
+static bool is_own_attachment(LLViewerObject* objp)
+{
+    if (!isAgentAvatarValid())
+    {
+        return false;
+    }
+
+    while (objp)
+    {
+        if (LLVOAvatar* avatarp = objp->asAvatar())
+        {
+            return avatarp->isSelf();
+        }
+        objp = (LLViewerObject*)objp->getParent();
+    }
+
+    return false;
+}
+// </ID:i.doll>
+
 void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images)
 {
     llassert(!gCubeSnapshot);
@@ -935,6 +961,9 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     {
         static LLCachedControl<F32> texture_scale_min(gSavedSettings, "TextureScaleMinAreaFactor", 0.0095f);
         static LLCachedControl<F32> texture_scale_max(gSavedSettings, "TextureScaleMaxAreaFactor", 25.f);
+        // <ID:i.doll> [Full-res own avatar textures]
+        static LLCachedControl<bool> self_full_res(gSavedSettings, "IDSelfAvatarFullResTextures", false);
+        // </ID:i.doll>
 
         F32 max_vsize = 0.f;
         bool on_screen = false;
@@ -1005,6 +1034,16 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                         static LLCachedControl<F32> texture_camera_boost(gSavedSettings, "TextureCameraBoost", 8.f);
                         vsize *= llmax(face->mImportanceToCamera*texture_camera_boost, 1.f);
                     }
+
+                    // <ID:i.doll> [Full-res own avatar textures]
+                    // Anything we are wearing is pinned at its native resolution, whatever the
+                    // camera is doing. Distance, frustum and memory bias are all bypassed here;
+                    // the RenderMaxTextureResolution clamp in processTextureStats still applies.
+                    if (self_full_res && is_own_attachment(objp))
+                    {
+                        vsize = (F32)MAX_IMAGE_AREA;
+                    }
+                    // </ID:i.doll>
 
                     max_vsize = llmax(max_vsize, vsize);
 

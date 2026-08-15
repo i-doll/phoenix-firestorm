@@ -36,6 +36,17 @@
     <key>Value</key>
     <integer>1</integer>
   </map>
+  <key>IDSelfAvatarFullResTextures</key>
+  <map>
+    <key>Comment</key>
+    <string>If true, your own avatar's baked layers and worn attachment textures are always fetched at full resolution, regardless of camera distance or visibility. Uses noticeably more texture memory. Still capped by RenderMaxTextureResolution.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
   <!-- </ID> -->
   <key>FSTrishMouseLookFix</key>
   <map>

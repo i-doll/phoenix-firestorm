@@ -3044,7 +3044,11 @@ void LLVOAvatarSelf::addLocalTextureStats( ETextureIndex type, LLViewerFetchedTe
             if (imagep->getDiscardLevel() != 0)
             {
                 F32 desired_pixels;
-                desired_pixels = llmin(mPixelArea, (F32)getTexImageArea());
+                // <ID:i.doll> [Full-res own avatar textures]
+                //desired_pixels = llmin(mPixelArea, (F32)getTexImageArea());
+                static LLCachedControl<bool> self_full_res(gSavedSettings, "IDSelfAvatarFullResTextures", false);
+                desired_pixels = self_full_res ? (F32)getTexImageArea() : llmin(mPixelArea, (F32)getTexImageArea());
+                // </ID:i.doll>
 
                 imagep->setBoostLevel(getAvatarBoostLevel());
                 imagep->resetTextureStats();
