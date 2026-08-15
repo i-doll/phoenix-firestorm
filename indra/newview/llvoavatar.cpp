@@ -6616,6 +6616,13 @@ void LLVOAvatar::updateTextures()
         }
     }
 
+    // <ID:i.doll> [Full-res own avatar textures]
+    // When enabled, feed our own baked layers their native texture area instead of the
+    // camera-derived pixel area, so they never drop to a coarser discard level.
+    static LLCachedControl<bool> self_full_res(gSavedSettings, "IDSelfAvatarFullResTextures", false);
+    const bool force_full_res = self_full_res && isSelf();
+    // </ID:i.doll>
+
     mMaxPixelArea = 0.f;
     mMinPixelArea = 99999999.f;
     mHasGrey = false; // debug
@@ -6656,7 +6663,10 @@ void LLVOAvatar::updateTextures()
         {
             const S32 boost_level = getAvatarBakedBoostLevel();
             imagep = LLViewerTextureManager::staticCastToFetchedTexture(getImage(texture_index,0), true);
-            addBakedTextureStats( imagep, mPixelArea, texel_area_ratio, boost_level );
+            // <ID:i.doll> [Full-res own avatar textures]
+            //addBakedTextureStats( imagep, mPixelArea, texel_area_ratio, boost_level );
+            addBakedTextureStats( imagep, force_full_res ? (F32)getTexImageArea() : mPixelArea, texel_area_ratio, boost_level );
+            // </ID:i.doll>
             // <FS:Ansariel> [Legacy Bake]
             // Spam if this is a baked texture, not set to default image, without valid host info
             if (isIndexBakedTexture((ETextureIndex)texture_index)
