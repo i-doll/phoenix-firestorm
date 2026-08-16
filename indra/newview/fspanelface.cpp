@@ -821,8 +821,6 @@ FSPanelFace::FSPanelFace() :
     mCommitCallbackRegistrar.add("BuildTool.Flip",              boost::bind(&FSPanelFace::onCommitFlip, this, _2));
     mCommitCallbackRegistrar.add("BuildTool.GLTFUVSpinner",     boost::bind(&FSPanelFace::onCommitGLTFUVSpinner, this, _1, _2));
     mCommitCallbackRegistrar.add("BuildTool.SelectSameTexture", boost::bind(&FSPanelFace::onClickBtnSelectSameTexture, this, _1, _2));
-    mCommitCallbackRegistrar.add("BuildTool.ShowFindAllButton", boost::bind(&FSPanelFace::onShowFindAllButton, this, _1, _2));
-    mCommitCallbackRegistrar.add("BuildTool.HideFindAllButton", boost::bind(&FSPanelFace::onHideFindAllButton, this, _1, _2));
 
     buildFromFile("panel_fs_tools_texture.xml");
 
@@ -2625,13 +2623,14 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
         calcp->setVar(LLCalc::TEX_TRANSPARENCY, (F32)mCtrlColorTransp->getValue().asReal());
         calcp->setVar(LLCalc::TEX_GLOW, (F32)mCtrlGlow->getValue().asReal());
 
-        // Find all faces with same texture
-        // TODO: these were not yet added to the new texture panel -Zi
-        /*
-        getChild<LLUICtrl>("btn_select_same_diff")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mTextureCtrl->getEnabled());
-        getChild<LLUICtrl>("btn_select_same_norm")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mBumpyTextureCtrl->getEnabled());
-        getChild<LLUICtrl>("btn_select_same_spec")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mShinyTextureCtrl->getEnabled());
-        */
+        // Find all faces with the map/material shown in the corresponding
+        // picker.  Keep these available in face-select mode only: the action
+        // intentionally refines the selected faces of the current linksets.
+        const bool te_mode = LLSelectMgr::getInstance()->getTEMode();
+        getChild<LLUICtrl>("btn_select_same_diff")->setEnabled(te_mode && mTextureCtrl->getEnabled());
+        getChild<LLUICtrl>("btn_select_same_norm")->setEnabled(te_mode && mBumpyTextureCtrl->getEnabled() && mBumpyTextureCtrl->getImageAssetID().notNull());
+        getChild<LLUICtrl>("btn_select_same_spec")->setEnabled(te_mode && mShinyTextureCtrl->getEnabled() && mShinyTextureCtrl->getImageAssetID().notNull());
+        getChild<LLUICtrl>("btn_select_same_gltf")->setEnabled(te_mode && mMaterialCtrlPBR->getEnabled() && mMaterialCtrlPBR->getImageAssetID().notNull());
     }
     else
     {
@@ -3700,13 +3699,6 @@ void FSPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
     updateShinyControls();
     updateBumpyControls();
 
-    // Find all faces with same texture
-    // TODO: is this still needed? -Zi Probably not but we don't have these buttons yet anyway -Zi
-    /*
-    getChild<LLUICtrl>("btn_select_same_diff")->setVisible(mTextureCtrl->getVisible());
-    getChild<LLUICtrl>("btn_select_same_norm")->setVisible(mBumpyTextureCtrl->getVisible());
-    getChild<LLUICtrl>("btn_select_same_spec")->setVisible(mShinyTextureCtrl->getVisible());
-    */
 }
 
 void FSPanelFace::onCommitBump()
@@ -6629,16 +6621,6 @@ void FSPanelFace::changePrecision(S32 decimal_precision)
     mCtrlShinyRot->setPrecision(decimal_precision);
     mCtrlRpt->setPrecision(decimal_precision);
     // TODO: add PBR spinners -Zi
-}
-
-void FSPanelFace::onShowFindAllButton(LLUICtrl* ctrl, const LLSD& user_data)
-{
-    findChildView(user_data.asStringRef())->setVisible(true);
-}
-
-void FSPanelFace::onHideFindAllButton(LLUICtrl* ctrl, const LLSD& user_data)
-{
-    findChildView(user_data.asStringRef())->setVisible(false);
 }
 
 // Find all faces with same texture

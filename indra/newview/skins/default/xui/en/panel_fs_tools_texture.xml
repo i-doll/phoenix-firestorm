@@ -1775,8 +1775,7 @@
    default_image_name="Default"
    fallback_image="materials_ui_x_24.png"
    tool_tip="Click to choose a picture"
-   caption_text.font="DejaVu"
-   caption_text.font.size="LSmall">
+>
    <texture_picker.mouseenter_callback
       function="BuildTool.ShowFindAllButton"
       parameter="btn_select_same_diff"/>
@@ -1801,7 +1800,7 @@
 
 <button
    enabled="true"
-   visible="false"
+   visible="true"
    layout="topleft"
    follows="right|top"
    height="23"
@@ -1834,8 +1833,7 @@
    label="Normal"
    name="bumpytexture control"
    tool_tip="Click to choose a picture"
-   caption_text.font="DejaVu"
-   caption_text.font.size="LSmall">
+>
    <texture_picker.mouseenter_callback
       function="BuildTool.ShowFindAllButton"
       parameter="btn_select_same_norm"/>
@@ -1846,7 +1844,7 @@
 
 <button
    enabled="true"
-   visible="false"
+   visible="true"
    layout="topleft"
    follows="right|top"
    height="23"
@@ -1879,8 +1877,7 @@
    label="Specular"
    name="shinytexture control"
    tool_tip="Click to choose a picture"
-   caption_text.font="DejaVu"
-   caption_text.font.size="LSmall">
+>
    <texture_picker.mouseenter_callback
       function="BuildTool.ShowFindAllButton"
       parameter="btn_select_same_spec"/>
@@ -1906,7 +1903,7 @@
 
 <button
    enabled="true"
-   visible="false"
+   visible="true"
    layout="topleft"
    follows="right|top"
    height="23"
