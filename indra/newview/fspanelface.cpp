@@ -1258,6 +1258,15 @@ LLGLTFMaterial::TextureInfo FSPanelFace::getPBRDropChannel()
     return (LLGLTFMaterial::TextureInfo)0;
 }
 
+LLGLTFMaterial::TextureInfo FSPanelFace::getPBRTextureInfo() const
+{
+    if (getCurrentMaterialType() != MATMEDIA_PBR)
+    {
+        return LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT;
+    }
+    return getCurrentPBRType(getCurrentPBRChannel());
+}
+
 LLMaterialPtr FSPanelFace::createDefaultMaterial(LLMaterialPtr current_material)
 {
     LLMaterialPtr new_material(current_material.notNull() ? new LLMaterial(current_material->asLLSD()) : new LLMaterial());
@@ -1612,11 +1621,39 @@ struct FSPanelFaceSetAlignedTEFunctor : public LLSelectedTEFunctor
                 FSPanelFace::LLSelectedTEMaterial::setSpecularRepeatY(mPanel, uv_scale.mV[VY], te, object->getID());
             }
 
-            // Also align GLTF material if any
-            S32 gltf_info_index = 0; // base texture
+            // Also align the selected GLTF channel, or all channels when no
+            // individual PBR transform page is active.
+            const LLGLTFMaterial::TextureInfo gltf_info_index = mPanel->getPBRTextureInfo();
             LLVector2 gltf_offset, gltf_scale;
             F32 gltf_rot;
-            if (facep->calcAlignedPlanarGLTF(mCenterFace, &gltf_offset, &gltf_scale, &gltf_rot, gltf_info_index))
+            if (gltf_info_index == LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT)
+            {
+                LLGLTFMaterial new_override;
+                const LLTextureEntry* tep = object->getTE(te);
+                if (tep && tep->getGLTFMaterialOverride())
+                {
+                    new_override = *tep->getGLTFMaterialOverride();
+                }
+                bool any_changed = false;
+
+                for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                {
+                    if (facep->calcAlignedPlanarGLTF(mCenterFace, &gltf_offset, &gltf_scale, &gltf_rot, i))
+                    {
+                        LLGLTFMaterial::TextureTransform& transform = new_override.mTextureTransform[i];
+                        transform.mOffset.set(gltf_offset.mV[0], gltf_offset.mV[1]);
+                        transform.mScale.set(gltf_scale.mV[0], gltf_scale.mV[1]);
+                        transform.mRotation = gltf_rot;
+                        any_changed = true;
+                    }
+                }
+
+                if (any_changed)
+                {
+                    LLGLTFMaterialList::queueModify(object, te, &new_override);
+                }
+            }
+            else if (facep->calcAlignedPlanarGLTF(mCenterFace, &gltf_offset, &gltf_scale, &gltf_rot, gltf_info_index))
             {
                 LLGLTFMaterial new_override;
                 const LLTextureEntry* tep = object->getTE(te);
@@ -1813,7 +1850,16 @@ void FSPanelFace::alignTextureLayer()
     bool identical_face = false;
     LLSelectedTE::getFace(last_face, identical_face);
 
-    // TODO: make this respect PBR channels -Zi
+    if (getCurrentMaterialType() == MATMEDIA_PBR)
+    {
+        // The Align button must update the GLTF texture transforms, not just
+        // the legacy TE layer.  This also handles rotation and all PBR
+        // channels from the PBR "All" tab.
+        FSPanelFaceSetAlignedTEFunctor setfunc(this, last_face);
+        LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
+        return;
+    }
+
     FSPanelFaceSetAlignedConcreteTEFunctor setfunc(this, last_face, getTextureChannelToEdit());
     LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
 }
@@ -2079,7 +2125,10 @@ void FSPanelFace::updateUI(bool force_set_values /*false*/)
         bool align_planar = mCheckPlanarAlign->get();
         bool identical_planar_aligned = false;
         {
-            const bool texture_info_selected = (getCurrentMaterialType() == MATMEDIA_PBR && getCurrentPBRChannel() != LLRender::NUM_TEXTURE_CHANNELS);
+            // PBR planar alignment is performed as a complete-material edit.
+            // Individual PBR texture tabs use their dedicated transform controls.
+            const bool texture_info_selected = (getCurrentMaterialType() == MATMEDIA_PBR &&
+                                                getCurrentPBRChannel() != LLRender::NUM_TEXTURE_CHANNELS);
             const bool enabled = (editable && isIdenticalPlanarTexgen() && !texture_info_selected);
 
             mCheckPlanarAlign->setValue(align_planar && enabled);
