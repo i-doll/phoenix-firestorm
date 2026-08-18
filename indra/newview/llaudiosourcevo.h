@@ -50,6 +50,11 @@ private:
 
 private:
     LLPointer<LLViewerObject>   mObjectp;
+    // <ID> The gain the object asked for, kept separate so the RLVa distance taper can be
+    //      re-applied every frame without losing it
+    F32                         mObjectGain;
+    F32                         mRlvGain;
+    // </ID>
 };
 
 #endif // LL_LLAUDIOSOURCEVO_H
