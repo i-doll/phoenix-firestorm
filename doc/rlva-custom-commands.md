@@ -193,24 +193,37 @@ All three are **strict-capable** and accept a per-source **UUID exception**
 (`:<uuid>=add|rem`, keeps that source audible). `@worldsounds`/`@soundothers` also accept
 a **distance modifier** (metres); `@soundself` does **not**.
 
+Sounds kept audible by a distance modifier **taper off** toward the edge of that radius
+instead of cutting out at it: gain is multiplied by a raised cosine, `0.5 * (1 + cos(pi * d/R))`
+— untouched at the ear, -6 dB at half the radius, silent exactly at `R`. `getSoundTaperGain()`
+in `rlvactions.cpp`.
+
+Attached/looping object sounds are re-evaluated **every frame** (`llaudiosourcevo.cpp`), so the
+fade follows the listener as they move. A restricted source is **muted, not stopped** — and one
+that arrives while restricted is still created — so a looping sound fades back in when the
+restriction lifts or the listener walks into range. The trade-off is that a restricted sound is
+still registered with the Sound Explorer; an accepted leak in exchange for a symmetric fade.
+One-shot triggered sounds are simply dropped when the gain reaches zero.
+
 ### `@worldsounds`  (synonym `@worldsound`)
 - **Syntax:** `@worldsounds=n|y` · `@worldsounds:<metres>=n` · `@worldsounds:<uuid>=add|rem`
 - **Modifier:** `WorldSoundsDist`, default `0.0` m, comparator `min`.
 - **Description:** Silences in-world (non-avatar object) sounds. Plain `=n` is unbounded;
   a distance modifier keeps sounds within `<metres>` audible. The object you're sitting
   on and per-UUID exceptions stay audible. `@worldsound` is a registered alias.
-- **Enforced at:** `rlvactions.cpp:376-420`.
+- **Enforced at:** `rlvactions.cpp` (`getWorldSoundGain`/`getSoundGain`); per-frame taper in `llaudiosourcevo.cpp`.
 
 ### `@soundothers`
 - **Syntax:** `@soundothers=n|y` · `@soundothers:<metres>=n` · `@soundothers:<uuid>=add|rem`
 - **Modifier:** `OtherAvatarSoundsDist`, default `0.0` m, comparator `min`.
 - **Description:** Silences sounds from **other avatars** and their attachments; same semantics as `@worldsounds`.
-- **Enforced at:** `rlvactions.cpp:369-370,318-351`.
+  Also covers other avatars' footsteps and typing sounds, which follow the same distance taper.
+- **Enforced at:** `rlvactions.cpp` (`getAvatarSoundGain`); avatar sounds `llvoavatar.cpp:5157,7058`.
 
 ### `@soundself`
 - **Syntax:** `@soundself=n|y` · `@soundself:<uuid>=add|rem` (**no distance form**).
 - **Description:** Silences sounds from **your own** avatar and attachments (HUD audio never covered).
-- **Enforced at:** `rlvactions.cpp:320,354-401`.
+- **Enforced at:** `rlvactions.cpp` (`getAvatarSoundGain`, `getSoundGain`).
 
 ---
 

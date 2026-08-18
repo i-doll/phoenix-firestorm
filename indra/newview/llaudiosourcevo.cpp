@@ -35,13 +35,20 @@
 #include "llviewercontrol.h"
 #include "llviewerparcelmgr.h"
 #include "llvoavatarself.h"
+// <ID> RLVa sound restriction taper
+#include "rlvactions.h"
+// </ID>
 
 LLAudioSourceVO::LLAudioSourceVO(const LLUUID &sound_id, const LLUUID& owner_id, const F32 gain, LLViewerObject *objectp)
 // <FS:CR> FIRE-10512 - Sound explorer fix by Sei Lisa
 //  :   LLAudioSource(sound_id, owner_id, gain, LLAudioEngine::AUDIO_TYPE_SFX),
     :   LLAudioSource(sound_id, owner_id, gain, LLAudioEngine::AUDIO_TYPE_SFX, objectp->getID(), false),
 // </FS:CR>
-    mObjectp(objectp)
+    mObjectp(objectp),
+    // <ID> RLVa distance taper
+    mObjectGain(llclamp(gain, 0.f, 1.f)),
+    mRlvGain(1.f)
+    // </ID>
 {
     update();
 }
@@ -57,7 +64,10 @@ LLAudioSourceVO::~LLAudioSourceVO()
 
 void LLAudioSourceVO::setGain(const F32 gain)
 {
-    mGain = llclamp(gain, 0.f, 1.f);
+    // <ID> Remember what the object asked for; update() folds in the RLVa distance taper
+    mObjectGain = llclamp(gain, 0.f, 1.f);
+    mGain = mObjectGain * mRlvGain;
+    // </ID>
 }
 
 void LLAudioSourceVO::checkCutOffRadius()
@@ -172,6 +182,13 @@ void LLAudioSourceVO::updateMute()
             mute = true;
         }
     }
+    // <ID> Out of range of an RLVa sound restriction: mute rather than stop, so the sound
+    //      comes back if the restriction (or the distance) relaxes again
+    else if (mRlvGain <= 0.f)
+    {
+        mute = true;
+    }
+    // </ID>
 
     if (!mute)
     {
@@ -223,6 +240,11 @@ void LLAudioSourceVO::updateMute()
 
 void LLAudioSourceVO::update()
 {
+    // <ID> Recompute the RLVa distance taper before muting decisions - it moves with the
+    //      listener, not just when the restriction changes
+    mRlvGain = (mObjectp && !mObjectp->isDead()) ? RlvActions::getSoundGain(mObjectp, mOwnerID) : 0.f;
+    // </ID>
+
     updateMute();
 
     if (!mObjectp)
@@ -240,6 +262,10 @@ void LLAudioSourceVO::update()
     {
         return;
     }
+
+    // <ID> Taper the sound off toward the edge of the allowed radius instead of cutting it
+    mGain = mObjectGain * mRlvGain;
+    // </ID>
 
     if (mObjectp->isHUDAttachment())
     {
