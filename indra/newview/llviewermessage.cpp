@@ -5070,23 +5070,32 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
         return;
     }
 
+    // <ID> RLVa sound restrictions taper the gain toward the edge of their radius rather than
+    //      cutting the sound off at it; a gain of zero means the sound is blocked outright
+    F32 rlv_gain = 1.f;
     LLViewerObject* source_object = gObjectList.findObject(object_id);
     if (source_object)
     {
-        if (!RlvActions::canPlaySound(source_object, owner_id))
-            return;
+        rlv_gain = RlvActions::getSoundGain(source_object, owner_id);
     }
     else if (object_id == owner_id)
     {
         LLVector3d avatar_position;
-        if (!LLWorld::getInstance()->getAvatar(owner_id, avatar_position) ||
-            !RlvActions::canPlayAvatarSound(owner_id, avatar_position))
+        if (!LLWorld::getInstance()->getAvatar(owner_id, avatar_position))
             return;
+
+        rlv_gain = RlvActions::getAvatarSoundGain(owner_id, avatar_position);
     }
-    else if (!RlvActions::canPlayWorldSound(pos_global, object_id))
+    else
     {
-        return;
+        rlv_gain = RlvActions::getWorldSoundGain(pos_global, object_id);
     }
+
+    if (rlv_gain <= 0.f)
+        return;
+
+    gain *= rlv_gain;
+    // </ID>
 
     // <FS:AO> Hack for legacy radar script interface compatibility. Interpret certain
     // sound assets as a request for a full radar update to a channel

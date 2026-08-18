@@ -6707,8 +6707,10 @@ void LLViewerObject::setAttachedSound(const LLUUID &audio_uuid, const LLUUID& ow
         return;
     }
 
-    if (!RlvActions::canPlaySound(this, owner_id))
-        return;
+    // <ID> No RLVa block here on purpose: the audio source is created either way and
+    //      LLAudioSourceVO keeps it muted while the restriction denies it, so the sound fades
+    //      back in if the restriction lifts or the listener moves into the allowed radius.
+    // </ID>
 
     // <FS:Ansariel> Asset blacklist
     FSAssetBlacklist& blacklist = FSAssetBlacklist::instance();
@@ -6806,8 +6808,12 @@ void LLViewerObject::adjustAudioGain(const F32 gain)
 
 void LLViewerObject::updateAudioSourceRlvRestriction()
 {
-    if (mAudioSourcep && !RlvActions::canPlaySound(this, mAudioSourcep->getOwnerID()))
-        mAudioSourcep->stop();
+    // <ID> The RLVa gain (and the mute that comes with a zero gain) is recomputed every frame in
+    //      LLAudioSourceVO::update(), so a restriction change only needs the source re-evaluated
+    //      rather than stopped - that way the sound comes back if the restriction relaxes again.
+    if (mAudioSourcep)
+        mAudioSourcep->update();
+    // </ID>
 }
 
 //----------------------------------------------------------------------------

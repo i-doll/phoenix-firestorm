@@ -5152,12 +5152,15 @@ void LLVOAvatar::updateFootstepSounds()
 
             LLVector3d foot_pos_global = gAgent.getPosGlobalFromAgent(foot_pos_agent);
 
+            // <ID> RLVa sound restrictions taper off toward the edge of their radius
+            const F32 rlv_gain = RlvActions::getAvatarSoundGain(getID(), foot_pos_global);
             if (LLViewerParcelMgr::getInstance()->canHearSound(foot_pos_global)
                 && !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds)
-                && RlvActions::canPlayAvatarSound(getID()))
+                && rlv_gain > 0.f)
             {
-                gAudiop->triggerSound(step_sound_id, getID(), STEP_VOLUME, LLAudioEngine::AUDIO_TYPE_AMBIENT, foot_pos_global);
+                gAudiop->triggerSound(step_sound_id, getID(), STEP_VOLUME * rlv_gain, LLAudioEngine::AUDIO_TYPE_AMBIENT, foot_pos_global);
             }
+            // </ID>
         }
     }
 }
@@ -7053,9 +7056,12 @@ bool LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, bool 
             if (gAudiop)
             {
                 LLVector3d char_pos_global = gAgent.getPosGlobalFromAgent(getCharacterPosition());
+                // <ID> RLVa sound restrictions taper off toward the edge of their radius
+                const F32 rlv_gain = RlvActions::getAvatarSoundGain(getID(), char_pos_global);
+                // </ID>
                 if (LLViewerParcelMgr::getInstance()->canHearSound(char_pos_global)
                     && !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds)
-                    && RlvActions::canPlayAvatarSound(getID()))
+                    && rlv_gain > 0.f)
                 {
                     // RN: uncomment this to play on typing sound at fixed volume once sound engine is fixed
                     // to support both spatialized and non-spatialized instances of the same sound
@@ -7074,7 +7080,7 @@ bool LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, bool 
                     {
                         static LLCachedControl<std::string> ui_snd_string(gSavedSettings, "UISndTyping");
                         LLUUID sound_id = LLUUID(ui_snd_string);
-                        gAudiop->triggerSound(sound_id, getID(), 1.0f, LLAudioEngine::AUDIO_TYPE_SFX, char_pos_global);
+                        gAudiop->triggerSound(sound_id, getID(), rlv_gain, LLAudioEngine::AUDIO_TYPE_SFX, char_pos_global); // <ID/> taper
                     }
                 }
             }
