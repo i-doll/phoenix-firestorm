@@ -172,6 +172,17 @@ public:
     static bool canPlaySound(const LLViewerObject* pSource, const LLUUID& idOwner);
 
     /*
+     * <ID> Returns the gain multiplier (0.0 to 1.0) to apply to a sound from the specified avatar or viewer object.
+     * Sounds that are only audible because of a distance modifier taper off toward the edge of that radius rather
+     * than cutting out abruptly; 0.0 means the sound is blocked outright. The can*Sound() variants above are simply
+     * "gain is greater than zero".
+     */
+    static F32 getAvatarSoundGain(const LLUUID& idAvatar);
+    static F32 getAvatarSoundGain(const LLUUID& idAvatar, const LLVector3d& position_global);
+    static F32 getWorldSoundGain(const LLVector3d& position_global, const LLUUID& idSource = LLUUID::null);
+    static F32 getSoundGain(const LLViewerObject* pSource, const LLUUID& idOwner);
+
+    /*
      * Checks if the user is allowed to use the specified volume in (main) chat and returns the appropriate chat volume type
      */
     static EChatType checkChatVolume(EChatType chatType);

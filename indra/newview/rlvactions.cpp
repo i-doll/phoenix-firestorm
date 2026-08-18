@@ -333,73 +333,119 @@ bool hasSoundSourceException(ERlvBehaviour behaviour, const LLViewerObject* pSou
     return pRoot && pRoot != pSource && gRlvHandler.isException(behaviour, pRoot->getID());
 }
 
-bool canHearRestrictedSound(ERlvBehaviour behaviour, ERlvBehaviourModifier modifier, const LLVector3d& position_global)
+// Sounds kept audible by a distance modifier taper off toward the edge of the radius rather than
+// cutting out abruptly. Raised cosine: full gain at the ear, -6dB at half the radius, silence at
+// the edge (and a zero slope at both ends, so neither the near field nor the cut-off pops).
+F32 getSoundTaperGain(const LLVector3d& position_global, F32 radius)
+{
+    if (radius <= 0.f)
+        return 0.f;
+
+    const F32 distance = (F32)(position_global - gAgent.getPositionGlobal()).magVec();
+    if (distance >= radius)
+        return 0.f;
+
+    return 0.5f * (1.f + cosf(F_PI * distance / radius));
+}
+
+F32 getRestrictedSoundGain(ERlvBehaviour behaviour, ERlvBehaviourModifier modifier, const LLVector3d& position_global)
 {
     if (!gRlvHandler.hasBehaviour(behaviour))
-        return true;
+        return 1.f;
 
     // A plain @worldsounds=n/@soundothers=n remains an unrestricted block. A
     // distance modifier only relaxes the restriction that supplied that modifier.
     if (hasUnboundedSoundRestriction(behaviour, modifier))
-        return false;
+        return 0.f;
 
     const RlvBehaviourModifier* pModifier = RlvBehaviourDictionary::instance().getModifier(modifier);
     if (!pModifier || !pModifier->hasValue() || position_global.isExactlyZero())
-        return false;
+        return 0.f;
 
-    const F32 radius = pModifier->getValue<F32>();
-    return radius >= 0.f && (position_global - gAgent.getPositionGlobal()).lengthSquared() <= radius * radius;
+    return getSoundTaperGain(position_global, pModifier->getValue<F32>());
 }
 }
 
 bool RlvActions::canPlayAvatarSound(const LLUUID& idAvatar)
 {
-    if (!isRlvEnabled())
-        return true;
-
-    const ERlvBehaviour behaviour = getAvatarSoundBehaviour(idAvatar);
-    return !gRlvHandler.hasBehaviour(behaviour) || gRlvHandler.isException(behaviour, idAvatar);
+    return getAvatarSoundGain(idAvatar) > 0.f;
 }
 
 bool RlvActions::canPlayAvatarSound(const LLUUID& idAvatar, const LLVector3d& position_global)
 {
-    if (!isRlvEnabled() || idAvatar == gAgentID)
-        return canPlayAvatarSound(idAvatar);
-
-    return gRlvHandler.isException(RLV_BHVR_SOUNDOTHERS, idAvatar) ||
-        canHearRestrictedSound(RLV_BHVR_SOUNDOTHERS, RLV_MODIFIER_SOUNDOTHERSDIST, position_global);
+    return getAvatarSoundGain(idAvatar, position_global) > 0.f;
 }
 
 bool RlvActions::canPlayWorldSound(const LLVector3d& position_global, const LLUUID& idSource)
 {
-    return !isRlvEnabled() ||
-        (idSource.notNull() && gRlvHandler.isException(RLV_BHVR_WORLDSOUNDS, idSource)) ||
-        canHearRestrictedSound(RLV_BHVR_WORLDSOUNDS, RLV_MODIFIER_WORLDSOUNDSDIST, position_global);
+    return getWorldSoundGain(position_global, idSource) > 0.f;
 }
 
 bool RlvActions::canPlaySound(const LLViewerObject* pSource, const LLUUID& idOwner)
 {
+    return getSoundGain(pSource, idOwner) > 0.f;
+}
+
+F32 RlvActions::getAvatarSoundGain(const LLUUID& idAvatar)
+{
+    if (!isRlvEnabled())
+        return 1.f;
+
+    const ERlvBehaviour behaviour = getAvatarSoundBehaviour(idAvatar);
+    return (!gRlvHandler.hasBehaviour(behaviour) || gRlvHandler.isException(behaviour, idAvatar)) ? 1.f : 0.f;
+}
+
+F32 RlvActions::getAvatarSoundGain(const LLUUID& idAvatar, const LLVector3d& position_global)
+{
+    if (!isRlvEnabled() || idAvatar == gAgentID)
+        return getAvatarSoundGain(idAvatar);
+
+    // Cheap exit first: this runs every frame for every playing sound source
+    if (!gRlvHandler.hasBehaviour(RLV_BHVR_SOUNDOTHERS) || gRlvHandler.isException(RLV_BHVR_SOUNDOTHERS, idAvatar))
+        return 1.f;
+
+    return getRestrictedSoundGain(RLV_BHVR_SOUNDOTHERS, RLV_MODIFIER_SOUNDOTHERSDIST, position_global);
+}
+
+F32 RlvActions::getWorldSoundGain(const LLVector3d& position_global, const LLUUID& idSource)
+{
+    if (!isRlvEnabled() || !gRlvHandler.hasBehaviour(RLV_BHVR_WORLDSOUNDS))
+        return 1.f;
+
+    if (idSource.notNull() && gRlvHandler.isException(RLV_BHVR_WORLDSOUNDS, idSource))
+        return 1.f;
+
+    return getRestrictedSoundGain(RLV_BHVR_WORLDSOUNDS, RLV_MODIFIER_WORLDSOUNDSDIST, position_global);
+}
+
+F32 RlvActions::getSoundGain(const LLViewerObject* pSource, const LLUUID& idOwner)
+{
     if (!isRlvEnabled() || !pSource)
-        return true;
+        return 1.f;
 
     // HUD audio is local UI/avatar audio from the user's HUD and is never covered by soundself.
     if (pSource->isHUDAttachment())
-        return true;
+        return 1.f;
 
     if (pSource->isAvatar())
-        return canPlayAvatarSound(pSource->getID(), pSource->getPositionGlobal());
+        return getAvatarSoundGain(pSource->getID(), pSource->getPositionGlobal());
 
     if (pSource->isAttachment())
     {
         const LLUUID idAvatar = pSource->getAvatar() ? pSource->getAvatar()->getID() : idOwner;
-        if (hasSoundSourceException(getAvatarSoundBehaviour(idAvatar), pSource))
-            return true;
+        const ERlvBehaviour behaviour = getAvatarSoundBehaviour(idAvatar);
+        // Cheap exit first: this runs every frame for every playing sound source
+        if (!gRlvHandler.hasBehaviour(behaviour))
+            return 1.f;
+
+        if (hasSoundSourceException(behaviour, pSource))
+            return 1.f;
 
         if (const LLVOAvatar* pAvatar = pSource->getAvatar())
-            return canPlayAvatarSound(pAvatar->getID(), pAvatar->getPositionGlobal());
+            return getAvatarSoundGain(pAvatar->getID(), pAvatar->getPositionGlobal());
 
         // If the attachment owner is all we know, apply the avatar restriction to it.
-        return canPlayAvatarSound(idOwner);
+        return getAvatarSoundGain(idOwner);
     }
 
     if (gRlvHandler.hasBehaviour(RLV_BHVR_WORLDSOUNDS))
@@ -411,15 +457,15 @@ bool RlvActions::canPlaySound(const LLViewerObject* pSource, const LLUUID& idOwn
             pSittingObject = static_cast<const LLViewerObject*>(gAgentAvatarp->getParent());
 
         if (pSittingObject && pSource->getRootEdit() == pSittingObject->getRootEdit())
-            return true;
+            return 1.f;
 
         if (hasSoundSourceException(RLV_BHVR_WORLDSOUNDS, pSource))
-            return true;
+            return 1.f;
 
-        return canPlayWorldSound(pSource->getPositionGlobal(), pSource->getID());
+        return getWorldSoundGain(pSource->getPositionGlobal(), pSource->getID());
     }
 
-    return true;
+    return 1.f;
 }
 
 // Handles: @chatwhisper, @chatnormal and @chatshout
