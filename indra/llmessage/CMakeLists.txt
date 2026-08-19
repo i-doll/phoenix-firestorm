@@ -168,6 +168,7 @@ set(llmessage_HEADER_FILES
     llxfer_mem.h
     llxfer_vfile.h
     llxorcipher.h
+    llzerocode.h
     machine.h
     mean_collision_data.h
     message.h
@@ -218,5 +219,6 @@ if (LL_TESTS)
   LL_ADD_INTEGRATION_TEST(llhost "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llpartdata "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llxfer_file "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(llzerocode "" "${test_libs}")
 endif (LL_TESTS)
 
