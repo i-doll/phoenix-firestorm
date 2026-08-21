@@ -4808,6 +4808,16 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         LLViewerObject *objectp = gObjectList.findObject(id);
         if (objectp)
         {
+            // Block vehicle / seat kills sent by the outgoing simulator during region crossings.
+            if (regionp && (regionp != gAgent.getRegion()) &&
+                isAgentAvatarValid() && gAgentAvatarp->isSitting() &&
+                (gAgentAvatarp->getRoot() == objectp->getRootEdit()))
+            {
+                LL_INFOS("Avatar") << "Ignoring vehicle kill from outgoing region " << regionp->getName()
+                    << " for seated root object " << objectp->getRootEdit()->getID() << LL_ENDL;
+                continue;
+            }
+
             // <FS:Ansariel> FIRE-12004: Attachments getting lost on TP
             static LLCachedControl<bool> fsExperimentalLostAttachmentsFix(gSavedSettings, "FSExperimentalLostAttachmentsFix");
             static LLCachedControl<F32> fsExperimentalLostAttachmentsFixKillDelay(gSavedSettings, "FSExperimentalLostAttachmentsFixKillDelay");
