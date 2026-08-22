@@ -284,6 +284,8 @@ public:
 
     // <FS:Ansariel> Teleport to feature
     static void teleportTo(const LLUUID& id);
+    // <ID> Confirmation callback for teleportTo
+    static bool handleTeleportTo(const LLSD& notification, const LLSD& response);
 
     //
     // Parcel actions
