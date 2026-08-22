@@ -11723,6 +11723,21 @@ Teleport to this avatar not possible, because the exact position is unknown.
   <tag>fail</tag>
   </notification>
 
+  <!-- <ID> Confirm "Teleport To" on an avatar -->
+  <notification
+   icon="alertmodal.tga"
+   name="IDConfirmTeleportToAvatar"
+   type="alertmodal">
+Teleport to &lt;nolink&gt;[NAME]&lt;/nolink&gt;?
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Confirm that I want to teleport to an avatar"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="Teleport"/>
+  </notification>
+  <!-- </ID> -->
+
   <notification
    icon="alertmodal.tga"
    name="ZoomToAvatarNotPossible"

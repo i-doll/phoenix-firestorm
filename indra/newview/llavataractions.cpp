@@ -892,14 +892,42 @@ void LLAvatarActions::track(const LLUUID& id)
 // </FS:Ansariel>
 
 // <FS:Ansariel> Teleport to feature
-//static
-void LLAvatarActions::teleportTo(const LLUUID& id)
+// <ID> Confirm before teleporting: this is reachable from several right-click
+// menus where a misclick would otherwise move the avatar with no warning.
+static void id_do_teleport_to(const LLUUID& id)
 {
     FSRadar* radar = FSRadar::getInstance();
     if (radar)
     {
         radar->teleportToAvatar(id);
     }
+}
+
+//static
+bool LLAvatarActions::handleTeleportTo(const LLSD& notification, const LLSD& response)
+{
+    if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+    {
+        id_do_teleport_to(notification["payload"]["id"].asUUID());
+    }
+    return false;
+}
+// </ID>
+
+//static
+void LLAvatarActions::teleportTo(const LLUUID& id)
+{
+    LLAvatarName av_name;
+    LLSD args;
+    args["NAME"] = LLAvatarNameCache::get(id, &av_name)
+                       ? av_name.getCompleteName()
+                       : LLTrans::getString("AvatarNameWaiting");
+
+    LLSD payload;
+    payload["id"] = id;
+
+    LLNotificationsUtil::add("IDConfirmTeleportToAvatar", args, payload,
+                             &LLAvatarActions::handleTeleportTo);
 }
 
 namespace action_give_inventory
