@@ -182,6 +182,7 @@
 #include "llsdserialize.h"
 #include "lltexturecache.h"
 #include "llmeshrepository.h"
+#include "llviewerjointattachment.h"
 #include "llvovolume.h"
 #include "particleeditor.h"
 #include "permissionstracker.h"
@@ -3541,6 +3542,87 @@ class LLAvatarTexRefresh : public view_listener_t
         return true;
     }
 };
+
+// <ID> Reload a whole avatar: baked body, skeleton, and every attachment's
+// textures and mesh. avatar_tex_refresh alone only drops the baked body
+// textures, which leaves stuck attachments exactly as they were.
+void avatar_full_reload(LLVOAvatar* avatar)
+{
+    if (!avatar)
+    {
+        return;
+    }
+
+    avatar_tex_refresh(avatar);
+    avatar->resetSkeleton(false);
+
+    // Cache eviction is per asset, so only evict each mesh once even when
+    // several attached prims share it.
+    std::set<LLUUID> evicted;
+
+    auto reload_object = [&evicted](LLViewerObject* object)
+    {
+        if (!object)
+        {
+            return;
+        }
+
+        handle_object_tex_refresh(object, nullptr);
+
+        LLVOVolume* vol = dynamic_cast<LLVOVolume*>(object);
+        if (!vol || !vol->isSculpted())
+        {
+            return;
+        }
+        LLVolume* volume = vol->getVolume();
+        if (!volume)
+        {
+            return;
+        }
+        const LLVolumeParams& params = volume->getParams();
+        if ((params.getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_MESH)
+        {
+            return;
+        }
+        const LLUUID& mesh_id = params.getSculptID();
+        if (mesh_id.isNull())
+        {
+            return;
+        }
+        if (evicted.insert(mesh_id).second)
+        {
+            gMeshRepo.reloadMesh(mesh_id);
+        }
+        vol->reloadMesh();
+    };
+
+    for (const auto& attach_pair : avatar->mAttachmentPoints)
+    {
+        LLViewerJointAttachment* attachment = attach_pair.second;
+        if (!attachment)
+        {
+            continue;
+        }
+        for (LLViewerObject* attached : attachment->mAttachedObjects)
+        {
+            reload_object(attached);
+            for (LLViewerObject* child : attached->getChildren())
+            {
+                reload_object(child);
+            }
+        }
+    }
+}
+
+class IDAvatarReload : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        avatar_full_reload(find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()));
+        return true;
+    }
+};
+// </ID>
 // </FS:Zi> Texture Refresh
 
 class LLObjectReportAbuse : public view_listener_t
@@ -13210,6 +13292,7 @@ void initialize_menus()
     // [/RLVa:KB]
     view_listener_t::addMenu(new LLAvatarReportAbuse(), "Avatar.ReportAbuse");
     view_listener_t::addMenu(new LLAvatarTexRefresh(), "Avatar.TexRefresh"); // ## Zi: Texture Refresh
+    view_listener_t::addMenu(new IDAvatarReload(), "Avatar.ReloadAvatar"); // <ID>
 
     view_listener_t::addMenu(new LLAvatarToggleMyProfile(), "Avatar.ToggleMyProfile");
     view_listener_t::addMenu(new LLAvatarTogglePicks(), "Avatar.TogglePicks");

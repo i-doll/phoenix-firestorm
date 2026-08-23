@@ -40,6 +40,7 @@ class LLParcelSelection;
 class LLObjectSelection;
 class LLSelectNode;
 class LLViewerObject;
+class LLVOAvatar;
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 void set_use_wireframe(bool useWireframe);
@@ -70,6 +71,8 @@ bool enable_object_edit_gltf_material();
 bool enable_object_open();
 void handle_object_open();
 void handle_object_tex_refresh(LLViewerObject* object, LLSelectNode* node);
+// <ID> Full avatar reload: baked body, skeleton, attachment textures and mesh
+void avatar_full_reload(LLVOAvatar* avatar);
 
 bool visible_take_object();
 bool tools_visible_take_object();
