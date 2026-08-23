@@ -90,6 +90,7 @@ LLContextMenu* FSRadarMenu::createMenu()
         registrar.add("Nearby.People.TeleportToAvatar",         boost::bind(&FSRadarMenu::teleportToAvatar,                 this));
         registrar.add("Nearby.People.TrackAvatar",              boost::bind(&FSRadarMenu::onTrackAvatarMenuItemClick,       this));
         registrar.add("Nearby.People.FaceTowardsAvatar",        boost::bind(&FSRadarMenu::onFaceTowardsAvatarMenuItemClick, this));
+        registrar.add("Nearby.People.ReloadAvatar",             boost::bind(&FSRadarMenu::onReloadAvatarMenuItemClick,      this)); // <ID>
         registrar.add("Nearby.People.SetRenderMode",            boost::bind(&FSRadarMenu::onSetRenderMode,                  this, _2));
         registrar.add("Nearby.People.SetAvatarMarkColor",       boost::bind(&LLNetMap::setAvatarMarkColor,                  id, _2));
         registrar.add("Nearby.People.ClearAvatarMarkColor",     boost::bind(&LLNetMap::clearAvatarMarkColor,                id));
@@ -102,6 +103,7 @@ LLContextMenu* FSRadarMenu::createMenu()
         enable_registrar.add("Avatar.VisibleKickTeleportHome",  boost::bind(&LLAvatarActions::canEstateKickOrTeleportHome,  id));
         enable_registrar.add("Nearby.People.CheckRenderMode",   boost::bind(&FSRadarMenu::checkSetRenderMode,               this, _2));
         enable_registrar.add("Nearby.People.CanFaceTowardsAvatar", boost::bind(&FSRadarMenu::canFaceTowardsAvatar,          this));
+        enable_registrar.add("Nearby.People.CanReloadAvatar",    boost::bind(&FSRadarMenu::canReloadAvatar,                 this)); // <ID>
 
         // create the context menu from the XUI
         return createFromFile("menu_fs_radar.xml");
@@ -296,6 +298,21 @@ bool FSRadarMenu::canFaceTowardsAvatar()
     return avatar && !avatar->isDead() &&
            dist_vec(avatar->getPositionAgent(), gAgent.getPositionAgent()) <= FSAvatarAlignBase::MAX_FACE_DISTANCE;
 }
+
+// <ID> Force a full re-rez of the selected avatar
+void FSRadarMenu::onReloadAvatarMenuItemClick()
+{
+    avatar_full_reload(dynamic_cast<LLVOAvatar*>(gObjectList.findObject(mUUIDs.front())));
+}
+
+bool FSRadarMenu::canReloadAvatar()
+{
+    // A radar entry can sit outside draw distance, where there is no object to
+    // reload; grey the item out rather than have it silently do nothing.
+    LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(gObjectList.findObject(mUUIDs.front()));
+    return avatar && !avatar->isDead();
+}
+// </ID>
 
 void FSRadarMenu::addToContactSet()
 {

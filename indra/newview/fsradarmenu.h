@@ -49,6 +49,9 @@ private:
     void onTrackAvatarMenuItemClick();
     void onFaceTowardsAvatarMenuItemClick();
     bool canFaceTowardsAvatar();
+    // <ID> Full avatar reload
+    void onReloadAvatarMenuItemClick();
+    bool canReloadAvatar();
     void addToContactSet();
     void onSetRenderMode(const LLSD& userdata);
     bool checkSetRenderMode(const LLSD& userdata);
