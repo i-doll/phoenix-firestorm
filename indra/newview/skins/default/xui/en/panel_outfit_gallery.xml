@@ -19,6 +19,11 @@
   <string name="no_matched_outfits_msg">
     Didn't find what you're looking for? Try [secondlife:///app/search/all/[SEARCH_TERM] Search].
   </string>
+  <!-- <ID> -->
+  <string name="outfits_breadcrumb_root">
+    Outfits
+  </string>
+  <!-- </ID> -->
   <text
     type="string"
     clip_partial="false"
@@ -33,13 +38,25 @@
     wrap="true">
     Searching...
   </text> 
+  <!-- <ID> Subfolder breadcrumb; hidden at the root and while filtering -->
+  <panel
+   background_visible="false"
+   follows="left|top|right"
+   height="16"
+   layout="topleft"
+   left="3"
+   name="outfit_breadcrumb"
+   right="310"
+   top="0"
+   visible="false" />
+  <!-- </ID> -->
   <scroll_container
    follows="all"
-   height="395"
+   height="379"
    right="310"
    layout="topleft"
    left="3"
-   top="0"
+   top="16"
    tab_stop="true"
    name="gallery_scroll_panel"
    opaque="false">

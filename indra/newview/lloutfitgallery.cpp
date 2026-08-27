@@ -123,6 +123,7 @@ bool LLOutfitGallery::postBuild()
     bool rv = LLOutfitListBase::postBuild();
     mScrollPanel = getChild<LLScrollContainer>("gallery_scroll_panel");
     mMessageTextBox = getChild<LLTextBox>("no_outfits_txt");
+    mBreadcrumbPanel = findChild<LLPanel>("outfit_breadcrumb"); // <ID>
     mOutfitGalleryMenu = new LLOutfitGalleryContextMenu(this);
     return rv;
 }
@@ -427,6 +428,12 @@ void LLOutfitGallery::updateRowsIfNeeded()
 
 bool compareGalleryItem(LLOutfitGalleryItem* item1, LLOutfitGalleryItem* item2)
 {
+    // <ID> Folders lead their level under every sort order.
+    if (item1->isFolder() != item2->isFolder())
+    {
+        return item1->isFolder();
+    }
+    // </ID>
     static LLCachedControl<S32> sort_by_name(gSavedSettings, "OutfitGallerySortOrder", 0);
     switch (sort_by_name())
     {
@@ -475,12 +482,40 @@ void LLOutfitGallery::reArrangeRows(S32 row_diff)
     std::string cur_filter = getFilterSubString();
     LLStringUtil::toUpper(cur_filter);
 
+    // <ID> With no filter, lay out only the direct children of the folder being browsed.
+    // With a filter, flatten: search the whole tree and drop folder tiles, because
+    // drill-down would otherwise hide every match living somewhere else.
+    const bool filtering = !cur_filter.empty();
+    const LLUUID browse_folder = mCurrentFolder.isNull()
+        ? gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS)
+        : mCurrentFolder;
+    // </ID>
+
     for (std::vector<LLOutfitGalleryItem*>::const_iterator it = buf_items.begin(); it != buf_items.end(); ++it)
     {
         std::string outfit_name = (*it)->getItemName();
         LLStringUtil::toUpper(outfit_name);
 
         bool hidden = (std::string::npos == outfit_name.find(cur_filter));
+
+        // <ID>
+        if (filtering)
+        {
+            if ((*it)->isFolder())
+            {
+                hidden = true;
+            }
+        }
+        else
+        {
+            LLViewerInventoryCategory* item_cat = gInventory.getCategory((*it)->getUUID());
+            if (!item_cat || item_cat->getParentUUID() != browse_folder)
+            {
+                hidden = true;
+            }
+        }
+        // </ID>
+
         (*it)->setHidden(hidden);
 
         addToGallery(*it);
@@ -494,6 +529,118 @@ void LLOutfitGallery::updateGalleryWidth()
     mRowPanelWidth = mRowPanWidthFactor * mItemsInRow - mItemHorizontalGap;
     mGalleryWidth = mGalleryWidthFactor * mItemsInRow - mItemHorizontalGap;
 }
+
+// <ID> Descend into, or back out of, a subfolder. Selecting a folder is not selecting an
+// outfit, so any outfit selection is cleared on navigation.
+void LLOutfitGallery::setCurrentFolder(const LLUUID& cat_id)
+{
+    const LLUUID root = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
+    LLUUID target = cat_id;
+
+    // A folder deleted or moved out from under us falls back to the root.
+    if (target.notNull() && target != root && !gInventory.getCategory(target))
+    {
+        target.setNull();
+    }
+    if (target == root)
+    {
+        target.setNull();
+    }
+
+    if (target == mCurrentFolder)
+    {
+        return;
+    }
+    mCurrentFolder = target;
+
+    if (getSelectedOutfitUUID().notNull())
+    {
+        ChangeOutfitSelection(NULL, LLUUID::null);
+    }
+    reArrangeRows();
+    updateBreadcrumb();
+}
+
+// Rebuild the "Outfits > Formal > Winter" strip from the parent chain of the folder being
+// browsed. Hidden at the root, and while a filter is active — filtering flattens the
+// hierarchy, so a trail would be a lie.
+void LLOutfitGallery::updateBreadcrumb()
+{
+    if (!mBreadcrumbPanel)
+    {
+        return;
+    }
+
+    mBreadcrumbPanel->deleteAllChildren();
+
+    if (mCurrentFolder.isNull() || !getFilterSubString().empty())
+    {
+        mBreadcrumbPanel->setVisible(false);
+        return;
+    }
+
+    const LLUUID root = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
+
+    std::vector<std::pair<LLUUID, std::string> > trail;
+    LLUUID walk = mCurrentFolder;
+    while (walk.notNull() && walk != root)
+    {
+        LLViewerInventoryCategory* cat = gInventory.getCategory(walk);
+        if (!cat)
+        {
+            break;
+        }
+        trail.push_back(std::make_pair(walk, cat->getName()));
+        walk = cat->getParentUUID();
+    }
+    trail.push_back(std::make_pair(root, getString("outfits_breadcrumb_root")));
+    std::reverse(trail.begin(), trail.end());
+
+    const S32 height = mBreadcrumbPanel->getRect().getHeight();
+    S32 left = 2;
+    for (size_t i = 0; i < trail.size(); ++i)
+    {
+        if (i > 0)
+        {
+            LLTextBox::Params sep;
+            sep.name("crumb_sep");
+            sep.initial_value(std::string(" > "));
+            sep.rect(LLRect(left, height, left + 14, 0));
+            LLTextBox* sep_box = LLUICtrlFactory::create<LLTextBox>(sep);
+            mBreadcrumbPanel->addChild(sep_box);
+            left += 14;
+        }
+
+        const LLUUID seg_id = trail[i].first;
+        const std::string& seg_name = trail[i].second;
+        const bool is_last = (i + 1 == trail.size());
+
+        const S32 width = 10 + (S32)seg_name.size() * 6;
+        LLTextBox::Params p;
+        p.name("crumb");
+        p.initial_value(seg_name);
+        p.rect(LLRect(left, height, left + width, 0));
+        LLTextBox* box = LLUICtrlFactory::create<LLTextBox>(p);
+        if (!is_last)
+        {
+            // Only ancestors navigate; the trailing segment is where you already are.
+            box->setClickedCallback([this, seg_id](void*)
+            {
+                setCurrentFolder(seg_id);
+            });
+            box->setShowCursorHand(true);
+        }
+        else
+        {
+            box->setShowCursorHand(false);
+        }
+        mBreadcrumbPanel->addChild(box);
+        left += width;
+    }
+
+    mBreadcrumbPanel->setVisible(true);
+}
+// </ID>
 
 void LLOutfitGallery::handleInvFavColorChange()
 {
@@ -782,6 +929,7 @@ LLOutfitGallery::~LLOutfitGallery()
 void LLOutfitGallery::onFilterSubStringChanged(const std::string& new_string, const std::string& old_string)
 {
     reArrangeRows();
+    updateBreadcrumb(); // <ID> hidden while filtering, restored when the filter clears
 }
 
 void LLOutfitGallery::onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id)
@@ -822,18 +970,26 @@ void LLOutfitGallery::updateAddedCategory(LLUUID cat_id)
     LLViewerInventoryCategory *cat = gInventory.getCategory(cat_id);
     if (!cat) return;
 
-    if (!isOutfitFolder(cat))
+    // <ID> Subfolders become folder tiles instead of being discarded. The observer
+    // registration is kept — it is what keeps nested contents live.
+    const bool is_folder = !isOutfitFolder(cat);
+    if (is_folder)
     {
-        // Assume a subfolder that contains or will contain outfits, track it
         const LLUUID outfits = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
         mCategoriesObserver->addCategory(cat_id, [this, outfits]()
         {
             observerCallback(outfits);
         });
-        return;
+        if (cat_id == outfits)
+        {
+            // The root is not a tile inside itself.
+            return;
+        }
     }
+    // </ID>
 
     LLOutfitGalleryItem* item = buildGalleryItem(cat->getName(), cat_id, cat->getIsFavorite());
+    item->setIsFolder(is_folder); // <ID>
     mOutfitMap.insert(LLOutfitGallery::outfit_map_value_t(cat_id, item));
     item->setRightMouseDownCallback(boost::bind(&LLOutfitListBase::outfitRightClickCallBack, this,
         _1, _2, _3, cat_id));
@@ -1091,6 +1247,24 @@ void LLOutfitGalleryItem::setOutfitFavorite(bool is_favorite)
     mOutfitNameText->setReadOnlyColor((mFavorite && use_color()) ? sDefaultFavoriteColor : sDefaultTextColor);
 }
 
+// <ID> A folder tile is an outfit tile with the thumbnail swapped for a folder icon.
+void LLOutfitGalleryItem::setIsFolder(bool is_folder)
+{
+    mIsFolder = is_folder;
+    if (mIsFolder)
+    {
+        mTexturep = NULL;
+        mImageAssetId.setNull();
+        mDefaultImage = false;
+        if (mPreviewIcon)
+        {
+            mPreviewIcon->setValue("Inv_FolderClosed");
+            mPreviewIcon->setVisible(true);
+        }
+    }
+}
+// </ID>
+
 void LLOutfitGalleryItem::setOutfitWorn(bool value)
 {
     mWorn = value;
@@ -1128,6 +1302,17 @@ bool LLOutfitGalleryItem::handleRightMouseDown(S32 x, S32 y, MASK mask)
 
 bool LLOutfitGalleryItem::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
+    // <ID> Double-clicking a folder descends into it rather than jumping to the list tab.
+    if (mIsFolder)
+    {
+        if (mGallery)
+        {
+            mGallery->setCurrentFolder(mUUID);
+            return true;
+        }
+        return false;
+    }
+    // </ID>
     return openOutfitsContent() || LLPanel::handleDoubleClick(x, y, mask);
 }
 
