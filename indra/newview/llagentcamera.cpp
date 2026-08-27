@@ -1848,6 +1848,65 @@ LLVector3d LLAgentCamera::calcFocusPositionTargetGlobal()
                             gPipeline.updateMoveDampedAsync(drawablep);
                         }
                     }
+
+                    // Updating only a moving linkset root leaves its children on the normal
+                    // update pass, which makes them appear dislocated from the root every few frames when the root was updated first.
+                    // This is particularly noticeable on moving children or avatars (and avatar attachments).
+                    if (mFocusObject->isRoot())
+                    {
+                        for (LLViewerObject* childp : mFocusObject->getChildren())
+                        {
+                            LLDrawable* child_drawablep = childp ? childp->mDrawable.get() : nullptr;
+                            if (!child_drawablep || child_drawablep->isDead() || !child_drawablep->isActive())
+                            {
+                                continue;
+                            }
+
+                            if (childp->isSelected() || child_drawablep->isState(LLDrawable::MOVE_UNDAMPED))
+                            {
+                                gPipeline.updateMoveNormalAsync(child_drawablep);
+                            }
+                            else
+                            {
+                                gPipeline.updateMoveDampedAsync(child_drawablep);
+                            }
+
+                            // Also apply transform to any seated avatars
+                            if (LLVOAvatar* avatarp = childp->asAvatar())
+                            {
+                                if (LLJoint* root_jointp = avatarp->getRootJoint())
+                                {
+                                    root_jointp->touch();
+                                    root_jointp->updateWorldMatrixChildren();
+                                    avatarp->idleUpdateNameTag(
+                                        avatarp->idleCalcNameTagPosition(root_jointp->getWorldPosition())); // Nametag updates separately and shouldn't trail behind either.
+                                }
+
+                                // ... and also their unrigged attachments (those are not children of the vehicle, they are children of the avatar)
+                                for (const auto& attachment_entry : avatarp->mAttachmentPoints)
+                                {
+                                    LLViewerJointAttachment* attachment = attachment_entry.second;
+                                    if (!attachment)
+                                    {
+                                        continue;
+                                    }
+
+                                    for (const auto& attached_objectp : attachment->mAttachedObjects)
+                                    {
+                                        LLViewerObject* attached_object = attached_objectp.get();
+                                        if (!attached_object || attached_object->isDead() || attached_object->mDrawable.isNull())
+                                        {
+                                            continue;
+                                        }
+
+                                        attached_object->mDrawable->clearState(LLDrawable::EARLY_MOVE);
+                                        gPipeline.updateMoveNormalAsync(attached_object->mDrawable);
+                                        attached_object->updateText();
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             // if not tracking object, update offset based on new object position
