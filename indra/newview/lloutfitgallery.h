@@ -112,6 +112,11 @@ public:
     void refreshOutfit(const LLUUID& category_id);
     virtual LLToggleableMenu* getSortMenu();
 
+    // <ID> Subfolder drill-down
+    void setCurrentFolder(const LLUUID& cat_id);
+    const LLUUID& getCurrentFolder() const { return mCurrentFolder; }
+    // </ID>
+
 protected:
     /*virtual*/ void onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id);
     /*virtual*/ void onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid);
@@ -183,6 +188,12 @@ private:
 
     LLListContextMenu* mOutfitGalleryMenu;
     LLOutfitGallerySortMenu* mSortMenu;
+
+    // <ID> Folder being browsed; null means the My Outfits root
+    LLUUID   mCurrentFolder;
+    LLPanel* mBreadcrumbPanel = nullptr;
+    void     updateBreadcrumb();
+    // </ID>
 
     typedef std::map<LLUUID, LLOutfitGalleryItem*>      outfit_map_t;
     typedef outfit_map_t::value_type                    outfit_map_value_t;
@@ -258,6 +269,11 @@ public:
     bool isDefaultImage() {return mDefaultImage;}
     bool isFavorite() { return mFavorite; }
 
+    // <ID> Folder tiles share the grid with outfit tiles
+    bool isFolder() const { return mIsFolder; }
+    void setIsFolder(bool is_folder);
+    // </ID>
+
     bool isHidden() {return mHidden;}
     void setHidden(bool hidden) {mHidden = hidden;}
 
@@ -275,6 +291,7 @@ private:
     bool     mDefaultImage;
     bool     mHidden;
     bool     mFavorite;
+    bool     mIsFolder = false; // <ID>
     std::string mOutfitName;
 
     static bool sColorSetInitialized;
