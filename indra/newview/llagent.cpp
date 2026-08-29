@@ -97,6 +97,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+#include "llviewermessage.h"
 #include "llviewerstats.h"
 #include "llviewerthrottle.h"
 #include "llviewerwindow.h"
@@ -5733,6 +5734,9 @@ void LLAgent::setTeleportState(ETeleportState state)
             " for previously failed teleport.  Ignore!" << LL_ENDL;
         return;
     }
+    const bool completed_teleport =
+        mTeleportState == TELEPORT_ARRIVING && state == TELEPORT_NONE;
+
     LL_DEBUGS("Teleport") << "Setting teleport state to "
                           << LLAgent::teleportStateName(state) << "(" << state << ")"
                           << " Previous state: "
@@ -5752,6 +5756,20 @@ void LLAgent::setTeleportState(ETeleportState state)
     {
         case TELEPORT_NONE:
             mbTeleportKeepsLookAt = false;
+
+            // Area Search demonstrates that a new simulator interest-list
+            // evaluation can make post-teleport objects arrive. Reset the
+            // normal interest mode once, then immediately restate the camera view.
+            if (completed_teleport && mInterestListMode == IL_MODE_DEFAULT)
+            {
+                LLViewerRegion* regionp = getRegion();
+                if (regionp && regionp->isAlive() && regionp->capabilitiesReceived())
+                {
+                    regionp->resetInterestList();
+                    send_agent_update(true, true);
+                }
+            }
+
             // <FS:Ansariel> FIRE-12004: Attachments getting lost on TP; always reset region crossing state after a finished TP
             if (isAgentAvatarValid())
             {
