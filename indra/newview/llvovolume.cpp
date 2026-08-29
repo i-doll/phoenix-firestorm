@@ -117,6 +117,37 @@ namespace
 {
 constexpr size_t LARGE_LINKSET_RESYNC_THRESHOLD = 128;
 constexpr F64 LARGE_LINKSET_RESYNC_INTERVAL_SEC = 0.5;
+constexpr F64 TE_RESYNC_INTERVAL_SEC = 1.0;
+
+// A malformed or incomplete terse TextureEntry update can otherwise leave a
+// drawable with only some of its face state updated.  Request the authoritative
+// full object update, but never let repeated bad packets create a request loop.
+void requestTEFullResync(LLViewerObject* objectp)
+{
+    if (!objectp)
+    {
+        return;
+    }
+
+    LLViewerRegion* regionp = objectp->getRegion();
+    const U32 local_id = objectp->getLocalID();
+    if (!regionp || !local_id)
+    {
+        return;
+    }
+
+    static std::unordered_map<LLUUID, F64> sLastTEFullResyncRequest;
+    const F64 now = LLFrameTimer::getTotalSeconds();
+    F64& last_request = sLastTEFullResyncRequest[objectp->getID()];
+    if (now - last_request < TE_RESYNC_INTERVAL_SEC)
+    {
+        return;
+    }
+    last_request = now;
+
+    regionp->addCacheMissFull(local_id);
+    regionp->requestCacheMisses();
+}
 
 // Terse updates are unreliable; for very large linksets, alpha/TE bursts can
 // leave random child links visually stale. Throttle a full linkset resync.
@@ -711,48 +742,43 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
                 // which adds a 4-byte length prefix in front of the TE payload.
                 constexpr S32 max_texture_dp_size = (S32)LLTEContents::MAX_TE_BUFFER + (S32)sizeof(S32);
                 U8 tdpbuffer[max_texture_dp_size];
-                S32 texture_dp_size = llmin(texture_length, max_texture_dp_size);
                 if (texture_length > max_texture_dp_size)
                 {
                     LL_WARNS("TEXTUREENTRY") << "Excessive terse TextureEntry size " << texture_length
-                                             << " for object " << getID() << ". Truncating to "
-                                             << max_texture_dp_size << LL_ENDL;
+                                             << " for object " << getID() << ". Discarding the incomplete update "
+                                             << "and requesting a full resync." << LL_ENDL;
+                    requestTEFullResync(this);
                 }
-
-                LLDataPackerBinaryBuffer tdp(tdpbuffer, texture_dp_size);
-                mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_TextureEntry, tdpbuffer, 0, block_num, texture_dp_size);
-                S32 result = unpackTEMessage(tdp);
-
-                // If a terse TE update arrives before this object has valid TE state,
-                // the update can be effectively dropped. Ask for a full update to resync.
-                if (update_type == OUT_TERSE_IMPROVED &&
-                    (result == TEM_INVALID || (result == TEM_CHANGE_NONE && getNumTEs() == 0)))
+                else
                 {
-                    if (LLViewerRegion* regionp = getRegion())
+                    LLDataPackerBinaryBuffer tdp(tdpbuffer, texture_length);
+                    mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_TextureEntry,
+                        tdpbuffer, 0, block_num, texture_length);
+                    S32 result = unpackTEMessage(tdp);
+
+                    // If a terse TE update arrives before this object has valid TE state,
+                    // the update can be effectively dropped. Ask for a full update to resync.
+                    if (update_type == OUT_TERSE_IMPROVED &&
+                        (result == TEM_INVALID || (result == TEM_CHANGE_NONE && getNumTEs() == 0)))
                     {
-                        U32 local_id = getLocalID();
-                        if (local_id)
-                        {
-                            regionp->addCacheMissFull(local_id);
-                            regionp->requestCacheMisses();
+                        requestTEFullResync(this);
+                    }
+                    else if (update_type == OUT_TERSE_IMPROVED)
+                    {
+                        requestLargeLinksetResync(this);
+                    }
+
+                    if (result & teDirtyBits)
+                    {
+                        if (mDrawable)
+                        { //on the fly TE updates break batches, isolate in octree
+                            shrinkWrap();
                         }
                     }
-                }
-                else if (update_type == OUT_TERSE_IMPROVED && texture_length > 0)
-                {
-                    requestLargeLinksetResync(this);
-                }
-
-                if (result & teDirtyBits)
-                {
-                    if (mDrawable)
-                    { //on the fly TE updates break batches, isolate in octree
-                        shrinkWrap();
+                    if (result & TEM_CHANGE_MEDIA)
+                    {
+                        retval |= MEDIA_FLAGS_CHANGED;
                     }
-                }
-                if (result & TEM_CHANGE_MEDIA)
-                {
-                    retval |= MEDIA_FLAGS_CHANGED;
                 }
             }
         }
