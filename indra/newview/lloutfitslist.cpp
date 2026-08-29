@@ -68,13 +68,42 @@ static const LLOutfitTabNameComparator OUTFIT_TAB_NAME_COMPARATOR;
 static const LLOutfitTabFavComparator OUTFIT_TAB_FAV_COMPARATOR;
 
 /*virtual*/
+// <ID> Folder tabs lead their level under every sort order. A folder tab is the one whose
+// body is a nested accordion rather than a wearable list.
+static bool id_tab_is_folder(const LLAccordionCtrlTab* tab)
+{
+    if (!tab)
+    {
+        return false;
+    }
+    return dynamic_cast<const LLAccordionCtrl*>(
+        const_cast<LLAccordionCtrlTab*>(tab)->getAccordionView()) != NULL;
+}
+// </ID>
+
 bool LLOutfitTabNameComparator::compare(const LLAccordionCtrlTab* tab1, const LLAccordionCtrlTab* tab2) const
 {
+    // <ID>
+    const bool folder1 = id_tab_is_folder(tab1);
+    const bool folder2 = id_tab_is_folder(tab2);
+    if (folder1 != folder2)
+    {
+        return folder1;
+    }
+    // </ID>
     return (LLStringUtil::compareDict(tab1->getTitle(), tab2->getTitle()) < 0);
 }
 
 bool LLOutfitTabFavComparator::compare(const LLAccordionCtrlTab* tab1, const LLAccordionCtrlTab* tab2) const
 {
+    // <ID>
+    const bool folder1 = id_tab_is_folder(tab1);
+    const bool folder2 = id_tab_is_folder(tab2);
+    if (folder1 != folder2)
+    {
+        return folder1;
+    }
+    // </ID>
     LLOutfitAccordionCtrlTab* taba = (LLOutfitAccordionCtrlTab*)tab1;
     LLOutfitAccordionCtrlTab* tabb = (LLOutfitAccordionCtrlTab*)tab2;
     if (taba->getFavorite() != tabb->getFavorite())
@@ -162,14 +191,23 @@ bool LLOutfitsList::postBuild()
 void LLOutfitsList::initComparator()
 {
     S32 mode = gSavedSettings.getS32("OutfitListSortOrder");
-    if (mode == 0)
+    const LLAccordionCtrl::LLTabComparator* comp = (mode == 0)
+        ? static_cast<const LLAccordionCtrl::LLTabComparator*>(&OUTFIT_TAB_NAME_COMPARATOR)
+        : static_cast<const LLAccordionCtrl::LLTabComparator*>(&OUTFIT_TAB_FAV_COMPARATOR);
+    mAccordion->setComparator(comp);
+
+    // <ID> Nested accordions need the same comparator, or subfolder contents sort in
+    // insertion order while the top level sorts properly.
+    for (std::map<LLUUID, LLAccordionCtrl*>::iterator it = mFolderAccordions.begin();
+         it != mFolderAccordions.end(); ++it)
     {
-        mAccordion->setComparator(&OUTFIT_TAB_NAME_COMPARATOR);
+        if (it->second)
+        {
+            it->second->setComparator(comp);
+        }
     }
-    else
-    {
-        mAccordion->setComparator(&OUTFIT_TAB_FAV_COMPARATOR);
-    }
+    // </ID>
+
     sortOutfits();
 }
 
@@ -200,6 +238,199 @@ void LLOutfitsList::onOpen(const LLSD& info)
 }
 
 
+// <ID> A folder tab survives the filter if its own name matches or any descendant outfit
+// survives. Recurses depth-first through inventory rather than through the accordion,
+// because LLAccordionCtrl keeps its tab vector private. Returns whether the tab is visible.
+bool LLOutfitsList::applyFilterToFolderTab(const LLUUID& cat_id,
+                                           LLOutfitAccordionCtrlTab* tab,
+                                           const std::string& filter_substring)
+{
+    if (!tab)
+    {
+        return false;
+    }
+
+    std::string title = tab->getTitle();
+    LLStringUtil::toUpper(title);
+    std::string cur_filter = filter_substring;
+    LLStringUtil::toUpper(cur_filter);
+
+    const bool self_matches = (std::string::npos != title.find(cur_filter));
+    bool any_child_visible = false;
+
+    LLInventoryModel::cat_array_t* cats = NULL;
+    LLInventoryModel::item_array_t* items = NULL;
+    gInventory.getDirectDescendentsOf(cat_id, cats, items);
+    if (cats)
+    {
+        for (const LLPointer<LLViewerInventoryCategory>& child : *cats)
+        {
+            const LLUUID child_id = child->getUUID();
+
+            std::map<LLUUID, LLOutfitAccordionCtrlTab*>::iterator folder_it = mFolderTabs.find(child_id);
+            if (folder_it != mFolderTabs.end())
+            {
+                if (applyFilterToFolderTab(child_id, folder_it->second, filter_substring))
+                {
+                    any_child_visible = true;
+                }
+                continue;
+            }
+
+            outfits_map_t::iterator outfit_it = mOutfitsMap.find(child_id);
+            if (outfit_it != mOutfitsMap.end())
+            {
+                applyFilterToTab(child_id, outfit_it->second, filter_substring);
+                if (outfit_it->second->getVisible())
+                {
+                    any_child_visible = true;
+                }
+            }
+        }
+    }
+
+    tab->setTitle(tab->getTitle(), cur_filter);
+    tab->setFilterGeneration(getFilterGeneration());
+    tab->setVisible(self_matches || any_child_visible);
+    return tab->getVisible();
+}
+
+// Where does this category's tab belong? Its parent folder's inner accordion if that
+// folder already has a tab, the top-level accordion if it sits at the root, or NULL
+// meaning "parent folder exists but has no tab yet" — the caller then defers.
+// <ID> The accordion that actually holds a tab, read from the view tree. Unlike
+// getParentAccordion this stays correct when inventory has already changed under the
+// tab (a move, or a delete that re-parented the category to Trash).
+static LLAccordionCtrl* id_owning_accordion(LLAccordionCtrlTab* tab)
+{
+    return tab ? dynamic_cast<LLAccordionCtrl*>(tab->getParent()) : NULL;
+}
+// </ID>
+
+LLAccordionCtrl* LLOutfitsList::getParentAccordion(const LLUUID& cat_id)
+{
+    LLViewerInventoryCategory* cat = gInventory.getCategory(cat_id);
+    if (!cat)
+    {
+        return mAccordion;
+    }
+    const LLUUID parent = cat->getParentUUID();
+    const LLUUID root = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
+    if (parent.isNull() || parent == root)
+    {
+        return mAccordion;
+    }
+    std::map<LLUUID, LLAccordionCtrl*>::iterator it = mFolderAccordions.find(parent);
+    return (it == mFolderAccordions.end()) ? NULL : it->second;
+}
+
+// A folder tab looks like an outfit tab but holds a nested accordion instead of a
+// wearable list.
+// <ID> A folder tab's body is an accordion, and LLAccordionCtrl::notifyParent swallows
+// "size_changes" — it schedules an arrange of its own children and returns without
+// forwarding. A nested outfit's wearable list reports its real height asynchronously
+// (when the list populates), and that report dies here, leaving the folder tab sized for
+// the stale height. This subclass tells the outfits list so it can resize the folder;
+// the folder tab's own handler then forwards upward, so nested folders propagate too.
+class IDFolderAccordionCtrl : public LLAccordionCtrl
+{
+public:
+    IDFolderAccordionCtrl(const Params& p) : LLAccordionCtrl(p) {}
+
+    void setContentSizeChangedCallback(std::function<void()> cb) { mContentSizeChangedCb = cb; }
+
+    S32 notifyParent(const LLSD& info) override
+    {
+        S32 handled = LLAccordionCtrl::notifyParent(info);
+        if (mContentSizeChangedCb && info.has("action") && info["action"].asString() == "size_changes")
+        {
+            mContentSizeChangedCb();
+        }
+        return handled;
+    }
+
+private:
+    std::function<void()> mContentSizeChangedCb;
+};
+// </ID>
+
+void LLOutfitsList::addFolderTab(LLViewerInventoryCategory* cat)
+{
+    if (!cat || mFolderAccordions.count(cat->getUUID()))
+    {
+        return;
+    }
+    const LLUUID cat_id = cat->getUUID();
+
+    LLAccordionCtrl* parent = getParentAccordion(cat_id);
+    if (!parent)
+    {
+        // Our own parent folder has no tab yet; it will flush us when it gets one.
+        mPendingChildren.insert(std::make_pair(cat->getParentUUID(), cat_id));
+        return;
+    }
+
+    outfit_accordion_tab_params tab_params(get_accordion_tab_params());
+    tab_params.cat_id = cat_id;
+    LLOutfitAccordionCtrlTab* tab = LLUICtrlFactory::create<LLOutfitAccordionCtrlTab>(tab_params);
+    if (!tab)
+    {
+        return;
+    }
+
+    LLAccordionCtrl::Params inner_params;
+    inner_params.name = "folder_accordion";
+    IDFolderAccordionCtrl* inner = LLUICtrlFactory::create<IDFolderAccordionCtrl>(inner_params);
+    inner->setContentSizeChangedCallback([this, cat_id]() { resizeFolderTab(cat_id); });
+    inner->setShape(tab->getLocalRect());
+    // Match the top level's ordering, including for folders created after initComparator.
+    inner->setComparator((gSavedSettings.getS32("OutfitListSortOrder") == 0)
+        ? static_cast<const LLAccordionCtrl::LLTabComparator*>(&OUTFIT_TAB_NAME_COMPARATOR)
+        : static_cast<const LLAccordionCtrl::LLTabComparator*>(&OUTFIT_TAB_FAV_COMPARATOR));
+    tab->addChild(inner);
+
+    const std::string name = cat->getName();
+    tab->setName(name);
+    tab->setTitle(name);
+    tab->setFavorite(cat->getIsFavorite());
+    tab->setDisplayChildren(false);
+
+    parent->addCollapsibleCtrl(tab);
+    mFolderAccordions[cat_id] = inner;
+    mFolderTabs[cat_id] = tab;
+
+    // Expanding or collapsing a folder changes how much room it needs, and nothing else
+    // recomputes that — without this the outer accordion keeps the collapsed height and
+    // the contents draw over whatever sits below.
+    tab->setDropDownStateChangedCallback([this](LLUICtrl*, const LLSD&)
+    {
+        arrange();
+    });
+
+    tab->setRightMouseDownCallback(boost::bind(&LLOutfitListBase::outfitRightClickCallBack, this,
+        _1, _2, _3, cat_id));
+
+    flushPendingChildren(cat_id);
+}
+
+// Re-run updateAddedCategory for anything that was waiting on this folder's tab.
+void LLOutfitsList::flushPendingChildren(const LLUUID& parent_id)
+{
+    std::vector<LLUUID> ready;
+    auto range = mPendingChildren.equal_range(parent_id);
+    for (auto it = range.first; it != range.second; ++it)
+    {
+        ready.push_back(it->second);
+    }
+    mPendingChildren.erase(parent_id);
+
+    for (const LLUUID& child : ready)
+    {
+        updateAddedCategory(child);
+    }
+}
+// </ID>
+
 void LLOutfitsList::updateAddedCategory(LLUUID cat_id)
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -214,6 +445,13 @@ void LLOutfitsList::updateAddedCategory(LLUUID cat_id)
         {
             observerCallback(outfits);
         });
+        // <ID> Render it as a nested tab instead of discarding it. The observer
+        // registration above is kept — it keeps nested contents live.
+        if (cat_id != outfits)
+        {
+            addFolderTab(cat);
+        }
+        // </ID>
         return;
     }
 
@@ -234,14 +472,25 @@ void LLOutfitsList::updateAddedCategory(LLUUID cat_id)
 
     // *TODO: LLUICtrlFactory::defaultBuilder does not use "display_children" from xml. Should be investigated.
     tab->setDisplayChildren(false);
-    mAccordion->addCollapsibleCtrl(tab);
+
+    // <ID> Place the outfit under its folder when it has one. A NULL target means the
+    // parent folder's tab has not been built yet, so defer until it is.
+    LLAccordionCtrl* target = getParentAccordion(cat_id);
+    if (!target)
+    {
+        mPendingChildren.insert(std::make_pair(cat->getParentUUID(), cat_id));
+        tab->die();
+        return;
+    }
+    target->addCollapsibleCtrl(tab);
+    // </ID>
 
     // Start observing the new outfit category.
     LLWearableItemsList* list = tab->getChild<LLWearableItemsList>("wearable_items_list");
     if (!mCategoriesObserver->addCategory(cat_id, boost::bind(&LLWearableItemsList::updateList, list, cat_id)))
     {
         // Remove accordion tab if category could not be added to observer.
-        mAccordion->removeCollapsibleCtrl(tab);
+        target->removeCollapsibleCtrl(tab); // was mAccordion
 
         // kill removed tab
         tab->die();
@@ -258,7 +507,18 @@ void LLOutfitsList::updateAddedCategory(LLUUID cat_id)
     tab->setFocusReceivedCallback(boost::bind(&LLOutfitListBase::ChangeOutfitSelection, this, list, cat_id));
 
     // Setting callback to reset items selection inside outfit on accordion collapsing and expanding (EXT-7875)
-    tab->setDropDownStateChangedCallback(boost::bind(&LLOutfitsList::resetItemSelection, this, list, cat_id));
+    // <ID> For a nested outfit the toggle also changes how much room its folder needs,
+    // and the inner accordion swallows the size_changes notify, so recompute here.
+    const bool nested = (target != mAccordion);
+    tab->setDropDownStateChangedCallback([this, list, cat_id, nested](LLUICtrl*, const LLSD&)
+    {
+        resetItemSelection(list, cat_id);
+        if (nested)
+        {
+            arrange();
+        }
+    });
+    // </ID>
 
     // Depending on settings, force showing list items that don't match current filter(EXT-7158)
     static LLCachedControl<bool> list_filter(gSavedSettings, "OutfitListFilterFullList");
@@ -315,6 +575,37 @@ void LLOutfitsList::updateAddedCategory(LLUUID cat_id)
 
 void LLOutfitsList::updateRemovedCategory(LLUUID cat_id)
 {
+    // <ID> A removed subfolder takes its tab and inner accordion with it. Its children are
+    // removed by the base's own diff, so nothing else needs re-parenting here.
+    {
+        std::map<LLUUID, LLOutfitAccordionCtrlTab*>::iterator folder_iter = mFolderTabs.find(cat_id);
+        if (folder_iter != mFolderTabs.end())
+        {
+            LLOutfitAccordionCtrlTab* folder_tab = folder_iter->second;
+            mCategoriesObserver->removeCategory(cat_id);
+            deselectOutfit(cat_id);
+            mFolderTabs.erase(folder_iter);
+            mFolderAccordions.erase(cat_id);
+            mPendingChildren.erase(cat_id);
+
+            // The owner must come from the view tree: for a deleted or moved category the
+            // inventory parent already points elsewhere, and removing from the wrong
+            // accordion leaves a dead pointer in the real owner's tab list.
+            LLAccordionCtrl* parent = id_owning_accordion(folder_tab);
+            if (!parent)
+            {
+                parent = mAccordion;
+            }
+            parent->removeCollapsibleCtrl(folder_tab);
+            if (folder_tab)
+            {
+                folder_tab->die();
+            }
+            return;
+        }
+    }
+    // </ID>
+
     outfits_map_t::iterator outfits_iter = mOutfitsMap.find(cat_id);
     if (outfits_iter != mOutfitsMap.end())
     {
@@ -331,8 +622,16 @@ void LLOutfitsList::updateRemovedCategory(LLUUID cat_id)
         // 3. Remove category UUID to accordion tab mapping.
         mOutfitsMap.erase(outfits_iter);
 
-        // 4. Remove outfit tab from accordion.
-        mAccordion->removeCollapsibleCtrl(tab);
+        // 4. Remove outfit tab from the accordion it actually lives in — read from the
+        // view tree, since inventory may already say Trash or a new folder.
+        // <ID> was unconditionally mAccordion, which silently no-ops for a nested tab
+        LLAccordionCtrl* owner = id_owning_accordion(tab);
+        if (!owner)
+        {
+            owner = mAccordion;
+        }
+        owner->removeCollapsibleCtrl(tab);
+        // </ID>
 
         // kill removed tab
         if (tab != NULL)
@@ -344,8 +643,135 @@ void LLOutfitsList::updateRemovedCategory(LLUUID cat_id)
 
 // <FS:Ansariel> Arrange accordions after all have been added
 //virtual
+// <ID> How deep is this folder under My Outfits? Used to size folders bottom-up, since a
+// parent's height depends on its children's final heights.
+S32 LLOutfitsList::getFolderDepth(const LLUUID& cat_id) const
+{
+    const LLUUID root = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
+    S32 depth = 0;
+    LLUUID walk = cat_id;
+    while (walk.notNull() && walk != root && depth < 64)
+    {
+        LLViewerInventoryCategory* cat = gInventory.getCategory(walk);
+        if (!cat)
+        {
+            break;
+        }
+        walk = cat->getParentUUID();
+        ++depth;
+    }
+    return depth;
+}
+
+
+// LLAccordionCtrlTab does not take its height from reshape() — setDisplayChildren()
+// re-derives the rect from mExpandedHeight, so a reshape is overwritten the moment a tab
+// is expanded or collapsed. The only channel that sets mExpandedHeight is a "size_changes"
+// notifyParent message, which is how LLFlatListView drives ordinary outfit tabs
+// (llflatlistview.cpp:1186). LLAccordionCtrl never sends it, so a nested accordion leaves
+// its folder tab stuck at creation height and the contents clip. Send it ourselves.
+void LLOutfitsList::resizeFolderTab(const LLUUID& cat_id)
+{
+    std::map<LLUUID, LLAccordionCtrl*>::iterator acc_it = mFolderAccordions.find(cat_id);
+    std::map<LLUUID, LLOutfitAccordionCtrlTab*>::iterator tab_it = mFolderTabs.find(cat_id);
+    if (acc_it == mFolderAccordions.end() || tab_it == mFolderTabs.end())
+    {
+        return;
+    }
+    LLAccordionCtrl* inner = acc_it->second;
+    LLOutfitAccordionCtrlTab* tab = tab_it->second;
+    if (!inner || !tab)
+    {
+        return;
+    }
+
+    S32 content_height = 0;
+    LLInventoryModel::cat_array_t* cats = NULL;
+    LLInventoryModel::item_array_t* items = NULL;
+    gInventory.getDirectDescendentsOf(cat_id, cats, items);
+    if (cats)
+    {
+        for (const LLPointer<LLViewerInventoryCategory>& child : *cats)
+        {
+            const LLUUID child_id = child->getUUID();
+
+            LLAccordionCtrlTab* child_tab = NULL;
+            std::map<LLUUID, LLOutfitAccordionCtrlTab*>::iterator f = mFolderTabs.find(child_id);
+            if (f != mFolderTabs.end())
+            {
+                child_tab = f->second;
+            }
+            else
+            {
+                outfits_map_t::iterator o = mOutfitsMap.find(child_id);
+                if (o != mOutfitsMap.end())
+                {
+                    child_tab = o->second;
+                }
+            }
+
+            if (child_tab && child_tab->getVisible())
+            {
+                content_height += child_tab->getRect().getHeight();
+            }
+        }
+    }
+
+    // The accordion needs more than the bare sum of its tabs, or it grows a scrollbar
+    // instead of letting the folder tab grow. Two margins are involved, both
+    // BORDER_MARGIN (2) in llaccordionctrl.cpp: calcRecuiredHeight() adds one to the sum
+    // when deciding whether to show a scrollbar, and arrangeMultiple() consumes another
+    // as a top inset before laying out the first tab. Those members are private, so the
+    // arithmetic has to be reproduced here rather than asked for.
+    static const S32 ACCORDION_BORDER_MARGIN = 2;
+    content_height += ACCORDION_BORDER_MARGIN * 2;
+
+    // The tab's handler clamps to a 10px floor and adds the header and padding itself, so
+    // pass the content height only.
+    content_height = llmax(content_height, 10);
+
+    // The message must go to the TAB, not the inner accordion: LLAccordionCtrl also
+    // overrides notifyParent and its "size_changes" branch swallows the message
+    // (llaccordionctrl.cpp:689) — it schedules an arrange of its own children and returns
+    // without forwarding, so a notify sent through the inner accordion never reaches the
+    // tab and mExpandedHeight never changes. Sent to the tab directly, its handler sets
+    // mExpandedHeight, reshapes (which cascades into the inner accordion via
+    // adjustContainerPanel), and forwards to the outer accordion to reposition siblings.
+    tab->notifyParent(LLSD().with("action", "size_changes").with("height", content_height));
+
+    // The reshape cascade above fixed the inner accordion's rect synchronously, but its
+    // children keep their old positions until an arrange runs — and the one the reshape
+    // scheduled is deferred to the next updateClass tick. Arrange now, inside the correct
+    // rect, so the children never render at stale coordinates.
+    inner->arrange();
+}
+// </ID>
+
 void LLOutfitsList::arrange()
 {
+    // <ID> Size folders bottom-up: a parent folder's height is the sum of its children's
+    // final heights, so the deepest must settle first. Arranging the outer accordion first
+    // would size every folder tab from a stale inner height — which is exactly the
+    // clipped, overlapping layout that nesting produces otherwise.
+    std::vector<std::pair<S32, LLUUID> > by_depth;
+    by_depth.reserve(mFolderAccordions.size());
+    for (std::map<LLUUID, LLAccordionCtrl*>::iterator it = mFolderAccordions.begin();
+         it != mFolderAccordions.end(); ++it)
+    {
+        by_depth.push_back(std::make_pair(getFolderDepth(it->first), it->first));
+    }
+    std::sort(by_depth.begin(), by_depth.end(),
+        [](const std::pair<S32, LLUUID>& a, const std::pair<S32, LLUUID>& b)
+        {
+            return a.first > b.first;
+        });
+
+    for (const std::pair<S32, LLUUID>& entry : by_depth)
+    {
+        resizeFolderTab(entry.second);
+    }
+    // </ID>
+
     if (mAccordion)
     {
         mAccordion->arrange();
@@ -476,6 +902,16 @@ bool LLOutfitListBase::isActionEnabled(const LLSD& userdata)
 {
     if (mSelectedOutfitUUID.isNull()) return false;
 
+    // <ID> A subfolder is not an outfit — every action below assumes it is one. Clicking a
+    // folder tile or tab routes through ChangeOutfitSelection like any other entry, so
+    // this is a real state, not a defensive one.
+    LLViewerInventoryCategory* selected_cat = gInventory.getCategory(mSelectedOutfitUUID);
+    if (selected_cat && !isOutfitFolder(selected_cat))
+    {
+        return false;
+    }
+    // </ID>
+
     const std::string command_name = userdata.asString();
     if (command_name == "delete")
     {
@@ -579,6 +1015,21 @@ bool LLOutfitsList::hasItemSelected()
 
 void LLOutfitsList::updateChangedCategoryName(LLViewerInventoryCategory *cat, std::string name)
 {
+    // <ID> Folder tabs are tracked separately from outfit tabs and rename too.
+    std::map<LLUUID, LLOutfitAccordionCtrlTab*>::iterator folder_iter = mFolderTabs.find(cat->getUUID());
+    if (folder_iter != mFolderTabs.end())
+    {
+        LLOutfitAccordionCtrlTab* folder_tab = folder_iter->second;
+        if (folder_tab)
+        {
+            folder_tab->setName(name);
+            folder_tab->setTitle(name);
+            folder_tab->setFavorite(cat->getIsFavorite());
+        }
+        return;
+    }
+    // </ID>
+
     outfits_map_t::iterator outfits_iter = mOutfitsMap.find(cat->getUUID());
     if (outfits_iter != mOutfitsMap.end())
     {
@@ -706,7 +1157,48 @@ void LLOutfitsList::onFilterSubStringChanged(const std::string& new_string, cons
         }
     }
 
-    mAccordion->arrange();
+    // <ID> The loop above walks mOutfitsMap only, so folder tabs would never be filtered
+    // and — worse — would never be made visible again once a filter was cleared. Handle
+    // them here. Only root-level folders are seeded: applyFilterToFolderTab recurses
+    // depth-first, so nested folders are reached with their children already resolved.
+    const LLUUID outfits_root = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
+    for (std::map<LLUUID, LLOutfitAccordionCtrlTab*>::iterator fit = mFolderTabs.begin();
+         fit != mFolderTabs.end(); ++fit)
+    {
+        LLOutfitAccordionCtrlTab* folder_tab = fit->second;
+        if (!folder_tab)
+        {
+            continue;
+        }
+
+        if (new_string.empty())
+        {
+            folder_tab->setVisible(true);
+            folder_tab->setTitle(folder_tab->getTitle());
+            continue;
+        }
+
+        LLViewerInventoryCategory* cat = gInventory.getCategory(fit->first);
+        if (cat && cat->getParentUUID() == outfits_root)
+        {
+            applyFilterToFolderTab(fit->first, folder_tab, new_string);
+        }
+    }
+
+    for (std::map<LLUUID, LLAccordionCtrl*>::iterator ait = mFolderAccordions.begin();
+         ait != mFolderAccordions.end(); ++ait)
+    {
+        if (ait->second)
+        {
+            ait->second->setFilterSubString(new_string);
+            ait->second->arrange();
+        }
+    }
+
+    // Filtering changes which nested tabs are visible, so folder heights must be
+    // recomputed; arrange() does that bottom-up and ends with mAccordion->arrange().
+    arrange();
+    // </ID>
 }
 
 void LLOutfitsList::applyFilterToTab(
@@ -716,6 +1208,17 @@ void LLOutfitsList::applyFilterToTab(
 {
     LL_PROFILE_ZONE_SCOPED;
     if (!tab) return;
+
+    // <ID> A folder tab's body is a nested accordion, not a wearable list, so it would
+    // fall straight through the dynamic_cast below and escape the filter entirely —
+    // visible, with every child hidden. Route it through the folder rule instead.
+    if (mFolderTabs.count(category_id))
+    {
+        applyFilterToFolderTab(category_id, tab, filter_substring);
+        return;
+    }
+    // </ID>
+
     LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
     if (!list) return;
 
@@ -883,8 +1386,93 @@ void LLOutfitsList::getCurrentCategories(uuid_vec_t& vcur)
 }
 
 
+// <ID> The refresh diff reports adds and removes only — a category whose PARENT changed
+// is in neither list, so after a move in inventory its tab would stay under the old
+// accordion forever (while the folder heights, computed from inventory truth, already
+// account for it). Sweep every known tab and rebuild the ones whose owning accordion no
+// longer matches inventory. Rebuild (remove + re-add) instead of moving the widget:
+// addCollapsibleCtrl wires callbacks bound to the owning accordion that cannot be
+// unhooked, and a migrated widget would keep firing into its old home.
+void LLOutfitsList::reparentMovedTabs()
+{
+    std::vector<LLUUID> moved_folders;
+    for (std::map<LLUUID, LLOutfitAccordionCtrlTab*>::iterator it = mFolderTabs.begin();
+         it != mFolderTabs.end(); ++it)
+    {
+        LLAccordionCtrl* desired = getParentAccordion(it->first);
+        if (desired && desired != id_owning_accordion(it->second))
+        {
+            moved_folders.push_back(it->first);
+        }
+    }
+
+    bool moved_any = false;
+
+    // Folders first: rebuilding one rebuilds its whole subtree, which may already fix
+    // outfits that moved along with it.
+    for (const LLUUID& folder_id : moved_folders)
+    {
+        LLInventoryModel::cat_array_t cats;
+        LLInventoryModel::item_array_t items;
+        LLIsType is_category(LLAssetType::AT_CATEGORY);
+        gInventory.collectDescendentsIf(folder_id, cats, items,
+                                        LLInventoryModel::EXCLUDE_TRASH, is_category);
+
+        // Children first: their views die with the folder tab, but the maps and observer
+        // registrations must be cleaned by the same path that created them.
+        for (const LLPointer<LLViewerInventoryCategory>& cat : cats)
+        {
+            updateRemovedCategory(cat->getUUID());
+        }
+        updateRemovedCategory(folder_id);
+
+        updateAddedCategory(folder_id);
+        for (const LLPointer<LLViewerInventoryCategory>& cat : cats)
+        {
+            // Ordering inside the subtree resolves itself: a child whose parent tab is
+            // not built yet parks in mPendingChildren and is flushed when it appears.
+            updateAddedCategory(cat->getUUID());
+        }
+        moved_any = true;
+    }
+
+    std::vector<LLUUID> moved_outfits;
+    for (outfits_map_t::iterator it = mOutfitsMap.begin(); it != mOutfitsMap.end(); ++it)
+    {
+        LLAccordionCtrl* desired = getParentAccordion(it->first);
+        if (desired && desired != id_owning_accordion(it->second))
+        {
+            moved_outfits.push_back(it->first);
+        }
+    }
+    for (const LLUUID& outfit_id : moved_outfits)
+    {
+        updateRemovedCategory(outfit_id);
+        updateAddedCategory(outfit_id);
+        moved_any = true;
+    }
+
+    if (moved_any)
+    {
+        arrange();
+    }
+}
+// </ID>
+
 void LLOutfitsList::sortOutfits()
 {
+    reparentMovedTabs();
+
+    // <ID> Sort nested contents too, or subfolders keep insertion order.
+    for (std::map<LLUUID, LLAccordionCtrl*>::iterator it = mFolderAccordions.begin();
+         it != mFolderAccordions.end(); ++it)
+    {
+        if (it->second)
+        {
+            it->second->sort();
+        }
+    }
+    // </ID>
     mAccordion->sort();
 }
 

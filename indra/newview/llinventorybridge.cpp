@@ -3229,6 +3229,17 @@ bool LLFolderBridge::dragCategoryIntoFolder(LLInventoryCategory* inv_cat,
                     tooltip_msg = LLTrans::getString("TooltipOutfitNotInInventory");
                     is_movable = false;
                 }
+                // <ID> An existing outfit, or a subfolder already inside My Outfits, is a
+                // plain relocation — the drop handler calls changeCategoryParent for these,
+                // so the outfit-creation content checks (item cap, wearable-only types)
+                // don't apply. Without this, outfits over WearFolderLimit or containing
+                // non-wearable links could never be moved back out of a subfolder.
+                else if (myoutfit_object_subfolder_type(model, cat_id, my_outifts_id) == MY_OUTFITS_OUTFIT ||
+                         myoutfit_object_subfolder_type(model, cat_id, my_outifts_id) == MY_OUTFITS_SUBFOLDER)
+                {
+                    is_movable = true;
+                }
+                // </ID>
                 else if (can_move_to_my_outfits_as_outfit(model, inv_cat, max_items_to_wear))
                 {
                     is_movable = true;
@@ -3268,6 +3279,17 @@ bool LLFolderBridge::dragCategoryIntoFolder(LLInventoryCategory* inv_cat,
                     is_movable = false;
                     tooltip_msg = LLTrans::getString("TooltipCantCreateOutfit");
                 }
+                // <ID> An existing outfit or organizer subfolder moving into a subfolder is
+                // a plain relocation (the drop handler calls changeCategoryParent for
+                // MY_OUTFITS_OUTFIT/MY_OUTFITS_SUBFOLDER sources) — skip the
+                // outfit-creation content checks, which reject outfits over
+                // WearFolderLimit or with non-wearable links.
+                else if (dest_res == MY_OUTFITS_SUBFOLDER &&
+                         (inv_res == MY_OUTFITS_OUTFIT || inv_res == MY_OUTFITS_SUBFOLDER))
+                {
+                    is_movable = true;
+                }
+                // </ID>
                 else if (can_move_to_my_outfits_as_outfit(model, inv_cat, max_items_to_wear))
                 {
                     is_movable = true;

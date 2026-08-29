@@ -457,6 +457,24 @@ private:
     typedef outfits_map_t::value_type                   outfits_map_value_t;
     outfits_map_t                   mOutfitsMap;
 
+    // <ID> Subfolder support. LLAccordionCtrl keeps its tab vector private with no
+    // accessor, so child tabs are resolved through these maps plus inventory rather than
+    // by walking the accordion.
+    std::map<LLUUID, LLAccordionCtrl*>          mFolderAccordions; // folder cat -> inner accordion
+    std::map<LLUUID, LLOutfitAccordionCtrlTab*> mFolderTabs;       // folder cat -> its tab
+    std::multimap<LLUUID, LLUUID>               mPendingChildren;  // parent cat -> child awaiting its parent's tab
+
+    LLAccordionCtrl* getParentAccordion(const LLUUID& cat_id);
+    S32  getFolderDepth(const LLUUID& cat_id) const;
+    void resizeFolderTab(const LLUUID& cat_id);
+    void reparentMovedTabs();
+    void addFolderTab(LLViewerInventoryCategory* cat);
+    void flushPendingChildren(const LLUUID& parent_id);
+    bool applyFilterToFolderTab(const LLUUID& cat_id,
+                                LLOutfitAccordionCtrlTab* tab,
+                                const std::string& filter_substring);
+    // </ID>
+
     // IDs of original items which are worn and linked in COF.
     // Used to monitor COF changes for updating items worn state. See EXT-8636.
     uuid_vec_t                      mCOFLinkedItems;
