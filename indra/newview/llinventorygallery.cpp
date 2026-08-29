@@ -3830,6 +3830,15 @@ bool dragCategoryIntoFolder(LLUUID dest_id, LLInventoryCategory* inv_cat,
                     tooltip_msg = LLTrans::getString("TooltipOutfitNotInInventory");
                     is_movable = false;
                 }
+                // <ID> An existing outfit, or a subfolder already inside My Outfits, is a
+                // plain relocation — the outfit-creation content checks (item cap,
+                // wearable-only types) don't apply.
+                else if (myoutfit_object_subfolder_type(model, cat_id, my_outifts_id) == MY_OUTFITS_OUTFIT ||
+                         myoutfit_object_subfolder_type(model, cat_id, my_outifts_id) == MY_OUTFITS_SUBFOLDER)
+                {
+                    is_movable = true;
+                }
+                // </ID>
                 else if (can_move_to_my_outfits_as_outfit(model, inv_cat, max_items_to_wear))
                 {
                     is_movable = true;
@@ -3869,6 +3878,14 @@ bool dragCategoryIntoFolder(LLUUID dest_id, LLInventoryCategory* inv_cat,
                     is_movable = false;
                     tooltip_msg = LLTrans::getString("TooltipCantCreateOutfit");
                 }
+                // <ID> An existing outfit or organizer subfolder moving into a subfolder is
+                // a plain relocation — skip the outfit-creation content checks.
+                else if (dest_res == MY_OUTFITS_SUBFOLDER &&
+                         (inv_res == MY_OUTFITS_OUTFIT || inv_res == MY_OUTFITS_SUBFOLDER))
+                {
+                    is_movable = true;
+                }
+                // </ID>
                 else if (can_move_to_my_outfits_as_outfit(model, inv_cat, max_items_to_wear))
                 {
                     is_movable = true;

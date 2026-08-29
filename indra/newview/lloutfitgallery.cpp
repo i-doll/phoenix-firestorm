@@ -158,6 +158,12 @@ void LLOutfitGallery::draw()
 
 bool LLOutfitGallery::handleKeyHere(KEY key, MASK mask)
 {
+    // <ID> A folder can be selected like any other tile, but Delete/rename/open all assume
+    // the selection is an outfit. Enter descends instead; the destructive keys do nothing.
+    LLOutfitGalleryItem* sel_item = getSelectedItem();
+    const bool folder_selected = (sel_item != NULL) && sel_item->isFolder();
+    // </ID>
+
     bool handled = false;
     switch (key)
     {
@@ -165,8 +171,17 @@ bool LLOutfitGallery::handleKeyHere(KEY key, MASK mask)
             // Open selected items if enter key hit on the inventory panel
             if (mask == MASK_NONE && mSelectedOutfitUUID.notNull())
             {
-                // Or should it wearSelectedOutfit?
-                getSelectedItem()->openOutfitsContent();
+                // <ID>
+                if (folder_selected)
+                {
+                    setCurrentFolder(mSelectedOutfitUUID);
+                }
+                else
+                // </ID>
+                {
+                    // Or should it wearSelectedOutfit?
+                    getSelectedItem()->openOutfitsContent();
+                }
             }
             handled = true;
             break;
@@ -176,7 +191,7 @@ bool LLOutfitGallery::handleKeyHere(KEY key, MASK mask)
 #endif
             // Delete selected items if delete or backspace key hit on the inventory panel
             // Note: on Mac laptop keyboards, backspace and delete are one and the same
-            if (mSelectedOutfitUUID.notNull())
+            if (mSelectedOutfitUUID.notNull() && !folder_selected) // <ID> never delete a folder from here
             {
                 onRemoveOutfit(mSelectedOutfitUUID);
             }
@@ -184,7 +199,10 @@ bool LLOutfitGallery::handleKeyHere(KEY key, MASK mask)
             break;
 
         case KEY_F2:
-            LLAppearanceMgr::instance().renameOutfit(mSelectedOutfitUUID);
+            if (!folder_selected) // <ID> renaming folders is the inventory floater's job
+            {
+                LLAppearanceMgr::instance().renameOutfit(mSelectedOutfitUUID);
+            }
             handled = true;
             break;
 
