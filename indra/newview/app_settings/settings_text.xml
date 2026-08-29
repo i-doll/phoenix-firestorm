@@ -561,6 +561,20 @@
     <integer>0</integer>
   </map>
 
+  <key>RenderAlphaBlendShadows</key>
+  <map>
+    <key>Comment</key>
+    <string>Render alpha-blended objects into shadow maps. Disabled by default because animated transparent effects are expensive shadow casters.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+    <key>Backup</key>
+    <integer>0</integer>
+  </map>
+
   <key>RenderFarClip</key>
   <map>
     <key>Comment</key>

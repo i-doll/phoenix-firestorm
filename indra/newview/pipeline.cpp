@@ -11165,6 +11165,13 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_RENDER);
     LL_PROFILE_GPU_ZONE("renderShadow");
 
+    // Alpha-blended surfaces are rendered once for every shadow map, despite
+    // their cutout shadows rarely being useful for effects such as rain,
+    // smoke, mist, and waterfalls. Keep the old behavior available for
+    // content that needs it, but avoid that repeated work by default.
+    static LLCachedControl<bool> render_alpha_blend_shadows(
+        gSavedSettings, "RenderAlphaBlendShadows", false);
+
     LLPipeline::sShadowRender = true;
 
     // disable occlusion culling during shadow render
@@ -11284,6 +11291,7 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                 renderMaskedObjects(LLRenderPass::PASS_ALPHA_MASK, true, true, rigged);
             }
 
+            if (render_alpha_blend_shadows)
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha blend");
                 LL_PROFILE_GPU_ZONE("shadow alpha blend");
