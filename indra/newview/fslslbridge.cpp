@@ -30,6 +30,8 @@
 #include "fscommon.h"
 #include "fslslbridge.h"
 #include "fslslbridgerequest.h"
+#include "idmcp.h"      // <ID> agent chat bridge facade
+#include "llbase64.h"   // <ID> encode/decode bridged chat payloads
 
 #include "apr_base64.h" // For getScriptInfo()
 #include "llagent.h"
@@ -55,7 +57,7 @@
 static const std::string FS_BRIDGE_FOLDER = "#LSL Bridge";
 static const std::string FS_BRIDGE_CONTAINER_FOLDER = "Landscaping";
 static const U32 FS_BRIDGE_MAJOR_VERSION = 2;
-static const U32 FS_BRIDGE_MINOR_VERSION = 29;
+static const U32 FS_BRIDGE_MINOR_VERSION = 30;  // <ID> bumped for agent chat bridge (ChatSend/ChatListen)
 static const U32 FS_MAX_MINOR_VERSION = 99;
 static const std::string UPLOAD_SCRIPT_CURRENT = "EBEDD1D2-A320-43f5-88CF-DD47BBCA5DFB.lsltxt";
 static const std::string FS_STATE_ATTRIBUTE = "state=";
@@ -547,6 +549,54 @@ bool FSLSLBridge::lslToViewer(std::string_view message, const LLUUID& fromID, co
     }
     // </FS:PP>
 
+    // <ID> Agent chat bridge: a message heard on an agent-opened listen, forwarded
+    // to the embedded MCP server. Payload is channel|senderKey|base64(name)|base64(msg).
+    else if (tag == "<bridgeChat>")
+    {
+        status = true;
+        static const std::string open_tag = "<bridgeChat>";
+        size_t p0 = message.find(open_tag) + open_tag.size();
+        size_t p1 = message.find("</bridgeChat>");
+        if (p1 != std::string::npos && p1 >= p0)
+        {
+            std::string payload(message.substr(p0, p1 - p0));
+            size_t a = payload.find('|');
+            size_t b = (a == std::string::npos) ? std::string::npos : payload.find('|', a + 1);
+            size_t c = (b == std::string::npos) ? std::string::npos : payload.find('|', b + 1);
+            if (c != std::string::npos)
+            {
+                S32         chan = atoi(payload.substr(0, a).c_str());
+                LLUUID      from(payload.substr(a + 1, b - a - 1));
+                std::string name = LLBase64::decodeAsString(payload.substr(b + 1, c - b - 1));
+                std::string text = LLBase64::decodeAsString(payload.substr(c + 1));
+                idmcp::onBridgeChat(chan, from, name, text);
+            }
+        }
+    }
+    // <ID> Agent chat bridge: open/close/error status for a requested listen.
+    else if (tag == "<bridgeChatOpened " || tag == "<bridgeChatClosed " || tag == "<bridgeChatError ")
+    {
+        status = true;
+        S32    chan   = 0;
+        size_t cp     = message.find("channel=");
+        if (cp != std::string::npos)
+        {
+            chan = atoi(std::string(message.substr(cp + 8)).c_str());  // atoi stops at '>'/space
+        }
+        std::string err;
+        if (tag == "<bridgeChatError ")
+        {
+            size_t ep = message.find("error=");
+            if (ep != std::string::npos)
+            {
+                size_t ee = message.find('>', ep);
+                size_t len = (ee == std::string::npos ? message.size() : ee) - (ep + 6);
+                err = std::string(message.substr(ep + 6, len));
+            }
+        }
+        idmcp::onBridgeChatStatus(tag == "<bridgeChatOpened ", chan, err);
+    }
+
     return status;
 }
 
@@ -575,6 +625,39 @@ bool FSLSLBridge::viewerToLSL(std::string_view message, Callback_t aCallback)
     LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpPost(mCurrentURL, LLSD(message.data()), pCallback, FSLSLBridgeRequest_Failure);
 
     return true;
+}
+
+// <ID> Agent chat bridge: drive the bridge script's arbitrary-channel chat so the
+// embedded MCP server can reach in-world scripts / RLV relays on channels the
+// viewer itself cannot use (negative / protocol channels).
+bool FSLSLBridge::sendChatViaBridge(S32 channel, const std::string& type, const std::string& message)
+{
+    if (!canUseBridge())
+    {
+        return false;
+    }
+    // Base64 the message so '|' / '<' / '>' in it can't collide with the command
+    // delimiter or the reply tags; the bridge llBase64ToString's it before saying.
+    const std::string b64 = LLBase64::encode(reinterpret_cast<const U8*>(message.data()), message.size());
+    return viewerToLSL(llformat("ChatSend|%d|%s|%s", channel, type.c_str(), b64.c_str()));
+}
+
+bool FSLSLBridge::listenViaBridge(S32 channel, F32 seconds)
+{
+    if (!canUseBridge())
+    {
+        return false;
+    }
+    return viewerToLSL(llformat("ChatListen|%d|%d", channel, (S32)seconds));
+}
+
+bool FSLSLBridge::stopListenViaBridge(const std::string& channelOrAll)
+{
+    if (!canUseBridge())
+    {
+        return false;
+    }
+    return viewerToLSL("ChatStopListen|" + channelOrAll);
 }
 
 bool FSLSLBridge::updateBoolSettingValue(const std::string& msgVal)

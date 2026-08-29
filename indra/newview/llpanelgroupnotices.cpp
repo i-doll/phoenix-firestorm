@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llpanelgroupnotices.h"
+#include "idmcp.h" // <ID> Embedded MCP server (stable facade)
 
 #include "llview.h"
 
@@ -484,6 +485,8 @@ std::map<LLUUID,LLPanelGroupNotices*> LLPanelGroupNotices::sInstances;
 // static
 void LLPanelGroupNotices::processGroupNoticesListReply(LLMessageSystem* msg, void** data)
 {
+    idmcp::onGroupNoticesListReply(msg); // <ID> MCP group notices
+
     LLUUID group_id;
     msg->getUUID("AgentData", "GroupID", group_id);
 
