@@ -89,6 +89,7 @@
 #include "llscriptfloater.h"
 #include "llscriptruntimeperms.h"
 #include "llselectmgr.h"
+#include "idmcp.h"  // <ID> embedded MCP server facade
 #include "llstartup.h"
 #include "llsky.h"
 #include "llslurl.h"
@@ -4890,6 +4891,11 @@ void process_object_properties(LLMessageSystem *msg, void**user_data)
     }
 
     PermissionsTracker::instance().objectPropertiesCallback(msg);
+
+    // <ID> forward full object properties (names) to the embedded MCP server
+    // (avatars.getWorn name resolution). The Family variant does not answer for
+    // other avatars' attachments, so we use the full ObjectProperties reply.
+    idmcp::onObjectProperties(msg);
 }
 // </FS:Techwolf Lupindo> area search
 

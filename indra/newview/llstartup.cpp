@@ -94,6 +94,7 @@
 
 #include "llappviewer.h"
 #include "llstartup.h"
+#include "idmcp.h" // <ID> Embedded MCP server (stable facade)
 
 #if LL_VELOPACK && LL_WINDOWS
 #include "llvelopack.h"
@@ -3476,6 +3477,8 @@ bool idle_startup()
 
         LLStartUp::setStartupState( STATE_STARTED );
         do_startup_frame();
+
+        idmcp::startupInit(); // <ID> Embedded MCP server: start if enabled (off by default)
 
         // <FS:Ansariel> Draw Distance stepping; originally based on SpeedRez by Henri Beauchamp, licensed under LGPL
         if (gSavedSettings.getBOOL("FSRenderFarClipStepping"))

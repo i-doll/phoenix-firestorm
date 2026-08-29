@@ -1,8 +1,9 @@
 # Firestorm fork — custom RLVa commands
 
 Reference for the RLVa commands **added by this fork** — author **Five** (Amalthea
-Skydancer) and **Trish**. Stock RLVa (Kitty Barnett) and upstream Firestorm commands
-are **not** documented here.
+Skydancer) and **Trish** — plus any stock command whose **behaviour** this fork
+extends (see *Extended stock commands*). Stock RLVa (Kitty Barnett) and upstream
+Firestorm commands are otherwise **not** documented here.
 
 Attribution below is by **commit authorship** (`git log --author`), which is
 authoritative — not `git blame` (merge/reformat commits reassign lines to upstream)
@@ -236,3 +237,33 @@ flag: `@interact`, `@touchhud`, `@tprequest`, `@accepttprequest`, `@findfolders`
 Also authored by Five but **not new commands**: `d2223c4a1a` ("Auto accept give to
 #RLV" — the `RestrainedLoveAutoAcceptGiveToRLV` setting) and `04f8a3f85c` /
 `0bcf0f055d` (a `@viewtransparent` enforcement fix and the `BHVR_EXTENDED` flagging).
+
+---
+
+# Extended stock commands
+
+Stock RLVa commands whose scope this fork **widens**. A restraint author working
+from the upstream RLVa spec will not expect the extra behaviour documented here.
+
+## `@edit` — extended to inventory content
+
+- **Syntax:** `@edit=n|y` · unchanged; still `NONE_OR_EXCEPTION`.
+- **Stock behaviour:** blocks editing **in-world objects** — the build tools, the
+  edit floater and object selection. `RlvActions::canEdit` takes an
+  `LLViewerObject*` (`rlvactions.cpp:698`) or an `ERlvCheckType` (`:668`); the
+  toggle handler drives the build floater (`rlvhandler.cpp:2099`).
+- **Fork extension:** additionally blocks **authoring inventory content** through
+  the embedded MCP server — `gesture.create`, `gesture.write`, `wearable.create`
+  and `wearable.write` return the structured RLV denial while `@edit` is active.
+- **Not affected:** reads. `gesture.read`, `gesture.list` and `wearable.read`
+  follow `@showinv`, as the rest of the inventory tools do. `gesture.play` is
+  governed by `@sendgesture` (enforced inside `LLGestureMgr`, `llgesturemgr.cpp:557`).
+- **Deliberate gap:** a worn wearable held by an RLV lock is still rewritable while
+  `@edit` is off — the lock governs detaching, not content. Content protection
+  requires `@edit`. This was considered and chosen, not overlooked.
+- **Enforced at:** `idmcptools_gesture.cpp` and `idmcptools_wearable.cpp` — the
+  request-phase `gate_edit` on all four tools, plus a re-check in `gesture.write`
+  before its deferred upload is enqueued (`idmcp_gesture_upload`), covering a
+  restriction that arrives during the async gesture-asset load. There is no
+  post-completion check: once a side effect has landed, reporting it blocked
+  would be a false negative.

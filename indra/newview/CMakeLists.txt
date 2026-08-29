@@ -90,6 +90,25 @@ set(viewer_SOURCE_FILES
     idsenderhighlight.cpp  # <ID> Sender-based chat highlighting
     idkeywordhighlight.cpp  # <ID> Keyword-based chat highlighting
     idfloaterkeywordcolors.cpp  # <ID> Keyword color settings floater
+    idmcpserver.cpp  # <ID> Embedded MCP server
+    idmcpconnection.cpp  # <ID> Embedded MCP server: connection
+    idmcprlvgate.cpp  # <ID> Embedded MCP server: RLV gate
+    idmcptools_inventory.cpp  # <ID> Embedded MCP server: inventory tools
+    idmcptools_appearance.cpp  # <ID> Embedded MCP server: appearance tools
+    idmcptools_gesture.cpp  # <ID> Embedded MCP server: gesture authoring tools
+    idmcptools_wearable.cpp  # <ID> Embedded MCP server: wearable authoring tools
+    idmcptools_profile.cpp  # <ID> Embedded MCP server: profile tools
+    idsearchmodel.cpp  # <ID> Embedded MCP server: headless dir search
+    idmcptools_avatars.cpp  # <ID> Embedded MCP server: nearby-avatar inspection
+    idmcptools_manage.cpp  # <ID> Embedded MCP server: inventory organize/give
+    idmcptools_groups.cpp  # <ID> Embedded MCP server: group interactions
+    idmcptools_upload.cpp  # <ID> Embedded MCP server: asset upload tools
+    idmcptools_chat.cpp  # <ID> Embedded MCP server: bridge-mediated in-world chat
+    idmcptools_movement.cpp  # <ID> Embedded MCP server: teleport/sit/stand/location/touch
+    idmcptools_vision.cpp  # <ID> Embedded MCP server: viewport snapshot
+    idmcptools_im.cpp  # <ID> Embedded MCP server: 1:1 instant messaging
+    idmcptools_notifications.cpp  # <ID> Embedded MCP server: offers/dialogs responder
+    idmcptools_money.cpp  # <ID> Embedded MCP server: L$ balance + guarded pay
     alfloaterregiontracker.cpp
     animationexplorer.cpp
     ao.cpp
@@ -957,6 +976,13 @@ set(viewer_HEADER_FILES
 # <Add FS includes below this line>
     idsenderhighlight.h  # <ID> Sender-based chat highlighting
     idkeywordhighlight.h  # <ID> Keyword-based chat highlighting
+    idmcp.h  # <ID> Embedded MCP server: stable facade
+    idmcpserver.h  # <ID> Embedded MCP server
+    idmcpconnection.h  # <ID> Embedded MCP server: connection
+    idmcptoolregistry.h  # <ID> Embedded MCP server: tool registry
+    idmcprlvgate.h  # <ID> Embedded MCP server: RLV gate
+    idmcptools.h  # <ID> Embedded MCP server: tool registration
+    idsearchmodel.h  # <ID> Embedded MCP server: headless dir search
     idfloaterkeywordcolors.h  # <ID> Keyword color settings floater
     alfloaterregiontracker.h
     animationexplorer.h

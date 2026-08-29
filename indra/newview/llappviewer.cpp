@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llappviewer.h"
+#include "idmcp.h" // <ID> Embedded MCP server (stable facade)
 
 // Viewer includes
 #include "llversioninfo.h"
@@ -6904,6 +6905,8 @@ void LLAppViewer::disconnectViewer()
     // Save snapshot for next time, if we made it through initialization
 
     LL_INFOS() << "Disconnecting viewer!" << LL_ENDL;
+
+    idmcp::shutdown(); // <ID> Stop the embedded MCP server before viewer teardown
 
     // Dump our frame statistics
 

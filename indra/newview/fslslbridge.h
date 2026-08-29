@@ -68,6 +68,13 @@ public:
     bool lslToViewer(std::string_view message, const LLUUID& fromID, const LLUUID& ownerID);
     bool viewerToLSL(std::string_view message, Callback_t = nullptr);
 
+    // <ID> Agent chat bridge (MCP): drive the bridge script's arbitrary-channel
+    // chat send/listen so the embedded MCP server can talk to in-world scripts /
+    // RLV relays on channels the viewer itself cannot use.
+    bool sendChatViaBridge(S32 channel, const std::string& type, const std::string& message);
+    bool listenViaBridge(S32 channel, F32 seconds);
+    bool stopListenViaBridge(const std::string& channelOrAll);
+
     bool updateBoolSettingValue(const std::string& msgVal);
     bool updateBoolSettingValue(const std::string& msgVal, bool contentVal);
     void updateIntegrations();

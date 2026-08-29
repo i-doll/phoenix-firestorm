@@ -31,6 +31,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llpaneldirbrowser.h"
+#include "idmcp.h" // <ID> Embedded MCP server (stable facade)
 
 // linden library includes
 #include "lldir.h"
@@ -415,6 +416,7 @@ void LLPanelDirBrowser::showEvent(const U32 event_id)
 void LLPanelDirBrowser::processDirPeopleReply(LLMessageSystem *msg, void**)
 {
     FSPanelSearchPeople::processSearchReply(msg, nullptr); // <FS:Ansariel> FS legacy search
+    idmcp::onDirPeopleReply(msg); // <ID> MCP search
 
     LLUUID query_id;
     std::string first_name;
@@ -500,6 +502,7 @@ void LLPanelDirBrowser::processDirPeopleReply(LLMessageSystem *msg, void**)
 void LLPanelDirBrowser::processDirPlacesReply(LLMessageSystem* msg, void**)
 {
     FSPanelSearchPlaces::processSearchReply(msg, nullptr); // <FS:Ansariel> FS legacy search
+    idmcp::onDirPlacesReply(msg); // <ID> MCP search
 
     LLUUID  agent_id;
     LLUUID  query_id;
@@ -587,6 +590,7 @@ void LLPanelDirBrowser::processDirPlacesReply(LLMessageSystem* msg, void**)
 void LLPanelDirBrowser::processDirEventsReply(LLMessageSystem* msg, void**)
 {
     FSPanelSearchEvents::processSearchReply(msg, nullptr); // <FS:Ansariel> FS legacy search
+    idmcp::onDirEventsReply(msg); // <ID> MCP search
 
     LLUUID agent_id;
     LLUUID query_id;
@@ -710,6 +714,7 @@ void LLPanelDirBrowser::processDirEventsReply(LLMessageSystem* msg, void**)
 void LLPanelDirBrowser::processDirGroupsReply(LLMessageSystem* msg, void**)
 {
     FSPanelSearchGroups::processSearchReply(msg, nullptr); // <FS:Ansariel> FS legacy search
+    idmcp::onDirGroupsReply(msg); // <ID> MCP search
 
     S32 i;
 
@@ -794,6 +799,7 @@ void LLPanelDirBrowser::processDirGroupsReply(LLMessageSystem* msg, void**)
 void LLPanelDirBrowser::processDirClassifiedReply(LLMessageSystem* msg, void**)
 {
     FSPanelSearchClassifieds::processSearchReply(msg, nullptr); // <FS:Ansariel> FS legacy search
+    idmcp::onDirClassifiedReply(msg); // <ID> MCP search
 
     S32 i;
     S32 num_new_rows;
@@ -875,6 +881,7 @@ void LLPanelDirBrowser::processDirClassifiedReply(LLMessageSystem* msg, void**)
 void LLPanelDirBrowser::processDirLandReply(LLMessageSystem *msg, void**)
 {
     FSPanelSearchLand::processSearchReply(msg, nullptr); // <FS:Ansariel> FS legacy search
+    idmcp::onDirLandReply(msg); // <ID> MCP search
 
     LLUUID agent_id;
     LLUUID query_id;
