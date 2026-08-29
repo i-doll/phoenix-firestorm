@@ -7,7 +7,7 @@
 //
 
 // Bridge platform
-string BRIDGE_VERSION = "2.29"; // This should match fslslbridge.cpp
+string BRIDGE_VERSION = "2.30"; // This should match fslslbridge.cpp
 string gLatestURL;
 integer gViewerIsFirestorm;
 integer gTryHandshakeOnce = TRUE;
@@ -39,6 +39,13 @@ integer AO_CHANNEL_LM = -8888;
 integer gAO_ListenerOC;
 integer gAO_ListenerLM;
 key gAO_CollarKey;
+
+// <ID> Agent chat bridge (MCP): dynamic listens the agent opens on arbitrary channels.
+// The viewer drives expiry (sends ChatStopListen at the deadline); the on-bridge
+// expiry below is a lazy crash-backstop. gIdListens is stride 3: [channel, handle, expiry].
+integer ID_MAX_LISTENS = 4;    // hard cap on concurrent agent listens (protects llListen slots)
+integer ID_MAX_SECS    = 120;  // max on-bridge lifetime backstop, seconds
+list    gIdListens;
 
 //
 // Bridge platform helper functions
@@ -161,6 +168,57 @@ movelockMe(integer lock)
 }
 
 //
+// <ID> Agent chat bridge helpers
+//
+
+integer idFindListen(integer chan)
+{
+    integer i = llGetListLength(gIdListens) - 3;
+    for (; i >= 0; i -= 3)
+    {
+        if (llList2Integer(gIdListens, i) == chan)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+idSweepListens()
+{
+    integer now = llGetUnixTime();
+    integer i = llGetListLength(gIdListens) - 3;
+    for (; i >= 0; i -= 3)
+    {
+        if (llList2Integer(gIdListens, i + 2) <= now)
+        {
+            llListenRemove(llList2Integer(gIdListens, i + 1));
+            gIdListens = llDeleteSubList(gIdListens, i, i + 2);
+        }
+    }
+}
+
+idRemoveListen(integer chan)
+{
+    integer i = idFindListen(chan);
+    if (i >= 0)
+    {
+        llListenRemove(llList2Integer(gIdListens, i + 1));
+        gIdListens = llDeleteSubList(gIdListens, i, i + 2);
+    }
+}
+
+idClearListens()
+{
+    integer i = llGetListLength(gIdListens) - 3;
+    for (; i >= 0; i -= 3)
+    {
+        llListenRemove(llList2Integer(gIdListens, i + 1));
+    }
+    gIdListens = [];
+}
+
+//
 // MAIN
 //
 
@@ -195,6 +253,7 @@ default
             llSetTimerEvent(0);
             flightHover(FALSE);
             movelockMe(FALSE);
+            idClearListens();   // <ID> drop any stale agent listens on (re)attach
 
             // Check VM version
             if (llGetMemoryLimit() <= 16384)
@@ -396,6 +455,7 @@ default
                 // Firestorm viewer and handshake
                 llOwnerSay("<bridgeURL>" + gLatestURL + "</bridgeURL><bridgeAuth>BRIDGEKEY</bridgeAuth><bridgeVer>" + BRIDGE_VERSION + "</bridgeVer>");
                 gTryHandshakeOnce = FALSE;
+                idClearListens();   // <ID> viewer (re)connected -> drop orphaned agent listens
             }
             else
             {
@@ -572,6 +632,61 @@ default
                 }
             }
 
+            else if (cmd == "ChatSend")
+            {
+                // <ID> agent chat: say a (base64-wrapped) message on any channel.
+                // Base64 avoids '|' collisions with the command delimiter.
+                integer chan = (integer)llList2String(commandList, 1);
+                string  ctype = llList2String(commandList, 2);
+                string  cmsg  = llBase64ToString(llList2String(commandList, 3));
+                if (ctype == "whisper")    llWhisper(chan, cmsg);
+                else if (ctype == "shout") llShout(chan, cmsg);
+                else                       llSay(chan, cmsg);
+            }
+
+            else if (cmd == "ChatListen")
+            {
+                // <ID> agent chat: open a bounded listen on a channel. ChatListen|channel|seconds
+                idSweepListens();
+                integer chan = (integer)llList2String(commandList, 1);
+                integer secs = (integer)llList2String(commandList, 2);
+                if (secs <= 0)          secs = 30;
+                if (secs > ID_MAX_SECS) secs = ID_MAX_SECS;
+                integer at = idFindListen(chan);
+                if (at >= 0)
+                {
+                    // Already listening: just refresh the expiry.
+                    gIdListens = llListReplaceList(gIdListens, [llGetUnixTime() + secs], at + 2, at + 2);
+                    llOwnerSay("<bridgeChatOpened channel=" + (string)chan + ">");
+                }
+                else if (llGetListLength(gIdListens) / 3 >= ID_MAX_LISTENS)
+                {
+                    llOwnerSay("<bridgeChatError channel=" + (string)chan + " error=toomanylistens>");
+                }
+                else
+                {
+                    integer h = llListen(chan, "", NULL_KEY, "");
+                    gIdListens += [chan, h, llGetUnixTime() + secs];
+                    llOwnerSay("<bridgeChatOpened channel=" + (string)chan + ">");
+                }
+            }
+
+            else if (cmd == "ChatStopListen")
+            {
+                // <ID> agent chat: close a listen (channel), or all. ChatStopListen|channel|all
+                string what = llList2String(commandList, 1);
+                if (what == "all")
+                {
+                    idClearListens();
+                    llOwnerSay("<bridgeChatClosed channel=all>");
+                }
+                else
+                {
+                    idRemoveListen((integer)what);
+                    llOwnerSay("<bridgeChatClosed channel=" + what + ">");
+                }
+            }
+
             else if (cmd == "URL Confirmed")
             {
                 // We're in the right viewer, go on.
@@ -644,6 +759,14 @@ default
             {
                 aoState("off");
             }
+        }
+
+        // <ID> agent chat bridge: forward messages heard on an agent-opened listen
+        // to the viewer. Payload is channel|senderKey|base64(name)|base64(msg).
+        else if (idFindListen(fromChan) >= 0)
+        {
+            llOwnerSay("<bridgeChat>" + (string)fromChan + "|" + (string)senderID + "|" +
+                       llStringToBase64(senderName) + "|" + llStringToBase64(msg) + "</bridgeChat>");
         }
 
     }
