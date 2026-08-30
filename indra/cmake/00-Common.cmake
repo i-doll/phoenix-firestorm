@@ -249,7 +249,10 @@ if (LINUX OR DARWIN)
     # -Wno-error=sfinae-incomplete: LLInitParam's Lazy<> forward references touch
     # IsSortable<T> SFINAE before the referenced types are defined (see llxuiparser.cpp
     # Sequence/Group/Element); GCC 15 promotes this to an error by default.
-    add_compile_options(-Wno-stringop-truncation -Wno-parentheses -Wno-maybe-uninitialized -Wno-error=array-bounds -Wno-error=sfinae-incomplete)
+    # -Wno-error=stringop-overflow: same speculative-devirtualization false positive
+    # as array-bounds, seen with GCC 16 inlining VHACDAsyncImpl accessors through an
+    # IVHACD* that it proved points at the smaller VHACDImpl (llconvexdecompositionvhacd.cpp).
+    add_compile_options(-Wno-stringop-truncation -Wno-parentheses -Wno-maybe-uninitialized -Wno-error=array-bounds -Wno-error=sfinae-incomplete -Wno-error=stringop-overflow)
   endif()
 
   if (NOT GCC_DISABLE_FATAL_WARNINGS AND NOT CLANG_DISABLE_FATAL_WARNINGS)
