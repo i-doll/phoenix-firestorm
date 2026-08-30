@@ -1530,7 +1530,13 @@ const LLVector3 LLVOAvatar::getRenderPosition() const
     }
     else
     {
-        return getPosition() * mDrawable->getParent()->getRenderMatrix();
+        LLDrawable* parentp = mDrawable->getParent();
+        if (!parentp)
+        {
+            // Parented at the object level but the parent drawable doesn't exist (yet)
+            return getPositionAgent();
+        }
+        return getPosition() * parentp->getRenderMatrix();
     }
 }
 
@@ -9122,6 +9128,12 @@ void LLVOAvatar::sitOnObject(LLViewerObject *sit_object)
 
     if (mDrawable.isNull())
     {
+        return;
+    }
+    if (sit_object->mDrawable.isNull())
+    {
+        // Seat has no drawable (delayed creation or already dead); the
+        // render-relative sit transform can't be computed against it.
         return;
     }
     LLQuaternion inv_obj_rot = ~sit_object->getRenderRotation();
