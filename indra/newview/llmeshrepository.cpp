@@ -4382,6 +4382,14 @@ void LLMeshRepository::shutdown()
 
     mUploads.clear();
 
+    for (const auto& entry : mDecompositionMap)
+    {
+        delete entry.second;
+    }
+    mDecompositionMap.clear();
+    mDecompositionLastAccess.clear();
+    sCacheBytesDecomps = 0;
+
     delete mMeshMutex;
     mMeshMutex = NULL;
 
@@ -4779,6 +4787,26 @@ void LLMeshRepository::notifyLoadedMeshes()
 
     if (mSkinInfoCullTimer.checkExpirationAndReset(10.f))
     {
+        constexpr F64 DECOMPOSITION_CACHE_LIFETIME = 120.0;
+        const F64 now = LLFrameTimer::getElapsedSeconds();
+
+        for (auto iter = mDecompositionMap.begin(); iter != mDecompositionMap.end();)
+        {
+            const auto access_iter = mDecompositionLastAccess.find(iter->first);
+            if (access_iter == mDecompositionLastAccess.end() ||
+                now - access_iter->second >= DECOMPOSITION_CACHE_LIFETIME)
+            {
+                sCacheBytesDecomps -= iter->second->sizeBytes();
+                delete iter->second;
+                mDecompositionLastAccess.erase(iter->first);
+                iter = mDecompositionMap.erase(iter);
+            }
+            else
+            {
+                ++iter;
+            }
+        }
+
         //// Clean up dead skin info
         //U64Bytes skinbytes(0);
         for (auto iter = mSkinMap.begin(), ender = mSkinMap.end(); iter != ender;)
@@ -5005,6 +5033,7 @@ void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decom
         sCacheBytesDecomps += iter->second->sizeBytes();
         delete decomp;
     }
+    mDecompositionLastAccess[decomp_id] = LLFrameTimer::getElapsedSeconds();
 
     if (physics_mesh)
     {
@@ -5150,6 +5179,7 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
         if (iter != mDecompositionMap.end())
         {
             decomp = iter->second;
+            mDecompositionLastAccess[mesh_id] = LLFrameTimer::getElapsedSeconds();
         }
 
         //decomposition block hasn't been fetched yet
@@ -5179,6 +5209,7 @@ LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id
         if (iter != mDecompositionMap.end())
         {
             ret = iter->second;
+            mDecompositionLastAccess[mesh_id] = LLFrameTimer::getElapsedSeconds();
         }
 
         //decomposition block hasn't been fetched yet

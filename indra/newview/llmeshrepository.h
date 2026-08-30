@@ -957,6 +957,7 @@ public:
 
     typedef std::map<LLUUID, LLModel::Decomposition*> decomposition_map;
     decomposition_map mDecompositionMap;
+    std::map<LLUUID, F64> mDecompositionLastAccess;
 
     LLMutex*                    mMeshMutex;
 
@@ -1018,4 +1019,3 @@ const F32 ANIMATED_OBJECT_BASE_COST = 15.0f;
 const F32 ANIMATED_OBJECT_COST_PER_KTRI = 1.5f;
 
 #endif
-

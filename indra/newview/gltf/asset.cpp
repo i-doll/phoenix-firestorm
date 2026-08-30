@@ -693,6 +693,70 @@ Asset::Asset(const Value& src)
     *this = src;
 }
 
+Asset::Asset(const Asset& src)
+{
+    *this = src;
+}
+
+Asset& Asset::operator=(const Asset& src)
+{
+    if (this != &src)
+    {
+        releaseGLResources();
+
+        mScenes = src.mScenes;
+        mNodes = src.mNodes;
+        mMeshes = src.mMeshes;
+        mMaterials = src.mMaterials;
+        mBuffers = src.mBuffers;
+        mBufferViews = src.mBufferViews;
+        mTextures = src.mTextures;
+        mSamplers = src.mSamplers;
+        mImages = src.mImages;
+        mAccessors = src.mAccessors;
+        mAnimations = src.mAnimations;
+        mSkins = src.mSkins;
+        mExtensionsUsed = src.mExtensionsUsed;
+        mExtensionsRequired = src.mExtensionsRequired;
+        mVersion = src.mVersion;
+        mGenerator = src.mGenerator;
+        mMinVersion = src.mMinVersion;
+        mCopyright = src.mCopyright;
+        mScene = src.mScene;
+        mExtras = src.mExtras;
+        mPendingBuffers = src.mPendingBuffers;
+        mFilename = src.mFilename;
+        mLastUpdateTime = src.mLastUpdateTime;
+        mRenderData[0] = src.mRenderData[0];
+        mRenderData[1] = src.mRenderData[1];
+        mLoadIntoVRAM = src.mLoadIntoVRAM;
+        mUnsupportedExtensions = src.mUnsupportedExtensions;
+        mIgnoredExtensions = src.mIgnoredExtensions;
+    }
+
+    return *this;
+}
+
+Asset::~Asset()
+{
+    releaseGLResources();
+}
+
+void Asset::releaseGLResources()
+{
+    if (mNodesUBO)
+    {
+        glDeleteBuffers(1, &mNodesUBO);
+        mNodesUBO = 0;
+    }
+
+    if (mMaterialsUBO)
+    {
+        glDeleteBuffers(1, &mMaterialsUBO);
+        mMaterialsUBO = 0;
+    }
+}
+
 bool Asset::load(std::string_view filename, bool loadIntoVRAM)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_GLTF;
@@ -835,6 +899,8 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
 
 const Asset& Asset::operator=(const Value& src)
 {
+    releaseGLResources();
+
     if (src.is_object())
     {
         const object& obj = src.as_object();
@@ -1470,5 +1536,4 @@ const Sampler& Sampler::operator=(const Value& src)
 
     return *this;
 }
-
 

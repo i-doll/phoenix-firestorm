@@ -1026,6 +1026,10 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
                 LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("SMAABuffer"); // <FS:Beq/> improve Tracy scoping 
                 if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA, false)) return false;
             }
+            else
+            {
+                mSMAABlendBuffer.release();
+            }
         }
         else
         {
@@ -1394,6 +1398,7 @@ void LLPipeline::releaseGLBuffers()
     mPostPongMap.release();
 
     mFXAAMap.release();
+    mSMAABlendBuffer.release();
 
     mUIScreen.release();
 

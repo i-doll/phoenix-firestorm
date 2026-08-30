@@ -398,6 +398,12 @@ void LLGLSLShader::unloadInternal()
         mSamplesQuery = 0;
     }
 
+    if (mPrimitivesQuery)
+    {
+        glDeleteQueries(1, &mPrimitivesQuery);
+        mPrimitivesQuery = 0;
+    }
+
     //hack to make apple not complain
     glGetError();
 
