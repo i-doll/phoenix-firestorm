@@ -4562,7 +4562,10 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     done_water_haze   = done_water_haze || low_detail_probe;
 
     sOITPass = 0;
-    const bool use_wboit = RenderOITWeighted && !LLPipeline::sRenderingHUDs && !gCubeSnapshot;
+    // Impostor generation renders into its own small target but mOITBuffer shares depth with
+    // the main screen; letting WBOIT run there would write OIT state (and, with the depth-mask
+    // pre-pass, main-screen depth) mid-impostor. Impostors keep legacy alpha.
+    const bool use_wboit = RenderOITWeighted && !LLPipeline::sRenderingHUDs && !gCubeSnapshot && !LLPipeline::sImpostorRender;
     const bool has_composite_shader = gOITCompositeProgram.mProgramObject != 0;
     const bool has_screen_triangle = mScreenTriangleVB.notNull();
     bool oit_targets_ready = mOITBuffer.isComplete() && mOITBuffer.getNumTextures() >= 2;
@@ -4750,6 +4753,15 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
                 sRenderRiggedAlpha = true;
                 sRenderNonRiggedAlpha = !rigged_only_wboit;
+
+                // Depth-mask pre-pass: render the OIT geometry once with depth writes on;
+                // shaders discard fragments below OIT_DEPTH_MASK_ALPHA_MIN and color writes
+                // are masked off, so effectively-opaque alpha (dense hair cards, near-opaque
+                // clothing layers) lands in the shared depth buffer. The weighted passes then
+                // depth-cull whatever lies behind it instead of averaging it through.
+                mOITBuffer.bindTarget();
+                render_alpha_pass(3);
+                mOITBuffer.flush();
 
                 if (supports_dual_blend)
                 {
