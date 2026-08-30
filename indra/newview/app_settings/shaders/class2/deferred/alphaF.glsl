@@ -336,6 +336,18 @@ void main()
         // The other output is inactive in this pass; write zeros for clarity.
         frag_color = vec4(0.0);
     }
+    else if (uOITPass == OIT_PASS_DEPTH_MASK)
+    {
+        // Depth-only pre-pass: fragments that are effectively opaque write
+        // depth so weighted accumulation cannot blend surfaces behind them
+        // through them. Color writes are masked off by the caller.
+        if (out_color.a < OIT_DEPTH_MASK_ALPHA_MIN)
+        {
+            discard;
+        }
+        frag_color = vec4(0.0);
+        frag_reveal = vec4(0.0);
+    }
     else
     {
         if (uPremultAlpha != 0)
