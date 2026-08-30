@@ -81,6 +81,14 @@ U32         gAgentPauseSerialNum = 0;
 //
 const S32 WORLD_PATCH_SIZE = 16;
 
+static LLTrace::BlockTimerStatHandle FTM_ENABLE_SIMULATOR("Enable Simulator");
+static LLTrace::BlockTimerStatHandle FTM_ADD_REGION("Add Region");
+static LLTrace::BlockTimerStatHandle FTM_UPDATE_WATER_OBJECTS("Update Edge Water");
+static LLTrace::CountStatHandle<S32> sSimulatorEnableMessages("simulator_enable_messages", "Simulator enable messages processed"),
+                                     sRegionsAdded("regions_added", "Regions created"),
+                                     sTerrainNeighborConnections("terrain_neighbor_connections", "Terrain neighbor connections"),
+                                     sHoleWaterObjectsCreated("hole_water_objects_created", "Hole water objects created");
+
 extern LLColor4U MAX_WATER_COLOR;
 // <FS:CR> Aurora Sim
 extern std::string SYSTEM_FROM;
@@ -520,6 +528,7 @@ void LLWorld::updateLimits()
 
 LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host, const U32 &region_size_x, const U32 &region_size_y)
 {
+    LL_RECORD_BLOCK_TIME(FTM_ADD_REGION);
     // <AW: opensim-limits>
     if(mLimitsNeedRefresh)
     {
@@ -617,6 +626,7 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host,
     F32 width = getRegionWidthInMeters();
 
     LLViewerRegion *neighborp;
+    S32 neighbor_connection_count = 0;
 // <FS:CR> Aurora Sim
     LLViewerRegion *last_neighborp;
 // </FS:CR> Aurora Sim
@@ -646,6 +656,7 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host,
                 //LL_INFOS() << "Connecting " << region_x << ":" << region_y << " -> " << adj_x << ":" << adj_y << LL_ENDL;
                 regionp->connectNeighbor(neighborp, dir);
                 last_neighborp = neighborp;
+                ++neighbor_connection_count;
             }
 
             if(dir == NORTHEAST ||
@@ -663,6 +674,9 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host,
     }
 
     updateWaterObjects();
+
+    LLTrace::add(sRegionsAdded, 1);
+    LLTrace::add(sTerrainNeighborConnections, neighbor_connection_count);
 
 // <AW: opensim-limits>
     if(mLimitsNeedRefresh)
@@ -1350,6 +1364,8 @@ void LLWorld::clearEdgeWaterObjects()
 
 void LLWorld::updateWaterObjects()
 {
+    LL_RECORD_BLOCK_TIME(FTM_UPDATE_WATER_OBJECTS);
+    S32 hole_water_count = 0;
     if (!gAgent.getRegion())
     {
         return;
@@ -1431,6 +1447,7 @@ void LLWorld::updateWaterObjects()
 // </FS:CR> Fix water height on regions larger than 2048x2048
                 gPipeline.createObject(waterp);
                 mHoleWaterObjects.push_back(waterp);
+                ++hole_water_count;
             }
         }
     }
@@ -1506,6 +1523,8 @@ void LLWorld::updateWaterObjects()
 
         gObjectList.updateActive(waterp);
     }
+
+    LLTrace::add(sHoleWaterObjectsCreated, hole_water_count);
 }
 
 
@@ -1585,6 +1604,8 @@ void LLWorld::disconnectRegions()
 void process_enable_simulator(LLMessageSystem *msg, void **user_data)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    LL_RECORD_BLOCK_TIME(FTM_ENABLE_SIMULATOR);
+    LLTrace::add(sSimulatorEnableMessages, 1);
     // enable the appropriate circuit for this simulator and
     // add its values into the gSimulator structure
     U64     handle;

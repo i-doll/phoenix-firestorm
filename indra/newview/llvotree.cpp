@@ -355,7 +355,7 @@ U32 LLVOTree::processUpdateMessage(LLMessageSystem *mesgsys,
 
 void LLVOTree::idleUpdate(LLAgent &agent, const F64 &time)
 {
-    if (mDead || !(gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_TREE)))
+    if (mDead || mDrawable.isNull() || !(gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_TREE)))
     {
         return;
     }
@@ -1251,4 +1251,3 @@ LLTreePartition::LLTreePartition(LLViewerRegion* regionp)
     mSlopRatio = 0.f;
     mLODPeriod = 1;
 }
-
