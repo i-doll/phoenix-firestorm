@@ -91,7 +91,7 @@ bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType fi
     LL_PROFILE_ZONE_COLOR(tracy::Color::Gold); // <FS:Beq> measure cache performance
     const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
 
-    LLFile::remove(filename.c_str(), suppress_error);
+    LLFile::remove(filename.c_str(), suppress_error == 0 ? ENOENT : suppress_error);
 
     return true;
 }

@@ -35,6 +35,7 @@
 
 #include "lltimer.h"
 #include "httpstats.h"
+#include "llhttpconstants.h"
 
 namespace
 {
@@ -401,11 +402,21 @@ bool HttpPolicy::stageAfterCompletion(const HttpOpRequest::ptr_t &op)
     // This op is done, finalize it delivering it to the reply queue...
     if (! op->mStatus)
     {
-        LL_WARNS(LOG_CORE) << "HTTP request " << op->getHandle()
-                           << " failed after " << op->mPolicyRetries
-                           << " retries.  Reason:  " << op->mStatus.toString()
-                           << " (" << op->mStatus.toTerseString() << ")"
-                           << LL_ENDL;
+        if (op->mStatus.getType() == HTTP_NOT_MODIFIED)
+        {
+            LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
+                                << " returned Not Modified after " << op->mPolicyRetries
+                                << " retries."
+                                << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS(LOG_CORE) << "HTTP request " << op->getHandle()
+                               << " failed after " << op->mPolicyRetries
+                               << " retries.  Reason:  " << op->mStatus.toString()
+                               << " (" << op->mStatus.toTerseString() << ")"
+                               << LL_ENDL;
+        }
     }
     else if (op->mPolicyRetries)
     {

@@ -273,11 +273,21 @@ void HttpCoroHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRespons
         result = LLSD::emptyMap();
         LLCore::HttpStatus::type_enum_t errType = status.getType();
 
-        LL_WARNS("CoreHTTP")
-            << "Possible failure [" << status.toTerseString() << "] cannot "<< response->getRequestMethod()
-            << " url '" << response->getRequestURL()
-            << "' because " << status.toString()
-            << LL_ENDL;
+        if (status.getType() == HTTP_NOT_MODIFIED)
+        {
+            LL_DEBUGS("CoreHTTP")
+                << "HTTP 304 Not Modified for " << response->getRequestMethod()
+                << " url '" << response->getRequestURL() << "'"
+                << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS("CoreHTTP")
+                << "Possible failure [" << status.toTerseString() << "] cannot "<< response->getRequestMethod()
+                << " url '" << response->getRequestURL()
+                << "' because " << status.toString()
+                << LL_ENDL;
+        }
         if ((errType >= 400) && (errType < 500))
         {
             LLSD body = this->parseBody(response, parseSuccess);
