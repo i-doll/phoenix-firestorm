@@ -4456,6 +4456,12 @@ U32 LLVOVolume::getRenderCost(texture_cost_t &textures) const
     U32 media_faces = 0;
 
     const LLDrawable* drawablep = mDrawable;
+    if (!drawablep)
+    {
+        // With RenderDelayCreation, a linkset child can be parented before its
+        // drawable exists; it contributes no render cost until then.
+        return 0;
+    }
     S32 num_faces = drawablep->getNumFaces();
 
     const LLVolumeParams& volume_params = getVolume()->getParams();
