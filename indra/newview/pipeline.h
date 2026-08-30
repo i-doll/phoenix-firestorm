@@ -824,6 +824,15 @@ public:
     LLVector4               mSunOrthoClipPlanes;
     LLVector2               mScreenScale;
 
+    // A complete sun-shadow set may be reused briefly while the camera is
+    // moving quickly. Keep the last observed camera state separate from the
+    // matrices so every reused set remains internally coherent.
+    LLVector3               mLastSunShadowCameraAt;
+    LLVector3               mLastSunShadowCameraOrigin;
+    F32                     mLastSunShadowCameraFOV = 0.f;
+    bool                    mSunShadowHistoryValid = false;
+    U8                      mSunShadowFramesSkipped = 0;
+
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;
     // Optional pre-alpha depth snapshot for RLVa sphere post effect.

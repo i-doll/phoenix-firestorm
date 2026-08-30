@@ -1491,6 +1491,8 @@ void LLPipeline::releaseScreenBuffers()
 void LLPipeline::releaseSunShadowTarget(U32 index)
 {
     llassert(index < 4);
+    mSunShadowHistoryValid = false;
+    mSunShadowFramesSkipped = 0;
     mRT->shadow[index].release();
 }
 
@@ -2394,7 +2396,9 @@ void LLPipeline::updateMove()
         LLTrace::sample(sRetexturedBacklog, (S32)mRetexturedList.size());
     }
 
-    updateMovedList(mMovedList, getUpdateTimeBudget());
+    // Motion is correctness-critical: EARLY_MOVE must be cleared this frame,
+    // and an active drawable already on this list must not miss newer updates.
+    updateMovedList(mMovedList);
     LLTrace::sample(sMovedDrawableBacklog, (S32)mMovedList.size());
 
     //balance octrees
@@ -2903,26 +2907,6 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         gGL.setColorMask(true, true);
     }
 
-    if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot)
-    {
-        gGL.setColorMask(false, false);
-        LLGLDepthTest depth(GL_TRUE, GL_FALSE);
-        LLGLDisable cull(GL_CULL_FACE);
-
-        gOcclusionCubeProgram.bind();
-
-        if (mCubeVB.isNull())
-        { //cube VB will be used for issuing occlusion queries
-            mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX);
-        }
-        mCubeVB->setBuffer();
-
-        mHeroProbeManager.doOcclusion();
-        gOcclusionCubeProgram.unbind();
-
-        gGL.setColorMask(true, true);
-    }
-
     if (LLPipeline::sUseOcclusion > 1 &&
         (sCull->hasOcclusionGroups() || LLVOCachePartition::sNeedsOcclusionCheck))
     {
@@ -3168,8 +3152,10 @@ void LLPipeline::updateGeom(F32 max_dtime)
     LLTrace::add(sDrawableGeomRebuilds, rebuild_count);
     LLTrace::sample(sDrawableGeomBacklog, (S32)mBuildQ1.size());
 
-    const F32 move_budget = llmax(0.f, max_dtime - static_cast<F32>(update_timer.getElapsedTimeF32()));
-    updateMovedList(mMovedBridge, move_budget);
+    // Keep spatial bridges in sync with their moving drawables.  Deferring
+    // this leaves their partitions at a stale transform and can make objects
+    // appear frozen or cull incorrectly.
+    updateMovedList(mMovedBridge);
 }
 
 void LLPipeline::markVisible(LLDrawable *drawablep, LLCamera& camera)
@@ -3512,28 +3498,33 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
     }
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("StateSort: visible groups");
-    for (LLCullResult::sg_iterator iter = sCull->beginVisibleGroups(); iter != sCull->endVisibleGroups(); ++iter)
-    {
-        LLSpatialGroup* group = *iter;
-        if (group->isDead())
+        // stateSort() can discover child bridge groups.  Read the group by
+        // index each time so mVisibleGroups may grow and reallocate safely.
+        for (U32 visible_group_index = 0;
+             visible_group_index < sCull->getVisibleGroupsSize();
+             ++visible_group_index)
         {
-            continue;
-        }
-        group->checkOcclusion();
-        if (sUseOcclusion > 1 && group->isOcclusionState(LLSpatialGroup::OCCLUDED))
-        {
-            markOccluder(group);
-        }
-        else
-        {
-            group->setVisible();
-            stateSort(group, camera);
+            LLSpatialGroup* group = sCull->getVisibleGroup(visible_group_index);
+            if (group->isDead())
+            {
+                continue;
+            }
+            group->checkOcclusion();
+            if (sUseOcclusion > 1 && group->isOcclusionState(LLSpatialGroup::OCCLUDED))
+            {
+                markOccluder(group);
+            }
+            else
+            {
+                group->setVisible();
+                stateSort(group, camera);
 
-            { //rebuild mesh as soon as we know it's visible
-                group->rebuildMesh();
+                { //rebuild mesh as soon as we know it's visible
+                    group->rebuildMesh();
+                }
             }
         }
-    }}
+    }
 
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWABLE("stateSort"); // LL_RECORD_BLOCK_TIME(FTM_STATESORT_DRAWABLE);
@@ -11473,6 +11464,51 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         return;
     }
 
+    // Sun-shadow generation performs four complete cull-and-render passes.
+    // During rapid camera movement, keep the last complete set for one frame
+    // instead of introducing a large frame-time spike.  Do not use this for probe
+    // snapshots or camera-offset rendering, which require their own matrices.
+    static LLCachedControl<bool> adaptive_shadow_updates(
+        gSavedSettings, "RenderAdaptiveShadowUpdates", true);
+    static LLCachedControl<F32> adaptive_shadow_pan_degrees(
+        gSavedSettings, "RenderAdaptiveShadowPanDegrees", 2.f);
+    static LLCachedControl<F32> adaptive_shadow_move_meters(
+        gSavedSettings, "RenderAdaptiveShadowMoveMeters", 0.5f);
+    static LLCachedControl<F32> adaptive_shadow_zoom_degrees(
+        gSavedSettings, "RenderAdaptiveShadowZoomDegrees", 1.f);
+    static LLCachedControl<U32> adaptive_shadow_max_skips(
+        gSavedSettings, "RenderAdaptiveShadowMaxSkippedFrames", 1);
+
+    const LLVector3 camera_at = camera.getAtAxis();
+    const LLVector3 camera_origin = camera.getOrigin();
+    const F32 camera_fov = camera.getView();
+    const F32 pan_degrees = llclamp((F32)adaptive_shadow_pan_degrees, 0.f, 180.f);
+    const F32 move_meters = llmax((F32)adaptive_shadow_move_meters, 0.f);
+    const F32 zoom_degrees = llmax((F32)adaptive_shadow_zoom_degrees, 0.f);
+    const bool rapid_pan = mSunShadowHistoryValid &&
+                           pan_degrees > 0.f &&
+                           camera_at * mLastSunShadowCameraAt < cosf(pan_degrees * DEG_TO_RAD);
+    const bool rapid_move = mSunShadowHistoryValid &&
+                            move_meters > 0.f &&
+                            (camera_origin - mLastSunShadowCameraOrigin).lengthSquared() > move_meters * move_meters;
+    const bool rapid_zoom = mSunShadowHistoryValid &&
+                            zoom_degrees > 0.f &&
+                            fabsf(camera_fov - mLastSunShadowCameraFOV) > zoom_degrees * DEG_TO_RAD;
+    const bool rapid_camera_motion = rapid_pan || rapid_move || rapid_zoom;
+
+    if (adaptive_shadow_updates &&
+        !gCubeSnapshot &&
+        !CameraOffset &&
+        rapid_camera_motion &&
+        mSunShadowFramesSkipped < adaptive_shadow_max_skips)
+    {
+        mLastSunShadowCameraAt = camera_at;
+        mLastSunShadowCameraOrigin = camera_origin;
+        mLastSunShadowCameraFOV = camera_fov;
+        ++mSunShadowFramesSkipped;
+        return;
+    }
+
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE; //LL_RECORD_BLOCK_TIME(FTM_GEN_SUN_SHADOW);
     LL_PROFILE_GPU_ZONE("generateSunShadow");
 
@@ -11617,6 +11653,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
         if (fp.empty())
         {
+            mSunShadowHistoryValid = false;
+            mSunShadowFramesSkipped = 0;
+
             if (!hasRenderDebugMask(RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
             {
                 mShadowCamera[0] = main_camera;
@@ -12244,6 +12283,15 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     set_last_projection(last_projection);
 
     popRenderTypeMask();
+
+    if (!gCubeSnapshot && mSunDiffuse != LLColor4::black)
+    {
+        mLastSunShadowCameraAt = camera_at;
+        mLastSunShadowCameraOrigin = camera_origin;
+        mLastSunShadowCameraFOV = camera_fov;
+        mSunShadowHistoryValid = true;
+        mSunShadowFramesSkipped = 0;
+    }
 
     if (!skip_avatar_update)
     {
@@ -13090,6 +13138,9 @@ void LLPipeline::restoreHiddenObject( const LLUUID& id )
 
 void LLPipeline::skipRenderingShadows()
 {
+    mSunShadowHistoryValid = false;
+    mSunShadowFramesSkipped = 0;
+
     LLGLDepthTest depth(GL_TRUE);
 
     for (S32 j = 0; j < 4; j++)
