@@ -917,8 +917,16 @@ void LLMotionController::updateMotions(bool force_update)
 void LLMotionController::updateMotionsMinimal()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-    // Always update mPrevTimerElapsed
-    mPrevTimerElapsed = mTimer.getElapsedTimeF32();
+    // Keep the animation clock moving while the pose work is skipped. Without
+    // this, an avatar resumes from its old animation phase after being hidden.
+    const F32 cur_time = mTimer.getElapsedTimeF32();
+    const F32 delta_time = cur_time - mPrevTimerElapsed;
+    mPrevTimerElapsed = cur_time;
+    mLastTime = mAnimTime;
+    if (!mPaused)
+    {
+        mAnimTime += delta_time * mTimeFactor * mUpdateFactor;
+    }
 
     purgeExcessMotions();
     updateLoadingMotions();
