@@ -88,9 +88,13 @@ public:
         LL_PROFILE_ZONE_SCOPED;
         init(drawablep, objp);
     }
-    ~LLFace()  { destroy(); }
+    ~LLFace();
 
-    const LLMatrix4& getWorldMatrix()   const   { return mVObjp->getWorldMatrix(mXform); }
+    const LLMatrix4& getWorldMatrix()   const
+    {
+        static const LLMatrix4 identity_matrix;
+        return mVObjp.notNull() ? mVObjp->getWorldMatrix(mXform) : identity_matrix;
+    }
     const LLMatrix4& getRenderMatrix() const;
     U32             getIndicesCount()   const   { return mIndicesCount; };
     S32             getIndicesStart()   const   { return mIndicesIndex; };

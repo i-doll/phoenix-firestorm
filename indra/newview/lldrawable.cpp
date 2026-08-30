@@ -237,7 +237,8 @@ LLVOVolume* LLDrawable::getVOVolume() const
 
 const LLMatrix4& LLDrawable::getRenderMatrix() const
 {
-    return isRoot() ? getWorldMatrix() : getParent()->getWorldMatrix();
+    LLDrawable* parent = getParent();
+    return isRoot() || !parent ? getWorldMatrix() : parent->getWorldMatrix();
 }
 
 bool LLDrawable::isLight() const
@@ -1278,7 +1279,8 @@ LLSpatialPartition* LLDrawable::getSpatialPartition()
     }
     else
     {
-        retval = getParent()->getSpatialPartition();
+        LLDrawable* parent = getParent();
+        retval = parent ? parent->getSpatialPartition() : gPipeline.getSpatialPartition(mVObjp);
     }
 
     if (retval && mSpatialBridge.notNull())
@@ -1346,7 +1348,18 @@ void LLSpatialBridge::updateSpatialExtents()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
 
+    if (!mDrawable || mDrawable->isDead() || !mOctree)
+    {
+        markDead();
+        return;
+    }
+
     LLSpatialGroup* root = (LLSpatialGroup*) mOctree->getListener(0);
+    if (!root)
+    {
+        markDead();
+        return;
+    }
 
     root->rebound();
 
@@ -1415,12 +1428,21 @@ void LLSpatialBridge::updateSpatialExtents()
 
 void LLSpatialBridge::updateBinRadius()
 {
-    setBinRadius(llmin( mOctree->getSize()[0]*0.5f, 256.f));
+    if (mOctree)
+    {
+        setBinRadius(llmin( mOctree->getSize()[0]*0.5f, 256.f));
+    }
 }
 
 LLCamera LLSpatialBridge::transformCamera(LLCamera& camera)
 {
     LLCamera ret = camera;
+    if (!mDrawable || mDrawable->isDead())
+    {
+        markDead();
+        return ret;
+    }
+
     LLXformMatrix* mat = mDrawable->getXform();
     LLVector3 center = LLVector3(0,0,0) * mat->getWorldMatrix();
 
@@ -1449,6 +1471,14 @@ LLCamera LLSpatialBridge::transformCamera(LLCamera& camera)
 
 void LLSpatialBridge::transformExtents(const LLVector4a* src, LLVector4a* dst)
 {
+    if (!mDrawable || mDrawable->isDead())
+    {
+        markDead();
+        dst[0] = src[0];
+        dst[1] = src[1];
+        return;
+    }
+
     LLMatrix4 mat = mDrawable->getXform()->getWorldMatrix();
     mat.invert();
 
@@ -1519,6 +1549,12 @@ void LLSpatialBridge::setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* 
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
 
+    if (!mDrawable || mDrawable->isDead() || !mOctree)
+    {
+        markDead();
+        return;
+    }
+
     if (!gPipeline.hasRenderType(mDrawableType))
     {
         return;
@@ -1535,6 +1571,11 @@ void LLSpatialBridge::setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* 
         if (parent)
         {
             LLViewerObject* objparent = parent->getVObj();
+            if (!objparent || !objparent->mDrawable)
+            {
+                return;
+            }
+
             av = objparent->mDrawable;
             LLSpatialGroup* group = av->getSpatialGroup();
 
@@ -1566,6 +1607,11 @@ void LLSpatialBridge::setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* 
 
 
     LLSpatialGroup* group = (LLSpatialGroup*) mOctree->getListener(0);
+    if (!group)
+    {
+        markDead();
+        return;
+    }
     group->rebound();
 
     LLVector4a center;
@@ -1600,8 +1646,11 @@ void LLSpatialBridge::setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* 
                      iter != child_list.end(); iter++)
                 {
                     LLViewerObject* child = *iter;
-                    LLDrawable* drawable = child->mDrawable;
-                    results->push_back(drawable);
+                    LLDrawable* drawable = child ? child->mDrawable.get() : nullptr;
+                    if (drawable && !drawable->isDead())
+                    {
+                        results->push_back(drawable);
+                    }
                 }
             }
         }
@@ -1618,7 +1667,7 @@ void LLSpatialBridge::updateDistance(LLCamera& camera_in, bool force_update)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
 
-    if (mDrawable == NULL)
+    if (!mDrawable || mDrawable->isDead())
     {
         markDead();
         return;
@@ -1673,11 +1722,18 @@ void LLSpatialBridge::move(LLDrawable *drawablep, LLSpatialGroup *curp, bool imm
 
 bool LLSpatialBridge::updateMove()
 {
-    llassert_always(mDrawable);
-    llassert_always(mDrawable->mVObjp);
-    llassert_always(mDrawable->getRegion());
+    if (!mDrawable || mDrawable->isDead() || !mDrawable->mVObjp || !mDrawable->getRegion() || !mOctree)
+    {
+        markDead();
+        return true;
+    }
+
     LLSpatialPartition* part = mDrawable->getRegion()->getSpatialPartition(mPartitionType);
-    llassert_always(part);
+    if (!part)
+    {
+        markDead();
+        return true;
+    }
 
     mOctree->balance();
     if (part)
@@ -1705,11 +1761,11 @@ void LLSpatialBridge::cleanupReferences()
             for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
                  iter != child_list.end(); iter++)
             {
-                LLViewerObject* child = *iter;
-                LLDrawable* drawable = child->mDrawable;
-                if (drawable)
-                {
-                    drawable->setGroup(NULL);
+            LLViewerObject* child = *iter;
+            LLDrawable* drawable = child ? child->mDrawable.get() : nullptr;
+            if (drawable)
+            {
+                drawable->setGroup(NULL);
                 }
                 }
             }
@@ -1839,4 +1895,3 @@ void LLHUDBridge::shiftPos(const LLVector4a& vec)
 {
     //don't shift hud bridges on region crossing
 }
-

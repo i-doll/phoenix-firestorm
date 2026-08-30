@@ -6120,7 +6120,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
     LLViewerObject *vobj = NULL;
     LLVOVolume *vol_obj = NULL;
 
-    if (bridge)
+    if (bridge && bridge->mDrawable)
     {
         vobj = bridge->mDrawable->getVObj();
         vol_obj = dynamic_cast<LLVOVolume*>(vobj);
@@ -6978,7 +6978,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                     }
 
                     //face has no texture index
-                    facep->mDrawInfo = NULL;
+                    facep->setDrawInfo(NULL);
                     facep->setTextureIndex(FACE_DO_NOT_BATCH_TEXTURES);
 
                     if (geom_count + facep->getGeomCount() > max_vertices)

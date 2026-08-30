@@ -48,6 +48,7 @@
 #include "llviewertexturelist.h"
 #include "llvopartgroup.h"
 #include "llvovolume.h"
+#include "llspatialpartition.h"
 #include "pipeline.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
@@ -71,6 +72,11 @@ bool LLFace::sSafeRenderSelect = true; // false
 
 
 #define DOTVEC(a,b) (a.mV[0]*b.mV[0] + a.mV[1]*b.mV[1] + a.mV[2]*b.mV[2])
+
+LLFace::~LLFace()
+{
+    destroy();
+}
 
 /*
 For each vertex, given:
@@ -227,6 +233,10 @@ void LLFace::destroy()
         }
     }
 
+    if (mDrawInfo)
+    {
+        mDrawInfo->mModelMatrix = nullptr;
+    }
     setDrawInfo(NULL);
 
     mDrawablep = NULL;
@@ -514,6 +524,12 @@ U16 LLFace::getGeometry(LLStrider<LLVector3> &vertices, LLStrider<LLVector3> &no
 
 void LLFace::updateCenterAgent()
 {
+    if (!mDrawablep)
+    {
+        mCenterAgent = mCenterLocal;
+        return;
+    }
+
     if (mDrawablep->isActive())
     {
         mCenterAgent = mCenterLocal * getRenderMatrix();
@@ -680,6 +696,21 @@ void LLFace::renderOneWireframe(const LLColor4 &color, F32 fogCfx, bool wirefram
 
 void LLFace::setDrawInfo(LLDrawInfo* draw_info)
 {
+    if (draw_info == mDrawInfo)
+    {
+        return;
+    }
+
+    if (draw_info)
+    {
+        draw_info->ref();
+    }
+
+    if (mDrawInfo)
+    {
+        mDrawInfo->unref();
+    }
+
     mDrawInfo = draw_info;
 }
 
@@ -2729,6 +2760,14 @@ void LLFace::setViewerObject(LLViewerObject* objp)
 
 const LLMatrix4& LLFace::getRenderMatrix() const
 {
+    // A face may outlive its drawable briefly while an old draw-info entry is
+    // being retired.  Do not dereference the cleared owner in that window.
+    static const LLMatrix4 identity_matrix;
+    if (!mDrawablep)
+    {
+        return identity_matrix;
+    }
+
     return mDrawablep->getRenderMatrix();
 }
 
@@ -2756,6 +2795,11 @@ S32 LLFace::getIndices(LLStrider<U16> &indicesp)
 
 LLVector3 LLFace::getPositionAgent() const
 {
+    if (!mDrawablep)
+    {
+        return mCenterAgent;
+    }
+
     if (mDrawablep->isStatic())
     {
         return mCenterAgent;
