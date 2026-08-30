@@ -285,8 +285,10 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     LLGLSPipelineAlpha gls_pipeline_alpha;
 
+    const bool oit_depth_mask_pass = LLPipeline::RenderOITWeighted && LLPipeline::sOITPass == 3;
+
     //enable writing to alpha for emissive effects
-    gGL.setColorMask(true, true);
+    gGL.setColorMask(!oit_depth_mask_pass, !oit_depth_mask_pass);
 
     bool write_depth = rigged ||
         LLDrawPoolWater::sSkipScreenCopy
@@ -297,7 +299,8 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     if (LLPipeline::RenderOITWeighted && LLPipeline::sOITPass != 0)
     {
-        write_depth = false;
+        // accumulation/reveal must not write depth; the depth-mask pre-pass exists to do exactly that
+        write_depth = oit_depth_mask_pass;
     }
 
     LLGLDepthTest depth(GL_TRUE, write_depth ? GL_TRUE : GL_FALSE);
@@ -352,7 +355,7 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     gGL.setColorMask(true, false);
 
-    if (!rigged && (LLPipeline::sRenderingHUDs || getType() == LLDrawPoolAlpha::POOL_ALPHA_POST_WATER))
+    if (!rigged && !oit_depth_mask_pass && (LLPipeline::sRenderingHUDs || getType() == LLDrawPoolAlpha::POOL_ALPHA_POST_WATER))
     { //render "highlight alpha" on final non-rigged pass for non-HUDs (HUDs only run pre-water alpha pass)
         // NOTE -- hacky call here protected by !rigged instead of alongside "forwardRender"
         // so renderDebugAlpha is executed while gls_pipeline_alpha and depth GL state

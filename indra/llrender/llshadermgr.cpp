@@ -755,6 +755,8 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_NONE 0\n");
     extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_ACCUM 1\n");
     extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_REVEAL 2\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_DEPTH_MASK 3\n");
+    extra_code_text[extra_code_count++] = strdup("#define OIT_DEPTH_MASK_ALPHA_MIN 0.95\n");
     extra_code_text[extra_code_count++] = strdup("#define OIT_ALPHA_MAX 0.9999\n");
     extra_code_text[extra_code_count++] = strdup("#define OIT_WEIGHT_MIN 1e-2\n");
     extra_code_text[extra_code_count++] = strdup("#define OIT_WEIGHT_ALPHA_BIAS 1e-2\n");
