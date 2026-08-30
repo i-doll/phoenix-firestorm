@@ -497,6 +497,7 @@ LLImageGL::LLImageGL(
     LLGLenum formatPrimary,
     LLGLenum formatType,
     LLTexUnit::eTextureAddressMode addressMode)
+:   mSaveData(0), mExternalTexture(true)
 {
     init(false, true);
     mTexName = texName;
@@ -2693,4 +2694,3 @@ void LLImageGLThread::run()
     gGL.shutdown();
     mWindow->destroySharedContext(mContext);
 }
-

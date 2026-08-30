@@ -160,7 +160,7 @@ class LLVfxManager : public LLSingleton<LLVfxManager>
 {
     LLSINGLETON(LLVfxManager);
 protected:
-    ~LLVfxManager() {}
+    ~LLVfxManager();
 
     /*
      * Member functions

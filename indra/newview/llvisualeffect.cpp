@@ -72,13 +72,24 @@ LLVfxManager::LLVfxManager()
 {
 }
 
+LLVfxManager::~LLVfxManager()
+{
+    for (LLVisualEffect* effect : m_Effects)
+    {
+        delete effect;
+    }
+    m_Effects.clear();
+}
+
 bool LLVfxManager::addEffect(LLVisualEffect* pEffectInst)
 {
     // Effect IDs can be reused across effects but should be unique for all effect instances sharing the same effect code
     auto itEffect = std::find_if(m_Effects.begin(), m_Effects.end(), [pEffectInst](const LLVisualEffect* pEffect) { return pEffect->getCode() == pEffectInst->getCode() && pEffect->getId() == pEffectInst->getId(); });
-    llassert(m_Effects.end() == itEffect);
     if (m_Effects.end() != itEffect)
+    {
+        delete pEffectInst;
         return false;
+    }
 
     m_Effects.insert(std::upper_bound(m_Effects.begin(), m_Effects.end(), pEffectInst, cmpEffect), pEffectInst);
     return true;

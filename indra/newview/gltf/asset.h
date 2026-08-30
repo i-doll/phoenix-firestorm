@@ -420,6 +420,10 @@ namespace LL
             // upload materils to UBO
             void uploadMaterials();
 
+            // Release GL resources owned by this asset. Copies intentionally
+            // start without UBOs so they do not share GL object ownership.
+            void releaseGLResources();
+
             // return the index of the node that the line segment intersects with, or -1 if no hit
             // input and output values must be in this asset's local coordinate frame
             S32 lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
@@ -432,6 +436,9 @@ namespace LL
 
             Asset() = default;
             Asset(const Value& src);
+            Asset(const Asset& src);
+            Asset& operator=(const Asset& src);
+            ~Asset();
 
             // load from given file
             // accepts .gltf and .glb files
