@@ -5512,6 +5512,14 @@ void LLViewerObject::setTE(const U8 te, const LLTextureEntry& texture_entry)
 
 void LLViewerObject::updateTEMaterialTextures(U8 te)
 {
+    if (!getTE(te))
+    {
+        // TE data can be missing for a live face, e.g. after a truncated or
+        // oversized TextureEntry update was discarded pending a full resync;
+        // the resync retriggers this path once real TE data arrives.
+        return;
+    }
+
     if (getTEref(te).getMaterialParams().notNull())
     {
         const LLUUID& norm_id = getTEref(te).getMaterialParams()->getNormalID();
