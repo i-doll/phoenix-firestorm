@@ -4634,6 +4634,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 void LLMeshRepository::notifyLoadedMeshes()
 { //called from main thread
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_NAMED("Mesh request scheduling");
 
     // <FS:Ansariel> [UDP Assets]
     //// GetMesh2 operation with keepalives, etc.  With pipelining,
@@ -4909,6 +4910,8 @@ void LLMeshRepository::notifyLoadedMeshes()
         // mPendingRequests go into queues, queues go into active http requests.
         // Checking sRequestHighWater to keep queues at least somewhat populated
         // for faster transition into http
+        LLTimer request_timer;
+        const F32 max_dtime = LLPipeline::getUpdateTimeBudget();
         S32 active_count = LLMeshRepoThread::sActiveHeaderRequests + LLMeshRepoThread::sActiveLODRequests + LLMeshRepoThread::sActiveSkinRequests;
         active_count += (S32)(mThread->mLODReqQ.size() + mThread->mHeaderReqQ.size() + mThread->mSkinInfoQ.size());
         if (active_count < LLMeshRepoThread::sRequestHighWater)
@@ -4919,19 +4922,37 @@ void LLMeshRepository::notifyLoadedMeshes()
             {
                 LL_PROFILE_ZONE_NAMED("Mesh score update");
                 // More requests than the high-water limit allows so
-                // sort and forward the most important.
+                // score and forward the most important.  A large mesh burst
+                // used to rescore and sort the entire backlog in one frame.
+                // Keep the priority window bounded so scheduling cannot turn
+                // into a visible frame hitch.
+                constexpr S32 MAX_SCORE_WINDOW = 256;
+                const S32 score_window = llmin((S32)mPendingRequests.size(),
+                                               llmax(push_count, MAX_SCORE_WINDOW));
+                S32 score_count = 0;
 
                 // update "score" for pending requests
-                for (std::shared_ptr<PendingRequestBase>& req_p : mPendingRequests)
+                for (pending_requests_vec::iterator iter = mPendingRequests.begin();
+                     iter != mPendingRequests.begin() + score_window &&
+                     (score_count == 0 || request_timer.getElapsedTimeF32() < max_dtime); ++iter)
                 {
-                    req_p->checkScore();
+                    (*iter)->checkScore();
+                    ++score_count;
                 }
 
-                //sort by "score"
-                std::partial_sort(mPendingRequests.begin(), mPendingRequests.begin() + push_count,
-                                  mPendingRequests.end(), PendingRequestBase::CompareScoreGreater());
+                if (score_count > 1)
+                {
+                    // Sort only the scored window.  Requests outside it stay
+                    // queued for a later scheduling pass.
+                    const S32 sorted_count = llmin(push_count, score_count);
+                    std::partial_sort(mPendingRequests.begin(), mPendingRequests.begin() + sorted_count,
+                                      mPendingRequests.begin() + score_count,
+                                      PendingRequestBase::CompareScoreGreater());
+                }
             }
-            while (!mPendingRequests.empty() && push_count > 0)
+            S32 scheduled_count = 0;
+            while (!mPendingRequests.empty() && push_count > 0 &&
+                   (scheduled_count == 0 || request_timer.getElapsedTimeF32() < max_dtime))
             {
                 std::shared_ptr<PendingRequestBase>& req_p = mPendingRequests.front();
                 // todo: check hasTrackedData here and erase request if none
@@ -4958,21 +4979,28 @@ void LLMeshRepository::notifyLoadedMeshes()
                 }
                 mPendingRequests.erase(mPendingRequests.begin());
                 push_count--;
+                ++scheduled_count;
             }
         }
 
         //send decomposition requests
-        while (!mPendingDecompositionRequests.empty())
+        S32 decomposition_count = 0;
+        while (!mPendingDecompositionRequests.empty() &&
+               (decomposition_count == 0 || request_timer.getElapsedTimeF32() < max_dtime))
         {
             mThread->loadMeshDecomposition(mPendingDecompositionRequests.front());
             mPendingDecompositionRequests.pop();
+            ++decomposition_count;
         }
 
         //send physics shapes decomposition requests
-        while (!mPendingPhysicsShapeRequests.empty())
+        S32 physics_shape_count = 0;
+        while (!mPendingPhysicsShapeRequests.empty() &&
+               (physics_shape_count == 0 || request_timer.getElapsedTimeF32() < max_dtime))
         {
             mThread->loadMeshPhysicsShape(mPendingPhysicsShapeRequests.front());
             mPendingPhysicsShapeRequests.pop();
+            ++physics_shape_count;
         }
 
         mThread->notifyLoadedMeshes();
