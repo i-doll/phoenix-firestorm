@@ -509,6 +509,7 @@ public:
 
     sg_iterator beginVisibleGroups();
     sg_iterator endVisibleGroups();
+    LLSpatialGroup* getVisibleGroup(U32 index);
 
     sg_iterator beginAlphaGroups();
     sg_iterator endAlphaGroups();

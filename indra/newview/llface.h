@@ -86,9 +86,13 @@ public:
         LL_PROFILE_ZONE_SCOPED;
         init(drawablep, objp);
     }
-    ~LLFace()  { destroy(); }
+    ~LLFace();
 
-    const LLMatrix4& getWorldMatrix()   const   { return mVObjp->getWorldMatrix(mXform); }
+    const LLMatrix4& getWorldMatrix()   const
+    {
+        static const LLMatrix4 identity_matrix;
+        return mVObjp.notNull() ? mVObjp->getWorldMatrix(mXform) : identity_matrix;
+    }
     const LLMatrix4& getRenderMatrix() const;
     U32             getIndicesCount()   const   { return mIndicesCount; };
     S32             getIndicesStart()   const   { return mIndicesIndex; };
@@ -210,6 +214,7 @@ public:
     void        setGeomIndex(U16 idx);
     void        setIndicesIndex(S32 idx);
     void        setDrawInfo(LLDrawInfo* draw_info);
+    void        clearTextureMatrix();
 
     F32         getTextureVirtualSize() ;
     void        resetVirtualSize();

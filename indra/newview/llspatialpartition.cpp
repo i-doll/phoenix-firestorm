@@ -2639,7 +2639,7 @@ void renderPhysicsShapes(LLSpatialGroup* group, bool wireframe)
         {
             LLSpatialBridge* bridge = drawable->asPartition()->asBridge();
 
-            if (bridge)
+            if (bridge && bridge->mDrawable && !bridge->mDrawable->isDead())
             {
                 gGL.pushMatrix();
                 gGL.multMatrix((F32*)bridge->mDrawable->getRenderMatrix().mMatrix);
@@ -2650,7 +2650,7 @@ void renderPhysicsShapes(LLSpatialGroup* group, bool wireframe)
         else
         {
             LLVOVolume* volume = drawable->getVOVolume();
-            if (volume && !volume->isAttachment() && volume->getPhysicsShapeType() != LLViewerObject::PHYSICS_SHAPE_NONE )
+            if (volume && drawable->getRegion() && !volume->isAttachment() && volume->getPhysicsShapeType() != LLViewerObject::PHYSICS_SHAPE_NONE )
             {
                 if (!group->getSpatialPartition()->isBridge())
                 {
@@ -3911,19 +3911,28 @@ public:
             LLVector4a local_start = mStart;
             LLVector4a local_end   = mEnd;
 
+            bool valid_bridge = true;
             if (group->getSpatialPartition()->isBridge())
             {
-                LLMatrix4 local_matrix = group->getSpatialPartition()->asBridge()->mDrawable->getRenderMatrix();
-                local_matrix.invert();
+                LLSpatialBridge* bridge = group->getSpatialPartition()->asBridge();
+                if (!bridge || !bridge->mDrawable || bridge->mDrawable->isDead())
+                {
+                    valid_bridge = false;
+                }
+                else
+                {
+                    LLMatrix4 local_matrix = bridge->mDrawable->getRenderMatrix();
+                    local_matrix.invert();
 
-                LLMatrix4a local_matrix4a;
-                local_matrix4a.loadu(local_matrix);
+                    LLMatrix4a local_matrix4a;
+                    local_matrix4a.loadu(local_matrix);
 
-                local_matrix4a.affineTransform(mStart, local_start);
-                local_matrix4a.affineTransform(mEnd, local_end);
+                    local_matrix4a.affineTransform(mStart, local_start);
+                    local_matrix4a.affineTransform(mEnd, local_end);
+                }
             }
 
-            if (LLLineSegmentBoxIntersect(local_start, local_end, center, size))
+            if (valid_bridge && LLLineSegmentBoxIntersect(local_start, local_end, center, size))
             {
                 check(child);
             }
@@ -4214,6 +4223,12 @@ LLCullResult::sg_iterator LLCullResult::beginVisibleGroups()
 LLCullResult::sg_iterator LLCullResult::endVisibleGroups()
 {
     return mVisibleGroupsEnd;
+}
+
+LLSpatialGroup* LLCullResult::getVisibleGroup(U32 index)
+{
+    llassert(index < mVisibleGroupsSize);
+    return mVisibleGroups[index];
 }
 
 LLCullResult::sg_iterator LLCullResult::beginAlphaGroups()

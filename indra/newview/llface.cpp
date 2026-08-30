@@ -48,6 +48,7 @@
 #include "llviewertexturelist.h"
 #include "llvopartgroup.h"
 #include "llvovolume.h"
+#include "llspatialpartition.h"
 #include "pipeline.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
@@ -77,6 +78,11 @@ bool LLFace::sSafeRenderSelect = true; // false
 
 
 #define DOTVEC(a,b) (a.mV[0]*b.mV[0] + a.mV[1]*b.mV[1] + a.mV[2]*b.mV[2])
+
+LLFace::~LLFace()
+{
+    destroy();
+}
 
 /*
 For each vertex, given:
@@ -213,8 +219,7 @@ void LLFace::destroy()
 
     if (mTextureMatrix)
     {
-        delete mTextureMatrix;
-        mTextureMatrix = NULL;
+        clearTextureMatrix();
 
         if (mDrawablep)
         {
@@ -227,6 +232,10 @@ void LLFace::destroy()
         }
     }
 
+    if (mDrawInfo)
+    {
+        mDrawInfo->mModelMatrix = nullptr;
+    }
     setDrawInfo(NULL);
 
     mDrawablep = NULL;
@@ -514,6 +523,12 @@ U16 LLFace::getGeometry(LLStrider<LLVector3> &vertices, LLStrider<LLVector3> &no
 
 void LLFace::updateCenterAgent()
 {
+    if (!mDrawablep)
+    {
+        mCenterAgent = mCenterLocal;
+        return;
+    }
+
     if (mDrawablep->isActive())
     {
         mCenterAgent = mCenterLocal * getRenderMatrix();
@@ -680,7 +695,44 @@ void LLFace::renderOneWireframe(const LLColor4 &color, F32 fogCfx, bool wirefram
 
 void LLFace::setDrawInfo(LLDrawInfo* draw_info)
 {
+    if (draw_info == mDrawInfo)
+    {
+        return;
+    }
+
+    if (draw_info)
+    {
+        draw_info->ref();
+    }
+
+    if (mDrawInfo)
+    {
+        mDrawInfo->unref();
+    }
+
     mDrawInfo = draw_info;
+}
+
+void LLFace::clearTextureMatrix()
+{
+    if (!mTextureMatrix)
+    {
+        return;
+    }
+
+    // Draw info stores raw matrix pointers for batching.  It may still be
+    // submitted during the frame in which this face loses its texture matrix.
+    if (mDrawInfo)
+    {
+        if (mDrawInfo->mTextureMatrix == mTextureMatrix)
+        {
+            mDrawInfo->mTextureMatrix = nullptr;
+        }
+        mDrawInfo->mModelMatrix = nullptr;
+    }
+
+    delete mTextureMatrix;
+    mTextureMatrix = nullptr;
 }
 
 void LLFace::printDebugInfo() const
@@ -2729,6 +2781,14 @@ void LLFace::setViewerObject(LLViewerObject* objp)
 
 const LLMatrix4& LLFace::getRenderMatrix() const
 {
+    // A face may outlive its drawable briefly while an old draw-info entry is
+    // being retired.  Do not dereference the cleared owner in that window.
+    static const LLMatrix4 identity_matrix;
+    if (!mDrawablep)
+    {
+        return identity_matrix;
+    }
+
     return mDrawablep->getRenderMatrix();
 }
 
@@ -2756,6 +2816,11 @@ S32 LLFace::getIndices(LLStrider<U16> &indicesp)
 
 LLVector3 LLFace::getPositionAgent() const
 {
+    if (!mDrawablep)
+    {
+        return mCenterAgent;
+    }
+
     if (mDrawablep->isStatic())
     {
         return mCenterAgent;
