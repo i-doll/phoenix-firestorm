@@ -932,6 +932,12 @@ LLVOAvatar::~LLVOAvatar()
 {
     sInstances.remove(this);
 
+    if (mGPUTimerQuery)
+    {
+        glDeleteQueries(1, &mGPUTimerQuery);
+        mGPUTimerQuery = 0;
+    }
+
     if (!mFullyLoaded)
     {
         debugAvatarRezTime("AvatarRezLeftCloudNotification", "left after ruth seconds as cloud");
@@ -1254,6 +1260,16 @@ void LLVOAvatar::restoreGL()
 //static
 void LLVOAvatar::destroyGL()
 {
+    for (LLCharacter* character : LLCharacter::sInstances)
+    {
+        LLVOAvatar* avatar = (LLVOAvatar*)character;
+        if (avatar->mGPUTimerQuery)
+        {
+            glDeleteQueries(1, &avatar->mGPUTimerQuery);
+            avatar->mGPUTimerQuery = 0;
+        }
+    }
+
     deleteCachedImages();
 
     resetImpostors();
@@ -11492,6 +11508,10 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
                 //LL_ERRS() << "No auxiliary source (morph mask) data for image id " << id << LL_ENDL;
                 LL_WARNS() << "No auxiliary source (morph mask) data for image id " << id << LL_ENDL;
                 // </FS:Ansariel>
+                if (final || !success)
+                {
+                    delete maskData;
+                }
                 return;
             }
 
@@ -11544,6 +11564,7 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
             if (!found_texture_id)
             {
                 LL_INFOS() << "unexpected image id: " << id << LL_ENDL;
+                LLImageGL::deleteTextures(1, &gl_name);
             }
             self->dirtyMesh();
             self->markBodyPartsComplexityDirty();

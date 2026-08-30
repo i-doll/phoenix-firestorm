@@ -958,6 +958,7 @@ public:
 
     typedef std::map<LLUUID, LLModel::Decomposition*> decomposition_map;
     decomposition_map mDecompositionMap;
+    std::map<LLUUID, F64> mDecompositionLastAccess;
 
     LLMutex*                    mMeshMutex;
 

@@ -70,13 +70,21 @@ void load_exr(const std::string& filename)
     int ret =  LoadEXRWithLayer(&out, &width, &height, filename.c_str(), /* layername */ nullptr, &err);
     if (ret == TINYEXR_SUCCESS)
     {
-        U32 texName = 0;
-        LLImageGL::generateTextures(1, &texName);
-
-        gEXRImage = new LLImageGL(texName, 4, GL_TEXTURE_2D, GL_RGB16F, GL_RGB16F, GL_FLOAT, LLTexUnit::TAM_CLAMP);
+        // This texture is owned by the viewer.  Do not wrap a manually
+        // generated name as an external texture: doing so leaves its GL
+        // lifetime outside LLImageGL and leaked previous HDRI previews.
+        gEXRImage = new LLImageGL(width, height, 4, true);
+        gEXRImage->setExplicitFormat(GL_RGB16F, GL_RGBA, GL_FLOAT);
         gEXRImage->setHasMipMaps(true);
         gEXRImage->setUseMipMaps(true);
         gEXRImage->setFilteringOption(LLTexUnit::TFO_TRILINEAR);
+
+        if (!gEXRImage->createGLTexture())
+        {
+            free(out);
+            gEXRImage = nullptr;
+            return;
+        }
 
         gGL.getTexUnit(0)->bind(gEXRImage);
 
