@@ -4389,10 +4389,18 @@ bool LLVOVolume::isHUDAttachment() const
 
 const LLMatrix4 LLVOVolume::getRenderMatrix() const
 {
-    if (mDrawable->isActive() && !mDrawable->isRoot())
+    static const LLMatrix4 identity_matrix;
+    if (mDrawable.isNull() || mDrawable->isDead())
     {
-        return mDrawable->getParent()->getWorldMatrix();
+        return identity_matrix;
     }
+
+    LLDrawable* parent = mDrawable->getParent();
+    if (mDrawable->isActive() && !mDrawable->isRoot() && parent && !parent->isDead())
+    {
+        return parent->getWorldMatrix();
+    }
+
     return mDrawable->getWorldMatrix();
 }
 

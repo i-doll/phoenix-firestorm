@@ -6788,11 +6788,15 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
                     else if (objectp->isAttachment())
                     {
                         //RN: hack for orthogonal projection of HUD attachments
-                        LLViewerJointAttachment* attachment_pt = (LLViewerJointAttachment*)objectp->getRootEdit()->mDrawable->getParent();
-                        if (attachment_pt && attachment_pt->getIsHUDAttachment())
+                        LLViewerObject* root_edit = objectp->getRootEdit();
+                        if (root_edit && root_edit->mDrawable.notNull())
                         {
-                            LLVector3 camera_pos = LLVector3(-10000.f, 0.f, 0.f);
-                            generateSilhouette(node, camera_pos);
+                            LLViewerJointAttachment* attachment_pt = (LLViewerJointAttachment*)root_edit->mDrawable->getParent();
+                            if (attachment_pt && attachment_pt->getIsHUDAttachment())
+                            {
+                                LLVector3 camera_pos = LLVector3(-10000.f, 0.f, 0.f);
+                                generateSilhouette(node, camera_pos);
+                            }
                         }
                     }
                 }
