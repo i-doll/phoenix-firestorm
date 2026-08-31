@@ -2176,8 +2176,10 @@ void LLPipeline::createObjects(F32 max_dtime)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
     LLTimer update_timer;
+    S32 create_count = 0;
 
-    while (!mCreateQ.empty() && update_timer.getElapsedTimeF32() < max_dtime)
+    while (!mCreateQ.empty() &&
+           (create_count == 0 || update_timer.getElapsedTimeF32() < max_dtime))
     {
         LLViewerObject* vobj = mCreateQ.front();
         if (!vobj->isDead())
@@ -2185,6 +2187,7 @@ void LLPipeline::createObjects(F32 max_dtime)
             createObject(vobj);
         }
         mCreateQ.pop_front();
+        ++create_count;
     }
 
     //for (LLViewerObject::vobj_list_t::iterator iter = mCreateQ.begin(); iter != mCreateQ.end(); ++iter)
@@ -2218,6 +2221,18 @@ void LLPipeline::createObject(LLViewerObject* vobj)
     else
     {
         vobj->setDrawableParent(NULL); // LLPipeline::addObject 2
+    }
+
+    // When drawable creation is deferred, a child can be received and created
+    // before its logical parent has a drawable.  Reapply the parent transform
+    // now that this drawable exists so those children do not remain visually
+    // unparented until another object update arrives.
+    for (LLViewerObject* child : vobj->getChildren())
+    {
+        if (child && !child->isDead() && child->getParent() == vobj && child->mDrawable.notNull())
+        {
+            child->setDrawableParent(drawablep);
+        }
     }
 
     markRebuild(drawablep, LLDrawable::REBUILD_ALL);
@@ -3090,8 +3105,14 @@ void LLPipeline::rebuildPriorityGroups()
            (rebuild_count == 0 || update_timer.getElapsedTimeF32() < max_dtime); ++iter)
     {
         LLSpatialGroup* group = *iter;
-        group->rebuildGeom();
-        group->clearState(LLSpatialGroup::IN_BUILD_Q1);
+        if (group)
+        {
+            if (!group->isDead())
+            {
+                group->rebuildGeom();
+            }
+            group->clearState(LLSpatialGroup::IN_BUILD_Q1);
+        }
         ++rebuild_count;
     }
 
@@ -3167,8 +3188,8 @@ void LLPipeline::markVisible(LLDrawable *drawablep, LLCamera& camera)
             const LLDrawable* root = ((LLSpatialBridge*) drawablep)->mDrawable;
             llassert(root); // trying to catch a bad assumption
 
-            if (root && //  // this test may not be needed, see above
-                    root->getVObj()->isAttachment())
+            const LLViewerObject* root_object = root ? root->getVObj() : nullptr;
+            if (root && !root->isDead() && root_object && root_object->isAttachment())
             {
                 LLDrawable* rootparent = root->getParent();
                 if (rootparent) // this IS sometimes NULL
@@ -3355,12 +3376,16 @@ void LLPipeline::processPartitionQ()
     // </FS:ND>
     {
         LLDrawable* drawable = *iter;
-        if (!drawable->isDead())
+        if (drawable && !drawable->isDead())
         {
             drawable->updateBinRadius();
             drawable->movePartition();
+            drawable->clearState(LLDrawable::PARTITION_MOVE);
         }
-        drawable->clearState(LLDrawable::PARTITION_MOVE);
+        else if (drawable)
+        {
+            drawable->clearState(LLDrawable::PARTITION_MOVE);
+        }
         ++update_count;
     }
 
@@ -3371,7 +3396,10 @@ void LLPipeline::processPartitionQ()
 
 void LLPipeline::markMeshDirty(LLSpatialGroup* group)
 {
-    mMeshDirtyGroup.push_back(group);
+    if (group && !group->isDead())
+    {
+        mMeshDirtyGroup.push_back(group);
+    }
 }
 
 void LLPipeline::markRebuild(LLSpatialGroup* group)
@@ -4026,7 +4054,11 @@ void LLPipeline::postSort(LLCamera &camera)
             for (; iter != mMeshDirtyGroup.end() &&
                    (rebuild_count == 0 || update_timer.getElapsedTimeF32() < max_dtime); ++iter)
             {
-                (*iter)->rebuildMesh();
+                LLSpatialGroup* group = *iter;
+                if (group && !group->isDead())
+                {
+                    group->rebuildMesh();
+                }
                 ++rebuild_count;
             }
             mMeshDirtyGroup.erase(mMeshDirtyGroup.begin(), iter);
@@ -5782,7 +5814,8 @@ void LLPipeline::renderDebug()
         for (LLCullResult::bridge_iterator i = sCull->beginVisibleBridge(); i != sCull->endVisibleBridge(); ++i)
         {
             LLSpatialBridge* bridge = *i;
-            if (!bridge->isDead() && hasRenderType(bridge->mDrawableType))
+            if (bridge && !bridge->isDead() && bridge->mDrawable &&
+                !bridge->mDrawable->isDead() && hasRenderType(bridge->mDrawableType))
             {
                 gGL.pushMatrix();
                 gGL.multMatrix((F32*)bridge->mDrawable->getRenderMatrix().mMatrix);
