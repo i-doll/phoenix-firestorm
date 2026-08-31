@@ -5098,6 +5098,14 @@ const LLQuaternion LLViewerObject::getRenderRotation() const
 
 const LLMatrix4 LLViewerObject::getRenderMatrix() const
 {
+    // RenderDelayCreation can leave a newly received neighbor object without a
+    // drawable until the creation queue reaches it.
+    static const LLMatrix4 identity_matrix;
+    if (mDrawable.isNull() || mDrawable->isDead())
+    {
+        return identity_matrix;
+    }
+
     return mDrawable->getWorldMatrix();
 }
 

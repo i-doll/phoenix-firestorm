@@ -524,7 +524,7 @@ U16 LLFace::getGeometry(LLStrider<LLVector3> &vertices, LLStrider<LLVector3> &no
 
 void LLFace::updateCenterAgent()
 {
-    if (!mDrawablep)
+    if (!mDrawablep || mDrawablep->isDead())
     {
         mCenterAgent = mCenterLocal;
         return;
@@ -544,7 +544,7 @@ void LLFace::renderSelected(LLViewerTexture *imagep, const LLColor4& color)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_FACE;
 
-    if (mDrawablep == NULL || mDrawablep->getSpatialGroup() == NULL)
+    if (!mDrawablep || mDrawablep->isDead() || mDrawablep->getSpatialGroup() == NULL)
     {
         return;
     }
@@ -2763,7 +2763,7 @@ const LLMatrix4& LLFace::getRenderMatrix() const
     // A face may outlive its drawable briefly while an old draw-info entry is
     // being retired.  Do not dereference the cleared owner in that window.
     static const LLMatrix4 identity_matrix;
-    if (!mDrawablep)
+    if (!mDrawablep || mDrawablep->isDead())
     {
         return identity_matrix;
     }
@@ -2795,7 +2795,7 @@ S32 LLFace::getIndices(LLStrider<U16> &indicesp)
 
 LLVector3 LLFace::getPositionAgent() const
 {
-    if (!mDrawablep)
+    if (!mDrawablep || mDrawablep->isDead())
     {
         return mCenterAgent;
     }
