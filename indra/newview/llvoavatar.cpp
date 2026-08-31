@@ -1479,13 +1479,16 @@ const LLVector3 LLVOAvatar::getRenderPosition() const
     }
     else
     {
-        LLDrawable* parentp = mDrawable->getParent();
-        if (!parentp)
+        // A child avatar can be observed for a frame after its drawable has
+        // been unparented (for example while standing or changing regions).
+        // In that window there is no parent render matrix to apply.
+        LLDrawable* parent = mDrawable->getParent();
+        if (!parent || parent->isDead())
         {
-            // Parented at the object level but the parent drawable doesn't exist (yet)
             return getPositionAgent();
         }
-        return getPosition() * parentp->getRenderMatrix();
+
+        return getPosition() * parent->getRenderMatrix();
     }
 }
 
