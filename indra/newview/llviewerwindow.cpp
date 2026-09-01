@@ -997,7 +997,7 @@ public:
                 objectp = nodep->getObject();
             }
 
-            if (objectp && !objectp->isDead())
+            if (objectp && !objectp->isDead() && objectp->mDrawable.notNull())
             {
                 S32 num_faces = objectp->mDrawable->getNumFaces() ;
                 std::set<LLViewerFetchedTexture*> tex_list;

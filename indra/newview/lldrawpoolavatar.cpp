@@ -364,14 +364,15 @@ void LLDrawPoolAvatar::renderShadow(S32 pass)
         return;
     }
 
-    const LLFace *facep = mDrawFace[0];
-    if (!facep->getDrawable())
+    const LLFace* facep = mDrawFace[0];
+    LLDrawable* drawable = facep ? facep->getDrawable() : nullptr;
+    if (!drawable)
     {
         return;
     }
-    LLVOAvatar *avatarp = (LLVOAvatar *)facep->getDrawable()->getVObj().get();
+    LLVOAvatar* avatarp = (LLVOAvatar*)drawable->getVObj().get();
 
-    if (avatarp->isDead() || avatarp->isUIAvatar() || avatarp->mDrawable.isNull())
+    if (!avatarp || avatarp->isDead() || avatarp->isUIAvatar() || avatarp->mDrawable.isNull())
     {
         return;
     }
@@ -957,7 +958,11 @@ LLViewerTexture *LLDrawPoolAvatar::getDebugTexture()
     {
         return NULL;
     }
-    const LLViewerObject *objectp = face->getDrawable()->getVObj();
+    const LLViewerObject* objectp = face->getDrawable()->getVObj();
+    if (!objectp)
+    {
+        return NULL;
+    }
 
     // Avatar should always have at least 1 (maybe 3?) TE's.
     return objectp->getTEImage(0);
@@ -968,5 +973,4 @@ LLColor3 LLDrawPoolAvatar::getDebugColor() const
 {
     return LLColor3(0.f, 1.f, 0.f);
 }
-
 

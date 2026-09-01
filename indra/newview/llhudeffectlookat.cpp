@@ -714,17 +714,24 @@ void LLHUDEffectLookAt::render()
     }
     // </FS:Trish>
 
-    if (mDebugLookAt && mSourceObject.notNull())
+    LLViewerObject* source_object = (LLViewerObject*)mSourceObject;
+    if (mDebugLookAt && source_object && !source_object->isDead() && source_object->isAvatar())
     {
+        LLVOAvatar* source_avatar = (LLVOAvatar*)source_object;
+        if (!source_avatar->mHeadp || !mAttentions)
+        {
+            return;
+        }
+
         static LLCachedControl<bool> hide_own(gSavedPerAccountSettings, "DebugLookAtHideOwn", false);
         static LLCachedControl<bool> is_private(gSavedSettings, "PrivateLookAtTarget", false);
-        if ((hide_own || is_private) && ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->isSelf())
+        if ((hide_own || is_private) && source_avatar->isSelf())
             return;
 
         //LLGLDisable gls_stencil(GL_STENCIL_TEST);
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);  // <FS:Zi> Reduce screen clutter
 
-        LLVector3 target = mTargetPos + ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->mHeadp->getWorldPosition();
+        LLVector3 target = mTargetPos + source_avatar->mHeadp->getWorldPosition();
         LLColor3 lookAtColor = (*mAttentions)[mTargetType].mColor;
 
         static LLCachedControl<U32> show_names(gSavedSettings, "DebugLookAtShowNames");
@@ -891,8 +898,14 @@ bool LLHUDEffectLookAt::calcTargetPosition()
         local_offset = gAgent.getPosAgentFromGlobal(mTargetOffsetGlobal);
     }
 
-    LLVOAvatar* source_avatar = (LLVOAvatar*)(LLViewerObject*)mSourceObject;
-    if (!source_avatar->isBuilt())
+    LLViewerObject* source_object = (LLViewerObject*)mSourceObject;
+    if (!source_object || source_object->isDead() || !source_object->isAvatar())
+    {
+        return false;
+    }
+
+    LLVOAvatar* source_avatar = (LLVOAvatar*)source_object;
+    if (!source_avatar->isBuilt() || !source_avatar->mHeadp)
         return false;
 
     if (target_obj && target_obj->mDrawable.notNull())
@@ -915,7 +928,7 @@ bool LLHUDEffectLookAt::calcTargetPosition()
             }
 
             // look the other avatar in the eye. note: what happens if target is self? -MG
-            mTargetPos = target_av->mHeadp->getWorldPosition();
+            mTargetPos = target_av->mHeadp ? target_av->mHeadp->getWorldPosition() : target_av->getRenderPosition();
             if (mTargetType == LOOKAT_TARGET_MOUSELOOK || mTargetType == LOOKAT_TARGET_FREELOOK)
             {
                 // mouselook and freelook target offsets are absolute
@@ -926,11 +939,11 @@ bool LLHUDEffectLookAt::calcTargetPosition()
                 // *NOTE: We have to do this because animation
                 // overrides do not set lookat behavior.
                 // *TODO: animation overrides for lookat behavior.
-                target_rot = target_av->mPelvisp->getWorldRotation();
+                target_rot = target_av->mPelvisp ? target_av->mPelvisp->getWorldRotation() : target_av->getRenderRotation();
             }
             else
             {
-                target_rot = target_av->mRoot->getWorldRotation();
+                target_rot = target_av->mRoot ? target_av->mRoot->getWorldRotation() : target_av->getRenderRotation();
             }
         }
         else // target obj is not an avatar

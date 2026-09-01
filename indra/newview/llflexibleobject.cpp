@@ -67,7 +67,7 @@ LLVolumeImplFlexible::LLVolumeImplFlexible(LLViewerObject* vo, LLFlexibleObjectD
     mCollisionSphereRadius = 0.f;
     mRenderRes = -1;
 
-    if(mVO->mDrawable.notNull())
+    if(mVO && mVO->mDrawable.notNull())
     {
         mVO->mDrawable->makeActive() ;
     }
@@ -111,12 +111,12 @@ void LLVolumeImplFlexible::updateClass()
 
 LLVector3 LLVolumeImplFlexible::getFramePosition() const
 {
-    return mVO->getRenderPosition();
+    return mVO ? mVO->getRenderPosition() : LLVector3::zero;
 }
 
 LLQuaternion LLVolumeImplFlexible::getFrameRotation() const
 {
-    return mVO->getRenderRotation();
+    return mVO ? mVO->getRenderRotation() : LLQuaternion::DEFAULT;
 }
 
 void LLVolumeImplFlexible::onParameterChanged(U16 param_type, LLNetworkData *data, bool in_use, bool local_origin)
@@ -149,6 +149,11 @@ void LLVolumeImplFlexible::setParentPositionAndRotationDirectly( LLVector3 p, LL
 void LLVolumeImplFlexible::remapSections(LLFlexibleObjectSection *source, S32 source_sections,
                                          LLFlexibleObjectSection *dest, S32 dest_sections)
 {
+    if (!mVO || mVO->mDrawable.isNull())
+    {
+        return;
+    }
+
     S32 num_output_sections = 1<<dest_sections;
     LLVector3 scale = mVO->mDrawable->getScale();
     F32 section_length = scale.mV[VZ] / (F32)num_output_sections;
@@ -235,6 +240,11 @@ void LLVolumeImplFlexible::setAttributesOfAllSections(LLVector3* inScale)
 {
     LLVector2 bottom_scale, top_scale;
     F32 begin_rot = 0, end_rot = 0;
+    if (!mVO || mVO->mDrawable.isNull())
+    {
+        return;
+    }
+
     if (mVO->getVolume())
     {
         const LLPathParams &params = mVO->getVolume()->getParams().getPathParams();
@@ -242,11 +252,6 @@ void LLVolumeImplFlexible::setAttributesOfAllSections(LLVector3* inScale)
         top_scale = params.getEndScale();
         begin_rot = F_PI * params.getTwistBegin();
         end_rot = F_PI * params.getTwist();
-    }
-
-    if (!mVO->mDrawable)
-    {
-        return;
     }
 
     S32 num_sections = 1 << mSimulateRes;
@@ -292,7 +297,7 @@ void LLVolumeImplFlexible::onSetVolume(const LLVolumeParams &volume_params, cons
 
 void LLVolumeImplFlexible::updateRenderRes()
 {
-    if (!mAttributes)
+    if (!mAttributes || !mVO || mVO->mDrawable.isNull())
         return;
 
     LLDrawable* drawablep = mVO->mDrawable;
@@ -334,6 +339,11 @@ void LLVolumeImplFlexible::updateRenderRes()
 //---------------------------------------------------------------------------------
 void LLVolumeImplFlexible::doIdleUpdate()
 {
+    if (!mVO || mVO->mDrawable.isNull())
+    {
+        return;
+    }
+
     LLDrawable* drawablep = mVO->mDrawable;
 
     if (drawablep)
@@ -429,7 +439,16 @@ inline S32 log2(S32 x)
 void LLVolumeImplFlexible::doFlexibleUpdate()
 {
     LL_PROFILE_ZONE_SCOPED;
+    if (!mVO || mVO->mDrawable.isNull())
+    {
+        return;
+    }
+
     LLVolume* volume = mVO->getVolume();
+    if (!volume)
+    {
+        return;
+    }
     LLPath *path = &volume->getPath();
     if ((mSimulateRes == 0 || !mInitialized) && mVO->mDrawable->isVisible())
     {
@@ -754,6 +773,11 @@ void LLVolumeImplFlexible::onSetScale(const LLVector3& scale, bool damped)
 bool LLVolumeImplFlexible::doUpdateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
+    if (!mVO || !drawable)
+    {
+        return true;
+    }
+
     LLVOVolume *volume = (LLVOVolume*)mVO;
 
     if (mVO->isAttachment())
@@ -886,6 +910,11 @@ LLVector3 LLVolumeImplFlexible::getPivotPosition() const
 //------------------------------------------------------------------
 LLVector3 LLVolumeImplFlexible::getAnchorPosition() const
 {
+    if (!mVO || mVO->mDrawable.isNull())
+    {
+        return LLVector3::zero;
+    }
+
     LLVector3 BasePosition = getFramePosition();
     LLQuaternion parentSegmentRotation = getFrameRotation();
     LLVector3 anchorDirectionRotated = LLVector3::z_axis * parentSegmentRotation;
@@ -908,6 +937,15 @@ void LLVolumeImplFlexible::updateRelativeXform(bool force_identity)
     LLQuaternion delta_rot;
     LLVector3 delta_pos, delta_scale;
     LLVOVolume* vo = (LLVOVolume*) mVO;
+    if (!vo || vo->mDrawable.isNull())
+    {
+        if (vo)
+        {
+            vo->mRelativeXform.setIdentity();
+            vo->mRelativeXformInvTrans.setIdentity();
+        }
+        return;
+    }
 
     bool use_identity = vo->mDrawable->isSpatialRoot() || force_identity;
 

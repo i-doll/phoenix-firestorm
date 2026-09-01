@@ -513,17 +513,21 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
                     delete mTextureAnimp;
                     mTextureAnimp = NULL;
 
-                    for (S32 i = 0; i < getNumTEs(); i++)
+                    if (mDrawable.notNull())
                     {
-                        LLFace* facep = mDrawable->getFace(i);
-                        if (facep && facep->mTextureMatrix)
+                        for (S32 i = 0; i < getNumTEs(); i++)
                         {
-                            // delete or reset
-                            facep->clearTextureMatrix();
+                            LLFace* facep = mDrawable->getFace(i);
+                            if (facep && facep->mTextureMatrix)
+                            {
+                                // delete or reset
+                                facep->clearTextureMatrix();
+                            }
                         }
+
+                        gPipeline.markTextured(mDrawable);
                     }
 
-                    gPipeline.markTextured(mDrawable);
                     mFaceMappingChanged = true;
                     mTexAnimMode = 0;
                 }
@@ -711,17 +715,21 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
                 delete mTextureAnimp;
                 mTextureAnimp = NULL;
 
-                for (S32 i = 0; i < getNumTEs(); i++)
+                if (mDrawable.notNull())
                 {
-                    LLFace* facep = mDrawable->getFace(i);
-                    if (facep && facep->mTextureMatrix)
+                    for (S32 i = 0; i < getNumTEs(); i++)
                     {
-                        // delete or reset
-                        facep->clearTextureMatrix();
+                        LLFace* facep = mDrawable->getFace(i);
+                        if (facep && facep->mTextureMatrix)
+                        {
+                            // delete or reset
+                            facep->clearTextureMatrix();
+                        }
                     }
+
+                    gPipeline.markTextured(mDrawable);
                 }
 
-                gPipeline.markTextured(mDrawable);
                 mFaceMappingChanged = true;
                 mTexAnimMode = 0;
             }
@@ -1143,7 +1151,8 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
             mSculptTexture->setForSculpt() ;
 
             S32 texture_discard = mSculptTexture->getRawImageLevel(); //try to match the texture
-            S32 current_discard = getVolume() ? getVolume()->getSculptLevel() : -2 ;
+            LLVolume* volume = getVolume();
+            S32 current_discard = volume ? volume->getSculptLevel() : -2;
 
             if (texture_discard >= 0 && //texture has some data available
                 (texture_discard < current_discard || //texture has more data than last rebuild
@@ -1156,7 +1165,7 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
             if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_SCULPTED))
             {
                 setDebugText(llformat("T%d C%d V%d\n%dx%d",
-                                          texture_discard, current_discard, getVolume()->getSculptLevel(),
+                                          texture_discard, current_discard, volume ? volume->getSculptLevel() : -2,
                                           mSculptTexture->getHeight(), mSculptTexture->getWidth()));
             }
         }
@@ -1166,14 +1175,17 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
     if (getLightTextureID().notNull())
     {
         LLLightImageParams* params = getLightImageParams();
-        LLUUID id = params->getLightTexture();
-        mLightTexture = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE);
-        if (mLightTexture.notNull())
+        if (params)
         {
-            F32 rad = getLightRadius();
-            mLightTexture->addTextureStats(gPipeline.calcPixelArea(getPositionAgent(),
-                                                                    LLVector3(rad,rad,rad),
-                                                                    *camera));
+            LLUUID id = params->getLightTexture();
+            mLightTexture = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE);
+            if (mLightTexture.notNull())
+            {
+                F32 rad = getLightRadius();
+                mLightTexture->addTextureStats(gPipeline.calcPixelArea(getPositionAgent(),
+                                                                        LLVector3(rad,rad,rad),
+                                                                        *camera));
+            }
         }
     }
 
@@ -1257,10 +1269,9 @@ void LLVOVolume::setScale(const LLVector3 &scale, bool damped)
 
         //since drawable transforms do not include scale, changing volume scale
         //requires an immediate rebuild of volume verts.
-        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_POSITION);
-
-        if (mDrawable)
+        if (mDrawable.notNull())
         {
+            gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_POSITION);
             shrinkWrap();
         }
     }
@@ -1564,9 +1575,12 @@ void LLVOVolume::updateVisualComplexity()
 void LLVOVolume::notifyMeshLoaded()
 {
     mSculptChanged = true;
-    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+    }
 
-    if (!mSkinInfo && !mSkinInfoUnavaliable)
+    if (!mSkinInfo && !mSkinInfoUnavaliable && getVolume())
     {
         // Header was loaded, update skin info state from header
         LLUUID mesh_id = getVolume()->getParams().getSculptID();
@@ -1983,7 +1997,10 @@ bool LLVOVolume::calcLOD()
 void LLVOVolume::forceLOD(S32 lod)
 {
     mLOD = lod;
-    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
+    }
     mLODChanged = true;
 }
 //</FS:Beq>
@@ -1999,7 +2016,13 @@ bool LLVOVolume::updateLOD()
 
     bool lod_changed = false;
 
-    if (!LLSculptIDSize::instance().isUnloaded(getVolume()->getParams().getSculptID()))
+    LLVolume* volume = getVolume();
+    if (!volume)
+    {
+        return false;
+    }
+
+    if (!LLSculptIDSize::instance().isUnloaded(volume->getParams().getSculptID()))
     {
         lod_changed = calcLOD();
     }
@@ -2036,7 +2059,7 @@ bool LLVOVolume::setDrawableParent(LLDrawable* parentp)
         return false;
     }
 
-    if (!mDrawable->isRoot())
+    if (mDrawable.notNull() && parentp && !mDrawable->isRoot())
     {
         // rebuild vertices in parent relative space
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
@@ -2056,6 +2079,11 @@ bool LLVOVolume::setDrawableParent(LLDrawable* parentp)
 
 void LLVOVolume::updateFaceFlags()
 {
+    if (mDrawable.isNull() || !getVolume())
+    {
+        return;
+    }
+
     // There's no guarantee that getVolume()->getNumFaces() == mDrawable->getNumFaces()
     for (S32 i = 0; i < getVolume()->getNumFaces() && i < mDrawable->getNumFaces(); i++)
     {
@@ -2108,6 +2136,11 @@ bool LLVOVolume::setParent(LLViewerObject* parent)
 void LLVOVolume::regenFaces()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+    if (mDrawable.isNull())
+    {
+        return;
+    }
+
     // remove existing faces
     bool count_changed = mNumFaces != getNumTEs();
 
@@ -2156,6 +2189,11 @@ void LLVOVolume::regenFaces()
 bool LLVOVolume::genBBoxes(bool force_global, bool should_update_octree_bounds)
 {
     LL_PROFILE_ZONE_SCOPED;
+    if (mDrawable.isNull() || !getVolume())
+    {
+        return false;
+    }
+
     bool res = true;
 
     LLVector4a min, max;
@@ -2293,6 +2331,12 @@ void LLVOVolume::updateRelativeXform(bool force_identity)
     }
 
     LLDrawable* drawable = mDrawable;
+    if (!drawable)
+    {
+        mRelativeXform.setIdentity();
+        mRelativeXformInvTrans.setIdentity();
+        return;
+    }
 
     if (drawable->isState(LLDrawable::RIGGED) && mRiggedVolume.notNull())
     { //rigged volume (which is in agent space) is used for generating bounding boxes etc
@@ -2392,6 +2436,11 @@ void LLVOVolume::updateRelativeXform(bool force_identity)
 bool LLVOVolume::lodOrSculptChanged(LLDrawable *drawable, bool &compiled, bool &should_update_octree_bounds)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+    if (!drawable || mDrawable.isNull() || !getVolume())
+    {
+        return false;
+    }
+
     bool regen_faces = false;
 
     LLVolume *old_volumep, *new_volumep;
@@ -2459,6 +2508,10 @@ bool LLVOVolume::lodOrSculptChanged(LLDrawable *drawable, bool &compiled, bool &
 bool LLVOVolume::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+    if (!drawable || mDrawable.isNull())
+    {
+        return true;
+    }
 
     if (mDrawable->isState(LLDrawable::REBUILD_RIGGED))
     {
@@ -2572,7 +2625,12 @@ bool LLVOVolume::updateGeometry(LLDrawable *drawable)
 
 void LLVOVolume::updateFaceSize(S32 idx)
 {
-    if( mDrawable->getNumFaces() <= idx )
+    if (mDrawable.isNull() || !getVolume())
+    {
+        return;
+    }
+
+    if (idx < 0 || mDrawable->getNumFaces() <= idx)
     {
         return;
     }
@@ -2651,7 +2709,10 @@ void LLVOVolume::changeTEImage(S32 index, LLViewerTexture* imagep)
     LLViewerObject::changeTEImage(index, imagep);
     if (changed)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
 }
@@ -2662,7 +2723,10 @@ void LLVOVolume::setTEImage(const U8 te, LLViewerTexture *imagep)
     LLViewerObject::setTEImage(te, imagep);
     if (changed)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
 }
@@ -2701,10 +2765,13 @@ S32 LLVOVolume::setTEColor(const U8 te, const LLColor4& color)
         F32 old_alpha = tep->getColor().mV[3];
         if (color.mV[3] != old_alpha)
         {
-            gPipeline.markTextured(mDrawable);
+            if (mDrawable.notNull())
+            {
+                gPipeline.markTextured(mDrawable);
+                gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
+            }
             //treat this alpha change as an LoD update since render batches may need to get rebuilt
             mLODChanged = true;
-            gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
         }
         retval = LLPrimitive::setTEColor(te, color);
         if (mDrawable.notNull() && retval)
@@ -2725,7 +2792,10 @@ S32 LLVOVolume::setTEBumpmap(const U8 te, const U8 bumpmap)
     S32 res = LLViewerObject::setTEBumpmap(te, bumpmap);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return  res;
@@ -2736,7 +2806,10 @@ S32 LLVOVolume::setTETexGen(const U8 te, const U8 texgen)
     S32 res = LLViewerObject::setTETexGen(te, texgen);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return  res;
@@ -2747,7 +2820,10 @@ S32 LLVOVolume::setTEMediaTexGen(const U8 te, const U8 media)
     S32 res = LLViewerObject::setTEMediaTexGen(te, media);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return  res;
@@ -2758,7 +2834,10 @@ S32 LLVOVolume::setTEShiny(const U8 te, const U8 shiny)
     S32 res = LLViewerObject::setTEShiny(te, shiny);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return  res;
@@ -2769,7 +2848,10 @@ S32 LLVOVolume::setTEFullbright(const U8 te, const U8 fullbright)
     S32 res = LLViewerObject::setTEFullbright(te, fullbright);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return  res;
@@ -2780,7 +2862,10 @@ S32 LLVOVolume::setTEBumpShinyFullbright(const U8 te, const U8 bump)
     S32 res = LLViewerObject::setTEBumpShinyFullbright(te, bump);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return res;
@@ -2791,7 +2876,10 @@ S32 LLVOVolume::setTEMediaFlags(const U8 te, const U8 media_flags)
     S32 res = LLViewerObject::setTEMediaFlags(te, media_flags);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return  res;
@@ -2839,7 +2927,10 @@ S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
     LL_DEBUGS("MaterialTEs") << " " << pMaterialID.asString() << LL_ENDL;
     if (res)
     {
-        LLMaterialMgr::instance().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
+        if (LLViewerRegion* regionp = getRegion())
+        {
+            LLMaterialMgr::instance().getTE(regionp->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
+        }
 
         setChanged(ALL_CHANGED);
         if (!mDrawable.isNull())
@@ -2893,7 +2984,10 @@ S32 LLVOVolume::setTEScale(const U8 te, const F32 s, const F32 t)
     S32 res = LLViewerObject::setTEScale(te, s, t);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return res;
@@ -2904,7 +2998,10 @@ S32 LLVOVolume::setTEScaleS(const U8 te, const F32 s)
     S32 res = LLViewerObject::setTEScaleS(te, s);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return res;
@@ -2915,7 +3012,10 @@ S32 LLVOVolume::setTEScaleT(const U8 te, const F32 t)
     S32 res = LLViewerObject::setTEScaleT(te, t);
     if (res)
     {
-        gPipeline.markTextured(mDrawable);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markTextured(mDrawable);
+        }
         mFaceMappingChanged = true;
     }
     return res;
@@ -3308,7 +3408,7 @@ void LLVOVolume::sendMediaDataUpdate()
 
 void LLVOVolume::removeMediaImpl(S32 texture_index)
 {
-    if(mMediaImplList.size() <= (U32)texture_index || mMediaImplList[texture_index].isNull())
+    if (texture_index < 0 || mMediaImplList.size() <= (U32)texture_index || mMediaImplList[texture_index].isNull())
     {
         return ;
     }
@@ -3349,6 +3449,11 @@ void LLVOVolume::removeMediaImpl(S32 texture_index)
 
 void LLVOVolume::addMediaImpl(LLViewerMediaImpl* media_impl, S32 texture_index)
 {
+    if (!media_impl || texture_index < 0)
+    {
+        return;
+    }
+
     if((S32)mMediaImplList.size() < texture_index + 1)
     {
         mMediaImplList.resize(texture_index + 1) ;
@@ -3368,10 +3473,10 @@ void LLVOVolume::addMediaImpl(LLViewerMediaImpl* media_impl, S32 texture_index)
     media_impl->addObject(this) ;
 
     //add the face to show the media if it is in playing
-    if(mDrawable)
+    if (mDrawable.notNull())
     {
         LLFace* facep(NULL);
-        if( texture_index < mDrawable->getNumFaces() )
+        if (texture_index < mDrawable->getNumFaces())
         {
             facep = mDrawable->getFace(texture_index) ;
         }
@@ -3512,12 +3617,18 @@ void LLVOVolume::setIsLight(bool is_light)
         if (is_light)
         {
             // Add it to the pipeline mLightSet
-            gPipeline.setLight(mDrawable, true);
+            if (mDrawable.notNull())
+            {
+                gPipeline.setLight(mDrawable, true);
+            }
         }
         else
         {
             // Not a light.  Remove it from the pipeline's light set.
-            gPipeline.setLight(mDrawable, false);
+            if (mDrawable.notNull())
+            {
+                gPipeline.setLight(mDrawable, false);
+            }
         }
     }
 }
@@ -3536,7 +3647,10 @@ void LLVOVolume::setLightLinearColor(const LLColor3& color)
         {
             param_block->setLinearColor(LLColor4(color, param_block->getLinearColor().mV[3]));
             parameterChanged(LLNetworkData::PARAMS_LIGHT, true);
-            gPipeline.markTextured(mDrawable);
+            if (mDrawable.notNull())
+            {
+                gPipeline.markTextured(mDrawable);
+            }
             mFaceMappingChanged = true;
         }
     }
@@ -3680,6 +3794,12 @@ void LLVOVolume::updateSpotLightPriority()
         return;
     }
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+
+    if (mDrawable.isNull())
+    {
+        mSpotLightPriority = 0.f;
+        return;
+    }
 
     F32 r = getLightRadius();
     LLVector3 pos = mDrawable->getPositionAgent();
@@ -4317,6 +4437,11 @@ void LLVOVolume::updateRiggingInfo()
 
 void LLVOVolume::generateSilhouette(LLSelectNode* nodep, const LLVector3& view_point)
 {
+    if (!nodep || mDrawable.isNull())
+    {
+        return;
+    }
+
     LLVolume *volume = getVolume();
 
     if (volume)
@@ -4807,10 +4932,11 @@ U32 LLVOVolume::getTriangleCount(S32* vcount) const
 {
     U32 count = 0;
     LLVolume* volume = getVolume();
-    if (volume)
+    if (!volume)
     {
-        count = volume->getNumTriangles(vcount);
+        return count;
     }
+    count = volume->getNumTriangles(vcount);
 
     return count;
 }
@@ -4963,7 +5089,10 @@ void LLVOVolume::setSelected(bool sel)
     LLViewerObject::setSelected(sel);
     if (isAnimatedObject())
     {
-        getRootEdit()->recursiveMarkForUpdate();
+        if (LLViewerObject* root = getRootEdit())
+        {
+            root->recursiveMarkForUpdate();
+        }
     }
     else
     {
@@ -4981,6 +5110,11 @@ void LLVOVolume::updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 F32 LLVOVolume::getBinRadius()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+    if (mDrawable.isNull())
+    {
+        return LLViewerObject::getBinRadius();
+    }
+
     F32 radius;
 
     static LLCachedControl<S32> octree_size_factor(gSavedSettings, "OctreeStaticObjectSizeFactor", 3);
@@ -5132,7 +5266,8 @@ bool LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
                                       LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 
 {
-    if (!mbCanSelect
+    if (mDrawable.isNull()
+        || !mbCanSelect
         || mDrawable->isDead()
         || !gPipeline.hasRenderType(mDrawable->getRenderType()))
     {

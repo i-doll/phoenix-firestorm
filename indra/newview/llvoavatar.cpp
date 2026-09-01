@@ -1506,7 +1506,7 @@ void LLVOAvatar::onShift(const LLVector4a& shift_vector)
 
 void LLVOAvatar::updateSpatialExtents(LLVector4a& newMin, LLVector4a &newMax)
 {
-    if (mDrawable.isNull())
+    if (mDrawable.isNull() || !mRoot || !mPelvisp)
     {
         return;
     }
@@ -2390,7 +2390,7 @@ bool LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
                     if (attached_object && !attached_object->isDead() && attachment->getValid())
                     {
                         LLDrawable* drawable = attached_object->mDrawable;
-                        if (drawable->isState(LLDrawable::RIGGED))
+                        if (drawable && drawable->isState(LLDrawable::RIGGED) && mDrawable.notNull())
                         { //regenerate octree for rigged attachment
                             gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_RIGGED);
                         }
@@ -2762,7 +2762,10 @@ void LLVOAvatar::releaseMeshData()
          ++iter)
     {
         LLAvatarJoint* joint = (*iter);
-        joint->setValid(false, true);
+        if (joint)
+        {
+            joint->setValid(false, true);
+        }
     }
 
     //cleanup data
@@ -2820,14 +2823,17 @@ void LLVOAvatar::restoreMeshData()
          ++iter)
     {
         LLViewerJointAttachment* attachment = iter->second;
-        if (!attachment->getIsHUDAttachment())
+        if (attachment && !attachment->getIsHUDAttachment())
         {
             attachment->setAttachmentVisibility(true);
         }
     }
 
     // force mesh update as LOD might not have changed to trigger this
-    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -3580,7 +3586,8 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
         mDrawable->movePartition();
 
         //force a move if sitting on an active object
-        if (getParent() && ((LLViewerObject*) getParent())->mDrawable->isActive())
+        LLViewerObject* parent = static_cast<LLViewerObject*>(getParent());
+        if (parent && parent->mDrawable.notNull() && parent->mDrawable->isActive())
         {
             gPipeline.markMoved(mDrawable, true);
         }
@@ -5495,6 +5502,11 @@ void LLVOAvatar::updateTimeStep()
 
 void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool was_sit_ground_constrained)
 {
+    if (!mRoot)
+    {
+        return;
+    }
+
     if (!(isSitting() && getParent()))
     {
         // This case includes all configurations except sitting on an
@@ -5835,6 +5847,11 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
 //-----------------------------------------------------------------------------
 void LLVOAvatar::updateHeadOffset()
 {
+    if (!mEyeLeftp || !mRoot)
+    {
+        return;
+    }
+
     // since we only care about Z, just grab one of the eyes
     LLVector3 midEyePt = mEyeLeftp->getWorldPosition();
     midEyePt -= mDrawable.notNull() ? mDrawable->getWorldPosition() : mRoot->getWorldPosition();
@@ -6026,7 +6043,8 @@ void LLVOAvatar::updateVisibility()
                      attachment_iter != attachment->mAttachedObjects.end();
                      ++attachment_iter)
                 {
-                    if (LLViewerObject *attached_object = attachment_iter->get())
+                    if (LLViewerObject *attached_object = attachment_iter->get();
+                        attached_object && attached_object->mDrawable.notNull())
                     {
                         if(attached_object->mDrawable->isVisible())
                         {
@@ -9033,6 +9051,14 @@ void LLVOAvatar::sitDown(bool bSitting)
 //-----------------------------------------------------------------------------
 void LLVOAvatar::sitOnObject(LLViewerObject *sit_object)
 {
+    // A seated avatar can arrive before the seat's deferred drawable creation
+    // has completed.  idleUpdate() retries sitOnObject() while the avatar is
+    // not yet sitting, so defer the parent transform until both sides exist.
+    if (!sit_object || mDrawable.isNull() || sit_object->mDrawable.isNull() || !mRoot)
+    {
+        return;
+    }
+
     if (isSelf())
     {
         // Might be first sit
@@ -9072,16 +9098,6 @@ void LLVOAvatar::sitOnObject(LLViewerObject *sit_object)
         // </FS:KC>
     }
 
-    if (mDrawable.isNull())
-    {
-        return;
-    }
-    if (sit_object->mDrawable.isNull())
-    {
-        // Seat has no drawable (delayed creation or already dead); the
-        // render-relative sit transform can't be computed against it.
-        return;
-    }
     LLQuaternion inv_obj_rot = ~sit_object->getRenderRotation();
     LLVector3 obj_pos = sit_object->getRenderPosition();
 
@@ -9110,8 +9126,9 @@ void LLVOAvatar::sitOnObject(LLViewerObject *sit_object)
 //-----------------------------------------------------------------------------
 void LLVOAvatar::getOffObject()
 {
-    if (mDrawable.isNull())
+    if (mDrawable.isNull() || !mRoot)
     {
+        sitDown(false);
         return;
     }
 
@@ -9942,7 +9959,10 @@ void LLVOAvatar::updateTooSlow()
     // <FS:Beq> better state change flagging
     if( changed_slow_state )
     {
-        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+        if (mDrawable.notNull())
+        {
+            gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+        }
     }
     // </FS:Beq>
 }
@@ -12052,7 +12072,8 @@ bool LLVOAvatar::updateLOD()
         return false;
     }
 
-    if (!LLPipeline::sImpostorRender && isImpostor() && 0 != mDrawable->getNumFaces() && mDrawable->getFace(0)->hasGeometry())
+    LLFace* impostor_face = mDrawable->getFace(0);
+    if (!LLPipeline::sImpostorRender && isImpostor() && impostor_face && impostor_face->hasGeometry())
     {
         return true;
     }
@@ -12090,8 +12111,9 @@ void showRigInfoTabExtents(LLVOAvatar *avatar, LLJointRiggingInfoTab& tab, S32& 
         if (tab[i].isRiggedTo())
         {
             count_rigged++;
-            LLJoint *joint = avatar->getJoint(i);
-            LL_DEBUGS("RigSpam") << "joint " << i << " name " << joint->getName() << " box "
+            LLJoint* joint = avatar ? avatar->getJoint(i) : nullptr;
+            LL_DEBUGS("RigSpam") << "joint " << i << " name "
+                                 << (joint ? joint->getName() : std::string("<missing>")) << " box "
                                  << tab[i].getRiggedExtents()[0] << ", " << tab[i].getRiggedExtents()[1] << LL_ENDL;
             if ((!tab[i].getRiggedExtents()[0].equals3(zero_vec)) ||
                 (!tab[i].getRiggedExtents()[1].equals3(zero_vec)))
@@ -12108,11 +12130,15 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
     for (const auto& iter : mAttachmentPoints)
     {
         LLViewerJointAttachment* attachment = iter.second;
+        if (!attachment)
+        {
+            continue;
+        }
         // LLViewerJointAttachment::attachedobjs_vec_t::iterator attach_end = attachment->mAttachedObjects.end(); // <FS:Beq/> set but not used
 
         for (LLViewerObject* attached_object : attachment->mAttachedObjects)
         {
-            if (attached_object->isDead())
+            if (!attached_object || attached_object->isDead())
                 continue;
 
             if (attached_object->getPCode() == LL_PCODE_VOLUME)
@@ -12130,7 +12156,7 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
 
             for (LLViewerObject* childp : attached_object->getChildren())
             {
-                if (!childp->isDead() &&  childp->getPCode() == LL_PCODE_VOLUME)
+                if (childp && !childp->isDead() && childp->getPCode() == LL_PCODE_VOLUME)
                 {
                     volumes.push_back((LLVOVolume*)childp);
                 }
@@ -12179,7 +12205,7 @@ void LLVOAvatar::updateRiggingInfo()
         // Get current rigging info key
         for (LLVOVolume* vol : volumes)
         {
-            if (vol->isRiggedMesh())
+            if (vol && vol->isRiggedMesh() && vol->getVolume())
             {
                 const LLUUID& mesh_id = vol->getVolume()->getParams().getSculptID();
                 S32 max_lod = llmax(vol->getLOD(), vol->mLastRiggingInfoLOD);
@@ -12203,8 +12229,11 @@ void LLVOAvatar::updateRiggingInfo()
     mJointRiggingInfoTab.clear();
     for (LLVOVolume* vol : volumes)
     {
-        vol->updateRiggingInfo();
-        mJointRiggingInfoTab.merge(vol->mJointRiggingInfoTab);
+        if (vol)
+        {
+            vol->updateRiggingInfo();
+            mJointRiggingInfoTab.merge(vol->mJointRiggingInfoTab);
+        }
     }
 
     //LL_INFOS() << "done update rig count is " << countRigInfoTab(mJointRiggingInfoTab) << LL_ENDL;
@@ -12346,6 +12375,15 @@ void LLVOAvatar::cacheImpostorValues()
 
 void LLVOAvatar::getImpostorValues(LLVector4a* extents, LLVector3& angle, F32& distance) const
 {
+    if (mDrawable.isNull())
+    {
+        extents[0].clear();
+        extents[1].clear();
+        angle.setVec(0.f, 0.f, 0.f);
+        distance = 0.f;
+        return;
+    }
+
     const LLVector4a* ext = mDrawable->getSpatialExtents();
     extents[0] = ext[0];
     extents[1] = ext[1];
@@ -13069,6 +13107,10 @@ void LLVOAvatar::accountRenderComplexityForObject(
                 iter != child_list.end(); ++iter)
             {
                 LLViewerObject* childp = *iter;
+                if (!childp)
+                {
+                    continue;
+                }
                 const LLVOVolume* chld_volume = dynamic_cast<LLVOVolume*>(childp);
                 if (chld_volume)
                 {

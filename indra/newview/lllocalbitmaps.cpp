@@ -516,12 +516,13 @@ void LLLocalBitmap::updateUserPrims(LLUUID old_id, LLUUID new_id, U32 channel)
             bool update_tex = false;
             bool update_mat = false;
             S32 num_faces = object->getNumFaces();
+            LLPointer<LLDrawable> drawable = object->mDrawable;
 
             for (U8 face_iter = 0; face_iter < num_faces; face_iter++)
             {
-                if (object->mDrawable)
+                if (drawable.notNull())
                 {
-                    LLFace* face = object->mDrawable->getFace(face_iter);
+                    LLFace* face = drawable->getFace(face_iter);
                     if (face && face->getTexture(channel) && face->getTexture(channel)->getID() == old_id)
                     {
                         // these things differ per channel, unless there already is a universal
@@ -563,9 +564,12 @@ void LLLocalBitmap::updateUserPrims(LLUUID old_id, LLUUID new_id, U32 channel)
                 object->sendTEUpdate();
             }
 
-            if (update_mat)
+            if (update_mat && drawable.notNull())
             {
-                object->mDrawable->getVOVolume()->faceMappingChanged();
+                if (LLVOVolume* volume = drawable->getVOVolume())
+                {
+                    volume->faceMappingChanged();
+                }
             }
         }
     }
@@ -1324,4 +1328,3 @@ void LLLocalBitmapMgr::doRebake()
         mNeedsRebake = false;
     }
 }
-
