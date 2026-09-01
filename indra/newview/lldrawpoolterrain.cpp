@@ -33,6 +33,7 @@
 #include "llagent.h"
 #include "llviewercontrol.h"
 #include "lldrawable.h"
+#include "llviewerobject.h"
 #include "llface.h"
 #include "llsky.h"
 #include "llsurface.h"
@@ -59,6 +60,13 @@ F32 LLDrawPoolTerrain::sDetailScale = DETAIL_SCALE;
 F32 LLDrawPoolTerrain::sPBRDetailScale = DETAIL_SCALE;
 static LLGLSLShader* sShader = NULL;
 static LLTrace::BlockTimerStatHandle FTM_SHADOW_TERRAIN("Terrain Shadow");
+
+static LLViewerRegion* getTerrainRegion(const LLFace* facep)
+{
+    LLDrawable* drawablep = facep ? facep->getDrawable() : nullptr;
+    LLViewerObject* objectp = drawablep ? drawablep->getVObj() : nullptr;
+    return objectp ? objectp->getRegion() : nullptr;
+}
 
 
 LLDrawPoolTerrain::LLDrawPoolTerrain(LLViewerTexture *texturep) :
@@ -124,9 +132,14 @@ void LLDrawPoolTerrain::prerender()
 void LLDrawPoolTerrain::boostTerrainDetailTextures()
 {
     // Hack! Get the region that this draw pool is rendering from!
-    LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
-    LLVLComposition *compp = regionp->getComposition();
-    compp->boost();
+    LLViewerRegion* regionp = mDrawFace.empty() ? nullptr : getTerrainRegion(mDrawFace[0]);
+    if (regionp)
+    {
+        if (LLVLComposition* compp = regionp->getComposition())
+        {
+            compp->boost();
+        }
+    }
 }
 
 void LLDrawPoolTerrain::beginDeferredPass(S32 pass)
@@ -206,9 +219,14 @@ void LLDrawPoolTerrain::drawLoop()
              iter != mDrawFace.end(); iter++)
         {
             LLFace *facep = *iter;
+            LLViewerRegion* regionp = getTerrainRegion(facep);
+            if (!regionp)
+            {
+                continue;
+            }
 
             llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
-            LLRenderPass::applyModelMatrix(&facep->getDrawable()->getRegion()->mRenderMatrix);
+            LLRenderPass::applyModelMatrix(&regionp->mRenderMatrix);
 
             facep->renderIndexed();
         }
@@ -219,8 +237,12 @@ void LLDrawPoolTerrain::renderFullShader()
 {
     const bool use_local_materials = gLocalTerrainMaterials.makeMaterialsReady(true, false);
     // Hack! Get the region that this draw pool is rendering from!
-    LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
-    LLVLComposition *compp = regionp->getComposition();
+    LLViewerRegion* regionp = mDrawFace.empty() ? nullptr : getTerrainRegion(mDrawFace[0]);
+    LLVLComposition* compp = regionp ? regionp->getComposition() : nullptr;
+    if (!compp)
+    {
+        return;
+    }
     const bool use_textures = !use_local_materials && (compp->getMaterialType() == LLTerrainMaterials::Type::TEXTURE);
 
     if (use_textures)
@@ -244,8 +266,12 @@ void LLDrawPoolTerrain::renderFullShader()
 void LLDrawPoolTerrain::renderFullShaderTextures()
 {
     // Hack! Get the region that this draw pool is rendering from!
-    LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
-    LLVLComposition *compp = regionp->getComposition();
+    LLViewerRegion* regionp = mDrawFace.empty() ? nullptr : getTerrainRegion(mDrawFace[0]);
+    LLVLComposition* compp = regionp ? regionp->getComposition() : nullptr;
+    if (!compp)
+    {
+        return;
+    }
 
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
     LLViewerTexture *detail_texture0p = (LLPipeline::sRenderTextures) ? compp->mDetailTextures[0] : LLViewerFetchedTexture::sDefaultDiffuseImagep;
@@ -258,7 +284,7 @@ void LLDrawPoolTerrain::renderFullShaderTextures()
 //  LLViewerTexture *detail_texture2p = compp->mDetailTextures[2];
 //  LLViewerTexture *detail_texture3p = compp->mDetailTextures[3];
 
-    LLVector3d region_origin_global = gAgent.getRegion()->getOriginGlobal();
+    LLVector3d region_origin_global = regionp->getOriginGlobal();
     F32 offset_x = (F32)fmod(region_origin_global.mdV[VX], 1.0/(F64)sDetailScale)*sDetailScale;
     F32 offset_y = (F32)fmod(region_origin_global.mdV[VY], 1.0/(F64)sDetailScale)*sDetailScale;
 
@@ -351,8 +377,12 @@ void LLDrawPoolTerrain::renderFullShaderTextures()
 void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
 {
     // Hack! Get the region that this draw pool is rendering from!
-    LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
-    LLVLComposition *compp = regionp->getComposition();
+    LLViewerRegion* regionp = mDrawFace.empty() ? nullptr : getTerrainRegion(mDrawFace[0]);
+    LLVLComposition* compp = regionp ? regionp->getComposition() : nullptr;
+    if (!compp)
+    {
+        return;
+    }
     LLPointer<LLFetchedGLTFMaterial> (*fetched_materials)[LLVLComposition::ASSET_COUNT] = &compp->mDetailRenderMaterials;
 
     constexpr U32 terrain_material_count = LLVLComposition::ASSET_COUNT;
@@ -659,8 +689,12 @@ void LLDrawPoolTerrain::hilightParcelOwners()
 void LLDrawPoolTerrain::renderFull4TU()
 {
     // Hack! Get the region that this draw pool is rendering from!
-    LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
-    LLVLComposition *compp = regionp->getComposition();
+    LLViewerRegion* regionp = mDrawFace.empty() ? nullptr : getTerrainRegion(mDrawFace[0]);
+    LLVLComposition* compp = regionp ? regionp->getComposition() : nullptr;
+    if (!compp)
+    {
+        return;
+    }
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
     LLViewerTexture *detail_texture0p = (LLPipeline::sRenderTextures) ? compp->mDetailTextures[0] : LLViewerFetchedTexture::sDefaultDiffuseImagep;
     LLViewerTexture *detail_texture1p = (LLPipeline::sRenderTextures) ? compp->mDetailTextures[1] : LLViewerFetchedTexture::sDefaultDiffuseImagep;
@@ -672,7 +706,7 @@ void LLDrawPoolTerrain::renderFull4TU()
 //  LLViewerTexture *detail_texture2p = compp->mDetailTextures[2];
 //  LLViewerTexture *detail_texture3p = compp->mDetailTextures[3];
 
-    LLVector3d region_origin_global = gAgent.getRegion()->getOriginGlobal();
+    LLVector3d region_origin_global = regionp->getOriginGlobal();
     F32 offset_x = (F32)fmod(region_origin_global.mdV[VX], 1.0/(F64)sDetailScale)*sDetailScale;
     F32 offset_y = (F32)fmod(region_origin_global.mdV[VY], 1.0/(F64)sDetailScale)*sDetailScale;
 
@@ -842,8 +876,12 @@ void LLDrawPoolTerrain::renderFull4TU()
 void LLDrawPoolTerrain::renderFull2TU()
 {
     // Hack! Get the region that this draw pool is rendering from!
-    LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
-    LLVLComposition *compp = regionp->getComposition();
+    LLViewerRegion* regionp = mDrawFace.empty() ? nullptr : getTerrainRegion(mDrawFace[0]);
+    LLVLComposition* compp = regionp ? regionp->getComposition() : nullptr;
+    if (!compp)
+    {
+        return;
+    }
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
     LLViewerTexture *detail_texture0p = (LLPipeline::sRenderTextures) ? compp->mDetailTextures[0] : LLViewerFetchedTexture::sDefaultDiffuseImagep;
     LLViewerTexture *detail_texture1p = (LLPipeline::sRenderTextures) ? compp->mDetailTextures[1] : LLViewerFetchedTexture::sDefaultDiffuseImagep;
@@ -855,7 +893,7 @@ void LLDrawPoolTerrain::renderFull2TU()
 //  LLViewerTexture *detail_texture2p = compp->mDetailTextures[2];
 //  LLViewerTexture *detail_texture3p = compp->mDetailTextures[3];
 
-    LLVector3d region_origin_global = gAgent.getRegion()->getOriginGlobal();
+    LLVector3d region_origin_global = regionp->getOriginGlobal();
     F32 offset_x = (F32)fmod(region_origin_global.mdV[VX], 1.0/(F64)sDetailScale)*sDetailScale;
     F32 offset_y = (F32)fmod(region_origin_global.mdV[VY], 1.0/(F64)sDetailScale)*sDetailScale;
 
@@ -1009,6 +1047,12 @@ void LLDrawPoolTerrain::renderFull2TU()
 
 void LLDrawPoolTerrain::renderSimple()
 {
+    LLViewerRegion* regionp = mDrawFace.empty() ? nullptr : getTerrainRegion(mDrawFace[0]);
+    if (!regionp)
+    {
+        return;
+    }
+
     LLVector4 tp0, tp1;
 
     //----------------------------------------------------------------------------
@@ -1021,7 +1065,7 @@ void LLDrawPoolTerrain::renderSimple()
     gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
     gGL.getTexUnit(0)->bind(mTexturep);
 
-    LLVector3 origin_agent = mDrawFace[0]->getDrawable()->getVObj()->getRegion()->getOriginAgent();
+    LLVector3 origin_agent = regionp->getOriginAgent();
     F32 tscale = 1.f/256.f;
     tp0.setVec(tscale, 0.f, 0.0f, -1.f*(origin_agent.mV[0]/256.f));
     tp1.setVec(0.f, tscale, 0.0f, -1.f*(origin_agent.mV[1]/256.f));
@@ -1047,20 +1091,31 @@ void LLDrawPoolTerrain::renderOwnership()
 {
     LLGLSPipelineAlpha gls_pipeline_alpha;
 
-    llassert(!mDrawFace.empty());
+    if (mDrawFace.empty())
+    {
+        return;
+    }
 
     // Each terrain pool is associated with a single region.
     // We need to peek back into the viewer's data to find out
     // which ownership overlay texture to use.
-    LLFace                  *facep              = mDrawFace[0];
-    LLDrawable              *drawablep          = facep->getDrawable();
-    const LLViewerObject    *objectp                = drawablep->getVObj();
+    LLFace* facep = mDrawFace[0];
+    LLDrawable* drawablep = facep ? facep->getDrawable() : nullptr;
+    const LLViewerObject* objectp = drawablep ? drawablep->getVObj() : nullptr;
+    if (!objectp)
+    {
+        return;
+    }
     const LLVOSurfacePatch  *vo_surface_patchp  = (LLVOSurfacePatch *)objectp;
     LLSurfacePatch          *surface_patchp     = vo_surface_patchp->getPatch();
-    LLSurface               *surfacep           = surface_patchp->getSurface();
-    LLViewerRegion          *regionp            = surfacep->getRegion();
-    LLViewerParcelOverlay   *overlayp           = regionp->getParcelOverlay();
-    LLViewerTexture         *texturep           = overlayp->getTexture();
+    LLSurface* surfacep = surface_patchp ? surface_patchp->getSurface() : nullptr;
+    LLViewerRegion* regionp = surfacep ? surfacep->getRegion() : nullptr;
+    LLViewerParcelOverlay* overlayp = regionp ? regionp->getParcelOverlay() : nullptr;
+    LLViewerTexture* texturep = overlayp ? overlayp->getTexture() : nullptr;
+    if (!texturep)
+    {
+        return;
+    }
 
     gGL.getTexUnit(0)->bind(texturep);
 
@@ -1077,7 +1132,10 @@ void LLDrawPoolTerrain::renderOwnership()
          iter != mDrawFace.end(); iter++)
     {
         LLFace *facep = *iter;
-        facep->renderIndexed();
+        if (facep && facep->getDrawable())
+        {
+            facep->renderIndexed();
+        }
     }
 
     gGL.matrixMode(LLRender::MM_TEXTURE);
@@ -1096,7 +1154,10 @@ void LLDrawPoolTerrain::dirtyTextures(const std::set<LLViewerFetchedTexture*>& t
              iter != mReferences.end(); iter++)
         {
             LLFace *facep = *iter;
-            gPipeline.markTextured(facep->getDrawable());
+            if (facep && facep->getDrawable())
+            {
+                gPipeline.markTextured(facep->getDrawable());
+            }
         }
     }
 }

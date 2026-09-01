@@ -124,7 +124,10 @@ void LLVOWLSky::resetVertexBuffers()
     mStarsVerts = nullptr;
     mFsSkyVerts = nullptr;
 
-    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
+    }
 }
 
 void LLVOWLSky::cleanupGL()
@@ -139,7 +142,10 @@ void LLVOWLSky::cleanupGL()
 void LLVOWLSky::restoreGL()
 {
     LLDrawPoolWLSky::restoreGL();
-    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
+    }
 }
 
 bool LLVOWLSky::updateGeometry(LLDrawable * drawable)

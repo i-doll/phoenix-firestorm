@@ -1436,7 +1436,10 @@ void LLVOAvatarSelf::restoreMeshData()
     updateAttachmentVisibility(gAgentCamera.getCameraMode());
 
     // force mesh update as LOD might not have changed to trigger this
-    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+    }
 }
 
 
@@ -3805,4 +3808,3 @@ void LLVOAvatarSelf::processRebakeAvatarTextures(LLMessageSystem* msg, void**)
     }
 }
 // </FS:Ansariel> [Legacy Bake]
-

@@ -345,12 +345,21 @@ void LLVOGrass::updateTextures()
 
 bool LLVOGrass::updateLOD()
 {
+    if (mDrawable.isNull())
+    {
+        return false;
+    }
+
     if (mDrawable->getNumFaces() <= 0)
     {
         return false;
     }
 
     LLFace* face = mDrawable->getFace(0);
+    if (!face)
+    {
+        return false;
+    }
 
     if(LLVOTree::isTreeRenderingStopped())
     {
@@ -416,6 +425,10 @@ static LLTrace::BlockTimerStatHandle FTM_UPDATE_GRASS("Update Grass");
 bool LLVOGrass::updateGeometry(LLDrawable *drawable)
 {
     LL_RECORD_BLOCK_TIME(FTM_UPDATE_GRASS);
+    if (!drawable || mDrawable.isNull())
+    {
+        return true;
+    }
 
     dirtySpatialGroup();
 
@@ -439,6 +452,11 @@ bool LLVOGrass::updateGeometry(LLDrawable *drawable)
 
 void LLVOGrass::plantBlades()
 {
+    if (mDrawable.isNull() || !mRegionp)
+    {
+        return;
+    }
+
     // It is possible that the species of a grass is not defined
     // This is bad, but not the end of the world.
     if (!sSpeciesTable.count(mSpecies))
@@ -453,18 +471,20 @@ void LLVOGrass::plantBlades()
     }
 
     LLFace *face = mDrawable->getFace(0);
-    if (face)
+    if (!face)
     {
-        face->setTexture(getTEImage(0));
-        face->setState(LLFace::GLOBAL);
-        face->setSize(mNumBlades * 8, mNumBlades * 12);
-        face->setVertexBuffer(NULL);
-        face->setTEOffset(0);
-        face->mCenterLocal = mPosition + mRegionp->getOriginAgent();
-        const LLVector4a* ext = mDrawable->getSpatialExtents();
-        face->mExtents[0] = ext[0];
-        face->mExtents[1] = ext[1];
+        return;
     }
+
+    face->setTexture(getTEImage(0));
+    face->setState(LLFace::GLOBAL);
+    face->setSize(mNumBlades * 8, mNumBlades * 12);
+    face->setVertexBuffer(NULL);
+    face->setTEOffset(0);
+    face->mCenterLocal = mPosition + mRegionp->getOriginAgent();
+    const LLVector4a* ext = mDrawable->getSpatialExtents();
+    face->mExtents[0] = ext[0];
+    face->mExtents[1] = ext[1];
 
     mDepth = (face->mCenterLocal - LLViewerCamera::getInstance()->getOrigin())*LLViewerCamera::getInstance()->getAtAxis();
     mDrawable->setPosition(face->mCenterLocal);
@@ -480,7 +500,7 @@ void LLVOGrass::getGeometry(S32 idx,
                                 LLStrider<LLColor4U>& emissivep,
                                 LLStrider<U16>& indicesp)
 {
-    if(!mNumBlades)//stop rendering grass
+    if(!mNumBlades || !mRegionp)//stop rendering grass or wait for a region
     {
         return ;
     }
@@ -794,7 +814,8 @@ bool LLVOGrass::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
                                       LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 {
     bool ret = false;
-    if (!mbCanSelect ||
+    if (mDrawable.isNull() ||
+        !mbCanSelect ||
         mDrawable->isDead() ||
         !gPipeline.hasRenderType(mDrawable->getRenderType()))
     {
@@ -938,4 +959,3 @@ bool LLVOGrass::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
 
     return ret;
 }
-

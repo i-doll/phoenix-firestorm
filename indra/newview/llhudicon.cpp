@@ -89,7 +89,7 @@ void LLHUDIcon::render()
     if (mHidden)
         return;
 
-    if (mSourceObject.isNull() || mImagep.isNull())
+    if (mSourceObject.isNull() || mSourceObject->isDead() || mSourceObject->mDrawable.isNull() || mImagep.isNull())
     {
         markDead();
         return;
@@ -201,7 +201,7 @@ bool LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
     if (mHidden)
         return false;
 
-    if (mSourceObject.isNull() || mImagep.isNull())
+    if (mSourceObject.isNull() || mSourceObject->isDead() || mSourceObject->mDrawable.isNull() || mImagep.isNull())
     {
         markDead();
         return false;

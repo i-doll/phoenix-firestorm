@@ -1899,7 +1899,10 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
         mInvisibilityCheckHistory |= 1;
         for (auto drawable : delete_list)
         {
-            gObjectList.killObject(drawable->getVObj());
+            if (drawable && drawable->getVObj())
+            {
+                gObjectList.killObject(drawable->getVObj());
+            }
         }
         delete_list.clear();
     }
@@ -1911,6 +1914,11 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>& delete_list)
 {
     //kill the object.
+    if (!entry || !entry->getEntry())
+    {
+        return;
+    }
+
     LLDrawable* drawablep = (LLDrawable*)entry->getEntry()->getDrawable();
     llassert(drawablep);
     llassert(drawablep->getRegion() == this);
@@ -1918,6 +1926,10 @@ void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>&
     if(drawablep && !drawablep->getParent())
     {
         LLViewerObject* v_obj = drawablep->getVObj();
+        if (!v_obj)
+        {
+            return;
+        }
         if (v_obj->isSelected()
             || (v_obj->flagAnimSource() && isAgentAvatarValid() && gAgentAvatarp->hasMotionFromSource(v_obj->getID())))
         {
@@ -1930,7 +1942,7 @@ void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>&
             iter != child_list.end(); iter++)
         {
             LLViewerObject* child = *iter;
-            if(child->mDrawable)
+            if(child && child->mDrawable)
             {
                 if( !child->mDrawable->getEntry()
                     || !child->mDrawable->getEntry()->hasVOCacheEntry()

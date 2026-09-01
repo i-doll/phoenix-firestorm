@@ -1271,7 +1271,9 @@ void LLManipScale::stretchFace( const LLVector3& drag_start_agent, const LLVecto
                 }
                 else
                 {
-                    LLXform* parent_xform = cur->mDrawable->getXform()->getParent();
+                    LLXform* parent_xform = cur->mDrawable.notNull()
+                        ? cur->mDrawable->getXform()->getParent()
+                        : NULL;
                     LLVector3 new_pos_local;
                     // this works in attachment point space using world space delta
                     if (parent_xform)

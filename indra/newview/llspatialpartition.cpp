@@ -2148,6 +2148,12 @@ void renderNormals(LLDrawable *drawablep)
             for (auto it = drawable_faces->begin(); it != drawable_faces->end(); ++it)
             {
                 LLFace* facep = *it;
+                LLDrawable* drawablep = facep ? facep->getDrawable() : nullptr;
+                LLViewerRegion* regionp = drawablep ? drawablep->getRegion() : nullptr;
+                if (!regionp)
+                {
+                    continue;
+                }
                 LLFace& face = **it;
                 LLVertexBuffer* buf = face.getVertexBuffer();
                 if (!buf) { continue; }
@@ -2167,7 +2173,7 @@ void renderNormals(LLDrawable *drawablep)
 
                 shader->uniform1f(LLShaderMgr::DEBUG_NORMAL_DRAW_LENGTH, draw_length);
 
-                LLRenderPass::applyModelMatrix(&facep->getDrawable()->getRegion()->mRenderMatrix);
+                LLRenderPass::applyModelMatrix(&regionp->mRenderMatrix);
 
                 buf->setBuffer();
                 // *NOTE: The render type in the vertex shader is TRIANGLES, but gets converted to LINES in the geometry shader
@@ -3167,23 +3173,38 @@ void renderRaycast(LLDrawable* drawablep)
 
 void renderAvatarCollisionVolumes(LLVOAvatar* avatar)
 {
-    avatar->renderCollisionVolumes();
+    if (avatar)
+    {
+        avatar->renderCollisionVolumes();
+    }
 }
 
 void renderAvatarBones(LLVOAvatar* avatar)
 {
-    avatar->renderBones();
+    if (avatar)
+    {
+        avatar->renderBones();
+    }
 }
 
 void renderAgentTarget(LLVOAvatar* avatar)
 {
     // render these for self only (why, i don't know)
-    if (avatar->isSelf())
+    if (avatar && avatar->isSelf())
     {
         renderCrossHairs(avatar->getPositionAgent(), 0.2f, LLColor4(1, 0, 0, 0.8f));
-        renderCrossHairs(avatar->mDrawable->getPositionAgent(), 0.2f, LLColor4(0, 1, 0, 0.8f));
-        renderCrossHairs(avatar->mRoot->getWorldPosition(), 0.2f, LLColor4(1, 1, 1, 0.8f));
-        renderCrossHairs(avatar->mPelvisp->getWorldPosition(), 0.2f, LLColor4(0, 0, 1, 0.8f));
+        if (avatar->mDrawable.notNull())
+        {
+            renderCrossHairs(avatar->mDrawable->getPositionAgent(), 0.2f, LLColor4(0, 1, 0, 0.8f));
+        }
+        if (avatar->mRoot)
+        {
+            renderCrossHairs(avatar->mRoot->getWorldPosition(), 0.2f, LLColor4(1, 1, 1, 0.8f));
+        }
+        if (avatar->mPelvisp)
+        {
+            renderCrossHairs(avatar->mPelvisp->getWorldPosition(), 0.2f, LLColor4(0, 0, 1, 0.8f));
+        }
     }
 }
 

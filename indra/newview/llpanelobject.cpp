@@ -1499,13 +1499,24 @@ void LLPanelObject::deactivateStandardFields()
 
 void LLPanelObject::activateMeshFields(LLViewerObject* objectp)
 {
+    if (!objectp || objectp->mDrawable.isNull())
+    {
+        return;
+    }
+
+    LLVOVolume* volume = objectp->mDrawable->getVOVolume();
+    if (!volume)
+    {
+        return;
+    }
+
     LLStringUtil::format_map_t args;
     static const char * dataFields[4] = { "LOWESTTRIS", "LOWTRIS", "MIDTRIS", "HIGHTRIS" };
 
     LLTextBox* num_tris = getChild<LLTextBox>("mesh_lod_num_tris");
     for (int i = 0; i < 4; i++)
     {
-        args[dataFields[i]] = llformat("%d", objectp->mDrawable->getVOVolume()->getLODTriangleCount(i));
+        args[dataFields[i]] = llformat("%d", volume->getLODTriangleCount(i));
     }
     num_tris->setText(getString("mesh_lod_num_tris_values",args));
     num_tris->setVisible(true);

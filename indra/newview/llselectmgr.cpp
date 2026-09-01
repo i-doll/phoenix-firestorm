@@ -5644,7 +5644,9 @@ void LLSelectMgr::saveSelectedObjectTransform(EActionType action_type)
                 {
                     if (object->isRootEdit())
                     {
-                        LLXform* parent_xform = object->mDrawable->getXform()->getParent();
+                        LLXform* parent_xform = object->mDrawable.notNull()
+                            ? object->mDrawable->getXform()->getParent()
+                            : NULL;
                         if (parent_xform)
                         {
                             selectNode->mSavedPositionGlobal = gAgent.getPosGlobalFromAgent((object->getPosition() * parent_xform->getWorldRotation()) + parent_xform->getWorldPosition());
@@ -5657,7 +5659,9 @@ void LLSelectMgr::saveSelectedObjectTransform(EActionType action_type)
                     else
                     {
                         LLViewerObject* attachment_root = (LLViewerObject*)object->getParent();
-                        LLXform* parent_xform = attachment_root ? attachment_root->mDrawable->getXform()->getParent() : NULL;
+                        LLXform* parent_xform = attachment_root && attachment_root->mDrawable.notNull()
+                            ? attachment_root->mDrawable->getXform()->getParent()
+                            : NULL;
                         if (parent_xform)
                         {
                             LLVector3 root_pos = (attachment_root->getPosition() * parent_xform->getWorldRotation()) + parent_xform->getWorldPosition();
@@ -6856,6 +6860,11 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
 
     auto renderMeshSelection_f = [fogCfx, wireframe_selection](LLSelectNode* node, LLViewerObject* objectp, LLColor4 hlColor)
     {
+        if (!node || !objectp || objectp->mDrawable.isNull())
+        {
+            return;
+        }
+
         LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
         if (shader)
@@ -6907,7 +6916,10 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
         {
             if (node->isTESelected(te))
             {
-                objectp->mDrawable->getFace(te)->renderOneWireframe(hlColor, fogCfx, wireframe_selection, bRenderHidenSelection, nullptr != shader);
+                if (LLFace* face = objectp->mDrawable->getFace(te))
+                {
+                    face->renderOneWireframe(hlColor, fogCfx, wireframe_selection, bRenderHidenSelection, nullptr != shader);
+                }
             }
         }
 

@@ -360,7 +360,8 @@ void LLHUDEffectPointAt::setSourceObject(LLViewerObject* objectp)
 void LLHUDEffectPointAt::render()
 {
     update();
-    if (sDebugPointAt && mTargetType != POINTAT_TARGET_NONE)
+    if (sDebugPointAt && mTargetType != POINTAT_TARGET_NONE &&
+        mSourceObject.notNull() && !mSourceObject->isDead())
     {
         //LLGLDisable gls_stencil(GL_STENCIL_TEST);
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -433,6 +434,12 @@ void LLHUDEffectPointAt::update()
 bool LLHUDEffectPointAt::calcTargetPosition()
 {
     LLViewerObject *targetObject = (LLViewerObject *)mTargetObject;
+    LLViewerObject *sourceObject = (LLViewerObject *)mSourceObject;
+    if (!sourceObject || sourceObject->isDead())
+    {
+        return false;
+    }
+
     LLVector3 local_offset;
 
     if (targetObject)
@@ -450,8 +457,8 @@ bool LLHUDEffectPointAt::calcTargetPosition()
         if (targetObject->isAvatar())
         {
             LLVOAvatar *avatarp = (LLVOAvatar *)targetObject;
-            mTargetPos = avatarp->mHeadp->getWorldPosition();
-            objRot = avatarp->mPelvisp->getWorldRotation();
+            mTargetPos = avatarp->mHeadp ? avatarp->mHeadp->getWorldPosition() : avatarp->getRenderPosition();
+            objRot = avatarp->mPelvisp ? avatarp->mPelvisp->getWorldRotation() : avatarp->getRenderRotation();
         }
         else
         {
@@ -474,16 +481,16 @@ bool LLHUDEffectPointAt::calcTargetPosition()
         mTargetPos = local_offset;
     }
 
-    mTargetPos -= mSourceObject->getRenderPosition();
+    mTargetPos -= sourceObject->getRenderPosition();
 
     if (!llfinite(mTargetPos.lengthSquared()))
     {
         return false;
     }
 
-    if (mSourceObject->isAvatar())
+    if (sourceObject->isAvatar())
     {
-        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->setAnimationData("PointAtPoint", (void *)&mTargetPos);
+        ((LLVOAvatar*)sourceObject)->setAnimationData("PointAtPoint", (void *)&mTargetPos);
     }
 
     return true;
@@ -493,7 +500,7 @@ const LLVector3d LLHUDEffectPointAt::getPointAtPosGlobal()
 {
     LLVector3d global_pos;
     global_pos.setVec(mTargetPos);
-    if (mSourceObject.notNull())
+    if (mSourceObject.notNull() && !mSourceObject->isDead())
     {
         global_pos += mSourceObject->getPositionGlobal();
     }

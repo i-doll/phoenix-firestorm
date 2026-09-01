@@ -111,6 +111,11 @@ LLDrawable *LLVOWater::createDrawable(LLPipeline *pipeline)
 bool LLVOWater::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
+    if (!drawable || mDrawable.isNull())
+    {
+        return true;
+    }
+
     LLFace *face;
 
     if (drawable->getNumFaces() < 1)
@@ -224,7 +229,7 @@ bool LLVOWater::updateGeometry(LLDrawable *drawable)
 
     buff->unmapBuffer();
 
-    mDrawable->movePartition();
+    drawable->movePartition();
     LLPipeline::sCompiles++;
     return true;
 }
@@ -263,7 +268,10 @@ void LLVOWater::updateSpatialExtents(LLVector4a &newMin, LLVector4a& newMax)
     pos.setAdd(newMin,newMax);
     pos.mul(0.5f);
 
-    mDrawable->setPositionGroup(pos);
+    if (mDrawable.notNull())
+    {
+        mDrawable->setPositionGroup(pos);
+    }
 }
 
 U32 LLVOWater::getPartitionType() const

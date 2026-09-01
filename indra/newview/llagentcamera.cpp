@@ -1719,6 +1719,10 @@ void LLAgentCamera::updateCamera()
         {
             LLVOAvatar::attachment_map_t::iterator curiter = iter++;
             LLViewerJointAttachment* attachment = curiter->second;
+            if (!attachment)
+            {
+                continue;
+            }
             for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
                  attachment_iter != attachment->mAttachedObjects.end();
                  ++attachment_iter)
