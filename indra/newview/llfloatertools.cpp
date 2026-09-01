@@ -798,11 +798,11 @@ void LLFloaterTools::refresh()
 // <FS:CR> FIRE-9287 - LI/Prim count not reflected on OpenSim
 #ifdef OPENSIM
         if (LLGridManager::getInstance()->isInOpenSim())
-            selection_args["LAND_IMPACT"] = llformat("%.1d", (link_cost ? (S32)link_cost : prim_count));
+            selection_args["LAND_IMPACT"] = (link_cost ? llformat("%.1f", link_cost) : llformat("%d", prim_count));
         else
 #endif // OPENSIM
 // </FS:CR>
-        selection_args["LAND_IMPACT"] = llformat("%.1d", (S32)link_cost);
+        selection_args["LAND_IMPACT"] = llformat("%.1f", link_cost);
         selection_args["PRIM_COUNT"] = llformat("%d", prim_count); // <FS:Ansariel> FIRE-36994: Always display prim count too
 
         mTextSelectionCount->setText(getString("status_selectcount", selection_args));
