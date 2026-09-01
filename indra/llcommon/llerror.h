@@ -67,7 +67,9 @@ const int LL_ERR_NOERR = 0;
 #define SHOW_ASSERT
 #else // _DEBUG
 
-#ifdef LL_RELEASE_WITH_DEBUG_INFO
+// RelWithDebInfo builds run with asserts disabled; define
+// LL_RELWITHDEBINFO_SHOW_ASSERT to turn llassert back into a hard abort.
+#if defined(LL_RELEASE_WITH_DEBUG_INFO) && defined(LL_RELWITHDEBINFO_SHOW_ASSERT)
 #define SHOW_ASSERT
 #endif // LL_RELEASE_WITH_DEBUG_INFO
 
