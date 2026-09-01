@@ -309,6 +309,15 @@ private:
 
 inline LLFace* LLDrawable::getFace(const S32 i) const
 {
+    // A drawable can be removed after a cull result or deferred render item
+    // has kept its raw pointer.  Most pipeline paths validate it before this
+    // point, but returning no face is safer than dereferencing a null drawable
+    // from a late consumer.
+    if (!this)
+    {
+        return nullptr;
+    }
+
     //switch these asserts to LL_ERRS() -- davep
     //llassert((U32)i < mFaces.size());
     //llassert(mFaces[i]);
