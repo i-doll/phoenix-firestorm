@@ -1567,6 +1567,10 @@ struct FSPanelFaceSetAlignedTEFunctor : public LLSelectedTEFunctor
 
     virtual bool apply(LLViewerObject* object, S32 te)
     {
+        if (!object || object->mDrawable.isNull())
+        {
+            return true;
+        }
         LLFace* facep = object->mDrawable->getFace(te);
         if (!facep)
         {
@@ -1652,6 +1656,10 @@ struct FSPanelFaceSetAlignedConcreteTEFunctor : public LLSelectedTEFunctor
 
     virtual bool apply(LLViewerObject* object, S32 te)
     {
+        if (!object || object->mDrawable.isNull())
+        {
+            return true;
+        }
         LLFace* facep = object->mDrawable->getFace(te);
         if (!facep)
         {
@@ -1718,6 +1726,10 @@ struct FSPanelFaceGetIsAlignedTEFunctor : public LLSelectedTEFunctor
 
     virtual bool apply(LLViewerObject* object, S32 te)
     {
+        if (!object || object->mDrawable.isNull())
+        {
+            return false;
+        }
         LLFace* facep = object->mDrawable->getFace(te);
         if (!facep)
         {
@@ -6150,7 +6162,7 @@ void FSPanelFace::LLSelectedTE::getFace(LLFace*& face_to_return, bool& identical
     {
         LLFace* get(LLViewerObject* object, S32 te)
         {
-            return (object->mDrawable) ? object->mDrawable->getFace(te): NULL;
+            return (object && object->mDrawable.notNull()) ? object->mDrawable->getFace(te) : NULL;
         }
     } get_te_face_func;
 

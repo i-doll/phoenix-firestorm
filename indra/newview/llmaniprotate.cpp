@@ -627,7 +627,8 @@ void LLManipRotate::drag( S32 x, S32 y )
                     object->saveUnselectedChildrenPosition(child_positions);
                 }
 
-                if (object->getParent() && object->mDrawable.notNull())
+                if (object->getParent() && object->mDrawable.notNull() &&
+                    object->mDrawable->mXform.getParent())
                 {
                     LLQuaternion invParentRotation = object->mDrawable->mXform.getParent()->getWorldRotation();
                     invParentRotation.transQuat();
@@ -698,7 +699,8 @@ void LLManipRotate::drag( S32 x, S32 y )
                 }
                 else
                 {
-                    if (object->isAttachment() && object->mDrawable.notNull())
+                    if (object->isAttachment() && object->mDrawable.notNull() &&
+                        object->mDrawable->getXform()->getParent())
                     {
                         // need to work in drawable space to handle selected items from multiple attachments
                         // (which have no shared frame of reference other than their render positions)
@@ -743,7 +745,8 @@ void LLManipRotate::drag( S32 x, S32 y )
                     }
                     else if (object->isRootEdit())
                     {
-                        if (object->isAttachment() && object->mDrawable.notNull())
+                        if (object->isAttachment() && object->mDrawable.notNull() &&
+                            object->mDrawable->getXform()->getParent())
                         {
                             LLXform* parent_xform = object->mDrawable->getXform()->getParent();
                             object->setPosition((new_position - parent_xform->getWorldPosition()) * ~parent_xform->getWorldRotation());
@@ -2007,4 +2010,3 @@ bool LLManipRotate::canAffectSelection()
     }
     return can_rotate;
 }
-

@@ -12544,6 +12544,10 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
                 ++iter)
             {
                 LLViewerJointAttachment *attachment = iter->second;
+                if (!attachment)
+                {
+                    continue;
+                }
                 for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
                     attachment_iter != attachment->mAttachedObjects.end();
                     ++attachment_iter)
@@ -12572,7 +12576,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
                     //        }
                     //    }
                     //}
-                    if (attached_object && !attached_object->getControlAvatar())
+                    if (attached_object && attached_object->mDrawable.notNull() && !attached_object->getControlAvatar())
                     {
                         markVisible(attached_object->mDrawable->getSpatialBridge(), *viewer_camera);
                     }
@@ -12582,7 +12586,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         }
         else
         {
-            if (specific_attachment)
+            if (specific_attachment && specific_attachment->mDrawable.notNull())
             {
                 markVisible(specific_attachment->mDrawable->getSpatialBridge(), *viewer_camera);
             }
@@ -12597,12 +12601,16 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
                     ++iter)
                 {
                     LLViewerJointAttachment* attachment = iter->second;
+                    if (!attachment)
+                    {
+                        continue;
+                    }
                     for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
                         attachment_iter != attachment->mAttachedObjects.end();
                         ++attachment_iter)
                     {
                         LLViewerObject* attached_object = attachment_iter->get();
-                        if (attached_object)
+                        if (attached_object && attached_object->mDrawable.notNull())
                         {
                             markVisible(attached_object->mDrawable->getSpatialBridge(), *viewer_camera);
                         }

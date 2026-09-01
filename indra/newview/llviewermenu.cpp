@@ -10483,6 +10483,10 @@ void handle_dump_attachments()
         LLVOAvatar::attachment_map_t::iterator curiter = iter++;
         LLViewerJointAttachment* attachment = curiter->second;
         S32 key = curiter->first;
+        if (!attachment)
+        {
+            continue;
+        }
         for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
              attachment_iter != attachment->mAttachedObjects.end();
              ++attachment_iter)
@@ -10493,7 +10497,7 @@ void handle_dump_attachments()
                             !attached_object->mDrawable->isRenderType(0));
             LLVector3 pos;
             if (visible) pos = attached_object->mDrawable->getPosition();
-            LL_INFOS() << "ATTACHMENT " << key << ": item_id=" << attached_object->getAttachmentItemID()
+            LL_INFOS() << "ATTACHMENT " << key << ": item_id=" << (attached_object ? attached_object->getAttachmentItemID() : LLUUID::null)
                     << (attached_object ? " present " : " absent ")
                     << (visible ? "visible " : "invisible ")
                     <<  " at " << pos

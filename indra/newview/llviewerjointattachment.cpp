@@ -107,7 +107,7 @@ U32 LLViewerJointAttachment::drawShape( F32 pixelArea, bool first_pass, bool is_
 
 void LLViewerJointAttachment::setupDrawable(LLViewerObject *object)
 {
-    if (!object->mDrawable)
+    if (!object || object->mDrawable.isNull())
         return;
     if (object->mDrawable->isActive())
     {
@@ -172,6 +172,10 @@ void LLViewerJointAttachment::setupDrawable(LLViewerObject *object)
 //-----------------------------------------------------------------------------
 bool LLViewerJointAttachment::addObject(LLViewerObject* object)
 {
+    if (!object)
+    {
+        return false;
+    }
 
     // Same object reattached
     if (isObjectAttached(object))
@@ -244,6 +248,11 @@ bool LLViewerJointAttachment::addObject(LLViewerObject* object)
 //-----------------------------------------------------------------------------
 void LLViewerJointAttachment::removeObject(LLViewerObject *object)
 {
+    if (!object)
+    {
+        return;
+    }
+
     attachedobjs_vec_t::iterator iter;
     for (iter = mAttachedObjects.begin();
          iter != mAttachedObjects.end();
@@ -327,7 +336,7 @@ void LLViewerJointAttachment::removeObject(LLViewerObject *object)
              iter != child_list.end(); ++iter)
         {
             LLViewerObject* childp = *iter;
-            if (childp->mText.notNull())
+            if (childp && childp->mText.notNull())
             {
                 childp->mText->setOnHUDAttachment(false);
             }
@@ -389,7 +398,7 @@ S32 LLViewerJointAttachment::getNumAnimatedObjects() const
          ++iter)
     {
         const LLViewerObject *attached_object = iter->get();
-        if (attached_object->isAnimatedObject())
+        if (attached_object && attached_object->isAnimatedObject())
         {
             count++;
         }
@@ -436,8 +445,11 @@ void LLViewerJointAttachment::calcLOD()
                  iter != child_list.end(); ++iter)
             {
                 LLViewerObject* childp = *iter;
-                F32 area = childp->getMaxScale() * childp->getMidScale();
-                maxarea = llmax(maxarea, area);
+                if (childp)
+                {
+                    F32 area = childp->getMaxScale() * childp->getMidScale();
+                    maxarea = llmax(maxarea, area);
+                }
             }
         }
     }
@@ -483,6 +495,10 @@ const LLViewerObject *LLViewerJointAttachment::getAttachedObject(const LLUUID &o
          ++iter)
     {
         const LLViewerObject* attached_object = iter->get();
+        if (!attached_object)
+        {
+            continue;
+        }
 //      if (attached_object->getAttachmentItemID() == object_id)
 // [SL:KB] - Patch: Appearance-PhantomAttach | Checked: Catznip-5.0
         if ( (attached_object->getAttachmentItemID() == object_id) && (!attached_object->isDead()) )
@@ -501,6 +517,10 @@ LLViewerObject *LLViewerJointAttachment::getAttachedObject(const LLUUID &object_
          ++iter)
     {
         LLViewerObject* attached_object = iter->get();
+        if (!attached_object)
+        {
+            continue;
+        }
         if (attached_object->getAttachmentItemID() == object_id)
         {
             return attached_object;

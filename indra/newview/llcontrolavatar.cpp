@@ -158,7 +158,7 @@ void LLControlAvatar::getNewConstraintFixups(LLVector3& new_pos_fixup, F32& new_
 
 void LLControlAvatar::matchVolumeTransform()
 {
-    if (mRootVolp)
+    if (mRootVolp && mRootVolp->mDrawable.notNull())
     {
         LLVector3 new_pos_fixup;
         F32 new_scale_fixup;
@@ -282,7 +282,7 @@ void LLControlAvatar::recursiveScaleJoint(LLJoint* joint, F32 factor)
 // Based on LLViewerJointAttachment::setupDrawable(), without the attaching part.
 void LLControlAvatar::updateVolumeGeom()
 {
-    if (!mRootVolp->mDrawable)
+    if (!mRootVolp || mRootVolp->mDrawable.isNull())
         return;
     if (mRootVolp->mDrawable->isActive())
     {
@@ -442,6 +442,10 @@ void LLControlAvatar::updateDebugText()
              it != volumes.end(); ++it)
         {
             LLVOVolume *volp = *it;
+            if (!volp)
+            {
+                continue;
+            }
             S32 verts = 0;
             total_tris += volp->getTriangleCount(&verts);
             total_verts += verts;
