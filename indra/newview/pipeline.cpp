@@ -2970,7 +2970,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         for (LLCullResult::sg_iterator iter = sCull->beginOcclusionGroups(); iter != sCull->endOcclusionGroups(); ++iter)
         {
             LLSpatialGroup* group = *iter;
-            if (!group->isDead())
+            if (group && !group->isDead())
             {
                 group->doOcclusion(&camera);
                 group->clearOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
@@ -3487,7 +3487,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
     for (LLCullResult::sg_iterator iter = sCull->beginDrawableGroups(); iter != sCull->endDrawableGroups(); ++iter)
     {
         LLSpatialGroup* group = *iter;
-        if (group->isDead())
+        if (!group || group->isDead())
         {
             continue;
         }
@@ -3521,6 +3521,10 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
         {
             LLCullResult::bridge_iterator cur_iter = i;
             LLSpatialBridge* bridge = *cur_iter;
+            if (!bridge)
+            {
+                continue;
+            }
             LLSpatialGroup* group = bridge->getSpatialGroup();
 
             if (last_group == NULL)
@@ -3557,7 +3561,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
              ++visible_group_index)
         {
             LLSpatialGroup* group = sCull->getVisibleGroup(visible_group_index);
-            if (group->isDead())
+            if (!group || group->isDead())
             {
                 continue;
             }
@@ -3584,7 +3588,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
              iter != sCull->endVisibleList(); ++iter)
         {
             LLDrawable *drawablep = *iter;
-            if (!drawablep->isDead())
+            if (drawablep && !drawablep->isDead())
             {
                 stateSort(drawablep, camera);
             }
@@ -3729,7 +3733,7 @@ void forAllDrawables(LLCullResult::sg_iterator begin,
     for (LLCullResult::sg_iterator i = begin; i != end; ++i)
     {
         LLSpatialGroup* group = *i;
-        if (group->isDead())
+        if (!group || group->isDead())
         {
             continue;
         }
@@ -3946,7 +3950,7 @@ void LLPipeline::postSort(LLCamera &camera)
             for (LLCullResult::sg_iterator i = sCull->beginDrawableGroups(); i != sCull->endDrawableGroups(); ++i)
             {
                 LLSpatialGroup *group = *i;
-                if (group->isDead())
+                if (!group || group->isDead())
                 {
                     continue;
                 }
@@ -3974,7 +3978,7 @@ void LLPipeline::postSort(LLCamera &camera)
     {
         LLSpatialGroup *group = *i;
 
-        if (group->isDead())
+        if (!group || group->isDead())
         {
             continue;
         }
@@ -12353,7 +12357,7 @@ void LLPipeline::renderGroups(LLRenderPass* pass, U32 type, bool texture)
     for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(); i != sCull->endVisibleGroups(); ++i)
     {
         LLSpatialGroup* group = *i;
-        if (!group->isDead() &&
+        if (group && !group->isDead() &&
             (!sUseOcclusion || !group->isOcclusionState(LLSpatialGroup::OCCLUDED)) &&
             gPipeline.hasRenderType(group->getSpatialPartition()->mDrawableType) &&
             group->mDrawMap.find(type) != group->mDrawMap.end())
@@ -12368,7 +12372,7 @@ void LLPipeline::renderRiggedGroups(LLRenderPass* pass, U32 type, bool texture)
     for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(); i != sCull->endVisibleGroups(); ++i)
     {
         LLSpatialGroup* group = *i;
-        if (!group->isDead() &&
+        if (group && !group->isDead() &&
             (!sUseOcclusion || !group->isOcclusionState(LLSpatialGroup::OCCLUDED)) &&
             gPipeline.hasRenderType(group->getSpatialPartition()->mDrawableType) &&
             group->mDrawMap.find(type) != group->mDrawMap.end())
