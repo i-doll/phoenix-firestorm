@@ -2614,6 +2614,11 @@ void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
                     getAcceleration().magVecSquared() <= F_APPROXIMATELY_ZERO)
                 {
                     mStatic = true;
+                    // mStatic makes isActive() false; take this object off the
+                    // active list like the processUpdateCore path does, or the
+                    // next LLViewerObjectList::update() trips
+                    // llassert(objectp->isActive()) on the stale entry.
+                    gObjectList.updateActive(this);
                 }
             }
 
