@@ -2457,7 +2457,7 @@ S32 LLViewerObjectList::findReferences(LLDrawable *drawablep) const
     for (vobj_list_t::const_iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
     {
         objectp = *iter;
-        if (objectp->mDrawable.notNull())
+        if (objectp && objectp->mDrawable.notNull())
         {
             num_refs += objectp->mDrawable->findReferences(drawablep);
         }
@@ -2473,7 +2473,7 @@ std::vector<LLUUID> LLViewerObjectList::findMeshObjectsBySculptID(LLUUID target_
 
     for (auto current_object : mObjects)
     {
-        if ((current_object->isMesh()) &&
+        if (current_object && current_object->isMesh() &&
             (current_object->getVolume()) &&
             (current_object->getVolume()->getParams().getSculptID() == target_sculpt_id))
         {
@@ -2486,6 +2486,11 @@ std::vector<LLUUID> LLViewerObjectList::findMeshObjectsBySculptID(LLUUID target_
 
 void LLViewerObjectList::orphanize(LLViewerObject *childp, U32 parent_id, U32 ip, U32 port)
 {
+    if (!childp)
+    {
+        return;
+    }
+
     LL_DEBUGS("ORPHANS") << "Orphaning object " << childp->getID() << " with parent " << parent_id << LL_ENDL;
 
     // We're an orphan, flag things appropriately.
@@ -2533,6 +2538,11 @@ void LLViewerObjectList::orphanize(LLViewerObject *childp, U32 parent_id, U32 ip
 void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+
+    if (!objectp)
+    {
+        return;
+    }
 
     if (objectp->isDead())
     {
@@ -2590,7 +2600,10 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
 #ifdef ORPHAN_SPAM
             addDebugBeacon(objectp->getPositionAgent(),"");
 #endif
-            gPipeline.markMoved(objectp->mDrawable);
+            if (objectp->mDrawable.notNull())
+            {
+                gPipeline.markMoved(objectp->mDrawable);
+            }
             objectp->setChanged(LLXform::MOVED | LLXform::SILHOUETTE);
 
             // Flag the object as no longer orphaned

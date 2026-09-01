@@ -348,7 +348,10 @@ U32 LLVOTree::processUpdateMessage(LLMessageSystem *mesgsys,
     mBranchAspect = sSpeciesTable[mSpecies]->mBranchAspect;
 
     // position change not caused by us, etc.  make sure to rebuild.
-    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
+    }
 
     return retval;
 }
@@ -502,6 +505,10 @@ const S32 LEAF_VERTICES = 16;
 bool LLVOTree::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
+    if (!drawable || mDrawable.isNull())
+    {
+        return true;
+    }
 
     if(mTrunkLOD >= sMAX_NUM_TREE_LOD_LEVELS) //do not display the tree.
     {
@@ -885,6 +892,11 @@ bool LLVOTree::updateGeometry(LLDrawable *drawable)
 
 void LLVOTree::updateMesh()
 {
+    if (mDrawable.isNull())
+    {
+        return;
+    }
+
     LLMatrix4 matrix;
 
     // Translate to tree base  HACK - adjustment in Z plants tree underground
@@ -1176,6 +1188,10 @@ void LLVOTree::updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
     newMax.load3((center+size).mV);
     LLVector4a pos;
     pos.load3(center.mV);
+    if (mDrawable.isNull())
+    {
+        return;
+    }
     mDrawable->setPositionGroup(pos);
 
     if (mDrawable->getNumFaces() > 0)
@@ -1192,6 +1208,11 @@ void LLVOTree::updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 bool LLVOTree::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, bool pick_transparent, bool pick_rigged, bool pick_unselectable, S32 *face_hitp,
                                   LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 {
+
+    if (mDrawable.isNull())
+    {
+        return false;
+    }
 
     if (!lineSegmentBoundingBox(start, end))
     {

@@ -4332,7 +4332,10 @@ void LLViewerObject::updateSpatialExtents(LLVector4a& newMin, LLVector4a &newMax
     newMin.setSub(center, size);
     newMax.setAdd(center, size);
 
-    mDrawable->setPositionGroup(center);
+    if (mDrawable.notNull())
+    {
+        mDrawable->setPositionGroup(center);
+    }
 }
 
 F32 LLViewerObject::getBinRadius()
@@ -4963,15 +4966,21 @@ void LLViewerObject::setPositionAbsoluteGlobal( const LLVector3d &pos_global, bo
         LLVector3 new_pos = mRegionp->getPosRegionFromGlobal(pos_global);
         if (isRootEdit())
         {
-            new_pos -= mDrawable->mXform.getParent()->getWorldPosition();
-            LLQuaternion world_rotation = mDrawable->mXform.getParent()->getWorldRotation();
-            new_pos = new_pos * ~world_rotation;
+            if (mDrawable.notNull() && mDrawable->mXform.getParent())
+            {
+                new_pos -= mDrawable->mXform.getParent()->getWorldPosition();
+                LLQuaternion world_rotation = mDrawable->mXform.getParent()->getWorldRotation();
+                new_pos = new_pos * ~world_rotation;
+            }
         }
         else
         {
             LLViewerObject* parentp = (LLViewerObject*)getParent();
-            new_pos -= parentp->getPositionAgent();
-            new_pos = new_pos * ~parentp->getRotationRegion();
+            if (parentp)
+            {
+                new_pos -= parentp->getPositionAgent();
+                new_pos = new_pos * ~parentp->getRotationRegion();
+            }
         }
         LLViewerObject::setPosition(new_pos);
 
@@ -4994,15 +5003,24 @@ void LLViewerObject::setPositionAbsoluteGlobal( const LLVector3d &pos_global, bo
             // the relative position with the parent is not constant
             LLViewerObject* parent = (LLViewerObject *)getParent();
             //RN: this assumes we are only calling this function from the edit tools
-            gPipeline.updateMoveNormalAsync(parent->mDrawable);
+            if (parent && parent->mDrawable.notNull())
+            {
+                gPipeline.updateMoveNormalAsync(parent->mDrawable);
+            }
 
-            LLVector3 pos_local = mRegionp->getPosRegionFromGlobal(pos_global) - parent->getPositionRegion();
-            pos_local = pos_local * ~parent->getRotationRegion();
-            LLViewerObject::setPosition( pos_local );
+            if (parent)
+            {
+                LLVector3 pos_local = mRegionp->getPosRegionFromGlobal(pos_global) - parent->getPositionRegion();
+                pos_local = pos_local * ~parent->getRotationRegion();
+                LLViewerObject::setPosition(pos_local);
+            }
         }
     }
     //RN: assumes we always want to snap the object when calling this function
-    gPipeline.updateMoveNormalAsync(mDrawable);
+    if (mDrawable.notNull())
+    {
+        gPipeline.updateMoveNormalAsync(mDrawable);
+    }
 }
 
 void LLViewerObject::setPosition(const LLVector3 &pos, bool damped)
@@ -5025,7 +5043,7 @@ void LLViewerObject::setPositionGlobal(const LLVector3d &pos_global, bool damped
 {
     if (isAttachment())
     {
-        if (isRootEdit())
+        if (isRootEdit() && mDrawable.notNull() && mDrawable->mXform.getParent())
         {
             LLVector3 newPos = mRegionp->getPosRegionFromGlobal(pos_global);
             newPos = newPos - mDrawable->mXform.getParent()->getWorldPosition();
@@ -5036,7 +5054,7 @@ void LLViewerObject::setPositionGlobal(const LLVector3d &pos_global, bool damped
             newPos = newPos * invWorldRotation;
             LLViewerObject::setPosition(newPos);
         }
-        else
+        else if (mDrawable.notNull() && mDrawable->mXform.getParent())
         {
             // assumes parent is root editable (root of attachment)
             LLVector3 newPos = mRegionp->getPosRegionFromGlobal(pos_global);
@@ -5053,6 +5071,10 @@ void LLViewerObject::setPositionGlobal(const LLVector3d &pos_global, bool damped
             LLVector3 old_pos = mDrawable->mXform.getParent()->getPosition();
             mDrawable->mXform.getParent()->setPosition(old_pos + delta_pos);
             setChanged(TRANSLATED | SILHOUETTE);
+        }
+        else
+        {
+            LLViewerObject::setPosition(mRegionp->getPosRegionFromGlobal(pos_global));
         }
         if (mParent && ((LLViewerObject*)mParent)->isAvatar())
         {
@@ -5071,10 +5093,14 @@ void LLViewerObject::setPositionGlobal(const LLVector3d &pos_global, bool damped
         else
         {
             // the relative position with the parent is constant, but the parent's position needs to be changed
-            LLVector3d position_offset;
-            position_offset.setVec(getPosition()*getParent()->getRotation());
-            LLVector3d new_pos_global = pos_global - position_offset;
-            ((LLViewerObject *)getParent())->setPositionGlobal(new_pos_global);
+            LLViewerObject* parent = (LLViewerObject*)getParent();
+            if (parent)
+            {
+                LLVector3d position_offset;
+                position_offset.setVec(getPosition()*parent->getRotation());
+                LLVector3d new_pos_global = pos_global - position_offset;
+                parent->setPositionGlobal(new_pos_global);
+            }
         }
     }
     updateDrawable(damped);
@@ -7044,7 +7070,10 @@ void LLViewerObject::setDrawableState(U32 state, bool recursive)
              iter != mChildList.end(); iter++)
         {
             LLViewerObject* child = *iter;
-            child->setDrawableState(state, recursive);
+            if (child)
+            {
+                child->setDrawableState(state, recursive);
+            }
         }
     }
 }
@@ -7061,7 +7090,10 @@ void LLViewerObject::clearDrawableState(U32 state, bool recursive)
              iter != mChildList.end(); iter++)
         {
             LLViewerObject* child = *iter;
-            child->clearDrawableState(state, recursive);
+            if (child)
+            {
+                child->clearDrawableState(state, recursive);
+            }
         }
     }
 }
@@ -7079,7 +7111,10 @@ bool LLViewerObject::isDrawableState(U32 state, bool recursive) const
              (iter != mChildList.end()) && matches; iter++)
         {
             LLViewerObject* child = *iter;
-            matches &= child->isDrawableState(state, recursive);
+            if (child)
+            {
+                matches &= child->isDrawableState(state, recursive);
+            }
         }
     }
 
@@ -7605,7 +7640,7 @@ void LLViewerObject::saveUnselectedChildrenPosition(std::vector<LLVector3>& posi
             iter != mChildList.end(); iter++)
     {
         LLViewerObject* childp = *iter;
-        if (!childp->isSelected() && childp->mDrawable.notNull())
+        if (childp && !childp->isSelected() && childp->mDrawable.notNull())
         {
             positions.push_back(childp->getPositionEdit());
         }
@@ -7625,7 +7660,7 @@ void LLViewerObject::saveUnselectedChildrenRotation(std::vector<LLQuaternion>& r
             iter != mChildList.end(); iter++)
     {
         LLViewerObject* childp = *iter;
-        if (!childp->isSelected() && childp->mDrawable.notNull())
+        if (childp && !childp->isSelected() && childp->mDrawable.notNull())
         {
             rotations.push_back(childp->getRotationEdit());
         }
@@ -7650,8 +7685,13 @@ void LLViewerObject::resetChildrenRotationAndPosition(const std::vector<LLQuater
             iter != mChildList.end(); iter++)
     {
         LLViewerObject* childp = *iter;
-        if (!childp->isSelected() && childp->mDrawable.notNull())
+        if (childp && !childp->isSelected() && childp->mDrawable.notNull())
         {
+            if (index >= (S32)rotations.size() || index >= (S32)positions.size())
+            {
+                break;
+            }
+
             if (childp->getPCode() != LL_PCODE_LEGACY_AVATAR)
             {
                 childp->setRotation(rotations[index] * inv_rotation);
@@ -7663,11 +7703,15 @@ void LLViewerObject::resetChildrenRotationAndPosition(const std::vector<LLQuater
                 LLVector3 reset_pos = (positions[index] - offset) * inv_rotation ;
                 LLQuaternion reset_rot = rotations[index] * inv_rotation ;
 
-                ((LLVOAvatar*)childp)->mDrawable->mXform.setPosition(reset_pos);
-                ((LLVOAvatar*)childp)->mDrawable->mXform.setRotation(reset_rot) ;
+                LLDrawable* child_drawable = childp->mDrawable;
+                child_drawable->mXform.setPosition(reset_pos);
+                child_drawable->mXform.setRotation(reset_rot);
 
-                ((LLVOAvatar*)childp)->mDrawable->getVObj()->setPosition(reset_pos, true);
-                ((LLVOAvatar*)childp)->mDrawable->getVObj()->setRotation(reset_rot, true) ;
+                if (LLViewerObject* child_object = child_drawable->getVObj())
+                {
+                    child_object->setPosition(reset_pos, true);
+                    child_object->setRotation(reset_rot, true);
+                }
 
                 LLManip::rebuild(childp);
             }
@@ -7693,7 +7737,7 @@ void LLViewerObject::resetChildrenPosition(const LLVector3& offset, bool simplif
     }
     else //rotation matrix might change too.
     {
-        if (isAttachment() && mDrawable.notNull())
+        if (isAttachment() && mDrawable.notNull() && mDrawable->getXform()->getParent())
         {
             LLXform* attachment_point_xform = mDrawable->getXform()->getParent();
             LLQuaternion parent_rotation = getRotation() * attachment_point_xform->getWorldRotation();
@@ -7710,7 +7754,7 @@ void LLViewerObject::resetChildrenPosition(const LLVector3& offset, bool simplif
     {
         LLViewerObject* childp = *iter;
 
-        if (!childp->isSelected() && childp->mDrawable.notNull())
+        if (childp && !childp->isSelected() && childp->mDrawable.notNull())
         {
             if (childp->getPCode() != LL_PCODE_LEGACY_AVATAR)
             {
@@ -7721,10 +7765,14 @@ void LLViewerObject::resetChildrenPosition(const LLVector3& offset, bool simplif
             {
                 if(!skip_avatar_child)
                 {
-                    LLVector3 reset_pos = ((LLVOAvatar*)childp)->mDrawable->mXform.getPosition() + child_offset ;
+                    LLDrawable* child_drawable = childp->mDrawable;
+                    LLVector3 reset_pos = child_drawable->mXform.getPosition() + child_offset;
 
-                    ((LLVOAvatar*)childp)->mDrawable->mXform.setPosition(reset_pos);
-                    ((LLVOAvatar*)childp)->mDrawable->getVObj()->setPosition(reset_pos);
+                    child_drawable->mXform.setPosition(reset_pos);
+                    if (LLViewerObject* child_object = child_drawable->getVObj())
+                    {
+                        child_object->setPosition(reset_pos);
+                    }
                     LLManip::rebuild(childp);
                 }
             }
@@ -7881,7 +7929,10 @@ void LLViewerObject::rebuildMaterial()
     llassert(!isDead());
 
     faceMappingChanged();
-    gPipeline.markTextured(mDrawable);
+    if (mDrawable.notNull())
+    {
+        gPipeline.markTextured(mDrawable);
+    }
 }
 
 void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool update_server, bool local_origin)

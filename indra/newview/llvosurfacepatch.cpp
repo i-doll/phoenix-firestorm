@@ -151,6 +151,11 @@ bool LLVOSurfacePatch::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
 
+    if (!drawable || mDrawable.isNull() || !mPatchp)
+    {
+        return true;
+    }
+
     dirtySpatialGroup();
 
     S32 min_comp, max_comp, range;
@@ -220,6 +225,10 @@ void LLVOSurfacePatch::updateFaceSize(S32 idx)
         LL_WARNS() << "Terrain partition requested invalid face!!!" << LL_ENDL;
         return;
     }
+    if (mDrawable.isNull() || !mRegionp)
+    {
+        return;
+    }
 
     LLFace* facep = mDrawable->getFace(idx);
     if (facep)
@@ -249,6 +258,11 @@ void LLVOSurfacePatch::getTerrainGeometry(LLStrider<LLVector3> &verticesp,
                                               LLStrider<LLVector2> &texCoords1p,
                                               LLStrider<U16> &indicesp)
 {
+    if (mDrawable.isNull())
+    {
+        return;
+    }
+
     LLFace* facep = mDrawable->getFace(0);
     if (!facep)
     {
@@ -862,6 +876,11 @@ bool LLVOSurfacePatch::lineSegmentIntersect(const LLVector4a& start, const LLVec
 
 {
 
+    if (mDrawable.isNull() || !mRegionp)
+    {
+        return false;
+    }
+
     if (!lineSegmentBoundingBox(start, end))
     {
         return false;
@@ -969,7 +988,10 @@ void LLVOSurfacePatch::updateSpatialExtents(LLVector4a& newMin, LLVector4a &newM
     LLVector4a pos;
     pos.setAdd(newMin,newMax);
     pos.mul(0.5f);
-    mDrawable->setPositionGroup(pos);
+    if (mDrawable.notNull())
+    {
+        mDrawable->setPositionGroup(pos);
+    }
 }
 
 U32 LLVOSurfacePatch::getPartitionType() const
@@ -1103,4 +1125,3 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 
     mFaceList.clear();
 }
-

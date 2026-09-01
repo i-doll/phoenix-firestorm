@@ -85,11 +85,17 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
         iter != mDrawFace.end(); iter++)
     {
         LLFace* face = *iter;
+        LLDrawable* drawable = face ? face->getDrawable() : nullptr;
+        LLViewerRegion* region = drawable ? drawable->getRegion() : nullptr;
+        if (!region)
+        {
+            continue;
+        }
         LLVertexBuffer* buff = face->getVertexBuffer();
 
         if (buff)
         {
-            LLMatrix4* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
+            LLMatrix4* model_matrix = &region->mRenderMatrix;
 
             llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
             LLRenderPass::applyModelMatrix(model_matrix);
@@ -165,4 +171,3 @@ LLColor3 LLDrawPoolTree::getDebugColor() const
 {
     return LLColor3(1.f, 0.f, 1.f);
 }
-

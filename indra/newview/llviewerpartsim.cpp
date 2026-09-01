@@ -170,7 +170,9 @@ LLViewerPartGroup::LLViewerPartGroup(const LLVector3 &center_agent, const F32 bo
     //gPipeline.addObject(mVOPartGroupp);
     gPipeline.createObject(mVOPartGroupp);
 
-    LLSpatialGroup* group = mVOPartGroupp->mDrawable->getSpatialGroup();
+    LLSpatialGroup* group = mVOPartGroupp && mVOPartGroupp->mDrawable.notNull()
+        ? mVOPartGroupp->mDrawable->getSpatialGroup()
+        : nullptr;
 
     if (group != NULL)
     {
@@ -954,4 +956,3 @@ void LLViewerPartSim::clearParticlesByOwnerID(const LLUUID& task_id)
         }
     }
 }
-

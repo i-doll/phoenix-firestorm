@@ -738,10 +738,11 @@ void LLFace::clearTextureMatrix()
 void LLFace::printDebugInfo() const
 {
     LLFacePool *poolp = getPool();
-    LL_INFOS() << "Object: " << getViewerObject()->mID << LL_ENDL;
-    if (getDrawable())
+    const LLViewerObject* objectp = getViewerObject();
+    LL_INFOS() << "Object: " << (objectp ? objectp->mID : LLUUID::null) << LL_ENDL;
+    if (LLDrawable* drawablep = getDrawable(); drawablep && drawablep->getVObj())
     {
-        LL_INFOS() << "Type: " << LLPrimitive::pCodeToString(getDrawable()->getVObj()->getPCode()) << LL_ENDL;
+        LL_INFOS() << "Type: " << LLPrimitive::pCodeToString(drawablep->getVObj()->getPCode()) << LL_ENDL;
     }
     if (getTexture())
     {
