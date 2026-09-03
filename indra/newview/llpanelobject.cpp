@@ -546,25 +546,15 @@ void LLPanelObject::getState( )
     mBtnPastePosClip->setEnabled( enable_move );
     // </FS>
 
-    if (enable_scale)
-    {
-        vec = objectp->getScale();
-        mCtrlScaleX->set( vec.mV[VX] );
-        mCtrlScaleY->set( vec.mV[VY] );
-        mCtrlScaleZ->set( vec.mV[VZ] );
-        calcp->setVar(LLCalc::X_SCALE, vec.mV[VX]);
-        calcp->setVar(LLCalc::Y_SCALE, vec.mV[VY]);
-        calcp->setVar(LLCalc::Z_SCALE, vec.mV[VZ]);
-    }
-    else
-    {
-        mCtrlScaleX->clear();
-        mCtrlScaleY->clear();
-        mCtrlScaleZ->clear();
-        calcp->setVar(LLCalc::X_SCALE, 0.f);
-        calcp->setVar(LLCalc::Y_SCALE, 0.f);
-        calcp->setVar(LLCalc::Z_SCALE, 0.f);
-    }
+    // Show the selection's size even without modify rights; the controls
+    // stay disabled below, so the values are view-only.
+    vec = objectp->getScale();
+    mCtrlScaleX->set( vec.mV[VX] );
+    mCtrlScaleY->set( vec.mV[VY] );
+    mCtrlScaleZ->set( vec.mV[VZ] );
+    calcp->setVar(LLCalc::X_SCALE, vec.mV[VX]);
+    calcp->setVar(LLCalc::Y_SCALE, vec.mV[VY]);
+    calcp->setVar(LLCalc::Z_SCALE, vec.mV[VZ]);
 
     //mMenuClipboardSize->setEnabled(enable_scale); // <FS> Extended copy & paste buttons
     mLabelSize->setEnabled( enable_scale );
