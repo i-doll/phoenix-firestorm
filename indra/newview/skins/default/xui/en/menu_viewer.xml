@@ -1051,7 +1051,16 @@
             <menu_item_call.on_click
              function="Tools.ResyncAnimations" />
         </menu_item_call>
-        
+
+        <!-- <ID> -->
+        <menu_item_call
+         label="Reload World Around Me"
+         name="Reload World Around Me">
+            <menu_item_call.on_click
+             function="World.RerezWorld" />
+        </menu_item_call>
+        <!-- </ID> -->
+
         <menu_item_separator/>
      
         <menu_item_call
