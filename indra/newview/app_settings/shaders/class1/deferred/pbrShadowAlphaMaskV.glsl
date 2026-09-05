@@ -23,11 +23,17 @@
  * $/LicenseInfo$
  */
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 uniform mat4 texture_matrix0;
 #if defined(HAS_SKIN)
 uniform mat4 modelview_matrix;
 uniform mat4 projection_matrix;
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 uniform mat4 modelview_projection_matrix;
 #endif
@@ -52,10 +58,7 @@ void main()
 {
     //transform vertex
 #if defined(HAS_SKIN)
-    vec4 pre_pos = vec4(position.xyz, 1.0);
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec4 pos = mat * pre_pos;
+    vec4 pos = skinTransformH(getSkinBlend(), position.xyz, modelview_matrix);
     pos = projection_matrix * pos;
 #else
     vec4 pre_pos = vec4(position.xyz, 1.0);

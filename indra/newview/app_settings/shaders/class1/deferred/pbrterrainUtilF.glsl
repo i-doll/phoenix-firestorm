@@ -139,8 +139,21 @@ PBRMix mix_pbr(PBRMix mix1, PBRMix mix2, float mix2_weight)
     return mix;
 }
 
+struct TerrainSampleCoord
+{
+    vec2 uv;
+    vec2 dx;
+    vec2 dy;
+};
+
+TerrainSampleCoord terrain_sample_coord(vec2 uv)
+{
+    // Call before material/axis selection and before clipping fragments.
+    return TerrainSampleCoord(uv, dFdx(uv), dFdy(uv));
+}
+
 PBRMix sample_pbr(
-    vec2 uv
+    TerrainSampleCoord coord
     , sampler2D tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
     , sampler2D tex_orm
@@ -154,18 +167,18 @@ PBRMix sample_pbr(
     )
 {
     PBRMix mix;
-    mix.col = texture(tex_col, uv);
+    mix.col = textureGrad(tex_col, coord.uv, coord.dx, coord.dy);
     mix.col.rgb = srgb_to_linear(mix.col.rgb);
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_OCCLUSION)
-    mix.orm = texture(tex_orm, uv).xyz;
+    mix.orm = textureGrad(tex_orm, coord.uv, coord.dx, coord.dy).xyz;
 #elif (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
-    mix.rm = texture(tex_orm, uv).yz;
+    mix.rm = textureGrad(tex_orm, coord.uv, coord.dx, coord.dy).yz;
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-    mix.vNt = texture(tex_vNt, uv).xyz*2.0-1.0;
+    mix.vNt = textureGrad(tex_vNt, coord.uv, coord.dx, coord.dy).xyz*2.0-1.0;
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
-    mix.emissive = srgb_to_linear(texture(tex_emissive, uv).xyz);
+    mix.emissive = srgb_to_linear(textureGrad(tex_emissive, coord.uv, coord.dx, coord.dy).xyz);
 #endif
     return mix;
 }
@@ -279,12 +292,25 @@ float terrain_mix(TerrainMix tm, vec4 tms4)
 // Triplanar mapping
 
 // Pre-transformed texture coordinates for each axial uv slice (Packing: xy, yz, (-x)z, unused)
-#define TerrainCoord vec4[3]
+struct TerrainCoord
+{
+    TerrainSampleCoord x;
+    TerrainSampleCoord y;
+    TerrainSampleCoord z;
+};
 
 // If sign_or_zero is positive, use uv_unflippped, otherwise use uv_flipped
 vec2 _t_uv(vec2 uv_unflipped, vec2 uv_flipped, float sign_or_zero)
 {
     return mix(uv_flipped, uv_unflipped, max(0.0, sign_or_zero));
+}
+
+TerrainCoord terrain_coord(vec2 z, vec2 x, vec2 y, vec2 flipped_x, vec2 flipped_y)
+{
+    return TerrainCoord(
+        terrain_sample_coord(_t_uv(x, flipped_x, sign(vary_vertex_normal.x))),
+        terrain_sample_coord(_t_uv(y, flipped_y, sign(vary_vertex_normal.y))),
+        terrain_sample_coord(_t_uv(z, vec2(0), sign(vary_vertex_normal.z))));
 }
 
 vec3 _t_normal_post_1(vec3 vNt0, float sign_or_zero)
@@ -341,14 +367,11 @@ PBRMix terrain_sample_pbr(
 {
     PBRMix mix = init_pbr_mix();
 
-#define get_uv_x() _t_uv(terrain_coord[0].zw, terrain_coord[1].zw, sign(vary_vertex_normal.x))
-#define get_uv_y() _t_uv(terrain_coord[1].xy, terrain_coord[2].xy, sign(vary_vertex_normal.y))
-#define get_uv_z() _t_uv(terrain_coord[0].xy, vec2(0),             sign(vary_vertex_normal.z))
     switch (tw.type & SAMPLE_X)
     {
     case SAMPLE_X:
         PBRMix mix_x = sample_pbr(
-            get_uv_x()
+            terrain_coord.x
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -374,7 +397,7 @@ PBRMix terrain_sample_pbr(
     {
     case SAMPLE_Y:
         PBRMix mix_y = sample_pbr(
-            get_uv_y()
+            terrain_coord.y
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -400,7 +423,7 @@ PBRMix terrain_sample_pbr(
     {
     case SAMPLE_Z:
         PBRMix mix_z = sample_pbr(
-            get_uv_z()
+            terrain_coord.z
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -428,7 +451,7 @@ PBRMix terrain_sample_pbr(
 
 #elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
 
-#define TerrainCoord vec2
+#define TerrainCoord TerrainSampleCoord
 
 #define terrain_sample_pbr sample_pbr
 

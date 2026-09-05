@@ -72,22 +72,7 @@ vec2 hammersley2d(int i, int N) {
 // (the normal must be normalized)
 mat3 generateTBN(vec3 normal)
 {
-    vec3 bitangent = vec3(0.0, 1.0, 0.0);
-
-    float NdotUp = dot(normal, vec3(0.0, 1.0, 0.0));
-    float epsilon = 0.0000001;
-    /*if (1.0 - abs(NdotUp) <= epsilon)
-    {
-        // Sampling +Y or -Y, so we need a more robust bitangent.
-        if (NdotUp > 0.0)
-        {
-            bitangent = vec3(0.0, 0.0, 1.0);
-        }
-        else
-        {
-            bitangent = vec3(0.0, 0.0, -1.0);
-        }
-    }*/
+    vec3 bitangent = abs(normal.y) < 0.999 ? vec3(0, 1, 0) : vec3(0, 0, 1);
 
     vec3 tangent = normalize(cross(bitangent, normal));
     bitangent = cross(normal, tangent);
@@ -120,7 +105,7 @@ MicrofacetDistributionSample Lambertian(vec2 xi, float roughness)
 
 
 // getImportanceSample returns an importance sample direction with pdf in the .w component
-vec4 getImportanceSample(int sampleIndex, vec3 N, float roughness)
+vec4 getImportanceSample(int sampleIndex, mat3 TBN, float roughness)
 {
     // generate a quasi monte carlo point in the unit square [0.1)^2
     vec2 xi = hammersley2d(sampleIndex, u_sampleCount);
@@ -138,7 +123,6 @@ vec4 getImportanceSample(int sampleIndex, vec3 N, float roughness)
         importanceSample.sinTheta * sin(importanceSample.phi),
         importanceSample.cosTheta
     ));
-    mat3 TBN = generateTBN(N);
     vec3 direction = TBN * localSpaceDirection;
 
     return vec4(direction, importanceSample.pdf);
@@ -176,10 +160,11 @@ float computeLod(float pdf)
 vec4 filterColor(vec3 N)
 {
     vec4 color = vec4(0.f);
+    mat3 TBN = generateTBN(normalize(N));
 
     for(int i = 0; i < u_sampleCount; ++i)
     {
-        vec4 importanceSample = getImportanceSample(i, N, 1.0);
+        vec4 importanceSample = getImportanceSample(i, TBN, 1.0);
 
         vec3 H = vec3(importanceSample.xyz);
         float pdf = importanceSample.w;
@@ -211,4 +196,3 @@ void main()
 
     frag_color = max(color, vec4(0));
 }
-

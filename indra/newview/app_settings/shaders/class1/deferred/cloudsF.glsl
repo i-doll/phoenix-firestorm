@@ -50,6 +50,11 @@ in float altitude_blend_factor;
 
 vec4 cloudNoise(vec2 uv)
 {
+   // blend_factor is uniform: endpoint skies need only one texture lookup.
+   if (blend_factor <= 0.0)
+       return texture(cloud_noise_texture, uv);
+   if (blend_factor >= 1.0)
+       return texture(cloud_noise_texture_next, uv);
    vec4 a = texture(cloud_noise_texture, uv);
    vec4 b = texture(cloud_noise_texture_next, uv);
    vec4 cloud_noise_sample = mix(a, b, blend_factor);
@@ -125,4 +130,3 @@ void main()
     frag_data[0] = vec4(color.rgb, alpha1);
 #endif
 }
-

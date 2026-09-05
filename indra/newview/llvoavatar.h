@@ -961,8 +961,16 @@ public:
         // Float array ready to be sent to GL
         std::vector<F32> mGLMp;
 
+        // Agent-space origin used to rebase rigged-mesh joint translations before
+        // uploading them.  Keeping this separate from the palette avoids feeding
+        // kilometre-scale coordinates through per-vertex fp32 skinning math.
+        LLVector3 mSkinOrigin;
+        bool mUsesLocalOrigin;
+
         MatrixPaletteCache() :
-            mFrame(gFrameCount - 1)
+            mFrame(gFrameCount - 1),
+            mSkinOrigin(LLVector3::zero),
+            mUsesLocalOrigin(false)
         {
         }
     };

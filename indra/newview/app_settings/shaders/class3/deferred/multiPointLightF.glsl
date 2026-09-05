@@ -111,7 +111,7 @@ void main()
             float dist = lightDist / lightSize;
             if (dist <= 1.0)
             {
-                lv /= lightDist;
+                lv /= max(lightDist, 1e-8);
 
                 float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
 
@@ -160,7 +160,7 @@ void main()
 
                         if (nh > 0.0)
                         {
-                            float scol = fres * texture(lightFunc, vec2(nh, spec.a)).r * gt / (nh * nl);
+                            float scol = fres * texture(lightFunc, vec2(nh, spec.a)).r * gt / (nh * max(nl, 1e-6));
                             col += lit * scol * light_col[i].rgb * spec.rgb;
                         }
                     }

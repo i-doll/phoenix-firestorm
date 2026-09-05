@@ -2064,7 +2064,7 @@ A_STATIC void CasSetup(
 //                                                     NON-PACKED VERSION
 //==============================================================================================================================
 #ifdef A_GPU
- AF3 CasLoad(ASU2 p) { return texelFetch(diffuseRect, p, 0).rgb; }
+ AF3 CasLoad(ASU2 p) { return texelFetch(diffuseRect, clamp(p, ASU2(0), textureSize(diffuseRect, 0) - ASU2(1)), 0).rgb; }
  void CasInput(inout AF1 r,inout AF1 g,inout AF1 b)
  {
  }

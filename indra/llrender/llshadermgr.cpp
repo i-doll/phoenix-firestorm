@@ -639,6 +639,19 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_HDRI      1.0\n");  // bit 2
     extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(data, flag)    (abs(data-flag)< 0.1)\n");
 
+    // Skinning helpers and their consumers are compiled as separate shader
+    // objects. Supply the test defines to both without changing the scope of
+    // the other global defines used to load basic shader dependencies.
+    for (const char* name : { "RIGGED_LOCAL_ORIGIN", "RIGGED_DIRECT_NORMALS", "RIGGED_PRECISE_MATH", "SKIN_PRECISE" })
+    {
+        auto global = LLGLSLShader::sGlobalDefines.find(name);
+        if (global != LLGLSLShader::sGlobalDefines.end() && (!defines || defines->count(name) == 0))
+        {
+            std::string define = "#define " + global->first + " " + global->second + "\n";
+            extra_code_text[extra_code_count++] = (GLchar*)strdup(define.c_str());
+        }
+    }
+
     if (defines)
     {
         for (auto iter = defines->begin(); iter != defines->end(); ++iter)
@@ -1023,10 +1036,30 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
     LL_INFOS("ShaderMgr") << "Initializing shader cache" << LL_ENDL;
 
     mShaderCacheEnabled = gGLManager.mGLVersion >= 4.09 && enabled;
+    if (mShaderCacheEnabled)
+    {
+        GLint num_binary_formats = 0;
+        glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &num_binary_formats);
+#if LL_WINDOWS
+        // Loaded at runtime on Windows and may be missing, linked directly elsewhere
+        const bool have_entry_points = glProgramParameteri && glGetProgramBinary && glProgramBinary;
+#else
+        const bool have_entry_points = true;
+#endif
+        if (!have_entry_points || num_binary_formats <= 0)
+        {
+            LL_WARNS("ShaderMgr") << "Disabling shader binary cache: "
+                                   << (have_entry_points ? "driver reports " : "required entry point missing; driver reports ")
+                                   << num_binary_formats << " program binary format(s)" << LL_ENDL;
+            mShaderCacheEnabled = false;
+        }
+    }
 
-    if(!mShaderCacheEnabled || mShaderCacheVersion.notNull())
+    if (!mShaderCacheEnabled || mShaderCacheVersion == current_cache_version)
         return;
 
+    // Source edits can change the version during an in-process shader reload.
+    mShaderBinaryCache.clear();
     mShaderCacheVersion = current_cache_version;
 
     mShaderCacheDir = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache");
@@ -1152,6 +1185,11 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 {
     if (!mShaderCacheEnabled) return false;
 
+    if (!shader || shader->mProgramObject == 0)
+    {
+        return false;
+    }
+
     glProgramParameteri(shader->mProgramObject, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 
     auto binary_iter = mShaderBinaryCache.find(shader->mShaderHash);
@@ -1198,6 +1236,11 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 {
     if (!mShaderCacheEnabled) return true;
+
+    if (!shader || shader->mProgramObject == 0)
+    {
+        return false;
+    }
 
     ProgramBinaryData binary_info = ProgramBinaryData();
     glGetProgramiv(shader->mProgramObject, GL_PROGRAM_BINARY_LENGTH, &binary_info.mBinaryLength);
@@ -1465,6 +1508,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("matrixPalette");
     mReservedUniforms.push_back("translationPalette");
+    mReservedUniforms.push_back("matrixPaletteSize");
+    mReservedUniforms.push_back("skin_origin");
 
 // <FS:CR> Import Vignette from Exodus
     mReservedUniforms.push_back("vignette");

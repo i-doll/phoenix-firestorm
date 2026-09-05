@@ -258,7 +258,7 @@ void main()
                 float gtdenom = 2 * nh;
                 float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-                scol *= fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*nl);
+                scol *= fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*max(nl, 1e-6));
                 color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
             }
 

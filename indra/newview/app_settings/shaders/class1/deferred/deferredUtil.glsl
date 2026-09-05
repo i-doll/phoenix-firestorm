@@ -114,17 +114,18 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v,
     out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist)
 {
-    l  = normalize(lv);
-    h  = normalize(l + v);
+    lightDist = length(lv);
+    l = lv / max(lightDist, 1e-8);
+    vec3 halfVector = l + v;
+    h = halfVector * inversesqrt(max(dot(halfVector, halfVector), 1e-8));
 
     // lower bound to avoid divide by zero
     float eps = 0.000001;
     nh = clamp(dot(n, h), eps, 1.0);
-    nl = clamp(dot(n, l), eps, 1.0);
+    nl = clamp(dot(n, l), 0.0, 1.0); // Keep back-facing light contribution at zero.
     nv = clamp(dot(n, v), eps, 1.0);
     vh = clamp(dot(v, h), eps, 1.0);
 
-    lightDist = length(lv);
 }
 
 // In:
@@ -478,11 +479,19 @@ void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
     vec3 specularEnvironmentR0 = specularColor.rgb;
     vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
 
-    vec3 h = normalize(l+v);                        // Half vector between both l and v
+    nl = clamp(dot(n, l), 0.0, 1.0);
+    diff = vec3(0);
+    spec = vec3(0);
+    if (nl <= 0.0)
+    {
+        return;
+    }
+    vec3 halfVector = l + v;
+    vec3 h = halfVector * inversesqrt(max(dot(halfVector, halfVector), 1e-8));
     vec3 reflection = -normalize(reflect(v, n));
     reflection.y *= -1.0f;
 
-    float NdotL = clamp(dot(n, l), 0.001, 1.0);
+    float NdotL = max(nl, 0.001); // Epsilon protects BRDF denominators only.
     float NdotV = clamp(abs(dot(n, v)), 0.001, 1.0);
     float NdotH = clamp(dot(n, h), 0.0, 1.0);
     float LdotH = clamp(dot(l, h), 0.0, 1.0);
@@ -512,8 +521,6 @@ void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
     vec3 diffuseContrib = (1.0 - F) * diffuse(pbrInputs);
     vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
 
-    nl = NdotL;
-
     diff = diffuseContrib;
     spec = specContrib;
 }
@@ -538,7 +545,7 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
     float dist = lightDist / lightSize;
     if (dist <= 1.0)
     {
-        lv /= lightDist;
+        lv /= max(lightDist, 1e-8);
 
         float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
 
@@ -547,7 +554,7 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
         // spot*spot => GL_SPOT_EXPONENT=2
         float spot_atten = spot*spot;
 
-        vec3 intensity = spot_atten * dist_atten * lightColor * 3.0; //magic number to balance with legacy materials
+        vec3 intensity = spot_atten * dist_atten * lightColor * 3.25; // Match deferred PBR light intensity.
 
         float nl = 0;
         vec3 diffPunc = vec3(0);
@@ -645,4 +652,3 @@ void waterClip(vec3 pos)
     }
 
 }
-

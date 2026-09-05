@@ -41,18 +41,11 @@ in vec3 vary_position;
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 void main()
 {
-    mirrorClip(vary_position);
-
     vec4 col = texture(diffuseMap, vary_texcoord0.xy);
-
-    if(col.a < minimum_alpha)
-    {
-        discard;
-    }
-    col *= vertex_color;
 
     vec3 norm = texture(bumpMap, vary_texcoord0.xy).rgb * 2.0 - 1.0;
 
@@ -60,10 +53,20 @@ void main()
             dot(norm,vary_mat1),
             dot(norm,vary_mat2));
 
-    frag_data[0] = vec4(col.rgb, 0.0);
-    frag_data[1] = vertex_color.aaaa; // spec
-    //frag_data[1] = vec4(vec3(vertex_color.a), vertex_color.a+(1.0-vertex_color.a)*vertex_color.a); // spec - from former class3 - maybe better, but not so well tested
     vec3 nvn = normalize(tnorm);
+    float glossiness = 1.0 - filterSpecularRoughness(1.0 - vertex_color.a, nvn);
+
+    // Evaluate normal derivatives before any potentially non-uniform discard.
+    mirrorClip(vary_position);
+    if (col.a < minimum_alpha)
+    {
+        discard;
+    }
+    col *= vertex_color;
+
+    frag_data[0] = vec4(col.rgb, 0.0);
+    frag_data[1] = vec4(vertex_color.aaa, glossiness); // spec
+    //frag_data[1] = vec4(vec3(vertex_color.a), vertex_color.a+(1.0-vertex_color.a)*vertex_color.a); // spec - from former class3 - maybe better, but not so well tested
     frag_data[2] = encodeNormal(nvn, vertex_color.a, GBUFFER_FLAG_HAS_ATMOS);
 
 #if defined(HAS_EMISSIVE)

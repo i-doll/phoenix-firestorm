@@ -92,7 +92,7 @@ float calcAmbientOcclusion(vec4 pos, vec3 norm, vec2 pos_screen)
         vec3 samppos_world = getPositionAo(samppos_screen).xyz;
 
         vec3 diff = pos_world - samppos_world;
-        float dist2 = dot(diff, diff);
+        float dist2 = max(dot(diff, diff), 1e-8);
 
         // assume each sample corresponds to an occluding sphere with constant radius, constant x-sectional area
         // --> solid angle shrinking by the square of distance
@@ -107,6 +107,10 @@ float calcAmbientOcclusion(vec4 pos, vec3 norm, vec2 pos_screen)
         points = points + diffz_val;
     }
 
+    if (points <= 0.0)
+    {
+        return 1.0;
+    }
     angle_hidden = min(ssao_factor*angle_hidden/points, 1.0);
 
     float points_val = (points > 0.0) ? 1.0 : 0.0;
@@ -115,4 +119,3 @@ float calcAmbientOcclusion(vec4 pos, vec3 norm, vec2 pos_screen)
     ret = max(ret, 0.0);
     return min(ret, 1.0);
 }
-

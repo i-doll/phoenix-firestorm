@@ -32,6 +32,11 @@ in vec2 texcoord0;
 in vec4 clothing;
 #endif
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 mat4 getSkinnedTransform();
 
 in vec4 weight;

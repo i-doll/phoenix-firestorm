@@ -23,18 +23,21 @@
  * $/LicenseInfo$
  */
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 uniform mat4 projection_matrix;
 uniform mat4 modelview_matrix;
 
 in vec3 position;
 
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 
 void main()
 {
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec3 pos = (mat*vec4(position.xyz, 1.0)).xyz;
+    vec3 pos = skinTransformH(getSkinBlend(), position.xyz, modelview_matrix).xyz;
     gl_Position = projection_matrix*vec4(pos, 1.0);
 }
-

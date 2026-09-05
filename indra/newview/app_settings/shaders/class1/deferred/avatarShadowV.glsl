@@ -25,6 +25,11 @@
 
 uniform mat4 projection_matrix;
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 mat4 getSkinnedTransform();
 
 in vec3 position;

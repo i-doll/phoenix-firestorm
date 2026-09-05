@@ -1496,7 +1496,9 @@ void LLGLManager::initExtensions()
     {
         mHasAnisotropic = ExtensionExists("GL_EXT_texture_filter_anisotropic", gGLHExts.mSysExts);
     }
-    mHasDSA = (mGLVersion >= 4.49f) || (gGLHExts.mSysExts && ExtensionExists("GL_ARB_direct_state_access", gGLHExts.mSysExts));
+    // The DSA call sites in this tree use the OpenGL 4.5 entry points loaded
+    // below. Do not enable the path from the extension string alone.
+    mHasDSA = mGLVersion >= 4.49f;
 
 
     // Misc
@@ -2347,6 +2349,25 @@ void LLGLManager::initExtensions()
     glGetnMinmax = (PFNGLGETNMINMAXPROC)GLH_EXT_GET_PROC_ADDRESS("glGetnMinmax");
     glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)GLH_EXT_GET_PROC_ADDRESS("glTextureBarrier");
 
+
+    if (mHasDSA && (!glCreateBuffers || !glNamedBufferData || !glNamedBufferSubData ||
+                    !glCreateTextures || !glTextureSubImage2D))
+    {
+        LL_WARNS("RenderInit") << "Disabling OpenGL DSA: driver did not expose all required entry points ("
+                               << mGLVendor << ", " << mGLRenderer << ", " << mDriverVersionVendorString << ")"
+                               << LL_ENDL;
+        mHasDSA = false;
+    }
+
+#if LL_WINDOWS
+    if (mHasDSA && mIsAMD)
+    {
+        LL_WARNS("RenderInit") << "Disabling OpenGL DSA on AMD/Windows; using legacy texture and VBO updates ("
+                               << mGLRenderer << ", " << mDriverVersionVendorString << ")" << LL_ENDL;
+        mHasDSA = false;
+    }
+#endif
+
     // GL_VERSION_4_6
     if (mGLVersion < 4.59f)
     {
@@ -3046,5 +3067,4 @@ extern "C"
     __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
 #endif
-
 

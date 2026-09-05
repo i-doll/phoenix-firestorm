@@ -35,6 +35,11 @@ out vec2 vary_texcoord0;
 uniform vec4 color;
 
 vec4 calcLighting(vec3 pos, vec3 norm, vec4 color);
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 mat4 getSkinnedTransform();
 void calcAtmospherics(vec3 inPositionEye);
 

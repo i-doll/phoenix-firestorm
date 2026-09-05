@@ -33,10 +33,24 @@
 #define TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE 0
 #define TERRAIN_PAINT_TYPE_PBR_PAINTMAP 1
 
+struct TerrainSampleCoord
+{
+    vec2 uv;
+    vec2 dx;
+    vec2 dy;
+};
+TerrainSampleCoord terrain_sample_coord(vec2 uv);
+
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-#define TerrainCoord vec4[3]
+struct TerrainCoord
+{
+    TerrainSampleCoord x;
+    TerrainSampleCoord y;
+    TerrainSampleCoord z;
+};
+TerrainCoord terrain_coord(vec2 z, vec2 x, vec2 y, vec2 flipped_x, vec2 flipped_y);
 #elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-#define TerrainCoord vec2
+#define TerrainCoord TerrainSampleCoord
 #endif
 
 #define MIX_X    1 << 3
@@ -183,8 +197,19 @@ vec3 mikktspace(vec3 vNt, vec3 vT, float sign)
 
 void main()
 {
-    // Make sure we clip the terrain if we're in a mirror.
-    mirrorClip(vary_position);
+    // Compute every swatch's gradients before divergent material/axis selection.
+    TerrainCoord coords[4];
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+    coords[0] = terrain_coord(vary_coords[0].xy, vary_coords[0].zw, vary_coords[1].xy, vary_coords[1].zw, vary_coords[2].xy);
+    coords[1] = terrain_coord(vary_coords[2].zw, vary_coords[3].xy, vary_coords[3].zw, vary_coords[4].xy, vary_coords[4].zw);
+    coords[2] = terrain_coord(vary_coords[5].xy, vary_coords[5].zw, vary_coords[6].xy, vary_coords[6].zw, vary_coords[7].xy);
+    coords[3] = terrain_coord(vary_coords[7].zw, vary_coords[8].xy, vary_coords[8].zw, vary_coords[9].xy, vary_coords[9].zw);
+#else
+    coords[0] = terrain_sample_coord(vary_coords[0].xy);
+    coords[1] = terrain_sample_coord(vary_coords[0].zw);
+    coords[2] = terrain_sample_coord(vary_coords[1].xy);
+    coords[3] = terrain_sample_coord(vary_coords[1].zw);
+#endif
 
     TerrainMix tm;
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
@@ -196,6 +221,8 @@ void main()
 #elif TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
     tm = get_terrain_usage_from_weight3(texture(paint_map, vary_texcoord).xyz);
 #endif
+
+    mirrorClip(vary_position);
 
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_OCCLUSION)
     // RGB = Occlusion, Roughness, Metal
@@ -218,21 +245,11 @@ void main()
 
     PBRMix pbr_mix = init_pbr_mix();
     PBRMix mix2;
-    TerrainCoord terrain_texcoord;
     switch (tm.type & MIX_X)
     {
     case MIX_X:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        terrain_texcoord[0].xy = vary_coords[0].xy;
-        terrain_texcoord[0].zw = vary_coords[0].zw;
-        terrain_texcoord[1].xy = vary_coords[1].xy;
-        terrain_texcoord[1].zw = vary_coords[1].zw;
-        terrain_texcoord[2].xy = vary_coords[2].xy;
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        terrain_texcoord = vary_coords[0].xy;
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
+            coords[0]
             , detail_0_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_0_metallic_roughness
@@ -267,17 +284,8 @@ void main()
     switch (tm.type & MIX_Y)
     {
     case MIX_Y:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        terrain_texcoord[0].xy = vary_coords[2].zw;
-        terrain_texcoord[0].zw = vary_coords[3].xy;
-        terrain_texcoord[1].xy = vary_coords[3].zw;
-        terrain_texcoord[1].zw = vary_coords[4].xy;
-        terrain_texcoord[2].xy = vary_coords[4].zw;
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        terrain_texcoord = vary_coords[0].zw;
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
+            coords[1]
             , detail_1_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_1_metallic_roughness
@@ -312,17 +320,8 @@ void main()
     switch (tm.type & MIX_Z)
     {
     case MIX_Z:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        terrain_texcoord[0].xy = vary_coords[5].xy;
-        terrain_texcoord[0].zw = vary_coords[5].zw;
-        terrain_texcoord[1].xy = vary_coords[6].xy;
-        terrain_texcoord[1].zw = vary_coords[6].zw;
-        terrain_texcoord[2].xy = vary_coords[7].xy;
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        terrain_texcoord = vary_coords[1].xy;
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
+            coords[2]
             , detail_2_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_2_metallic_roughness
@@ -357,17 +356,8 @@ void main()
     switch (tm.type & MIX_W)
     {
     case MIX_W:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        terrain_texcoord[0].xy = vary_coords[7].zw;
-        terrain_texcoord[0].zw = vary_coords[8].xy;
-        terrain_texcoord[1].xy = vary_coords[8].zw;
-        terrain_texcoord[1].zw = vary_coords[9].xy;
-        terrain_texcoord[2].xy = vary_coords[9].zw;
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        terrain_texcoord = vary_coords[1].zw;
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
+            coords[3]
             , detail_3_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_3_metallic_roughness
@@ -410,7 +400,7 @@ void main()
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     vec3 tnorm = normalize(pbr_mix.vNt);
 #else
-    vec3 tnorm = vary_normal;
+    vec3 tnorm = normalize(vary_normal);
 #endif
     tnorm *= gl_FrontFacing ? 1.0 : -1.0;
 
@@ -436,4 +426,3 @@ void main()
     frag_data[3] = max(vec4(mix_emissive,0), vec4(0));                                                // PBR sRGB Emissive
 #endif
 }
-

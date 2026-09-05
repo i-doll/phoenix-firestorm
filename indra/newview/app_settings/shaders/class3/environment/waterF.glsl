@@ -148,6 +148,21 @@ void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
 
     vec2 bigwave = vec2(refCoord.w, view.w);
 
+    if (blend_factor <= 0.0)
+    {
+        wave1 = texture(bumpMap, bigwave).xyz * 2.0 - 1.0;
+        wave2 = texture(bumpMap, littleWave.xy).xyz * 2.0 - 1.0;
+        wave3 = texture(bumpMap, littleWave.zw).xyz * 2.0 - 1.0;
+        return;
+    }
+    if (blend_factor >= 1.0)
+    {
+        wave1 = texture(bumpMap2, bigwave).xyz * 2.0 - 1.0;
+        wave2 = texture(bumpMap2, littleWave.xy).xyz * 2.0 - 1.0;
+        wave3 = texture(bumpMap2, littleWave.zw).xyz * 2.0 - 1.0;
+        return;
+    }
+
     vec3 wave1_a = texture(bumpMap, bigwave).xyz * 2.0 - 1.0;
     vec3 wave2_a = texture(bumpMap, littleWave.xy).xyz * 2.0 - 1.0;
     vec3 wave3_a = texture(bumpMap, littleWave.zw).xyz * 2.0 - 1.0;
@@ -344,6 +359,6 @@ void main()
 
     float spec = min(max(max(punctual.r, punctual.g), punctual.b), 0);
 
-    frag_color = min(vec4(1),max(vec4(color.rgb, spec * water_mask), vec4(0)));
+    // Keep HDR highlights for the exposure/tone-map pass and bound half-float output.
+    frag_color = vec4(clamp(color.rgb, vec3(0), vec3(65504)), clamp(spec * water_mask, 0.0, 1.0));
 }
-

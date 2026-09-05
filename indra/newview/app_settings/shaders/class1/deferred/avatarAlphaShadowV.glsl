@@ -27,6 +27,11 @@ uniform mat4 texture_matrix0;
 uniform mat4 projection_matrix;
 uniform float shadow_target_width;
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 mat4 getSkinnedTransform();
 void passTextureIndex();
 

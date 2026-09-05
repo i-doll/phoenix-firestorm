@@ -23,6 +23,11 @@
  * $/LicenseInfo$
  */
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 #define DIFFUSE_ALPHA_MODE_IGNORE 0
 #define DIFFUSE_ALPHA_MODE_BLEND 1
 #define DIFFUSE_ALPHA_MODE_MASK 2
@@ -33,7 +38,9 @@ uniform mat4 projection_matrix;
 uniform mat4 modelview_projection_matrix;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinNormal(mat3x4 b, vec3 pos, vec3 dir, mat4 m);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 uniform mat3 normal_matrix;
 #endif
@@ -72,11 +79,8 @@ out vec2 vary_texcoord0;
 void main()
 {
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-
-    mat = modelview_matrix * mat;
-
-    vec3 pos = (mat*vec4(position.xyz,1.0)).xyz;
+    mat3x4 skin = getSkinBlend();
+    vec3 pos = skinTransformH(skin, position.xyz, modelview_matrix).xyz;
 
     vary_position = pos;
 
@@ -99,9 +103,9 @@ void main()
 #endif
 
 #ifdef HAS_SKIN
-    vec3 n = normalize((mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz);
+    vec3 n = normalize(skinNormal(skin, position.xyz, normal.xyz, modelview_matrix));
 #ifdef HAS_NORMAL_MAP
-    vec3 t = normalize((mat*vec4(tangent.xyz+position.xyz,1.0)).xyz-pos.xyz);
+    vec3 t = normalize(skinNormal(skin, position.xyz, tangent.xyz, modelview_matrix));
 
     vary_tangent = t;
     vary_sign = tangent.w;
@@ -128,4 +132,3 @@ void main()
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
 #endif
 }
-

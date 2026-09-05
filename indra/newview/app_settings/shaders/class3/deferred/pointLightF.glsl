@@ -72,23 +72,27 @@ void main()
     vec3 final_color = vec3(0);
     vec2 tc          = getScreenCoord(vary_fragcoord);
     vec3 pos         = getPosition(tc).xyz;
+    vec3 lv = trans_center.xyz - pos;
+    if (size <= 0.0 || dot(lv, lv) >= size * size)
+    {
+        discard;
+    }
     GBufferInfo gb = getGBuffer(tc);
 
     vec3 n = gb.normal;
+    if (dot(n, lv) <= 0.0)
+    {
+        discard;
+    }
 
     vec3 diffuse = gb.albedo.rgb;
     vec4 spec    = gb.specular;
 
     // Common half vectors calcs
-    vec3  lv = trans_center.xyz-pos;
     vec3  h, l, v = -normalize(pos);
     float nh, nl, nv, vh, lightDist;
     calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
 
-    if (lightDist >= size)
-    {
-        discard;
-    }
     float dist = lightDist / size;
     float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
 
@@ -118,10 +122,6 @@ void main()
     }
     else
     {
-        if (nl < 0.0)
-        {
-            discard;
-        }
         diffuse = srgb_to_linear(diffuse);
         spec.rgb = srgb_to_linear(spec.rgb);
 
@@ -140,7 +140,7 @@ void main()
 
             if (nh > 0.0)
             {
-                float scol = fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*nl);
+                float scol = fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*max(nl, 1e-6));
                 final_color += lit*scol*color.rgb*spec.rgb;
             }
         }

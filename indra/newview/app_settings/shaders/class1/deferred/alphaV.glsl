@@ -23,6 +23,11 @@
  * $/LicenseInfo$
  */
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 #define INDEXED 1
 #define NON_INDEXED 2
 #define NON_INDEXED_NO_COLOR 3
@@ -48,7 +53,9 @@ in vec4 diffuse_color;
 in vec2 texcoord0;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinNormal(mat3x4 b, vec3 pos, vec3 dir, mat4 m);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #ifdef IS_AVATAR_SKIN
 mat4 getSkinnedTransform();
@@ -74,13 +81,9 @@ void main()
 
     //transform vertex
 #ifdef HAS_SKIN
-    mat4 trans = getObjectSkinnedTransform();
-    trans = modelview_matrix * trans;
-
-    pos = trans * vec4(position.xyz, 1.0);
-
-    norm = position.xyz + normal.xyz;
-    norm = normalize((trans * vec4(norm, 1.0)).xyz - pos.xyz);
+    mat3x4 skin = getSkinBlend();
+    pos = skinTransformH(skin, position.xyz, modelview_matrix);
+    norm = normalize(skinNormal(skin, position.xyz, normal.xyz, modelview_matrix));
     vec4 frag_pos = projection_matrix * pos;
     gl_Position = frag_pos;
 #else
@@ -136,4 +139,3 @@ void main()
 #endif
 
 }
-

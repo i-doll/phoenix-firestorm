@@ -23,6 +23,11 @@
  * $/LicenseInfo$
  */
 
+#ifdef RIGGED_PRECISE_MATH
+invariant gl_Position;
+precise gl_Position;
+#endif
+
 uniform mat3 normal_matrix;
 uniform mat4 texture_matrix0;
 uniform vec4 ambient_color; // <FS:Beq/> add ambient color to preview shader
@@ -55,7 +60,9 @@ float calcDirectionalLight(vec3 n, vec3 l)
 
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinNormal(mat3x4 b, vec3 pos, vec3 dir, mat4 m);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 uniform mat4 modelview_matrix;
 uniform mat4 projection_matrix;
 #endif
@@ -64,11 +71,10 @@ void main()
 {
     vec3 norm;
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec4 pos = mat * vec4(position.xyz, 1.0);
+    mat3x4 skin = getSkinBlend();
+    vec4 pos = skinTransformH(skin, position.xyz, modelview_matrix);
     gl_Position = projection_matrix * pos;
-    norm = normalize((mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz);
+    norm = normalize(skinNormal(skin, position.xyz, normal.xyz, modelview_matrix));
 #else
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
     norm = normalize(normal_matrix * normal);

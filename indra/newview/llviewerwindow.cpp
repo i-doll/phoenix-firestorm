@@ -2150,7 +2150,21 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 
     // Init the image list.  Must happen after GL is initialized and before the images that
     // LLViewerWindow needs are requested, as well as before LLViewerMedia starts updating images.
-    LLImageGL::initClass(mWindow, LLViewerTexture::MAX_GL_IMAGE_CATEGORY, false, gSavedSettings.getBOOL("RenderGLMultiThreadedTextures"), gSavedSettings.getBOOL("RenderGLMultiThreadedMedia"));
+    bool threaded_texture_uploads = gSavedSettings.getBOOL("RenderGLMultiThreadedTextures");
+    bool threaded_media_uploads = gSavedSettings.getBOOL("RenderGLMultiThreadedMedia");
+    // Force these settings off on Windows, they're buggy.
+#if LL_WINDOWS
+    if (gGLManager.mIsAMD && gSavedSettings.getBOOL("RenderAMDDisableTextureThreading"))
+    {
+        threaded_texture_uploads = false;
+        threaded_media_uploads = false;
+    }
+#endif
+    LL_INFOS("RenderInit") << "Threaded texture uploads enabled: " << threaded_texture_uploads
+        << " (saved setting: " << gSavedSettings.getBOOL("RenderGLMultiThreadedTextures") << ")" << LL_ENDL;
+    LL_INFOS("RenderInit") << "Threaded media uploads enabled: " << threaded_media_uploads
+        << " (saved setting: " << gSavedSettings.getBOOL("RenderGLMultiThreadedMedia") << ")" << LL_ENDL;
+    LLImageGL::initClass(mWindow, LLViewerTexture::MAX_GL_IMAGE_CATEGORY, false, threaded_texture_uploads, threaded_media_uploads);
     gTextureList.init();
     LLViewerTextureManager::init() ;
     gBumpImageList.init();

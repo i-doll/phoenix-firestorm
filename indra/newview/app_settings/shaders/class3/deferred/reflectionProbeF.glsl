@@ -91,6 +91,20 @@ int probeIndex[REF_SAMPLE_COUNT];
 // number of probes stored in probeIndex
 int probeInfluences = 0;
 
+void appendProbe(int index)
+{
+    // Reserve the final slot for the automatic/void probe, including the water path.
+    int capacity = index == 0 ? REF_SAMPLE_COUNT : REF_SAMPLE_COUNT - 1;
+    if (index == 0 && probeInfluences > 0 && probeIndex[probeInfluences - 1] == 0)
+    {
+        return;
+    }
+    if (probeInfluences < capacity)
+    {
+        probeIndex[probeInfluences++] = index;
+    }
+}
+
 bool isAbove(vec3 pos, vec4 plane)
 {
     return (dot(plane.xyz, pos) + plane.w) > 0;
@@ -149,18 +163,18 @@ int getStartIndex(vec3 pos)
 // populate "probeIndex" with N probe indices that influence pos where N is REF_SAMPLE_COUNT
 void preProbeSample(vec3 pos)
 {
+    probeInfluences = 0;
 #if REFMAP_LEVEL > 0
 
     int start = getStartIndex(pos);
 
     // TODO: make some sort of structure that reduces the number of distance checks
-    for (int i = start; i < refmapCount; ++i)
+    for (int i = start; i < refmapCount && probeInfluences < REF_SAMPLE_COUNT - 1; ++i)
     {
         // found an influencing probe
         if (shouldSampleProbe(i, pos))
         {
-            probeIndex[probeInfluences] = i;
-            ++probeInfluences;
+            appendProbe(i);
 
             int neighborIdx = refIndex[i].y;
             if (neighborIdx != -1)
@@ -168,7 +182,7 @@ void preProbeSample(vec3 pos)
                 int neighborCount = refIndex[i].z;
 
                 int count = 0;
-                while (count < neighborCount)
+                while (count < neighborCount && probeInfluences < REF_SAMPLE_COUNT - 1)
                 {
                     // check up to REF_SAMPLE_COUNT-1 neighbors (neighborIdx is ivec4 index)
 
@@ -176,8 +190,8 @@ void preProbeSample(vec3 pos)
                     int idx = refNeighbor[neighborIdx].x;
                     if (shouldSampleProbe(idx, pos))
                     {
-                        probeIndex[probeInfluences++] = idx;
-                        if (probeInfluences == REF_SAMPLE_COUNT)
+                        appendProbe(idx);
+                        if (probeInfluences >= REF_SAMPLE_COUNT - 1)
                         {
                             break;
                         }
@@ -192,8 +206,8 @@ void preProbeSample(vec3 pos)
                     idx = refNeighbor[neighborIdx].y;
                     if (shouldSampleProbe(idx, pos))
                     {
-                        probeIndex[probeInfluences++] = idx;
-                        if (probeInfluences == REF_SAMPLE_COUNT)
+                        appendProbe(idx);
+                        if (probeInfluences >= REF_SAMPLE_COUNT - 1)
                         {
                             break;
                         }
@@ -208,8 +222,8 @@ void preProbeSample(vec3 pos)
                     idx = refNeighbor[neighborIdx].z;
                     if (shouldSampleProbe(idx, pos))
                     {
-                        probeIndex[probeInfluences++] = idx;
-                        if (probeInfluences == REF_SAMPLE_COUNT)
+                        appendProbe(idx);
+                        if (probeInfluences >= REF_SAMPLE_COUNT - 1)
                         {
                             break;
                         }
@@ -224,8 +238,8 @@ void preProbeSample(vec3 pos)
                     idx = refNeighbor[neighborIdx].w;
                     if (shouldSampleProbe(idx, pos))
                     {
-                        probeIndex[probeInfluences++] = idx;
-                        if (probeInfluences == REF_SAMPLE_COUNT)
+                        appendProbe(idx);
+                        if (probeInfluences >= REF_SAMPLE_COUNT - 1)
                         {
                             break;
                         }
@@ -242,10 +256,10 @@ void preProbeSample(vec3 pos)
 
     if (sample_automatic)
     { // probe at index 0 is a special probe for smoothing out automatic probes
-        probeIndex[probeInfluences++] = 0;
+        appendProbe(0);
     }
 #else
-    probeIndex[probeInfluences++] = 0;
+    appendProbe(0);
 #endif
 }
 
@@ -799,7 +813,7 @@ void sampleReflectionProbesWater(inout vec3 ambenv, inout vec3 glossenv,
     preProbeSample(pos);
     sample_automatic = true;
     // always include void probe on water
-    probeIndex[probeInfluences++] = 0;
+    appendProbe(0);
 
     doProbeSample(ambenv, glossenv, tc, pos, norm, glossiness, false, amblit);
 }
@@ -924,4 +938,3 @@ void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 no
     reflected_color *= (envIntensity*fresnel);
     color = mix(color.rgb, reflected_color*0.5, envIntensity);
  }
-

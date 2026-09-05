@@ -309,8 +309,8 @@ void main()
 #endif
 
 #ifndef UNLIT
-    vec3 n = (mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz;
-    vec3 t = (mat*vec4(tangent.xyz+position.xyz,1.0)).xyz-pos.xyz;
+    vec3 n = mat3(mat) * normal.xyz;
+    vec3 t = mat3(mat) * tangent.xyz;
 
     n = normalize(n);
     vary_tangent = normalize(gltf_tangent_space_transform(vec4(t, tangent.w), n, texture_normal_transform));
@@ -323,7 +323,6 @@ void main()
     vary_fragcoord = vert.xyz;
 #endif
 }
-
 
 
 

@@ -676,6 +676,8 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, const LLMeshSkinInfo*
         count,
         false,
         (GLfloat*)&(mpc.mGLMp[0]));
+    LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLViewerShaderMgr::AVATAR_MATRIX_SIZE, count);
+    LLGLSLShader::sCurBoundShaderPtr->uniform3fv(LLViewerShaderMgr::SKIN_ORIGIN, 1, mpc.mSkinOrigin.mV);
 
     return true;
 }
@@ -712,6 +714,8 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, const LLMeshSkinInfo*
             count,
             false,
             (GLfloat*)&(mpc.mGLMp[0]));
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLViewerShaderMgr::AVATAR_MATRIX_SIZE, count);
+        LLGLSLShader::sCurBoundShaderPtr->uniform3fv(LLViewerShaderMgr::SKIN_ORIGIN, 1, mpc.mSkinOrigin.mV);
     }
 
     return !skipLastSkin;
@@ -750,6 +754,8 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, const LLMeshSkinInfo*
             count,
             false,
             (GLfloat*)&(mpc.mGLMp[0]));
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLViewerShaderMgr::AVATAR_MATRIX_SIZE, count);
+        LLGLSLShader::sCurBoundShaderPtr->uniform3fv(LLViewerShaderMgr::SKIN_ORIGIN, 1, mpc.mSkinOrigin.mV);
     }
 
     return !skipLastSkin;

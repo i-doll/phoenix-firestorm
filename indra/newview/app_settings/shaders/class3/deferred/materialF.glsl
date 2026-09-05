@@ -56,6 +56,7 @@ in vec3 vary_position;
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 
@@ -297,19 +298,21 @@ float getShadow(vec3 pos, vec3 norm)
 
 void main()
 {
-    mirrorClip(vary_position);
-    waterClip();
-
     // diffcol == diffuse map combined with vertex color
     vec4 diffcol = texture(diffuseMap, vary_texcoord0.xy);
     diffcol.rgb *= vertex_color.rgb;
-    alphaMask(diffcol.a);
 
     // spec == specular map combined with specular color
     vec4 spec = getSpecular();
     float env = env_intensity * spec.a;
     float glossiness = specular_color.a;
     vec3 norm = getNormal(glossiness);
+    glossiness = 1.0 - filterSpecularRoughness(1.0 - glossiness, norm);
+
+    // Evaluate normal derivatives before any potentially non-uniform discard.
+    mirrorClip(vary_position);
+    waterClip();
+    alphaMask(diffcol.a);
 
     float emissive = getEmissive(diffcol);
 
@@ -341,9 +344,9 @@ void main()
     vec3 amblit_linear = amblit;
 
     vec3 ambenv = amblit;
-    vec3 glossenv;
-    vec3 legacyenv;
-    sampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, pos.xy*0.5+0.5, pos.xyz, norm.xyz, glossiness, env, true, amblit_linear);
+    vec3 glossenv = vec3(0.0);
+    vec3 legacyenv = vec3(0.0);
+    sampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, gl_FragCoord.xy / screen_res, pos.xyz, norm.xyz, glossiness, env, true, amblit_linear);
 
     color = ambenv;
 
@@ -385,7 +388,7 @@ void main()
             float gtdenom = 2 * nh;
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-            float scol = shadow*fres*texture(lightFunc, vec2(nh, glossiness)).r*gt/(nh*nl);
+            float scol = shadow*fres*texture(lightFunc, vec2(nh, glossiness)).r*gt/(nh*max(nl, 1e-6));
             color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
         }
 

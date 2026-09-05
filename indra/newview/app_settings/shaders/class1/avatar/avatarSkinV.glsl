@@ -30,7 +30,7 @@ uniform vec4 matrixPalette[45];
 
 mat4 getSkinnedTransform()
 {
-    mat4 ret;
+    SKIN_PRECISE mat4 ret;
     int i = int(floor(weight.x));
     i = min(i, 14);
     int next = min(i + 1, 14);
@@ -41,11 +41,12 @@ mat4 getSkinnedTransform()
     ret[2] = mix(matrixPalette[i+30],matrixPalette[next+30], x);
     ret[3] = vec4(0,0,0,1);
 
-    return ret;
-
+// TODO: Consider if this hack is still necessary. Any driver could potentially optimize this out if the return is before the unreachable code or if the assigned variable is unused.
 #ifdef IS_AMD_CARD
     // If it's AMD make sure the GLSL compiler sees the arrays referenced once by static index. Otherwise it seems to optimise the storage awawy which leads to unfun crashes and artifacts.
     vec4 dummy1 = matrixPalette[0];
     vec4 dummy2 = matrixPalette[44];
 #endif
+
+    return ret;
 }

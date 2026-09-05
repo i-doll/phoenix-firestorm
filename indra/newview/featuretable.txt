@@ -419,7 +419,8 @@ RenderGLMultiThreadedMedia  1   0
 RenderDownScaleMethod       1   0
 
 list AMD
-RenderGLMultiThreadedTextures       1   1
+RenderGLMultiThreadedTextures       1   0
+RenderGLMultiThreadedMedia           1   0
 
 list GL3
 RenderFSAAType  			0	0
@@ -437,4 +438,3 @@ RenderTerrainPBRDetail      1   -1
 
 list VaryingVectors16orLess
 RenderTerrainPBRPlanarSampleCount 1   1
-

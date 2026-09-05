@@ -51,6 +51,18 @@ vec2 generateProjectedPosition(vec3 pos)
     return samplePosition.xy;
 }
 
+bool projectScreenRay(vec3 pos, out vec2 tc)
+{
+    vec4 clip = projection_matrix * vec4(pos, 1.0);
+    tc = vec2(0);
+    if (clip.w <= 0.0 || clip.z < -clip.w || clip.z > clip.w)
+    {
+        return false;
+    }
+    tc = clip.xy / clip.w * 0.5 + 0.5;
+    return all(greaterThanEqual(tc, vec2(0))) && all(lessThan(tc, vec2(1)));
+}
+
 bool isBinarySearchEnabled = true;
 bool isAdaptiveStepEnabled = true;
 bool isExponentialStepEnabled = true;
@@ -87,26 +99,29 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
 
     vec3 step = rayStep * reflection;
     vec3 marchingPosition = position + step;
-    float delta;
+    float delta = 0.0;
     float depthFromScreen;
     vec2 screenPosition;
     bool hit = false;
     hitColor = vec4(0);
+    hitDepth = 0.0;
+    bool haveFront = false;
+    bool bracketed = false;
+    vec3 frontPosition = position;
+    vec3 backPosition = position;
 
     int i = 0;
     if (depth > depthRejectBias)
     {
         for (; i < iterationCount && !hit; i++)
         {
-            screenPosition = generateProjectedPosition(marchingPosition);
-            if (screenPosition.x > 1 || screenPosition.x < 0 ||
-                screenPosition.y > 1 || screenPosition.y < 0)
+            if (!projectScreenRay(marchingPosition, screenPosition))
             {
                 hit = false;
                 break;
             }
             depthFromScreen = getLinearDepth(screenPosition);
-            delta = abs(marchingPosition.z) - depthFromScreen;
+            delta = -marchingPosition.z - depthFromScreen;
 
             if (depth < depthFromScreen + epsilon && depth > depthFromScreen - epsilon)
             {
@@ -125,7 +140,14 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
             }
             if (isBinarySearchEnabled && delta > 0)
             {
+                bracketed = haveFront;
+                backPosition = marchingPosition;
                 break;
+            }
+            if (delta < 0.0)
+            {
+                haveFront = true;
+                frontPosition = marchingPosition;
             }
             if (isAdaptiveStepEnabled)
             {
@@ -145,22 +167,27 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
                 step *= adaptiveStepMultiplier;
             }
         }
-        if(isBinarySearchEnabled)
+        if (isBinarySearchEnabled && bracketed)
         {
             for(; i < iterationCount && !hit; i++)
             {
-                step *= 0.5;
-                marchingPosition = marchingPosition - step * sign(delta);
+                marchingPosition = mix(frontPosition, backPosition, 0.5);
 
-                screenPosition = generateProjectedPosition(marchingPosition);
-                if (screenPosition.x > 1 || screenPosition.x < 0 ||
-                    screenPosition.y > 1 || screenPosition.y < 0)
+                if (!projectScreenRay(marchingPosition, screenPosition))
                 {
                     hit = false;
                     break;
                 }
                 depthFromScreen = getLinearDepth(screenPosition);
-                delta = abs(marchingPosition.z) - depthFromScreen;
+                delta = -marchingPosition.z - depthFromScreen;
+                if (delta > 0.0)
+                {
+                    backPosition = marchingPosition;
+                }
+                else
+                {
+                    frontPosition = marchingPosition;
+                }
 
                 if (depth < depthFromScreen + epsilon && depth > depthFromScreen - epsilon)
                 {
@@ -347,25 +374,31 @@ collectedColor = vec4(1, 0, 1, 1);
 
     vec4 hitpoint;
 
-    glossiness = 1 - glossiness;
+    glossiness = clamp(1.0 - glossiness, 0.0, 1.0);
 
-    totalSamples = int(max(glossySampleCount, glossySampleCount * glossiness * vignette));
-
-    totalSamples = max(totalSamples, 1);
+    int sampleBudget = int(clamp(glossySampleCount, 1.0, 128.0));
+    // Sharp mirrors need one ray; broaden the budget across the supported roughness range.
+    totalSamples = int(ceil(mix(1.0, float(sampleBudget), clamp(glossiness / 0.35, 0.0, 1.0) * vignette)));
+    totalSamples = clamp(totalSamples, 1, 128);
+    vec3 axis = abs(rayDirection.z) < 0.999 ? vec3(0, 0, 1) : vec3(0, 1, 0);
+    vec3 firstBasis = normalize(cross(axis, rayDirection));
+    vec3 secondBasis = cross(rayDirection, firstBasis);
     if (glossiness < 0.35)
     {
         if (vignette > 0)
         {
             for (int i = 0; i < totalSamples; i++)
             {
-                vec3 firstBasis = normalize(cross(getPoissonSample(i), rayDirection));
-                vec3 secondBasis = normalize(cross(rayDirection, firstBasis));
-                vec2 coeffs = vec2(random(tc + vec2(0, i)) + random(tc + vec2(i, 0)));
+                vec2 sampleUV = fract(POISSON3D_SAMPLES[i].xy + vec2(random(tc), random(tc + vec2(17.0, 59.0))));
+                float radius = sqrt(sampleUV.x);
+                float angle = 6.28318530718 * sampleUV.y;
+                vec2 coeffs = radius * vec2(cos(angle), sin(angle));
                 vec3 reflectionDirectionRandomized = rayDirection + ((firstBasis * coeffs.x + secondBasis * coeffs.y) * glossiness);
 
                 //float hitDepth;
 
-                bool hit = traceScreenRay(viewPos, normalize(reflectionDirectionRandomized), hitpoint, depth, depth, source);
+                float hitDepth;
+                bool hit = traceScreenRay(viewPos, normalize(reflectionDirectionRandomized), hitpoint, hitDepth, depth, source);
 
                 hitpoint.a = 0;
 

@@ -45,6 +45,7 @@
 #include "pipeline.h"
 
 #include "llfile.h"
+#include "lldiriterator.h"
 #include "llviewerwindow.h"
 #include "llwindow.h"
 
@@ -534,42 +535,59 @@ S32 LLViewerShaderMgr::getShaderLevel(S32 type)
 //============================================================================
 // Shader Management
 
-// Cached program binaries are keyed by shader file names, not contents, so fold
-// every shader source into the cache version. Editing a shader then invalidates
-// the cache even when the viewer version string stays the same.
-static void hash_shader_sources(HBXXH128& hash_obj)
+// Hash sorted relative names and contents, including shared GLSL helpers. Run once
+// per reload so same-version developer edits cannot reuse stale program binaries.
+static bool hashShaderSources(HBXXH128& hash, const std::string& root, const std::string& relative = "")
 {
-    const std::string shader_dir = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "shaders");
-#if LL_WINDOWS
-    const std::filesystem::path root(ll_convert<std::wstring>(shader_dir));
-#else
-    const std::filesystem::path root(shader_dir);
-#endif
-
-    std::vector<std::filesystem::path> files;
-    std::error_code ec;
-    for (std::filesystem::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+    const std::string directory = root + relative;
+    if (!LLFile::isdir(directory))
     {
-        if (it->is_regular_file(ec))
+        return false;
+    }
+    LLDirIterator iterator(directory, "*");
+    std::vector<std::string> names;
+    std::string name;
+    while (iterator.next(name))
+    {
+        if (name != "." && name != "..")
         {
-            files.push_back(it->path());
+            names.push_back(name);
         }
     }
-
-    if (ec)
+    std::sort(names.begin(), names.end());
+    for (const auto& entry : names)
     {
-        LL_WARNS("ShaderLoading") << "Could not list shaders in " << shader_dir << ": " << ec.message() << LL_ENDL;
+        const std::string path = directory + entry;
+        if (LLFile::isdir(path))
+        {
+            if (!hashShaderSources(hash, root, relative + entry + "/"))
+            {
+                return false;
+            }
+        }
+        else if (entry.size() >= 5 && entry.compare(entry.size() - 5, 5, ".glsl") == 0)
+        {
+            LLFILE* file = LLFile::fopen(path, "rb");
+            if (!file)
+            {
+                return false;
+            }
+            hash.update(relative + entry);
+            char buffer[8192];
+            size_t count;
+            while ((count = fread(buffer, 1, sizeof(buffer), file)) > 0)
+            {
+                hash.update(buffer, count);
+            }
+            const bool failed = ferror(file) != 0;
+            fclose(file);
+            if (failed)
+            {
+                return false;
+            }
+        }
     }
-
-    // directory iteration order is unspecified, sort so the hash is stable
-    std::sort(files.begin(), files.end());
-
-    for (const auto& file : files)
-    {
-        hash_obj.update(file.lexically_relative(root).generic_string());
-        std::ifstream stream(file, std::ios::binary);
-        hash_obj.update(stream);
-    }
+    return true;
 }
 
 void LLViewerShaderMgr::setShaders()
@@ -594,21 +612,32 @@ void LLViewerShaderMgr::setShaders()
 
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
-        static LLUUID old_cache_version;
-        static LLUUID current_cache_version;
-        if (current_cache_version.isNull())
+        LLUUID old_cache_version;
+        LLUUID current_cache_version;
+        bool sources_read = false;
         {
             HBXXH128 hash_obj;
             hash_obj.update(LLVersionInfo::instance().getVersion());
-            hash_shader_sources(hash_obj);
+            // Program binaries are driver-specific.  Do not reuse binaries
+            // after an OpenGL driver update even when the viewer version is
+            // unchanged.
+            hash_obj.update(gGLManager.mDriverVersionVendorString);
+            sources_read = hashShaderSources(hash_obj,
+                gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "shaders") + "/");
             current_cache_version = hash_obj.digest();
 
             old_cache_version = LLUUID(gSavedSettings.getString("RenderShaderCacheVersion"));
             gSavedSettings.setString("RenderShaderCacheVersion", current_cache_version.asString());
         }
 
+        bool use_shader_cache = shader_cache_enabled && sources_read;
+#if LL_WINDOWS
+        use_shader_cache = use_shader_cache &&
+            !(gGLManager.mIsAMD && gSavedSettings.getBOOL("RenderAMDDisableShaderCache"));
+#endif
+        LL_INFOS("ShaderLoading") << "Shader binary cache enabled: " << use_shader_cache << LL_ENDL;
         initShaderCache(
-            shader_cache_enabled,
+            use_shader_cache,
             old_cache_version,
             current_cache_version,
             LLAppViewer::instance()->isSecondInstance());
@@ -856,6 +885,28 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     std::map<std::string, std::string> attribs;
     attribs["MAX_JOINTS_PER_MESH_OBJECT"] =
         std::to_string(LLSkinningUtil::getMaxJointCount());
+
+    // Keep these choices in the global defines so shader binaries and all
+    // separately compiled skinning dependencies use the same test permutation.
+    if (gSavedSettings.getBOOL("RenderRiggedLocalOrigin"))
+    {
+        attribs["RIGGED_LOCAL_ORIGIN"] = "1";
+    }
+    if (gSavedSettings.getBOOL("RenderRiggedDirectNormals"))
+    {
+        attribs["RIGGED_DIRECT_NORMALS"] = "1";
+    }
+    const bool precise_skinning = gSavedSettings.getBOOL("RenderRiggedPreciseMath") &&
+        gGLManager.mGLSLVersionMajor >= 4;
+    attribs["SKIN_PRECISE"] = precise_skinning ? "precise" : "";
+    if (precise_skinning)
+    {
+        attribs["RIGGED_PRECISE_MATH"] = "1";
+    }
+    LL_INFOS("ShaderLoading") << "Rigged skinning tests: local origin="
+        << gSavedSettings.getBOOL("RenderRiggedLocalOrigin") << ", direct normals="
+        << gSavedSettings.getBOOL("RenderRiggedDirectNormals") << ", precise math="
+        << precise_skinning << LL_ENDL;
 
     static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
 

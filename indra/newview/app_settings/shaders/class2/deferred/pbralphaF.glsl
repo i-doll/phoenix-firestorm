@@ -54,9 +54,7 @@ layout(location = 1) out vec4 frag_reveal;
 
 in vec3 vary_fragcoord;
 
-#ifdef HAS_SUN_SHADOW
-  uniform vec2 screen_res;
-#endif
+uniform vec2 screen_res;
 
 in vec3 vary_position;
 
@@ -191,7 +189,7 @@ void main()
     float gloss      = 1.0 - perceptualRoughness;
     vec3  irradiance = amblit;
     vec3  radiance  = vec3(0);
-    sampleReflectionProbes(irradiance, radiance, vary_position.xy*0.5+0.5, pos.xyz, norm.xyz, gloss, true, amblit);
+    sampleReflectionProbes(irradiance, radiance, gl_FragCoord.xy / screen_res, pos.xyz, norm.xyz, gloss, true, amblit);
 
     vec3 diffuseColor;
     vec3 specularColor;

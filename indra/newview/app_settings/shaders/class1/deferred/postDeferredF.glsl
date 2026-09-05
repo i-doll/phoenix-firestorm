@@ -85,7 +85,31 @@ void main()
         float PI = 3.14159265358979323846264;
 
         // sample quite uniformly spaced points within a circle, for a circular 'bokeh'
-        if (sc > 0.5)
+        if (abs(sc) > 8.0)
+        {
+            // Bound large CoC/snapshot kernels without shrinking the bokeh radius.
+            // Small kernels retain the existing ring samples below.
+            const int SAMPLE_COUNT = 128;
+            float radius = abs(sc);
+            float centerWeight = min(1.0, float(SAMPLE_COUNT) / (1.85 * radius * (radius + 1.0)));
+            diff *= centerWeight;
+            w = centerWeight;
+            for (int i = 0; i < SAMPLE_COUNT; ++i)
+            {
+                float r = radius * sqrt((float(i) + 0.5) / float(SAMPLE_COUNT));
+                float angle = float(i) * 2.39996322973;
+                vec2 sampleCoord = tc + r * vec2(cos(angle), sin(angle)) / screen_res;
+                if (sc > 0.0)
+                {
+                    dofSampleNear(diff, w, r, sampleCoord);
+                }
+                else
+                {
+                    dofSample(diff, w, r, sampleCoord);
+                }
+            }
+        }
+        else if (sc > 0.5)
         {
             while (sc > 0.5)
             {
