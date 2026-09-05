@@ -7039,6 +7039,23 @@ The folder &apos;[FOLDERNAME]&apos; is a system folder. Deleting system folders 
      yestext="OK"/>
   </notification>
 
+  <!-- <ID> -->
+  <notification
+   icon="alertmodal.tga"
+   name="IDRerezWorld"
+   type="alertmodal">
+The objects around you will be dropped and requested from the region again. The world goes empty and then fills back in over the next few minutes, a batch at a time. Textures and meshes are left alone.
+
+Reload the world around you?
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Confirm before I reload the world around me"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+  <!-- </ID> -->
+
   <notification
    icon="alertmodal.tga"
    name="PurgeSelectedItems"

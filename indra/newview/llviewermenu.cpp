@@ -126,6 +126,8 @@
 #include "llviewermessage.h"
 #include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
+#include "llcallbacklist.h" // <ID> re-rez diagnostics
+#include "lldrawable.h"     // <ID> re-rez diagnostics
 #include "llviewerparcelmgr.h"
 #include "llviewerstats.h"
 #include "llviewerstatsrecorder.h"
@@ -3623,6 +3625,309 @@ class IDAvatarReload : public view_listener_t
 };
 // </ID>
 // </FS:Zi> Texture Refresh
+
+// <ID> Simulator content, as opposed to the sky, water, terrain and particle
+// objects that share gObjectList but are created and owned by the viewer.
+// Those must never be dropped: gSky, LLSurface and the pipeline hold pointers
+// to them and assume they exist for the life of the region.
+static bool is_rerezzable_world_content(LLViewerObject* objectp)
+{
+    if (!objectp->getRegion())
+    {
+        return false;
+    }
+
+    switch (objectp->getPCode())
+    {
+        case LL_PCODE_VOLUME:       // prims and mesh
+        case LL_PCODE_LEGACY_TREE:
+        case LL_PCODE_TREE_NEW:
+        case LL_PCODE_LEGACY_GRASS:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// What we are holding, layer by layer. Counting objects alone is misleading:
+// a resurrected object can sit in gObjectList with a name, a position and full
+// properties while having no drawable at all, which renders as nothing. These
+// four numbers say which layer a re-rez actually got to.
+struct RerezCensus
+{
+    RerezCensus() : mObjects(0), mWithVolume(0), mWithDrawable(0), mInSpatialGroup(0) {}
+
+    S32 mObjects;         // present in gObjectList
+    S32 mWithVolume;      // geometry loaded (mesh/sculpt asset arrived)
+    S32 mWithDrawable;    // has a live drawable
+    S32 mInSpatialGroup;  // drawable is in a spatial partition, ie. renderable
+};
+
+static RerezCensus take_rerez_census()
+{
+    RerezCensus census;
+
+    for (S32 i = 0; i < gObjectList.getNumObjects(); ++i)
+    {
+        LLViewerObject* objectp = gObjectList.getObject(i);
+        if (!objectp || objectp->isAttachment() || !is_rerezzable_world_content(objectp))
+        {
+            continue;
+        }
+
+        ++census.mObjects;
+
+        LLVolume* volume = objectp->getVolume();
+        if (volume && volume->getNumVolumeFaces() > 0)
+        {
+            ++census.mWithVolume;
+        }
+
+        LLDrawable* drawablep = objectp->mDrawable;
+        if (drawablep && !drawablep->isDead())
+        {
+            ++census.mWithDrawable;
+            if (drawablep->getSpatialGroup())
+            {
+                ++census.mInSpatialGroup;
+            }
+        }
+    }
+
+    return census;
+}
+
+namespace
+{
+    // One object we have dropped and still owe a request for.
+    struct RerezRequest
+    {
+        RerezRequest(LLViewerRegion* region, U32 local_id)
+        :   mRegion(region), mLocalID(local_id) {}
+
+        LLViewerRegion* mRegion;
+        U32             mLocalID;
+    };
+
+    std::vector<RerezRequest> sPendingRerez;
+    bool                      sRerezPacerRunning = false;
+
+    // Asking for several thousand objects in one burst got about a quarter of
+    // them answered and the rest ignored, so feed the simulator a batch at a
+    // time. 250 matches the 255-block cap on RequestMultipleObjects, so each
+    // tick is one message per region.
+    const size_t REREZ_BATCH_SIZE     = 250;
+    const F32    REREZ_BATCH_INTERVAL = 1.f;
+
+    bool send_rerez_batch()
+    {
+        std::set<LLViewerRegion*> touched;
+        size_t sent = 0;
+
+        while (!sPendingRerez.empty() && sent < REREZ_BATCH_SIZE)
+        {
+            const RerezRequest& request = sPendingRerez.back();
+
+            // The region can go away underneath us: this runs over many
+            // seconds and the user is free to teleport out mid-flight.
+            if (LLWorld::getInstance()->isRegionListed(request.mRegion))
+            {
+                request.mRegion->addCacheMissFull(request.mLocalID);
+                touched.insert(request.mRegion);
+                ++sent;
+            }
+            sPendingRerez.pop_back();
+        }
+
+        for (std::set<LLViewerRegion*>::iterator iter = touched.begin(); iter != touched.end(); ++iter)
+        {
+            (*iter)->requestCacheMisses();
+        }
+
+        LL_INFOS() << "RerezWorld: requested batch of " << sent << ", "
+                   << sPendingRerez.size() << " still queued" << LL_ENDL;
+
+        if (sPendingRerez.empty())
+        {
+            sRerezPacerRunning = false;
+            return true;
+        }
+        return false;
+    }
+
+    void start_rerez_pacer()
+    {
+        if (sRerezPacerRunning || sPendingRerez.empty())
+        {
+            return;
+        }
+        sRerezPacerRunning = true;
+        doPeriodically(send_rerez_batch, REREZ_BATCH_INTERVAL);
+    }
+}
+
+// Force the world around us to re-rez: drop the simulator's objects along with
+// their cache entries, then ask for every one of them back by local ID, paced
+// out over time. Textures and meshes are deliberately left alone - evicting
+// them at region scale deletes tens of thousands of cache files and gets the
+// asset CDN to rate-limit us into marking textures permanently missing.
+void handle_rerez_world()
+{
+    // A re-rez while an earlier one is still feeding out supersedes it. Any
+    // pacer already running will simply drain the new queue.
+    sPendingRerez.clear();
+
+    // The build tools hold pointers into objects we are about to kill.
+    LLSelectMgr::getInstance()->deselectAll();
+    LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
+    if (tool && tool->getEditingObject())
+    {
+        tool->stopEditing();
+    }
+
+    // Killing an object unseats anything sitting on it, so leave our own seat
+    // alone: dropping it would unseat us locally while the simulator still
+    // believes we are sitting.
+    LLViewerObject* sit_root = NULL;
+    if (isAgentAvatarValid() && gAgentAvatarp->getParent())
+    {
+        sit_root = ((LLViewerObject*)gAgentAvatarp->getParent())->getRootEdit();
+    }
+
+    // Held by LLPointer so a cascading parent kill cannot free one out from
+    // under us between the two passes.
+    std::vector<LLPointer<LLViewerObject> > doomed;
+
+    const RerezCensus before = take_rerez_census();
+    std::map<LLViewerRegion*, S32> queued_per_region;
+
+    S32 object_count = 0;
+    S32 request_count = 0;
+
+    // killObject() only marks objects dead, so the list does not shift under us.
+    for (S32 i = 0; i < gObjectList.getNumObjects(); ++i)
+    {
+        LLViewerObject* objectp = gObjectList.getObject(i);
+        if (!objectp)
+        {
+            continue;
+        }
+
+        // Attachments and HUDs belong to an avatar, not to the world.
+        if (objectp->isAttachment() || objectp->isHUDAttachment())
+        {
+            continue;
+        }
+
+        if (!is_rerezzable_world_content(objectp))
+        {
+            continue;
+        }
+
+        if (sit_root && objectp->getRootEdit() == sit_root)
+        {
+            continue;
+        }
+
+        LLViewerRegion* regionp = objectp->getRegion();
+        U32 local_id = objectp->getLocalID();
+        if (!local_id)
+        {
+            continue;
+        }
+
+        // Queue the request rather than sending it. The simulator will not
+        // re-announce an object it believes we already have, so dropping one
+        // without asking is how it stays gone - but asking for everything at
+        // once is how most of the asks get ignored.
+        sPendingRerez.push_back(RerezRequest(regionp, local_id));
+        ++request_count;
+        ++queued_per_region[regionp];
+
+        doomed.push_back(objectp);
+    }
+
+    // Kill in a second pass. markDead() cascades to children, so killing as we
+    // walked the list would have skipped every child prim of a linkset whose
+    // root we reached first, and those children would never have been asked for.
+    //
+    // The regions' cache entries are deliberately left alone. Killing them was
+    // the prime suspect for objects coming back as data with no drawable: with
+    // VO cache culling on, that entry is what carries an object into the
+    // region's visible set and spatial partition, and destroying it leaves a
+    // resurrected object with nowhere to be drawn. The explicit full update we
+    // asked for supersedes the cached copy anyway.
+    for (std::vector<LLPointer<LLViewerObject> >::iterator iter = doomed.begin();
+         iter != doomed.end(); ++iter)
+    {
+        if (!(*iter)->isDead() && gObjectList.killObject(iter->get()))
+        {
+            ++object_count;
+        }
+    }
+    doomed.clear();
+
+    // Clear the dead objects out before the replies land, so the incoming full
+    // updates build fresh objects instead of colliding with dying ones.
+    gObjectList.cleanDeadObjects(false);
+
+    // Start feeding the queue to the simulator, a batch a second.
+    start_rerez_pacer();
+
+    LL_INFOS() << "RerezWorld: before - " << before.mObjects << " objects, "
+               << before.mWithVolume << " with geometry, " << before.mWithDrawable
+               << " with drawable, " << before.mInSpatialGroup << " renderable" << LL_ENDL;
+    LL_INFOS() << "RerezWorld: dropped " << object_count << " objects, queued "
+               << request_count << " requests over "
+               << (request_count / (S32)REREZ_BATCH_SIZE + 1) << " batches" << LL_ENDL;
+
+    for (std::map<LLViewerRegion*, S32>::iterator iter = queued_per_region.begin();
+         iter != queued_per_region.end(); ++iter)
+    {
+        LL_INFOS() << "RerezWorld: region '" << iter->first->getName() << "' queued "
+                   << iter->second << " objects, interest list mode '"
+                   << gAgent.getInterestListMode() << "'" << LL_ENDL;
+    }
+
+    // Track all four layers as it comes back. Objects recovering while
+    // "renderable" stays flat is the failure we are chasing: data arriving
+    // that never becomes geometry. Where the numbers diverge says which layer
+    // to fix - no geometry means the mesh never loaded, no drawable means the
+    // pipeline was never told about the object, and drawable-but-not-in-a-
+    // spatial-group means it was built but never placed to be drawn.
+    S32 ticks = 0;
+    doPeriodically(
+        [before, request_count, ticks]() mutable -> bool
+        {
+            const RerezCensus now = take_rerez_census();
+            ++ticks;
+            LL_INFOS() << "RerezWorld: +" << (ticks * 5) << "s objects " << now.mObjects
+                       << "/" << before.mObjects << ", geometry " << now.mWithVolume
+                       << "/" << before.mWithVolume << ", drawable " << now.mWithDrawable
+                       << "/" << before.mWithDrawable << ", renderable " << now.mInSpatialGroup
+                       << "/" << before.mInSpatialGroup << " (" << sPendingRerez.size()
+                       << " still queued)" << LL_ENDL;
+            return (now.mInSpatialGroup >= before.mInSpatialGroup) || (ticks >= 60);
+        },
+        5.f);
+}
+
+class IDRerezWorld : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLNotificationsUtil::add("IDRerezWorld", LLSD(), LLSD(),
+            [](const LLSD& notification, const LLSD& response)
+            {
+                if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+                {
+                    handle_rerez_world();
+                }
+            });
+        return true;
+    }
+};
+// </ID>
 
 class LLObjectReportAbuse : public view_listener_t
 {
@@ -13307,6 +13612,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAvatarReportAbuse(), "Avatar.ReportAbuse");
     view_listener_t::addMenu(new LLAvatarTexRefresh(), "Avatar.TexRefresh"); // ## Zi: Texture Refresh
     view_listener_t::addMenu(new IDAvatarReload(), "Avatar.ReloadAvatar"); // <ID>
+    view_listener_t::addMenu(new IDRerezWorld(), "World.RerezWorld"); // <ID>
 
     view_listener_t::addMenu(new LLAvatarToggleMyProfile(), "Avatar.ToggleMyProfile");
     view_listener_t::addMenu(new LLAvatarTogglePicks(), "Avatar.TogglePicks");
