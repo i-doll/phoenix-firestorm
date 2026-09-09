@@ -1617,6 +1617,11 @@ void LLVOVolume::notifySkinInfoUnavailable()
 {
     mSkinInfoUnavaliable = true;
     mSkinInfo = nullptr;
+    mSculptChanged = true;
+    if (mDrawable.notNull())
+    {
+        gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+    }
 }
 
 void LLVOVolume::reloadMesh()
