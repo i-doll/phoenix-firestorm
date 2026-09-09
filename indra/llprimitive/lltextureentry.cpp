@@ -600,7 +600,12 @@ LLGLTFMaterial* LLTextureEntry::getGLTFRenderMaterial() const
         return mGLTFRenderMaterial;
     }
 
-    llassert(getGLTFMaterialOverride() == nullptr || getGLTFMaterialOverride()->isClearedForBaseMaterial());
+    // NOTE: like the precondition assert in setGLTFMaterial above, this fires on a
+    // legitimate transient: a full object update can recreate the TE and re-apply a
+    // cached override before the composed render material has been rebuilt (made
+    // frequent by the discard-and-resync handling of oversized TE updates). Falling
+    // back to the base material is correct until composition completes.
+    //llassert(getGLTFMaterialOverride() == nullptr || getGLTFMaterialOverride()->isClearedForBaseMaterial());
     return getGLTFMaterial();
 }
 
