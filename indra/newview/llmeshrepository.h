@@ -593,6 +593,8 @@ public:
     bool fetchMeshHeader(const LLVolumeParams& mesh_params);
     bool fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
     EMeshProcessingResult headerReceived(const LLVolumeParams& mesh_params, U8* data, S32 data_size, U32 flags = 0);
+    // A terminal header failure clears pending LODs and queues unavailable notifications.
+    void headerUnavailable(const LLVolumeParams& mesh_params);
     EMeshProcessingResult lodReceived(const LLVolumeParams& mesh_params, S32 lod, U8* data, S32 data_size);
     bool skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
     bool decompositionReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
