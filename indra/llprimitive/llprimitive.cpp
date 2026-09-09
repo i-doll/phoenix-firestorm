@@ -1405,8 +1405,8 @@ S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name
     }
     else if (tec.size >= LLTEContents::MAX_TE_BUFFER)
     {
-        LL_WARNS("TEXTUREENTRY") << "Excessive buffer size detected in Texture Entry! Truncating." << LL_ENDL;
-        tec.size = LLTEContents::MAX_TE_BUFFER - 1;
+        LL_WARNS("TEXTUREENTRY") << "Excessive Texture Entry size; rejecting update." << LL_ENDL;
+        return 0;
     }
 
     // if block_num < 0 ask for block 0
@@ -1438,9 +1438,13 @@ S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name
         return 0;
     }
 
-    if (cur_ptr >= buffer_end || !unpack_TEField<material_id_type>(material_data, tec.face_count, cur_ptr, buffer_end, MVT_LLUUID))
+    if (cur_ptr >= buffer_end - 1)
     {
         memset((void*)material_data, 0, sizeof(material_data));
+    }
+    else if (!unpack_TEField<material_id_type>(material_data, tec.face_count, cur_ptr, buffer_end, MVT_LLUUID))
+    {
+        return 0;
     }
 
     for (U32 i = 0; i < tec.face_count; i++)
@@ -1542,8 +1546,8 @@ S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
     }
     else if (size >= MAX_TE_BUFFER)
     {
-        LL_WARNS("TEXTUREENTRY") << "Excessive buffer size detected in Texture Entry! Truncating." << LL_ENDL;
-        size = MAX_TE_BUFFER - 1;
+        LL_WARNS("TEXTUREENTRY") << "Excessive Texture Entry size; rejecting update." << LL_ENDL;
+        return TEM_INVALID;
     }
 
     // The last field is not zero terminated.
@@ -1569,12 +1573,16 @@ S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
             unpack_TEField<U8>(glow, face_count, cur_ptr, buffer_end, MVT_U8)))
     {
         LL_WARNS("TEXTUREENTRY") << "Failure parsing Texture Entry Message due to malformed TE Field! Dropping changes on the floor. " << LL_ENDL;
-        return 0;
+        return TEM_INVALID;
     }
 
-    if (cur_ptr >= buffer_end || !unpack_TEField<material_id_type>(material_data, face_count, cur_ptr, buffer_end, MVT_LLUUID))
+    if (cur_ptr >= buffer_end - 1)
     {
         memset((void*)material_data, 0, sizeof(material_data));
+    }
+    else if (!unpack_TEField<material_id_type>(material_data, face_count, cur_ptr, buffer_end, MVT_LLUUID))
+    {
+        return TEM_INVALID;
     }
 
     for (i = 0; i < face_count; i++)
@@ -2435,4 +2443,3 @@ const LLUUID& LLRenderMaterialParams::getMaterial(U8 te) const
 
     return LLUUID::null;
 }
-
