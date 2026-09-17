@@ -36,6 +36,8 @@ uniform sampler2DShadow shadowMap3;
 uniform sampler2DShadow shadowMap4; // shadow map of the projector being drawn
 #endif
 
+uniform int cube_snapshot;
+
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
 uniform vec2 shadow_res;
@@ -130,6 +132,10 @@ float pcfShadow(sampler2DShadow shadowMap, vec3 norm, vec4 stc, float bias_mul, 
     }
 
     stc.z += offset * 2.0;
+    if (cube_snapshot != 0)
+    {
+        return texture(shadowMap, stc.xyz);
+    }
 
     // <ID:PCSS>
     if (sun_shadow_softness > 0.0)
@@ -159,6 +165,10 @@ float pcfSpotShadow(sampler2DShadow shadowMap, vec4 stc, float bias_scale, vec2 
 #if defined(SPOT_SHADOW)
     stc.xyz /= stc.w;
     stc.z += spot_shadow_bias * bias_scale;
+    if (cube_snapshot != 0)
+    {
+        return texture(shadowMap, stc.xyz);
+    }
 
     // <ID:PCSS>
     if (proj_shadow_softness.y > 0.0)
@@ -323,4 +333,3 @@ float sampleSpotShadow(vec3 pos, vec3 norm, vec2 pos_screen)
     return 1.0;
 #endif
 }
-

@@ -27,8 +27,6 @@
 
 out vec4 frag_color;
 
-uniform sampler2D     lightFunc;
-
 uniform vec3  env_mat[3];
 uniform float sun_wash;
 uniform int   light_count;
@@ -43,6 +41,11 @@ uniform int classic_mode;
 in vec4 vary_fragcoord;
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float blinnPhongLobe(float nh, float glossiness);
+void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
+vec3 clampRadiance(vec3 c);
+float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 vec4 getPosition(vec2 pos_screen);
 vec4 getNorm(vec2 screenpos);
@@ -89,15 +92,16 @@ void main()
     {
         vec3 colorEmissive = gb.emissive.rgb;
         vec3 orm = spec.rgb;
-        float perceptualRoughness = orm.g;
+        float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
-        vec3 f0 = vec3(0.04);
         vec3 baseColor = diffuse.rgb;
 
-        vec3 diffuseColor = baseColor.rgb*(vec3(1.0)-f0);
-        diffuseColor *= 1.0 - metallic;
-
-        vec3 specularColor = mix(f0, baseColor.rgb, metallic);
+        // The shared split, not a copy of it. Carrying an inlined duplicate is how the
+        // deferred local lights came to disagree with the sun and IBL about a dielectric's
+        // diffuse albedo -- same surface, different answer depending on what was lighting it.
+        vec3 diffuseColor;
+        vec3 specularColor;
+        calcDiffuseSpecular(baseColor, metallic, diffuseColor, specularColor);
 
         for (int light_idx = 0; light_idx < LIGHT_COUNT; ++light_idx)
         {
@@ -115,12 +119,12 @@ void main()
 
                 float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
 
-                vec3 intensity = dist_atten * lightColor * 3.25;
+                vec3 intensity = dist_atten * lightColor * PUNCTUAL_LIGHT_SCALE;
                 float nl = 0;
                 vec3 diff = vec3(0);
                 vec3 specPunc = vec3(0);
                 pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diff, specPunc);
-                final_color += intensity * clamp(nl * (diff + specPunc), vec3(0), vec3(10));
+                final_color += intensity * clampRadiance(nl * (diff + specPunc));
             }
         }
     }
@@ -160,12 +164,18 @@ void main()
 
                         if (nh > 0.0)
                         {
-                            float scol = fres * texture(lightFunc, vec2(nh, spec.a)).r * gt / (nh * max(nl, 1e-6));
+                            float scol = fres * blinnPhongLobe(nh, spec.a) * gt / (nh * max(nl, 1e-6));
                             col += lit * scol * light_col[i].rgb * spec.rgb;
                         }
                     }
 
-                    final_color += col;
+                    // Bounded the same way the PBR branch above is. The specular term divides
+                    // by two cosines that calcHalfVectors only floors at 1e-6, and the
+                    // Blinn-Phong LUT carries a normalization of its own on top -- at grazing
+                    // angles that product runs past what a half-float target can hold, and an
+                    // inf here spreads to the whole frame through bloom. Colour-preserving, so
+                    // a highlight that hits the ceiling dims rather than changing hue.
+                    final_color += clampRadiance(col);
                 }
             }
         }

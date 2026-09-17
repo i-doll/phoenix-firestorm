@@ -88,7 +88,7 @@ LLGLSLShader    gReflectionMipProgram;
 LLGLSLShader    gGaussianProgram;
 LLGLSLShader    gRadianceGenProgram;
 LLGLSLShader    gHeroRadianceGenProgram;
-LLGLSLShader    gIrradianceGenProgram;
+LLGLSLShader    gSHProjectionProgram;
 LLGLSLShader    gGlowCombineFXAAProgram;
 LLGLSLShader    gTwoTextureCompareProgram;
 LLGLSLShader    gOneTextureFilterProgram;
@@ -915,6 +915,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["HAS_EMISSIVE"] = "1";
     }
 
+    // Blinn-Phong exponent at full glossiness, for deferredUtil's blinnPhongLobe. A define
+    // rather than a uniform because it reaches a shared object -- this map is what compiles
+    // those, and a program's own mShaderFiles never see it, which is fine: the lobe is
+    // evaluated in deferredUtil and nowhere else.
+    attribs["SPECULAR_EXPONENT"] = llformat("%.1f", gSavedSettings.getF32("RenderSpecularExponent"));
+
     bool ssr = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
 
     bool mirrors = gSavedSettings.getBOOL("RenderMirrors");
@@ -1662,13 +1668,19 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         S32 detail = gSavedSettings.getS32("RenderTerrainPBRDetail");
         detail = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
         const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
+        // Faceted terrain shading is a fragment-stage choice, not a surface-data one: a
+        // per-triangle normal has no per-vertex representation on a mesh whose vertices are
+        // shared, so pbrterrainF derives it from position derivatives instead. See
+        // terrain_geometric_normal().
+        const bool flat_normals = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             LLGLSLShader* shader = &gDeferredPBRTerrainProgram[paint_type];
-            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s",
+            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s",
                     detail,
                     (paint_type == TERRAIN_PAINT_TYPE_PBR_PAINTMAP ? "paintmap" : "heightmap-with-noise"),
-                    (mapping == 1 ? "flat" : "triplanar"));
+                    (mapping == 1 ? "flat" : "triplanar"),
+                    (flat_normals ? "faceted" : "smooth"));
             shader->mFeatures.hasSrgb = true;
             shader->mFeatures.isAlphaLighting = true;
             shader->mFeatures.calculatesAtmospherics = true;
@@ -1684,6 +1696,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->addPermutation("TERRAIN_PBR_DETAIL", llformat("%d", detail));
             shader->addPermutation("TERRAIN_PAINT_TYPE", llformat("%d", paint_type));
             shader->addPermutation("TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT", llformat("%d", mapping));
+            if (flat_normals)
+            {
+                shader->addPermutation("TERRAIN_FLAT_NORMALS", "1");
+            }
 
             add_common_permutations(shader);
 
@@ -3728,12 +3744,14 @@ bool LLViewerShaderMgr::loadShadersInterface()
 
     if (success && gGLManager.mHasCubeMapArray)
     {
-        gIrradianceGenProgram.mName = "Irradiance Gen Shader";
-        gIrradianceGenProgram.mShaderFiles.clear();
-        gIrradianceGenProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
-        gIrradianceGenProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenF.glsl", GL_FRAGMENT_SHADER));
-        gIrradianceGenProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gIrradianceGenProgram.createShader();
+        gSHProjectionProgram.mName = "SH Irradiance Projection Shader";
+        gSHProjectionProgram.mShaderFiles.clear();
+        // Shares the radiance pass's vertex stage: it emits the same fullscreen quad, and the
+        // sample direction it also computes is simply unused here.
+        gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
+        gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/shProjectF.glsl", GL_FRAGMENT_SHADER));
+        gSHProjectionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSHProjectionProgram.createShader();
     }
 
     if( !success )

@@ -639,6 +639,16 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_HDRI      1.0\n");  // bit 2
     extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(data, flag)    (abs(data-flag)< 0.1)\n");
 
+    if (LLRender::sGBufferNormHDR)
+    {
+        extra_code_text[extra_code_count++] = strdup("#define GBUFFER_NORM_HDR 1\n");
+    }
+
+    // Keep the PBR punctual-light scale and safety ceiling consistent across
+    // separately compiled shader objects.
+    extra_code_text[extra_code_count++] = strdup("#define PUNCTUAL_LIGHT_SCALE      3.0\n");
+    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     65504.0\n");
+
     // Skinning helpers and their consumers are compiled as separate shader
     // objects. Supply the test defines to both without changing the scope of
     // the other global defines used to load basic shader dependencies.
@@ -762,7 +772,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     }
 
     // Master definition can be found in deferredUtil.glsl
-    extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
+    extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec3 geoNormal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
 
     // Weighted blended OIT constants shared across fragment shaders
     extra_code_text[extra_code_count++] = strdup("#define OIT_PASS_NONE 0\n");
@@ -1375,7 +1385,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sceneMap");
     mReservedUniforms.push_back("sceneDepth");
     mReservedUniforms.push_back("reflectionProbes");
-    mReservedUniforms.push_back("irradianceProbes");
+    mReservedUniforms.push_back("shCoeffs");
     mReservedUniforms.push_back("heroProbes");
     mReservedUniforms.push_back("cloud_noise_texture");
     mReservedUniforms.push_back("cloud_noise_texture_next");
@@ -1497,7 +1507,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("exposureMap");
     mReservedUniforms.push_back("brdfLut");
     mReservedUniforms.push_back("noiseMap");
-    mReservedUniforms.push_back("lightFunc");
     mReservedUniforms.push_back("lightMap");
     mReservedUniforms.push_back("bloomMap");
     mReservedUniforms.push_back("projectionMap");

@@ -45,6 +45,7 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 vec3 scaleSoftClipFragLinear(vec3 l);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float blinnPhongLobe(float nh, float glossiness);
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
@@ -73,7 +74,6 @@ void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 no
 void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity);
 
 uniform samplerCube environmentMap;
-uniform sampler2D     lightFunc;
 
 // Inputs
 uniform vec4 morphFactor;
@@ -171,7 +171,7 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 npos, vec3 diffuse, vec4 spe
 
             if (nh > 0.0)
             {
-                float scol = fres*texture(lightFunc, vec2(nh, spec.a)).r*gt / (nh*da);
+                float scol = fres*blinnPhongLobe(nh, spec.a)*gt / (nh*max(da, 1e-6));
                 vec3 speccol = lit*scol*light_col.rgb*spec.rgb;
                 speccol = clamp(speccol, vec3(0), vec3(1));
                 col += speccol;
@@ -314,6 +314,17 @@ void main()
     waterClip();
     alphaMask(diffcol.a);
 
+    // Widen the lobe by whatever normal detail this pixel lost to minification, as the PBR
+    // writers do. A normal map at distance packs many normals into one texel; averaging them
+    // leaves the shading with a single direction and the authored lobe width, so a narrow
+    // Blinn-Phong highlight snaps between pixels as the camera moves. Worked in the
+    // (1 - glossiness) domain, which is what this path already treats as perceptual roughness
+    // -- it is the same number that picks the probe mip in sampleReflectionProbesLegacy.
+    //
+    // Derivatives, so uniform control flow: this sits after the alpha mask, where the PBR
+    // writers put theirs.
+    glossiness = 1.0 - filterSpecularRoughness(1.0 - glossiness, norm);
+
     float emissive = getEmissive(diffcol);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
@@ -388,7 +399,7 @@ void main()
             float gtdenom = 2 * nh;
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-            float scol = shadow*fres*texture(lightFunc, vec2(nh, glossiness)).r*gt/(nh*max(nl, 1e-6));
+            float scol = shadow*fres*blinnPhongLobe(nh, glossiness)*gt/(nh*max(nl, 1e-6));
             color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
         }
 

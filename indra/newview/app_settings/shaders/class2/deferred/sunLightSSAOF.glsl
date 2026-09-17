@@ -36,6 +36,7 @@ vec4 getNorm(vec2 pos_screen);
 
 float sampleDirectionalShadow(vec3 shadow_pos, vec3 norm, vec2 pos_screen);
 float calcAmbientOcclusion(vec4 pos, vec3 norm, vec2 pos_screen);
+vec3 getGeoNorm(vec2 pos_screen);
 
 void main()
 {
@@ -45,7 +46,10 @@ void main()
 
     vec4 col;
     col.r = sampleDirectionalShadow(pos.xyz, norm.xyz, pos_screen);
-    col.g = calcAmbientOcclusion(pos, norm.xyz, pos_screen);
+    // Geometric normal, not the shading one. The occlusion test compares neighbouring depths
+    // against this plane, and depth knows nothing about normal-mapped detail -- testing against a
+    // perturbed normal makes a flat wall occlude itself wherever its map has texture.
+    col.g = calcAmbientOcclusion(pos, getGeoNorm(pos_screen), pos_screen);
     col.b = 1.0f; // projector shadows are sampled per light in spotLightF
     col.a = 1.0f;
 

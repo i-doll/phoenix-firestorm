@@ -346,7 +346,28 @@ vec3 getPoissonSample(int i) {
     return POISSON3D_SAMPLES[i] * 2 - 1;
 }
 
-float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, inout vec4 collectedColor, sampler2D source, float glossiness)
+// Roughness fade for the ray march, and the glossiness at which it reaches zero.
+//
+// The caller that decides whether to march at all lives in another compilation unit and cannot
+// see a constant declared here, so it asks for the threshold through a function. It used to
+// carry its own literal instead, and the two disagreed: this fade ramped up from 0.567 while the
+// gate rejected everything below 0.9, so the whole ramp was unreachable and screen-space
+// reflections switched on at full strength in a single step -- a hard visible edge across any
+// surface whose roughness crossed 0.1.
+#define SSR_GLOSS_FADE_SLOPE 3.0
+#define SSR_GLOSS_FADE_BIAS  1.7
+
+float ssrMinGlossiness()
+{
+    return SSR_GLOSS_FADE_BIAS / SSR_GLOSS_FADE_SLOPE;
+}
+
+// rayDir - the direction to march, supplied by the caller rather than derived here. The probe
+//          tap bends its lookup toward the normal as the surface roughens (the GGX dominant
+//          direction), and a mirror reflect() computed here pointed somewhere else, so the two
+//          reflections being mixed together came from measurably different directions on every
+//          rough surface. n is still wanted separately, for the grazing-angle fade below.
+float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, vec3 rayDir, inout vec4 collectedColor, sampler2D source, float glossiness)
 {
 #ifdef TRANSPARENT_SURFACE
 collectedColor = vec4(1, 0, 1, 1);
@@ -357,7 +378,7 @@ collectedColor = vec4(1, 0, 1, 1);
 
     float depth = -viewPos.z;
 
-    vec3 rayDirection = normalize(reflect(viewPos, normalize(n)));
+    vec3 rayDirection = normalize(rayDir);
 
     vec2 uv2 = tc * screen_res;
     float c = (uv2.x + uv2.y) * 0.125;
@@ -370,20 +391,18 @@ collectedColor = vec4(1, 0, 1, 1);
     float zFar = 128.0;
     vignette *= clamp(1.0+(viewPos.z/zFar), 0.0, 1.0);
 
-    vignette *= clamp(glossiness * 3 - 1.7, 0, 1);
+    vignette *= clamp(glossiness * SSR_GLOSS_FADE_SLOPE - SSR_GLOSS_FADE_BIAS, 0, 1);
 
     vec4 hitpoint;
 
     glossiness = clamp(1.0 - glossiness, 0.0, 1.0);
 
-    int sampleBudget = int(clamp(glossySampleCount, 1.0, 128.0));
-    // Sharp mirrors need one ray; broaden the budget across the supported roughness range.
-    totalSamples = int(ceil(mix(1.0, float(sampleBudget), clamp(glossiness / 0.35, 0.0, 1.0) * vignette)));
-    totalSamples = clamp(totalSamples, 1, 128);
+    totalSamples = clamp(int(ceil(glossySampleCount * glossiness)), 1, max(1, int(glossySampleCount)));
+
     vec3 axis = abs(rayDirection.z) < 0.999 ? vec3(0, 0, 1) : vec3(0, 1, 0);
     vec3 firstBasis = normalize(cross(axis, rayDirection));
     vec3 secondBasis = cross(rayDirection, firstBasis);
-    if (glossiness < 0.35)
+
     {
         if (vignette > 0)
         {

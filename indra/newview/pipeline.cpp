@@ -429,6 +429,8 @@ bool addDeferredAttachments(LLRenderTarget& target, bool for_impostor = false)
         emissive = GL_RGB;
     }
 
+    LLRender::sGBufferNormHDR = hdr;
+
     bool valid = true;
     valid      = valid && target.addColorAttachment(orm);    // frag-data[1] specular OR PBR ORM
     valid      = valid && target.addColorAttachment(norm);
@@ -463,7 +465,6 @@ LLPipeline::LLPipeline() :
 {
     mNoiseMap = 0;
     mTrueNoiseMap = 0;
-    mLightFunc = 0;
 
     for(U32 i = 0; i < 8; i++)
     {
@@ -1487,12 +1488,6 @@ void LLPipeline::releaseGLBuffers()
 
 void LLPipeline::releaseLUTBuffers()
 {
-    if (mLightFunc)
-    {
-        LLImageGL::deleteTextures(1, &mLightFunc);
-        mLightFunc = 0;
-    }
-
     mPbrBrdfLut.release();
 
     releaseTonyMcMapfaceLut();
@@ -1704,67 +1699,6 @@ F32 lerpf(F32 a, F32 b, F32 w)
 
 void LLPipeline::createLUTBuffers()
 {
-    if (!mLightFunc)
-    {
-        U32 lightResX = gSavedSettings.getU32("RenderSpecularResX");
-        U32 lightResY = gSavedSettings.getU32("RenderSpecularResY");
-        F32* ls = nullptr;
-        try
-        {
-            ls = new F32[lightResX*lightResY];
-        }
-        catch (std::bad_alloc&)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            // might be better to set the error into mFatalMessage and rethrow
-            LL_ERRS() << "Bad memory allocation in createLUTBuffers! lightResX: "
-                << lightResX << " lightResY: " << lightResY << LL_ENDL;
-        }
-        F32 specExp = gSavedSettings.getF32("RenderSpecularExponent");
-        // Calculate the (normalized) blinn-phong specular lookup texture. (with a few tweaks)
-        for (U32 y = 0; y < lightResY; ++y)
-        {
-            for (U32 x = 0; x < lightResX; ++x)
-            {
-                ls[y*lightResX+x] = 0;
-                F32 sa = (F32) x/(lightResX-1);
-                F32 spec = (F32) y/(lightResY-1);
-                F32 n = spec * spec * specExp;
-
-                // Nothing special here.  Just your typical blinn-phong term.
-                spec = powf(sa, n);
-
-                // Apply our normalization function.
-                // Note: This is the full equation that applies the full normalization curve, not an approximation.
-                // This is fine, given we only need to create our LUT once per buffer initialization.
-                spec *= (((n + 2) * (n + 4)) / (8 * F_PI * (powf(2, -n/2) + n)));
-
-                // Since we use R16F, we no longer have a dynamic range issue we need to work around here.
-                // Though some older drivers may not like this, newer drivers shouldn't have this problem.
-                ls[y*lightResX+x] = spec;
-            }
-        }
-
-        U32 pix_format = GL_R16F;
-#if LL_DARWIN
-        if(!gGLManager.mIsApple)
-        {
-            // Need to work around limited precision with 10.6.8 and older drivers
-            //
-            pix_format = GL_R32F;
-        }
-#endif
-        LLImageGL::generateTextures(1, &mLightFunc);
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls, false);
-        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-        delete [] ls;
-    }
-
     mPbrBrdfLut.allocate(512, 512, GL_RG16F);
     mPbrBrdfLut.bindTarget();
 
@@ -9781,15 +9715,9 @@ void LLPipeline::renderFinalize()
     recordTrianglesDrawn();
 }
 
-void LLPipeline::bindLightFunc(LLGLSLShader& shader)
+void LLPipeline::bindBrdfLut(LLGLSLShader& shader)
 {
-    S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);
-    if (channel > -1)
-    {
-        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
-    }
-
-    channel = shader.enableTexture(LLShaderMgr::DEFERRED_BRDF_LUT, LLTexUnit::TT_TEXTURE);
+    S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_BRDF_LUT, LLTexUnit::TT_TEXTURE);
     if (channel > -1)
     {
         mPbrBrdfLut.bindTexture(0, channel);
@@ -9843,7 +9771,8 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
     if (shader.mCanBindFast)
     { // was previously fully bound, use fast path
         shader.bind();
-        bindLightFunc(shader);
+        shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
+        bindBrdfLut(shader);
         bindShadowMaps(shader);
         bindReflectionProbes(shader);
     }
@@ -9932,7 +9861,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
         gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
     }
 
-    bindLightFunc(shader);
+    bindBrdfLut(shader);
 
     stop_glerror();
 
@@ -11021,7 +10950,6 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     }
 
     shader.disableTexture(LLShaderMgr::DEFERRED_NOISE);
-    shader.disableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);
 
     if (!LLPipeline::sReflectionProbesEnabled)
     {
@@ -11069,10 +10997,10 @@ void LLPipeline::bindReflectionProbes(LLGLSLShader& shader)
         bound = true;
     }
 
-    channel = shader.enableTexture(LLShaderMgr::IRRADIANCE_PROBES, LLTexUnit::TT_CUBE_MAP_ARRAY);
-    if (channel > -1 && mReflectionMapManager.mIrradianceMaps.notNull())
+    channel = shader.enableTexture(LLShaderMgr::SH_COEFFS, LLTexUnit::TT_TEXTURE);
+    if (channel > -1 && mReflectionMapManager.mSHCoeffs.isComplete())
     {
-        mReflectionMapManager.mIrradianceMaps->bind(channel);
+        mReflectionMapManager.mSHCoeffs.bindTexture(0, channel, LLTexUnit::TFO_POINT);
         bound = true;
     }
 

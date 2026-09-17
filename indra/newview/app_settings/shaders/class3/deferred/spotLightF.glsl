@@ -28,8 +28,6 @@
 out vec4 frag_color;
 
 uniform samplerCube environmentMap;
-uniform sampler2D lightFunc;
-
 uniform mat4 proj_mat; //screen space to light space
 uniform float proj_near; //near clip for projection
 uniform vec3 proj_p; //plane projection is emitting from (in screen space)
@@ -64,6 +62,11 @@ uniform vec2 screen_res;
 uniform mat4 inv_proj;
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float blinnPhongLobe(float nh, float glossiness);
+void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
+vec3 clampRadiance(vec3 c);
+float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 bool clipProjectedLightVars(vec3 center, vec3 pos, out float dist, out float l_dist, out vec3 lv, out vec4 proj_tc );
 vec4 getNorm(vec2 screenpos);
@@ -155,15 +158,13 @@ void main()
     if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR))
     {
         vec3 orm = spec.rgb;
-        float perceptualRoughness = orm.g;
+        float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
-        vec3 f0 = vec3(0.04);
         vec3 baseColor = diffuse.rgb;
 
-        vec3 diffuseColor = baseColor.rgb*(vec3(1.0)-f0);
-        diffuseColor *= 1.0 - metallic;
-
-        vec3 specularColor = mix(f0, baseColor.rgb, metallic);
+        vec3 diffuseColor;
+        vec3 specularColor;
+        calcDiffuseSpecular(baseColor, metallic, diffuseColor, specularColor);
         vec3 diffPunc = vec3(0);
         vec3 specPunc = vec3(0);
 
@@ -177,20 +178,21 @@ void main()
             lv = normalize(lv);
             pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
 
-            if (nl > 0.0)
+            if (dot(n.xyz, lv) > 0.0)
             {
                 amb_da += (nl*0.5 + 0.5) * proj_ambiance;
 
                 dlit = getProjectedLightDiffuseColor( l_dist, proj_tc.xy );
 
-                vec3 intensity = dist_atten * dlit * 3.25 * shadow; // Legacy attenuation, magic number to balance with legacy materials
+                vec3 intensity = dist_atten * dlit * PUNCTUAL_LIGHT_SCALE * shadow;
 
-                final_color += intensity * clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
+                final_color += intensity * clampRadiance(nl * (diffPunc + specPunc));
+                lit = clamp(nl * dist_atten, 0.0, 1.0);
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * 3.25 * shadow; //magic number to balance with legacy ambiance
+            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * PUNCTUAL_LIGHT_SCALE * shadow;
 
-            final_color += amb_rgb * clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
+            final_color += diffuseColor.rgb * amb_rgb;
         }
     }
     else
@@ -235,7 +237,7 @@ void main()
 
             if (nh > 0.0)
             {
-                float scol = fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*max(nl, 1e-6));
+                float scol = fres*blinnPhongLobe(nh, spec.a)*gt/(nh*max(nl, 1e-6));
                 vec3 speccol = dlit*scol*spec.rgb*shadow;
                 speccol = clamp(speccol, vec3(0), vec3(1));
                 final_color += speccol;
