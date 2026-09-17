@@ -32,6 +32,7 @@
 #include "v4math.h"
 #include "m4math.h"
 #include <queue>
+#include <unordered_map>
 
 #include <boost/align/aligned_allocator.hpp>
 
@@ -293,6 +294,47 @@ public:
 
     //get list of weight influences closest to given position
     weight_list& getJointInfluences(const LLVector3& pos);
+
+    // Builds a spatial index over the model's finalized skin weights for
+    // callers that need an influence lookup for every vertex. A miss falls
+    // back to getJointInfluences(), preserving its closest-point behavior.
+    class JointWeightCache
+    {
+    public:
+        explicit JointWeightCache(LLModel& model);
+        const weight_list& influences(const LLVector3& pos) const;
+
+    private:
+        static constexpr F32 WELD_EPSILON = 1e-5f;
+
+        struct CellKey
+        {
+            S32 x;
+            S32 y;
+            S32 z;
+
+            bool operator==(const CellKey& other) const
+            {
+                return x == other.x && y == other.y && z == other.z;
+            }
+        };
+
+        struct CellHash
+        {
+            size_t operator()(const CellKey& key) const
+            {
+                return static_cast<size_t>(
+                    static_cast<U32>(key.x) * 73856093u ^
+                    static_cast<U32>(key.y) * 19349663u ^
+                    static_cast<U32>(key.z) * 83492791u);
+            }
+        };
+
+        static CellKey cellKey(const LLVector3& pos);
+
+        LLModel& mModel;
+        std::unordered_map<CellKey, std::vector<const weight_map::value_type*>, CellHash> mCells;
+    };
 
     LLMeshSkinInfo mSkinInfo;
 
