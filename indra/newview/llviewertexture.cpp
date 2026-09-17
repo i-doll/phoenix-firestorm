@@ -3388,8 +3388,6 @@ void LLViewerLODTexture::processTextureStats()
     }
 }
 
-extern LLGLSLShader gCopyProgram;
-
 bool LLViewerLODTexture::scaleDown()
 {
     if (mGLTexturep.isNull() || !mGLTexturep->getHasGLTexture())

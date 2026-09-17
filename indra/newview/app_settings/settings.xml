@@ -11044,6 +11044,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+  <key>RenderAvatarShadowDetail</key>
+    <map>
+      <key>Comment</key>
+      <string>Which avatar passes cast shadows. 0 = opaque only, 1 = opaque plus alpha mask, 2 = full including alpha blend.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>2</integer>
+    </map>
     <key>RenderCanUseGLTFPBROpaqueShaders</key>
     <map>
         <key>Comment</key>
@@ -11266,6 +11277,17 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>Value</key>
     <integer>256</integer>
   </map>
+  <key>RenderShadowCullMode</key>
+    <map>
+      <key>Comment</key>
+      <string>How sun shadow cascades are culled. 0 = cull and sort each cascade separately. 1 = cull and sort once against a frustum spanning all cascades, sharing the result.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
   <key>RenderShadowSplitExponent</key>
   <map>
     <key>Comment</key>

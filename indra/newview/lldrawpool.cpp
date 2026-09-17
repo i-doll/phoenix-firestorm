@@ -797,6 +797,8 @@ void LLRenderPass::pushGLTFBatches(U32 type, bool textured)
 void LLRenderPass::pushGLTFBatches(U32 type)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LLFetchedGLTFMaterial* lastMat = nullptr;
+    LLViewerTexture* lastTex = nullptr;
     auto* begin = gPipeline.beginRenderMap(type);
     auto* end = gPipeline.endRenderMap(type);
     for (LLCullResult::drawinfo_iterator i = begin; i != end; )
@@ -805,7 +807,7 @@ void LLRenderPass::pushGLTFBatches(U32 type)
         LLDrawInfo& params = **i;
         LLCullResult::increment_iterator(i, end);
 
-        pushGLTFBatch(params);
+        pushGLTFBatch(params, lastMat, lastTex);
     }
 }
 
@@ -825,16 +827,25 @@ void LLRenderPass::pushUntexturedGLTFBatches(U32 type)
 }
 
 // static
-void LLRenderPass::pushGLTFBatch(LLDrawInfo& params)
+void LLRenderPass::pushGLTFBatch(LLDrawInfo& params, LLFetchedGLTFMaterial*& lastMat, LLViewerTexture*& lastTex)
 {
-    auto& mat = params.mGLTFMaterial;
+    LLFetchedGLTFMaterial* mat = params.mGLTFMaterial.get();
 
-    if (mat.notNull())
+    if (mat)
     {
-        mat->bind(params.mTexture);
+        // params.mTexture is the media override (bind() applies it to base color
+        // and emissive), so it is part of the cache key -- otherwise media faces
+        // sharing a material would render with a stale base texture.
+        LLViewerTexture* tex = params.mTexture.get();
+        if (mat != lastMat || tex != lastTex)
+        {
+            mat->bind(params.mTexture);
+            lastMat = mat;
+            lastTex = tex;
+        }
     }
 
-    LLGLDisable cull_face(mat.notNull() && mat->mDoubleSided ? GL_CULL_FACE : 0);
+    LLGLDisable cull_face(mat && mat->mDoubleSided ? GL_CULL_FACE : 0);
 
     setup_texture_matrix(params);
 
@@ -877,6 +888,8 @@ void LLRenderPass::pushRiggedGLTFBatches(U32 type)
     const LLVOAvatar* lastAvatar = nullptr;
     U64 lastMeshId = 0;
     bool skipLastSkin = false;
+    LLFetchedGLTFMaterial* lastMat = nullptr;
+    LLViewerTexture* lastTex = nullptr;
 
     auto* begin = gPipeline.beginRenderMap(type);
     auto* end = gPipeline.endRenderMap(type);
@@ -886,7 +899,7 @@ void LLRenderPass::pushRiggedGLTFBatches(U32 type)
         LLDrawInfo& params = **i;
         LLCullResult::increment_iterator(i, end);
 
-        pushRiggedGLTFBatch(params, lastAvatar, lastMeshId, skipLastSkin);
+        pushRiggedGLTFBatch(params, lastAvatar, lastMeshId, skipLastSkin, lastMat, lastTex);
     }
 }
 
@@ -911,11 +924,11 @@ void LLRenderPass::pushUntexturedRiggedGLTFBatches(U32 type)
 
 
 // static
-void LLRenderPass::pushRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin)
+void LLRenderPass::pushRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, LLFetchedGLTFMaterial*& lastMat, LLViewerTexture*& lastTex)
 {
     if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
     {
-        pushGLTFBatch(params);
+        pushGLTFBatch(params, lastMat, lastTex);
     }
 }
 
