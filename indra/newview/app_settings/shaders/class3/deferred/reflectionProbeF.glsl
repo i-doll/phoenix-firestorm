@@ -62,13 +62,6 @@ layout (std140) uniform ReflectionProbes
     int heroShape;
     int heroMipCount;
     int heroProbeCount;
-    float iterationCount;
-    float rayStep;
-    float distanceBias;
-    float depthRejectBias;
-    float glossySampleCount;
-    float adaptiveStepMultiplier;
-    vec2 ssrTailPad;
 };
 
 // Inputs

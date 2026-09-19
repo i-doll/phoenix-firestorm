@@ -1464,15 +1464,6 @@ void LLReflectionMapManager::updateUniforms()
     mProbeData.heroMipCount   = gPipeline.mHeroProbeManager.mHeroData.heroMipCount;
     mProbeData.heroProbeCount = gPipeline.mHeroProbeManager.mHeroData.heroProbeCount;
 
-    // SSR march parameters ride along in this block rather than being re-pushed loose on every
-    // bindReflectionProbes; they are constant for the frame.
-    mProbeData.iterationCount         = (F32)LLPipeline::RenderScreenSpaceReflectionIterations;
-    mProbeData.rayStep                = LLPipeline::RenderScreenSpaceReflectionRayStep;
-    mProbeData.distanceBias           = LLPipeline::RenderScreenSpaceReflectionDistanceBias;
-    mProbeData.depthRejectBias        = LLPipeline::RenderScreenSpaceReflectionDepthRejectBias;
-    mProbeData.glossySampleCount      = (F32)LLPipeline::RenderScreenSpaceReflectionGlossySamples;
-    mProbeData.adaptiveStepMultiplier = LLPipeline::RenderScreenSpaceReflectionAdaptiveStepMultiplier;
-
     // Copy mProbeData into the uniform buffer object.
     if (mUBO == 0)
     {

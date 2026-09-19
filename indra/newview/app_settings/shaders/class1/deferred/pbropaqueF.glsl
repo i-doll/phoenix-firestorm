@@ -70,17 +70,12 @@ uniform mat3 normal_matrix;
 
 void main()
 {
-    mirrorClip(vary_position);
 
     vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
     basecolor.rgb = srgb_to_linear(basecolor.rgb);
 
     basecolor *= vertex_color;
 
-    if (basecolor.a < minimum_alpha)
-    {
-        discard;
-    }
 
     vec3 col = basecolor.rgb;
 
@@ -120,6 +115,12 @@ void main()
     //emissive = vNt * 0.5 + 0.5;
     //emissive = tnorm*0.5+0.5;
     // See: C++: addDeferredAttachments(), GLSL: softenLightF
+    mirrorClip(vary_position);
+    if (basecolor.a < minimum_alpha)
+    {
+        discard;
+    }
+
     frag_data[0] = max(vec4(col, 0.0), vec4(0));                                                   // Diffuse
     frag_data[1] = packORM(max(spec.rgb, vec3(0)));  // Occlusion, Roughness (green+alpha), Metal
     // Geometric normal in place of environment intensity: PBR never reads the latter, and

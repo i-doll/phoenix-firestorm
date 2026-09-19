@@ -143,22 +143,14 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
 
 void main()
 {
-    mirrorClip(vary_position);
 
     vec3 color = vec3(0,0,0);
 
     vec3  light_dir   = (sun_up_factor == 1) ? sun_dir : moon_dir;
     vec3  pos         = vary_position;
 
-    waterClip(pos);
 
     vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
-#ifdef HAS_ALPHA_MASK
-    if (basecolor.a < minimum_alpha)
-    {
-        discard;
-    }
-#endif
 
     vec3 col = vertex_color.rgb * basecolor.rgb;
 
@@ -176,6 +168,14 @@ void main()
     // The material response is genuinely lost for blended surfaces in an impostor. It cannot
     // be kept: a G-buffer has one normal and one ORM per texel and blended layers have no
     // single value for either, which is why the flat path is the convention here.
+    mirrorClip(vary_position);
+    waterClip(pos);
+#ifdef HAS_ALPHA_MASK
+    if (basecolor.a < minimum_alpha)
+    {
+        discard;
+    }
+#endif
     frag_color = max(vec4(col, basecolor.a * vertex_color.a), vec4(0));
     frag_reveal = vec4(0.0);
 #else
@@ -227,6 +227,15 @@ void main()
     vec3 colorEmissive = emissiveColor;
     // emissiveMap here is a vanilla RGB texture encoded as sRGB, manually convert to linear
     colorEmissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
+
+    mirrorClip(vary_position);
+    waterClip(pos);
+#ifdef HAS_ALPHA_MASK
+    if (basecolor.a < minimum_alpha)
+    {
+        discard;
+    }
+#endif
 
     // PBR IBL
     float gloss      = 1.0 - perceptualRoughness;

@@ -221,8 +221,6 @@ void main()
     // derivative needs, so the one derivative this shader takes is taken while all four are live.
     geom_normal = terrain_geometric_normal();
 
-    // Make sure we clip the terrain if we're in a mirror.
-    mirrorClip(vary_position);
 
     TerrainMix tm;
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
@@ -473,10 +471,6 @@ void main()
     }
 
     float minimum_alpha = terrain_mix(tm, minimum_alphas);
-    if (pbr_mix.col.a < minimum_alpha)
-    {
-        discard;
-    }
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     vec3 tnorm = normalize(pbr_mix.vNt);
 #else
@@ -502,6 +496,12 @@ void main()
     // maps reach their minification limit within the visible frame every time.
     vec3 orm_out = mix_orm;
     orm_out.g = filterSpecularRoughness(orm_out.g, tnorm);
+
+    mirrorClip(vary_position);
+    if (pbr_mix.col.a < minimum_alpha)
+    {
+        discard;
+    }
 
     frag_data[0] = max(vec4(pbr_mix.col.xyz, 0.0), vec4(0));                                                   // Diffuse
     // Alpha is zero, as every other PBR GBuffer writer leaves it. Nothing reads this channel for
