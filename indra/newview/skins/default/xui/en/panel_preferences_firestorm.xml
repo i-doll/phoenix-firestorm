@@ -65,6 +65,16 @@
             (requires restart)
         </text>
         <check_box
+         control_name="RLVaExperimentalLoginPrivacy"
+         top_pad="3"
+         left="10"
+         follows="left|top"
+         height="16"
+         width="490"
+         name="rlva_login_privacy"
+         label="Protect privacy while RLVa attachments load (experimental)"
+         tool_tip="At login, temporarily restrict visibility and interaction while RLVa attachments load. Releases after loading plus 15 seconds, or after 60 seconds. Applies at next login." />
+        <check_box
          top_pad="3"
          left="10"
          follows="left|top"

@@ -177,11 +177,14 @@ public:
     void onExperienceEvent(const LLSD& sdEvent);
     bool onGC();
     void onLoginComplete();
+    void startStartupPrivacy();
+    void stopStartupPrivacy();
     void onSitOrStand(bool fSitting);
     void onTeleportFailed();
     void onTeleportFinished(const LLVector3d& posArrival);
     static void cleanupClass();
     static void onIdleStartup(void* pParam);
+    static void onIdleStartupPrivacy(void* pParam);
 protected:
     void getAttachmentResourcesCoro(const std::string& strUrl);
     void onTeleportCallback(U64 hRegion, const LLVector3& posRegion, const LLVector3& vecLookAt, const LLUUID& idRlvObj);
@@ -251,6 +254,10 @@ protected:
 
     rlv_command_list_t    m_Retained;
     RlvGCTimer*           m_pGCTimer;
+    LLUUID                m_idStartupPrivacy;
+    LLTimer               m_StartupPrivacyTimer;
+    LLTimer               m_StartupPrivacyReadyTimer;
+    bool                  m_fStartupPrivacyReady;
 
     std::stack<std::reference_wrapper<const RlvCommand>> m_CurCommandStack; // Convenience (see @tpto)
     std::stack<LLUUID>    m_CurObjectStack;         // Convenience (see @tpto)

@@ -31,6 +31,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+#include "llvoavatarself.h"
 
 // Command specific includes
 #include "llagentcamera.h"              // @setcam and related
@@ -148,7 +149,11 @@ static bool rlvParseGetStatusOption(const std::string& strOption, std::string& s
 //
 
 // Checked: 2010-04-07 (RLVa-1.2.0d) | Modified: RLVa-1.0.1d
-RlvHandler::RlvHandler() : m_fCanCancelTp(true), m_posSitSource(), m_pGCTimer(NULL)
+RlvHandler::RlvHandler()
+    : m_pGCTimer(NULL),
+      m_fStartupPrivacyReady(false),
+      m_fCanCancelTp(true),
+      m_posSitSource()
 {
     gAgent.addListener(this, "new group");
 
@@ -166,6 +171,8 @@ void RlvHandler::cleanup()
     // Nothing to clean if we're not enabled (or already cleaned up)
     if (!m_fEnabled)
         return;
+
+    stopStartupPrivacy();
 
     //
     // Clean up any restrictions that are still active
@@ -1198,11 +1205,90 @@ void RlvHandler::onLoginComplete()
     RlvInventory::instance().fetchSharedInventory();
     RlvSettings::updateLoginLastLocation();
 
+    startStartupPrivacy();
+
     m_ExperienceEventConn = LLExperienceLog::instance().addUpdateSignal(boost::bind(&RlvHandler::onExperienceEvent, this, _1));
     m_TeleportFailedConn = LLViewerParcelMgr::getInstance()->setTeleportFailedCallback(boost::bind(&RlvHandler::onTeleportFailed, this));
     m_TeleportFinishedConn = LLViewerParcelMgr::getInstance()->setTeleportFinishedCallback(boost::bind(&RlvHandler::onTeleportFinished, this, _1));
 
     processRetainedCommands();
+}
+
+void RlvHandler::startStartupPrivacy()
+{
+    if (!m_idStartupPrivacy.isNull() || !gSavedSettings.getBOOL("RLVaExperimentalLoginPrivacy"))
+        return;
+
+    // Hold privacy restrictions under a synthetic source while login attachments
+    // rez and resend their commands. Clearing this source later only removes
+    // restrictions which were not independently asserted by a real object.
+    static const char* const commands[] =
+    {
+        "setsphere=n",
+        "shownames=n",
+        "showloc=n",
+        "showworldmap=n",
+        "showminimap=n",
+        "shownearby=n",
+        "showhovertextworld=n",
+        "startim=n",
+        "share=n",
+        "tplocal=n",
+        "tploc=n",
+        "tplm=n",
+        "tplure=n",
+        "showcontacts=n",
+        "showsearch=n",
+        "showareasearch=n",
+        "showinv=n",
+        "showlookat=n"
+    };
+
+    m_idStartupPrivacy.generate();
+    for (const char* command : commands)
+    {
+        processCommand(m_idStartupPrivacy, command, false);
+    }
+
+    m_fStartupPrivacyReady = false;
+    m_StartupPrivacyTimer.reset();
+    m_StartupPrivacyReadyTimer.reset();
+    gIdleCallbacks.addFunction(onIdleStartupPrivacy, this);
+    RLV_INFOS << "Enabled the experimental login privacy guard" << RLV_ENDL;
+}
+
+void RlvHandler::stopStartupPrivacy()
+{
+    gIdleCallbacks.deleteFunction(onIdleStartupPrivacy, this);
+
+    if (m_idStartupPrivacy.isNull())
+        return;
+
+    RLV_INFOS << "Releasing the experimental login privacy guard" << RLV_ENDL;
+    processCommand(m_idStartupPrivacy, "clear", false);
+    m_idStartupPrivacy.setNull();
+    m_fStartupPrivacyReady = false;
+}
+
+// static
+void RlvHandler::onIdleStartupPrivacy(void* pParam)
+{
+    RlvHandler* handler = static_cast<RlvHandler*>(pParam);
+
+    constexpr F32 READY_GRACE_SECONDS = 15.f;
+    constexpr F32 HARD_TIMEOUT_SECONDS = 60.f;
+
+    if (!handler->m_fStartupPrivacyReady && isAgentAvatarValid() && gAgentAvatarp->isFullyLoaded())
+    {
+        handler->m_fStartupPrivacyReady = true;
+        handler->m_StartupPrivacyReadyTimer.reset();
+    }
+
+    if (handler->m_StartupPrivacyTimer.getElapsedTimeF32() >= HARD_TIMEOUT_SECONDS ||
+        (handler->m_fStartupPrivacyReady && handler->m_StartupPrivacyReadyTimer.getElapsedTimeF32() >= READY_GRACE_SECONDS))
+    {
+        handler->stopStartupPrivacy();
+    }
 }
 
 void RlvHandler::onTeleportCallback(U64 hRegion, const LLVector3& posRegion, const LLVector3& vecLookAt, const LLUUID& idRlvObj)
