@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_close="true"
+ can_minimize="true"
+ height="720"
+ layout="topleft"
+ min_height="600"
+ min_width="1200"
+ name="mass_object_edit"
+ title="Mass Object Edit"
+ width="1200">
+    <text left="12" top="28" width="360" height="20" name="targets_label">1. Choose target prims (right-click for object actions)</text>
+    <line_editor left="12" top="50" width="114" height="24" name="name_filter"
+     label="Object name" tool_tip="Show objects whose name contains this text" />
+    <line_editor left="132" top="50" width="114" height="24" name="creator_filter"
+     label="Creator" tool_tip="Show objects whose creator name or UUID contains this text" />
+    <line_editor left="252" top="50" width="120" height="24" name="owner_filter"
+     label="Owner" tool_tip="Show objects whose owner name or UUID contains this text" />
+    <button left="12" top="80" width="70" height="24" name="refresh_btn" label="Refresh" />
+    <button left_pad="6" width="74" height="24" name="select_all_targets_btn" label="Select All" />
+    <button left_pad="6" width="58" height="24" name="clear_targets_btn" label="Clear" />
+    <button left_pad="6" width="128" height="24" name="scan_contents_btn" label="Scan Contents" />
+    <scroll_list
+     left="12" top="112" width="360" height="540"
+     follows="left|top|bottom"
+     name="target_list" multi_select="true" sort_lazily="true">
+        <scroll_list.columns name="name" label="Object / link" width="150" />
+        <scroll_list.columns name="creator" label="Creator" width="120" />
+        <scroll_list.columns name="owner" label="Owner" width="74" />
+    </scroll_list>
+
+    <button left="384" top="28" width="180" height="24" name="use_source_btn" label="2. Use Selected Prim as Source" />
+    <text left="574" top="32" width="200" height="20" name="source_label">No source selected</text>
+    <text left="384" top="62" width="390" height="20" name="source_contents_label">Source contents (select items to add or replace)</text>
+    <scroll_list
+     left="384" top="84" width="390" height="520"
+     follows="left|top|bottom"
+     name="source_list" multi_select="true">
+        <scroll_list.columns name="name" label="Name" width="220" />
+        <scroll_list.columns name="type" label="Type" width="100" />
+        <scroll_list.columns name="permissions" label="Copy" width="50" />
+    </scroll_list>
+    <button left="384" top="616" width="118" height="28" name="add_btn" label="Add Selected" />
+    <button left_pad="8" width="118" height="28" name="replace_btn" label="Replace Selected" />
+    <button left_pad="8" width="118" height="28" name="delete_btn" label="Delete Content" />
+    <text left="384" top="650" width="390" height="20" name="operation_scope_label">Operation scope: 0 selected target prims</text>
+
+    <text left="786" top="28" width="402" height="20" name="target_contents_label">3. Review contents (click headers to sort)</text>
+    <line_editor left="786" top="50" width="145" height="24" name="content_name_filter"
+     label="Filter name" tool_tip="Show contents whose name contains this text" />
+    <line_editor left="937" top="50" width="125" height="24" name="content_type_filter"
+     label="Filter type" tool_tip="Examples: script, notecard, texture" />
+    <line_editor left="1068" top="50" width="120" height="24" name="content_count_filter"
+     label="Count filter" tool_tip="Examples: 10 (at least 10), &gt;10, &lt;=50, =3, or 10-20" />
+    <progress_bar
+     left="786" top="80" width="402" height="16"
+     name="scan_progress" tool_tip="Target inventory scan progress" />
+    <scroll_list
+     left="786" top="104" width="402" height="280"
+     follows="right|top"
+     name="target_contents_list" multi_select="true" sort_lazily="true">
+        <scroll_list.columns name="name" label="Name" width="210" />
+        <scroll_list.columns name="type" label="Type" width="105" />
+        <scroll_list.columns name="count" label="Targets" width="70" />
+    </scroll_list>
+    <text left="786" top="396" width="306" height="20" name="occurrence_label">Objects containing the selected content (0)</text>
+    <button left="1098" top="392" width="90" height="24" name="refresh_occurrences_btn"
+     label="Refresh" tool_tip="Refresh inventory only for the objects currently shown below" />
+    <scroll_list
+     left="786" top="418" width="402" height="234"
+     follows="right|top|bottom"
+     name="occurrence_list" multi_select="true" sort_lazily="true">
+        <scroll_list.columns name="name" label="Object / link" width="245" />
+        <scroll_list.columns name="owner" label="Owner" width="140" />
+    </scroll_list>
+
+    <text left="12" top="674" width="1176" height="34" name="status_text" word_wrap="true">Ready.</text>
+</floater>

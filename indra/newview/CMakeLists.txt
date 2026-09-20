@@ -188,6 +188,7 @@ set(viewer_SOURCE_FILES
     fslslpreprocviewer.cpp
     fsmaniprotatejoint.cpp
     fsmaniptranslatejoint.cpp
+    fsmassobjectedit.cpp
     fsmoneytracker.cpp
     fsnamelistavatarmenu.cpp
     fsnearbychatbarlistener.cpp
@@ -1075,6 +1076,7 @@ set(viewer_HEADER_FILES
     fslslpreproc.h
     fslslpreprocpath.h # <FS:Beq> Extended non-ASCII path test coverage. </FS:Beq>
     fslslpreprocviewer.h
+    fsmassobjectedit.h
     fsmoneytracker.h
     fsmaniprotatejoint.h
     fsmaniptranslatejoint.h
