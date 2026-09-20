@@ -462,7 +462,7 @@ void LLAudioEngine::idle()
     {
         if (mBuffers[i])
         {
-            if (!mBuffers[i]->mInUse && mBuffers[i]->mLastUseTimer.getElapsedTimeF32() > 30.f)
+            if (!mBuffers[i]->mInUse && !mBuffers[i]->isPinned() && mBuffers[i]->mLastUseTimer.getElapsedTimeF32() > 30.f)
             {
                 //LL_INFOS() << "Flushing unused buffer!" << LL_ENDL;
                 mBuffers[i]->mAudioDatap->mBufferp = NULL;
@@ -563,7 +563,7 @@ LLAudioBuffer * LLAudioEngine::getFreeBuffer()
     {
         if (mBuffers[i])
         {
-            if (!mBuffers[i]->mInUse)
+            if (!mBuffers[i]->mInUse && !mBuffers[i]->isPinned())
             {
                 if (mBuffers[i]->mLastUseTimer.getElapsedTimeF32() > max_age)
                 {
@@ -656,7 +656,7 @@ void LLAudioEngine::cleanupBuffer(LLAudioBuffer *bufferp)
 }
 
 
-bool LLAudioEngine::preloadSound(const LLUUID &uuid)
+bool LLAudioEngine::preloadSound(const LLUUID &uuid, bool pin_buffer)
 {
     LL_DEBUGS("AudioEngine")<<"( "<<uuid<<" )"<<LL_ENDL;
 
@@ -665,8 +665,24 @@ bool LLAudioEngine::preloadSound(const LLUUID &uuid)
         return false;
     // </FS:ND>
 
-    getAudioData(uuid); // We don't care about the return value, this is just to make sure
-                                    // that we have an entry, which will mean that the audio engine knows about this
+    LLAudioData *adp = getAudioData(uuid);
+    if (!adp)
+        return false;
+
+    if (pin_buffer)
+    {
+        adp->setPinned(true);
+    }
+
+    if (pin_buffer && adp->hasDecodedData() && !adp->getBuffer())
+    {
+        adp->load();
+        if (adp->getBuffer() && pin_buffer)
+        {
+            adp->getBuffer()->setPinned(true);
+        }
+        return true;
+    }
 
     if (LLAudioDecodeMgr::getInstance()->addDecodeRequest(uuid))
     {
@@ -1982,16 +1998,6 @@ bool LLAudioData::load()
         gAudiop->cleanupBuffer(mBufferp);
         mBufferp = nullptr;
 
-        if (!gDirUtilp->fileExists(wav_path))
-        {
-            mHasLocalData = false;
-            mHasDecodedData = false;
-            mHasCompletedDecode = false;
-            mHasDecodeFailed = false;
-            mHasWAVLoadFailed = false;
-            gAudiop->preloadSound(mID);
-        }
-
         // <FS:Ansariel> FIRE-480: Opening multiple instances causes sound failures
         if (!gDirUtilp->fileExists(wav_path))
         {
@@ -2000,13 +2006,17 @@ bool LLAudioData::load()
             mHasCompletedDecode = false;
             mHasDecodeFailed = false;
             mHasWAVLoadFailed = false;
-            gAudiop->preloadSound(mID);
+            gAudiop->preloadSound(mID, mPinned);
         }
         // </FS:Ansariel>
 
         return false;
     }
     mBufferp->mAudioDatap = this;
+    if (mPinned)
+    {
+        mBufferp->setPinned(true);
+    }
     return true;
 }
 
