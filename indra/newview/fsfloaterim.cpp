@@ -328,6 +328,39 @@ void FSFloaterIM::snooze(S32 duration /*= -1*/)
     LLFloater::onClickCloseBtn();
 }
 
+void FSFloaterIM::onSnoozeGroupClicked(const LLUICtrl* ctrl)
+{
+    if (!ctrl)
+    {
+        return;
+    }
+
+    const std::string snooze_value = ctrl->getValue().asString();
+    S32 snooze_minutes = 0;
+    if (!LLStringUtil::convertToS32(snooze_value, snooze_minutes))
+    {
+        LL_WARNS("FSFloaterIM") << "Invalid group IM snooze value: " << snooze_value << LL_ENDL;
+        return;
+    }
+
+    // -2 distinguishes "until relog" from the existing -1 sentinel, which
+    // means use the configured default duration.
+    const S32 snooze_duration = snooze_minutes < 0 ? -2 : snooze_minutes * 60;
+    LLIMModel::LLIMSession* session = LLIMModel::instance().findIMSession(mSessionID);
+    LLVoiceChannel* voice_channel = LLIMModel::getInstance()->getVoiceChannel(mSessionID);
+    if (session && voice_channel && voice_channel->isActive())
+    {
+        LLSD payload;
+        payload["session_id"] = mSessionID;
+        payload["snooze"] = true;
+        payload["snooze_duration"] = snooze_duration;
+        LLNotificationsUtil::add("ConfirmLeaveCall", LLSD(), payload, confirmLeaveCallCallback);
+        return;
+    }
+
+    snooze(snooze_duration);
+}
+
 /* static */
 void FSFloaterIM::newIMCallback(const LLSD& data){
 
@@ -949,6 +982,10 @@ bool FSFloaterIM::postBuild()
                 getChild<LLLayoutPanel>("end_call_btn_panel")->setVisible(false);
                 getChild<LLLayoutPanel>("voice_ctrls_btn_panel")->setVisible(false);
                 getChild<LLLayoutPanel>("add_participant_panel")->setVisible(false);
+                getChild<LLLayoutPanel>("snooze_group_panel")->setVisible(true);
+
+                getChild<LLUICtrl>("snooze_group_btn")->setCommitCallback(
+                    boost::bind(&FSFloaterIM::onSnoozeGroupClicked, this, _1));
 
                 LL_DEBUGS("FSFloaterIM") << "LLIMModel::LLIMSession::GROUP_SESSION end" << LL_ENDL;
                 break;
@@ -2226,6 +2263,11 @@ void FSFloaterIM::confirmLeaveCallCallback(const LLSD& notification, const LLSD&
         {
             if (snooze)
             {
+                if (payload.has("snooze_duration"))
+                {
+                    im_floater->snooze(payload["snooze_duration"].asInteger());
+                    return;
+                }
                 im_floater->confirmSnooze();
                 return;
             }

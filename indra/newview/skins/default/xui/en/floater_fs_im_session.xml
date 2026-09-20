@@ -107,6 +107,43 @@
           parameter="group_info"/>
         </button>
     </layout_panel>
+
+    <layout_panel
+      name="snooze_group_panel"
+      auto_resize="false"
+      user_resize="false"
+      visible="false"
+      top="0"
+      layout="topleft"
+      height="20"
+      width="52"
+      follows="left|top">
+      <flyout_button
+       follows="left|top"
+       height="20"
+       label=""
+       layout="topleft"
+       left_delta="2"
+       name="snooze_group_btn"
+       tool_tip="Snooze group chat"
+       top="0"
+       width="50">
+        <flyout_button.item label="Next message" value="0" />
+        <flyout_button.item label="5 minutes" value="5" />
+        <flyout_button.item label="15 minutes" value="15" />
+        <flyout_button.item label="30 minutes" value="30" />
+        <flyout_button.item label="45 minutes" value="45" />
+        <flyout_button.item label="1 hour" value="60" />
+        <flyout_button.item label="Next relog" value="-1" />
+        <flyout_button.action_button
+         image_hover_unselected="Toolbar_Middle_Over"
+         image_overlay="Icon_Snooze_Foreground"
+         image_overlay_alignment="center"
+         image_selected="Toolbar_Middle_Selected"
+         image_unselected="Toolbar_Middle_Off"
+         imgoverlay_label_space="0" />
+      </flyout_button>
+    </layout_panel>
     
     <layout_panel
       name="profile_panel"
