@@ -15627,4 +15627,17 @@ Folder names cannot contain / or \.
   </notification>
   <!-- </FS:Amy> Favorite Wearables folders -->
 
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmMassObjectEdit"
+   type="alertmodal">
+    Apply [OPERATION] to [ITEM_COUNT] selected content entries across [TARGET_COUNT] target prims?
+
+    [WARNING]
+    <tag>confirm</tag>
+    <form>
+      <button index="0" name="Apply" text="Apply" />
+      <button default="true" index="1" name="Cancel" text="Cancel" />
+    </form>
+  </notification>
 </notifications>
