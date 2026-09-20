@@ -4088,7 +4088,12 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
         static LLCachedControl<S32> s_nSnoozeTime(gSavedSettings, "GroupSnoozeTime", 900);
         snoozed_sessions_t::iterator itSession = mSnoozedSessions.find(session_id);
         F64 expirationTime = LLTimer::getTotalSeconds() + F64(s_nSnoozeTime);
-        if (im_session->mSnoozeTime > -1)
+        if (im_session->mSnoozeTime == -2)
+        {
+            expirationTime = -1.0;
+            im_session->mSnoozeTime = -1;
+        }
+        else if (im_session->mSnoozeTime > -1)
         {
             expirationTime = LLTimer::getTotalSeconds() + F64(im_session->mSnoozeTime);
             im_session->mSnoozeTime = -1;
@@ -4102,6 +4107,7 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
     else
     {
         LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+        mSnoozedSessions.erase(session_id);
         // <FS:Amalthea> Group close: protect against in-flight messages re-opening the floater
         if (im_session->isGroupSessionType())
         {
@@ -4313,7 +4319,8 @@ bool LLIMMgr::hasSession(const LLUUID& session_id)
 bool LLIMMgr::checkSnoozeExpiration(const LLUUID& session_id) const
 {
     snoozed_sessions_t::const_iterator itSession = mSnoozedSessions.find(session_id);
-    return (mSnoozedSessions.end() != itSession) && (itSession->second <= LLTimer::getTotalSeconds());
+    return (mSnoozedSessions.end() != itSession) && (itSession->second >= 0.0) &&
+        (itSession->second <= LLTimer::getTotalSeconds());
 }
 
 bool LLIMMgr::isSnoozedSession(const LLUUID& session_id) const
@@ -4326,11 +4333,10 @@ bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
     snoozed_sessions_t::iterator itSession = mSnoozedSessions.find(session_id);
     if (mSnoozedSessions.end() != itSession)
     {
-        mSnoozedSessions.erase(itSession);
-
         LLGroupData groupData;
         if (gAgent.getGroupData(session_id, groupData))
         {
+            mSnoozedSessions.erase(itSession);
             gIMMgr->addSession(groupData.mName, IM_SESSION_INVITE, session_id);
 
             uuid_vec_t ids;

@@ -232,6 +232,7 @@ private:
     void confirmSnooze();
     void snoozeDurationCallback(const LLSD& notification, const LLSD& response);
     void snooze(S32 duration = -1);
+    void onSnoozeGroupClicked(const LLUICtrl* ctrl);
 
     void onAddButtonClicked();
     bool canAddSelectedToChat(const uuid_vec_t& uuids);
