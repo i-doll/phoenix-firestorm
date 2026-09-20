@@ -293,18 +293,17 @@ void RlvUIEnabler::onToggleShowAreaSearch()
 {
     bool fEnable = !gRlvHandler.hasBehaviour(RLV_BHVR_AREASEARCH);
 
-    // Hide the area search floater if it's currently visible
-    if ( (!fEnable) && (LLFloaterReg::instanceVisible("area_search")) )
-        LLFloaterReg::hideInstance("area_search");
-
-    // Start or stop filtering opening the area search floater
-    if (!fEnable)
+    for (const std::string& name : { std::string("area_search"), std::string("mass_object_edit") })
     {
-        RLV_VERIFY(addGenericFloaterFilter("area_search"));
-    }
-    else
-    {
-        RLV_VERIFY(removeGenericFloaterFilter("area_search"));
+        if (!fEnable)
+        {
+            LLFloaterReg::hideInstance(name);
+            RLV_VERIFY(addGenericFloaterFilter(name));
+        }
+        else
+        {
+            RLV_VERIFY(removeGenericFloaterFilter(name));
+        }
     }
 }
 

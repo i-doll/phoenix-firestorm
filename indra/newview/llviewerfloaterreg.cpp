@@ -227,6 +227,7 @@
 #include "fsfloatervolumecontrols.h"
 #include "fsfloatervramusage.h"
 #include "fsfloaterwearablefavorites.h"
+#include "fsmassobjectedit.h"
 #include "fsmoneytracker.h"
 //#include "fspanelclassified.h"
 #include "lggbeamcolormapfloater.h"
@@ -640,6 +641,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("animation_explorer", "floater_animation_explorer.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<AnimationExplorer>);
     LLFloaterReg::add("animation_overrider", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);
     LLFloaterReg::add("area_search", "floater_fs_area_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSAreaSearch>);
+    LLFloaterReg::add("mass_object_edit", "floater_fs_mass_object_edit.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSMassObjectEdit>);
     LLFloaterReg::add("export_collada", "floater_export_collada.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ColladaExportFloater>);
     LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
     LLFloaterReg::add("flickr", "floater_flickr.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterFlickr>);

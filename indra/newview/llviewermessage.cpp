@@ -147,6 +147,7 @@
 #include <boost/regex.hpp>
 #include "animationexplorer.h"      // <FS:Zi> Animation Explorer
 #include "fsareasearch.h"
+#include "fsmassobjectedit.h"
 #include "fsassetblacklist.h"
 #include "fscommon.h"
 #include "fsfloaterplacedetails.h"
@@ -4896,6 +4897,11 @@ void process_object_properties(LLMessageSystem *msg, void**user_data)
     if (area_search_floater)
     {
         area_search_floater->processObjectProperties(msg);
+    }
+
+    if (FSMassObjectEdit* mass_edit = LLFloaterReg::findTypedInstance<FSMassObjectEdit>("mass_object_edit"))
+    {
+        mass_edit->processObjectProperties(msg);
     }
 
     AnimationExplorer* explorer = LLFloaterReg::findTypedInstance<AnimationExplorer>("animation_explorer");

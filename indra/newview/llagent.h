@@ -311,8 +311,9 @@ private:
 
     std::string                             mInterestListMode;  // How agent wants regions to send updates
     // <FS:Beq> Area search fixes
-    bool mFSAreaSearchActive;
-    bool m360CaptureActive;
+    bool mFSAreaSearchActive{ false };
+    bool m360CaptureActive{ false };
+    bool mFSMassObjectEditActive{ false };
     // </FS:Beq>
 
     //--------------------------------------------------------------------
@@ -325,8 +326,10 @@ public:
     // <FS:Beq> Area search fixes
     void            setFSAreaSearchActive(bool enabled) { mFSAreaSearchActive = enabled; }
     void            set360CaptureActive(bool enabled) { m360CaptureActive = enabled; }
+    void            setFSMassObjectEditActive(bool enabled) { mFSMassObjectEditActive = enabled; }
     bool            getFSAreaSearchActive() const { return mFSAreaSearchActive; }
     bool            get360CaptureActive() const { return m360CaptureActive; }
+    bool            getFSMassObjectEditActive() const { return mFSMassObjectEditActive; }
     // </FS:Beq>
 
     const LLVector3d &getLastPositionGlobal() const { return mLastPositionGlobal; }

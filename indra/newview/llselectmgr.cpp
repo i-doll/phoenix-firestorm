@@ -110,6 +110,7 @@
 #include "llworld.h"
 // </FS:CR> Aurora Sim
 #include "fsareasearch.h"
+#include "fsmassobjectedit.h"
 #include "llglheaders.h"
 #include "llinventoryobserver.h"
 #include "fscommon.h"
@@ -6264,7 +6265,9 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
         {
             // <FS:Techwolf Lupindo> area search
             FSAreaSearch* area_search_floater = LLFloaterReg::findTypedInstance<FSAreaSearch>("area_search");
-            if (!area_search_floater || !area_search_floater->isActive()) // Don't spam the log when areasearch is active.
+            FSMassObjectEdit* mass_edit = LLFloaterReg::findTypedInstance<FSMassObjectEdit>("mass_object_edit");
+            if ((!area_search_floater || !area_search_floater->isActive()) &&
+                (!mass_edit || !mass_edit->isScanning())) // Background scans do not select objects locally.
             {
             // </FS:Techwolf Lupindo>
             LL_WARNS() << "Couldn't find object " << id << " selected." << LL_ENDL;

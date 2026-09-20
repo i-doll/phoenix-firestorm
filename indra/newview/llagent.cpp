@@ -3691,7 +3691,7 @@ void LLAgent::changeInterestListMode(const std::string &new_mode)
     if (new_mode != mInterestListMode)
     {
     // <FS:Beq> Fix area search again
-        if ( (new_mode == IL_MODE_DEFAULT && (!mFSAreaSearchActive && !m360CaptureActive))  ||
+        if ( (new_mode == IL_MODE_DEFAULT && (!mFSAreaSearchActive && !m360CaptureActive && !mFSMassObjectEditActive))  ||
              (new_mode == IL_MODE_360) )
         {
         LL_DEBUGS("360Capture") << "Setting Agent interest list mode to " << new_mode << " and updating regions" << LL_ENDL;
