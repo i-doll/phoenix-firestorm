@@ -1770,13 +1770,14 @@ void RlvForceWear::done()
     // Process removals
     //
 
-    uuid_vec_t remItems;
+    uuid_vec_t remWearableItems;
+    uuid_vec_t remAttachmentItems;
 
     // Wearables
     if (m_remWearables.size())
     {
         for (const LLViewerWearable* pWearable : m_remWearables)
-            remItems.push_back(pWearable->getItemID());
+            remWearableItems.push_back(pWearable->getItemID());
         m_remWearables.clear();
     }
 
@@ -1794,7 +1795,7 @@ void RlvForceWear::done()
     {
         LLAgentWearables::userRemoveMultipleAttachments(m_remAttachments);
         for (const LLViewerObject* pAttachObj : m_remAttachments)
-            remItems.push_back(pAttachObj->getAttachmentItemID());
+            remAttachmentItems.push_back(pAttachObj->getAttachmentItemID());
         m_remAttachments.clear();
     }
 
@@ -1835,9 +1836,16 @@ void RlvForceWear::done()
     // Remove : | LLAppearanceMgr | LLAppearanceMgr  | LLGestureMgr    |
     LLPointer<LLInventoryCallback> cb = new LLUpdateAppearanceOnDestroy(false, false, boost::bind(RlvForceWear::updatePendingAttachments));
 
-    if (!remItems.empty())
+    // Clothing can wait for AIS to acknowledge removal before its local COF link disappears.
+    // This preserves the FIRE-33455 behavior without leaving intentionally detached objects
+    // visible in the COF, where an intervening appearance reconciliation can reattach them.
+    if (!remWearableItems.empty())
     {
-        LLAppearanceMgr::instance().removeItemsFromAvatar(remItems, no_op, cb, true);
+        LLAppearanceMgr::instance().removeItemsFromAvatar(remWearableItems, no_op, cb, false);
+    }
+    if (!remAttachmentItems.empty())
+    {
+        LLAppearanceMgr::instance().removeItemsFromAvatar(remAttachmentItems, no_op, cb, true);
     }
 
     if ( (addBodyParts.empty()) && (!addClothing.empty()) && (m_addGestures.empty()) )
