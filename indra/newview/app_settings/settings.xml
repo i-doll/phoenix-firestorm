@@ -28062,5 +28062,16 @@ Change of this parameter will affect the layout of buttons in notification toast
       <integer>1000</integer>
     </map>
     <!-- </ID> -->
-  </map>
+    <key>TextureFetchPipelineDiagnostics</key>
+    <map>
+      <key>Comment</key>
+      <string>Log a periodic texture HTTP pipeline snapshot for diagnosing stalled texture fetches.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+</map>
 </llsd>
