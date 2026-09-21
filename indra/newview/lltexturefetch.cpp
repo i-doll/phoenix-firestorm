@@ -2239,10 +2239,19 @@ void LLTextureFetchWorker::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRe
     bool success = true;
     bool partial = false;
     LLCore::HttpStatus status(response->getStatus());
+    LLViewerRegion* request_region = getRegion();
+    // A 403 is recoverable when the capability URL belongs to a region we
+    // have crossed out of.  A 403 from the current region is not made
+    // recoverable here, otherwise a stationary texture can repeatedly create
+    // new requests after each failed worker completes.
     const bool forbidden_capability =
-        status == LLCore::HttpStatus(HTTP_FORBIDDEN) && mLastRegionId.notNull();
+        status == LLCore::HttpStatus(HTTP_FORBIDDEN) &&
+        mLastRegionId.notNull() && request_region &&
+        mLastRegionId != request_region->getRegionID();
+    const bool no_longer_visible = mImagePriority < F_ALMOST_ZERO;
     if (!status && mFTType != FTT_SERVER_BAKE && mFTType != FTT_MAP_TILE &&
         (status.isRetryable() || forbidden_capability) &&
+        !no_longer_visible &&
         mHttpRetryAttempt < MAX_TRANSIENT_HTTP_RETRIES)
     {
         ++mHttpRetryAttempt;
@@ -3276,16 +3285,17 @@ bool LLTextureFetch::getRequestFinished(const LLUUID& id, S32& discard_level, S3
 bool LLTextureFetch::updateRequestPriority(const LLUUID& id, F32 priority)
 {
     LL_PROFILE_ZONE_SCOPED;
-    mRequestQueue.tryPost([=, this]()
-        {
-            LLTextureFetchWorker* worker = getWorker(id);
-            if (worker)
-            {
-                worker->lockWorkMutex();                                        // +Mw
-                worker->setImagePriority(priority);
-                worker->unlockWorkMutex();                                      // -Mw
-            }
-        });
+
+    // Priority changes must not wait behind the texture work queue.  During a
+    // region crossing, this is how old-region requests become abortable while
+    // current requests continue through the normal worker lifecycle.
+    LLTextureFetchWorker* worker = getWorker(id);
+    if (worker)
+    {
+        worker->lockWorkMutex();                                        // +Mw
+        worker->setImagePriority(priority);
+        worker->unlockWorkMutex();                                      // -Mw
+    }
 
     return true;
 }
