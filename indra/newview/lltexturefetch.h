@@ -99,6 +99,7 @@ public:
     //
     // Threads:  T*
     void deleteRequest(const LLUUID& id, bool cancel);
+    bool deleteRequestIfFinished(const LLUUID& id);
 
     void deleteAllRequests();
 

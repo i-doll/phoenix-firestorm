@@ -1091,10 +1091,11 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                 (!on_screen && LLViewerTexture::sDesiredDiscardBias > BIAS_TRS_ON_SCREEN))
             {
                 imagep->mMaxVirtualSize = 0.f;
+                imagep->mSceneVirtualSize = 0.f;
             }
         }
 
-        imagep->addTextureStats(max_vsize);
+        imagep->updateSceneTextureStats(max_vsize);
     }
 
 #if 0
@@ -1328,6 +1329,49 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
+    LLTimer timer;
+    // Give visible textures a small extra pass while reserving most of the
+    // budget for the complete sweep (including offscreen cleanup). This scan
+    // is cheap and bounded; it does not recalculate pixel areas for candidates.
+    std::unordered_set<LLViewerFetchedTexture*> urgent_updates;
+    const U32 scan_count = llmin((U32)mUUIDMap.size(), 512U);
+    auto urgent_iter = mUUIDMap.upper_bound(mLastUrgentUpdateKey);
+    for (U32 scanned = 0; scanned < scan_count && urgent_updates.size() < 32 && !mUUIDMap.empty(); ++scanned)
+    {
+        if (timer.getElapsedTimeF32() >= max_time * 0.25f)
+        {
+            break;
+        }
+        if (urgent_iter == mUUIDMap.end())
+        {
+            urgent_iter = mUUIDMap.begin();
+        }
+        mLastUrgentUpdateKey = urgent_iter->first;
+        LLPointer<LLViewerFetchedTexture> imagep = urgent_iter->second;
+        bool visible = imagep->isJustBound();
+        U32 checked_faces = 0;
+        for (U32 ch = 0; !visible && ch < LLRender::NUM_TEXTURE_CHANNELS; ++ch)
+        {
+            for (S32 fi = 0; !visible && fi < imagep->getNumFaces(ch) && checked_faces < 8; ++fi)
+            {
+                ++checked_faces;
+                LLFace* face = (*imagep->getFaceList(ch))[fi];
+                visible = face && face->getDrawable() && face->getDrawable()->isVisible();
+            }
+        }
+        if (visible && imagep->getGLTexture())
+        {
+            updateImageDecodePriority(imagep);
+            if (imagep->isInImageList())
+            {
+                imagep->updateFetch();
+                urgent_updates.insert(imagep.get());
+            }
+        }
+        // Updating can erase map entries. Reacquire the iterator by key.
+        urgent_iter = mUUIDMap.upper_bound(mLastUrgentUpdateKey);
+    }
+
     typedef std::vector<LLPointer<LLViewerFetchedTexture> > entries_list_t;
     entries_list_t entries;
 
@@ -1375,16 +1419,18 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
         }
     }
 
-    LLTimer timer;
-
     for (auto& imagep : entries)
     {
         mLastUpdateKey = LLTextureKey(imagep->getID(), (ETexListType)imagep->getTextureListType());
 
-        if (imagep->getNumRefs() > 1) // make sure this image hasn't been deleted before attempting to update (may happen as a side effect of some other image updating)
+        if (imagep->getNumRefs() > 1 && !urgent_updates.count(imagep.get()))
         {
             updateImageDecodePriority(imagep);
-            imagep->updateFetch();
+            // Pruning can remove the image during the priority update.
+            if (imagep->isInImageList())
+            {
+                imagep->updateFetch();
+            }
         }
 
         if (timer.getElapsedTimeF32() > max_time)
@@ -1525,6 +1571,7 @@ bool LLViewerTextureList::createUploadFile(LLPointer<LLImageRaw> raw_image,
     }
     return true;
 }
+
 
 bool LLViewerTextureList::createUploadFile(const std::string& filename,
                                          const std::string& out_filename,
@@ -2159,5 +2206,3 @@ bool LLUIImageList::initFromFile()
     }
     return true;
 }
-
-

@@ -441,24 +441,15 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
         // safe to access req.
         if (req)
         {
-            // <FS:Beq> Deferred retry requests
-            // Avoid loop when idle by restoring a sleep
-            // note that when there is nothing to do the thread still sleeps normally.
-            using namespace std::chrono_literals;
-
-            const auto throttle_time = 2ms;
-            if (req->mDeferUntil > LL::WorkQueue::TimePoint::clock::now())
-            {
-                ms_sleep((U32)throttle_time.count());
-            }
-            // if we're still not ready to retry then requeue
+            // Keep deferred work in the timed queue. Sleeping here would also
+            // delay ready requests and HTTP completion servicing.
             if (req->mDeferUntil > LL::WorkQueue::TimePoint::clock::now())
             {
                 LL_PROFILE_ZONE_NAMED("qtpr - defer requeue");
 
                 lockData();
                 req->setStatus(STATUS_QUEUED);
-                mRequestQueue.post([this, req]() { processRequest(req); });
+                mRequestQueue.post([this, req]() { processRequest(req); }, req->mDeferUntil);
                 unlockData();
                 mIdleThread = true;
                 return;
@@ -484,7 +475,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
             else
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_THREAD("qtpr - retry");
-                //put back on queue and try again in 0.1ms
+                // Retry later without occupying the worker while we wait.
                 lockData();
                 req->setStatus(STATUS_QUEUED);
 
@@ -492,24 +483,6 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 
                 llassert(!mDataLock->isSelfLocked());
 
-#if 0
-                // try again on next frame
-                // NOTE: tried using "post" with a time in the future, but this
-                // would invariably cause this thread to wait for a long time (10+ ms)
-                // while work is pending
-                bool ret = LL::WorkQueue::postMaybe(
-                    mMainQueue,
-                    [=]()
-                    {
-                        LL_PROFILE_ZONE_NAMED("processRequest - retry");
-                        mRequestQueue.post([=]()
-                            {
-                                LL_PROFILE_ZONE_NAMED("processRequest - retry"); // <-- not redundant, track retry on both queues
-                                processRequest(req);
-                            });
-                    });
-                llassert(ret);
-#else
                 using namespace std::chrono_literals;
                 // <FS:Beq> improve retry behaviour
                 // mRequestQueue.post([=, this]
@@ -531,12 +504,10 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
                 //const auto retry_backoff = 16ms;
                 const auto retry_backoff = std::chrono::milliseconds(req->getRetryDelayMs());
                 // </FS:Trish>
-                auto retry_time = LL::WorkQueue::TimePoint::clock::now() + retry_backoff; 
+                auto retry_time = LL::WorkSchedule::TimePoint::clock::now() + retry_backoff;
                 req->defer_until(retry_time);
                 LL_PROFILE_ZONE_NAMED("processRequest - post deferred");
-                mRequestQueue.post([this, req]() { processRequest(req); });
-                // </FS:Beq>
-#endif
+                mRequestQueue.post([this, req]() { processRequest(req); }, retry_time);
 
             }
         }

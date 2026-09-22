@@ -173,7 +173,7 @@ protected:
 
     //typedef std::set<QueuedRequest*, queued_request_less> request_queue_t;
     //request_queue_t mRequestQueue;
-    LL::WorkQueue mRequestQueue;
+    LL::WorkSchedule mRequestQueue;
     LL::WorkQueue::weak_t mMainQueue;
 
     enum { REQUEST_HASH_SIZE = 512 }; // must be power of 2

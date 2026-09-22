@@ -1661,6 +1661,15 @@ bool LLTextureFetchWorker::doWork(S32 param)
                 }
             }
         }
+        if (cur_size > 0 && cur_size >= mDesiredSize)
+        {
+            // A lower-resolution target may now fit in bytes already cached.
+            // Do not turn a zero/negative remaining range into a full GET.
+            mLoadedDiscard = mDesiredDiscard;
+            setState(DECODE_IMAGE);
+            releaseHttpSemaphore();
+            return doWork(param);
+        }
         mRequestedSize = mDesiredSize;
         mRequestedDiscard = mDesiredDiscard;
         mRequestedSize -= cur_size;
@@ -2035,6 +2044,12 @@ bool LLTextureFetchWorker::doWork(S32 param)
 
         llassert_always(mFormattedImage.notNull());
         S32 discard = mHaveAllData && mFormattedImage->getCodec() != IMG_CODEC_J2C ? 0 : mLoadedDiscard;
+        if (mFormattedImage->getCodec() == IMG_CODEC_J2C)
+        {
+            // Demand may have fallen while the network request was active.
+            // Keep its bytes, but avoid decoding an unnecessarily large image.
+            discard = llmax(discard, mDesiredDiscard);
+        }
         if (discard > MAX_DISCARD_LEVEL) // only warn for j2c
         {
             // We encode j2c with fixed amount of discard levels,
@@ -3090,6 +3105,33 @@ void LLTextureFetch::deleteRequest(const LLUUID& id, bool cancel)
     }
 }
 
+// Threads:  T*
+bool LLTextureFetch::deleteRequestIfFinished(const LLUUID& id)
+{
+    LL_PROFILE_ZONE_SCOPED;
+
+    LLTextureFetchWorker* worker = getWorker(id);
+    if (!worker)
+    {
+        return true;
+    }
+
+    worker->lockWorkMutex();                                      // +Mw
+    const bool finished = (worker->mState == LLTextureFetchWorker::DONE ||
+                           !worker->haveWork()) && !worker->mHttpActive;
+    worker->unlockWorkMutex();                                    // -Mw
+
+    if (!finished)
+    {
+        return false;
+    }
+
+    // Keep removal on the normal two-phase worker lifecycle. Do not erase the
+    // request map directly while the texture still owns the fetch state.
+    deleteRequest(id, true);
+    return true;
+}
+
 // NB:  If you change removeRequest() you should probably make
 // parallel changes in deleteRequest().  They're functionally
 // identical with only argument variations.
@@ -4130,7 +4172,10 @@ void LLTextureFetch::releaseHttpWaiters()
     // ordering assumption of std::set, std::map, etc. so we
     // don't use those containers.  We use a vector and an explicit
     // sort to keep the containers valid later.
-    typedef std::vector<LLTextureFetchWorker *> worker_list_t;
+    // The main thread can change priorities while we sort. Snapshot each one
+    // under its worker lock so the comparator has a stable ordering.
+    typedef std::pair<F32, LLTextureFetchWorker*> prioritized_worker_t;
+    typedef std::vector<prioritized_worker_t> worker_list_t;
     worker_list_t tids2;
 
     tids2.reserve(tids.size());
@@ -4141,7 +4186,9 @@ void LLTextureFetch::releaseHttpWaiters()
         LLTextureFetchWorker * worker(getWorker(* iter));
         if (worker)
         {
-            tids2.push_back(worker);
+            worker->lockWorkMutex();
+            tids2.emplace_back(worker->mImagePriority, worker);
+            worker->unlockWorkMutex();
         }
         else
         {
@@ -4158,7 +4205,10 @@ void LLTextureFetch::releaseHttpWaiters()
     // Sort into priority order, if necessary and only as much as needed
     if (tids2.size() > needed)
     {
-        LLTextureFetchWorker::Compare compare;
+        auto compare = [](const prioritized_worker_t& lhs, const prioritized_worker_t& rhs)
+        {
+            return lhs.first > rhs.first;
+        };
         std::partial_sort(tids2.begin(), tids2.begin() + needed, tids2.end(), compare);
     }
 
@@ -4169,9 +4219,16 @@ void LLTextureFetch::releaseHttpWaiters()
     // has moved any worker state around....
     for (worker_list_t::iterator iter2(tids2.begin()); tids2.end() != iter2; ++iter2)
     {
-        LLTextureFetchWorker * worker(* iter2);
+        LLTextureFetchWorker* worker = iter2->second;
 
         worker->lockWorkMutex();                                        // +Mw
+        if (worker->mImagePriority < F_ALMOST_ZERO)
+        {
+            // Let doWork take its normal low-interest completion path without
+            // allocating a network slot in the meantime.
+            worker->unlockWorkMutex();
+            continue;
+        }
         if (LLTextureFetchWorker::WAIT_HTTP_RESOURCE2 != worker->mState)
         {
             // Not in expected state, remove it, try the next one
