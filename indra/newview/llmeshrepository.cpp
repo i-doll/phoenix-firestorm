@@ -46,6 +46,7 @@
 #include "llmath.h"
 #include "llnotificationsutil.h"
 #include "llsd.h"
+#include "llsdutil.h" // <ID> llsd_clone for the upload observer response
 #include "llsdutil_math.h"
 #include "llsdserialize.h"
 #include "llthread.h"
@@ -3409,7 +3410,8 @@ void LLMeshUploadThread::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResp
 
                 if (observer)
                 {
-                    doOnIdleOneTime(boost::bind(&LLWholeModelUploadObserver::onModelUploadSuccess, observer));
+                    // <ID> hand observers the response so they can read the new item/asset ids (deep copy of body).
+                    doOnIdleOneTime(boost::bind(&LLWholeModelUploadObserver::onModelUploadSuccessWithResponse, observer, llsd_clone(body)));
                 }
             }
             else

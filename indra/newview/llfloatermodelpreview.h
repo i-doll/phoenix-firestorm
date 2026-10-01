@@ -138,6 +138,7 @@ public:
 protected:
     friend class LLModelPreview;
     friend class LLMeshFilePicker;
+    friend class IDMCPMeshUploadJob; // <ID> MCP upload.mesh drives the floater
     friend class LLPhysicsDecomp;
 
     void        onDescriptionKeystroke(LLUICtrl*);

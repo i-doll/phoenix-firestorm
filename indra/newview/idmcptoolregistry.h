@@ -43,6 +43,8 @@ struct IDMCPTool
     boost::json::value input_schema;   // JSON Schema object for `arguments`
     std::function<void(const boost::json::object& args, const IDMCPCallPtr& call)> invoke;
     std::function<IDMCPGateResult(const boost::json::object& args, IDMCPGatePhase phase)> gate;
+    // Deadline for a deferred call, in seconds. 0 = the server default (30 s).
+    F64 timeout = 0.0;
 };
 
 class IDMCPToolRegistry
