@@ -103,6 +103,7 @@ set(viewer_SOURCE_FILES
     idmcptools_manage.cpp  # <ID> Embedded MCP server: inventory organize/give
     idmcptools_groups.cpp  # <ID> Embedded MCP server: group interactions
     idmcptools_upload.cpp  # <ID> Embedded MCP server: asset upload tools
+    idmcp_meshupload.cpp  # <ID> Embedded MCP server: upload.mesh floater job
     idmcptools_chat.cpp  # <ID> Embedded MCP server: bridge-mediated in-world chat
     idmcptools_movement.cpp  # <ID> Embedded MCP server: teleport/sit/stand/location/touch
     idmcptools_vision.cpp  # <ID> Embedded MCP server: viewport snapshot
@@ -984,6 +985,7 @@ set(viewer_HEADER_FILES
     idmcptoolregistry.h  # <ID> Embedded MCP server: tool registry
     idmcprlvgate.h  # <ID> Embedded MCP server: RLV gate
     idmcptools.h  # <ID> Embedded MCP server: tool registration
+    idmcp_meshupload.h  # <ID> Embedded MCP server: upload.mesh floater job
     idsearchmodel.h  # <ID> Embedded MCP server: headless dir search
     idfloaterkeywordcolors.h  # <ID> Keyword color settings floater
     alfloaterregiontracker.h

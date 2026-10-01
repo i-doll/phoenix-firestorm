@@ -491,7 +491,7 @@ void IDMCPServer::handleRequest(const std::shared_ptr<IDMCPConnection>& conn,
         {
             conn->beginDeferred();
             const F64 now = LLTimer::getTotalSeconds();
-            call->setDeadline(now + DEFAULT_TOOL_TIMEOUT);
+            call->setDeadline(now + (tool->timeout > 0.0 ? tool->timeout : DEFAULT_TOOL_TIMEOUT));
             trackDeferred(call);
         }
         return;

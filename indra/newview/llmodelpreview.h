@@ -273,6 +273,7 @@ protected:
     friend class LLModelLoader;
     friend class LLFloaterModelPreview;
     friend class LLFloaterModelPreview::DecompRequest;
+    friend class IDMCPMeshUploadJob; // <ID> MCP upload.mesh drives the preview
     friend class LLPhysicsDecomp;
 
     LLFloater*  mFMP;

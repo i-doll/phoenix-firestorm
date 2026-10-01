@@ -70,6 +70,12 @@ public:
 
     virtual void onModelUploadSuccess() = 0;
 
+    // <ID> Same as onModelUploadSuccess, plus the server response
+    // (new_inventory_item, new_asset). The default drops the response, so
+    // existing observers are unchanged. Separate name, not an overload:
+    // an overload would be hidden in subclasses (-Woverloaded-virtual).
+    virtual void onModelUploadSuccessWithResponse(const LLSD& response) { onModelUploadSuccess(); }
+
     virtual void onModelUploadFailure() = 0;
 
     LLHandle<LLWholeModelUploadObserver> getWholeModelUploadObserverHandle() const { return mWholeModelUploadObserverHandle; }
