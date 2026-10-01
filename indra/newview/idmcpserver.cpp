@@ -169,6 +169,10 @@ void IDMCPServer::initSingleton()
     idmcp_register_im_tools(mRegistry);
     idmcp_register_notifications_tools(mRegistry);
     idmcp_register_money_tools(mRegistry);
+    idmcp_register_object_tools(mRegistry);
+    idmcp_register_faces_tools(mRegistry);
+    idmcp_register_contents_tools(mRegistry);
+    idmcp_register_rez_tools(mRegistry);
 
     // Watch the enable setting so toggling it mid-session starts/stops the
     // server live (e.g. from the Debug Settings floater).

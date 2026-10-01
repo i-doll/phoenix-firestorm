@@ -110,6 +110,10 @@ set(viewer_SOURCE_FILES
     idmcptools_im.cpp  # <ID> Embedded MCP server: 1:1 instant messaging
     idmcptools_notifications.cpp  # <ID> Embedded MCP server: offers/dialogs responder
     idmcptools_money.cpp  # <ID> Embedded MCP server: L$ balance + guarded pay
+    idmcptools_object.cpp  # <ID> Embedded MCP server: object build tools
+    idmcptools_faces.cpp  # <ID> Embedded MCP server: object.setFaces
+    idmcptools_contents.cpp  # <ID> Embedded MCP server: object contents tools
+    idmcptools_rez.cpp  # <ID> Embedded MCP server: rez/attach/take objects
     alfloaterregiontracker.cpp
     animationexplorer.cpp
     ao.cpp
@@ -986,6 +990,7 @@ set(viewer_HEADER_FILES
     idmcprlvgate.h  # <ID> Embedded MCP server: RLV gate
     idmcptools.h  # <ID> Embedded MCP server: tool registration
     idmcp_meshupload.h  # <ID> Embedded MCP server: upload.mesh floater job
+    idmcptools_object.h  # <ID> Embedded MCP server: object build helpers
     idsearchmodel.h  # <ID> Embedded MCP server: headless dir search
     idfloaterkeywordcolors.h  # <ID> Keyword color settings floater
     alfloaterregiontracker.h
