@@ -13,6 +13,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "idmcp.h"       // facade: idmcp::onObjectProperties
+#include "idmcptools_object.h"      // idmcp_obj::onObjectProperties (object build tools)
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
@@ -164,6 +165,9 @@ namespace
 // message was already read by the LL handler; re-reading the fields is safe.
 void idmcp::onObjectProperties(LLMessageSystem* msg)
 {
+    // Object build tools first: the early return below only concerns getWorn.
+    idmcp_obj::onObjectProperties(msg);
+
     if (!msg || g_worn_waits.empty()) return;
 
     const S32 n = msg->getNumberOfBlocksFast(_PREHASH_ObjectData);

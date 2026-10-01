@@ -27,5 +27,9 @@ void idmcp_register_vision_tools(IDMCPToolRegistry& reg);
 void idmcp_register_im_tools(IDMCPToolRegistry& reg);
 void idmcp_register_notifications_tools(IDMCPToolRegistry& reg);
 void idmcp_register_money_tools(IDMCPToolRegistry& reg);
+void idmcp_register_object_tools(IDMCPToolRegistry& reg);
+void idmcp_register_faces_tools(IDMCPToolRegistry& reg);
+void idmcp_register_contents_tools(IDMCPToolRegistry& reg);
+void idmcp_register_rez_tools(IDMCPToolRegistry& reg);
 
 #endif // ID_IDMCPTOOLS_H
