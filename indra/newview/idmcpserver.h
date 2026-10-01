@@ -58,6 +58,9 @@ public:
     void setCleanup(std::function<void()> fn) { mCleanup = std::move(fn); }
     void runCleanup();
 
+    // False once the client connection is gone.
+    bool connected() const { return !mConn.expired(); }
+
     // Monotonic deadline (seconds, LLTimer::getTotalSeconds clock); 0 = none.
     F64  deadline() const { return mDeadline; }
     void setDeadline(F64 t) { mDeadline = t; }
@@ -83,6 +86,7 @@ enum EIDMCPError
     IDMCP_ERR_NOT_LOGGED_IN  = -32003,
     IDMCP_ERR_PERMISSION     = -32004,
     IDMCP_ERR_CAP_UNAVAIL    = -32005,
+    IDMCP_ERR_BUSY           = -32006,  // a single-instance resource is in use
     IDMCP_ERR_RLV_RESTRICTED = -32011,
 };
 

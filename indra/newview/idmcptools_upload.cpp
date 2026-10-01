@@ -1,6 +1,6 @@
 /**
  * @file idmcptools_upload.cpp
- * @brief <ID> MCP server: asset upload tools (image / sound / animation / material).
+ * @brief <ID> MCP server: asset upload tools (image / sound / animation / material / mesh).
  *
  * Part of Five's custom Firestorm fork. Custom code carries an `ID` prefix.
  *
@@ -17,12 +17,17 @@
  * and then routed through the same path. Materials use the dedicated GLTF flow
  * (idmcp_upload_detail::material_upload). Cost estimation mirrors
  * get_bulk_upload_expected_cost.
+ *
+ * Mesh is different: it needs the Upload Model floater, so upload.mesh only
+ * parses and validates its args here and hands off to idmcp_meshupload.cpp.
+ * Its dry run asks the server for a fee quote rather than estimating locally.
  */
 
 #include "llviewerprecompiledheaders.h"
 
 #include "idmcptools.h"
 #include "idmcpserver.h"
+#include "idmcp_meshupload.h"       // upload.mesh job
 
 #include "llagent.h"
 #include "llviewerregion.h"
@@ -59,6 +64,9 @@
 #include "lltinygltfhelper.h"       // LLTinyGLTFHelper, tinygltf::Model
 #include "llfetchedgltfmaterial.h"  // LLFetchedGLTFMaterial
 #include "llgltfmaterial.h"         // LLGLTFMaterial::GLTF_TEXTURE_INFO_*
+
+// Mesh upload
+#include "llmodel.h"                // LLModel::LOD_* indices
 
 #include <algorithm>
 #include <cctype>
@@ -554,6 +562,107 @@ namespace
         }
     }
 
+    // ---- upload.mesh -----------------------------------------------------
+
+    void run_mesh_tool(const boost::json::object& args, const IDMCPCallPtr& call)
+    {
+        IDMCPMeshUploadParams p;
+        p.path = arg_str(args, "path");
+        if (p.path.empty())
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "path is required");
+            return;
+        }
+        if (!gDirUtilp->fileExists(p.path))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "file not found: " + p.path);
+            return;
+        }
+        const std::string ext = lower(gDirUtilp->getExtension(p.path));
+        if (ext != "dae" && ext != "gltf" && ext != "glb")
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "unsupported extension for upload.mesh: ." + ext);
+            return;
+        }
+
+        p.name = name_for({ arg_str(args, "name") }, 0, p.path);
+        const std::string dest = arg_str(args, "dest");
+        p.dest = resolve_folder(dest);
+        if (!dest.empty() && p.dest.isNull())
+        {
+            idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "unknown dest folder: " + dest);
+            return;
+        }
+
+        p.scale = arg_flt(args, "scale", 1.f);
+        if (p.scale <= 0.f)
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "scale must be greater than 0");
+            return;
+        }
+        p.textures = arg_bool(args, "textures", false);
+
+        auto it = args.find("rigged");
+        if (it != args.end() && it->value().is_object())
+        {
+            const boost::json::object& r = it->value().as_object();
+            auto tri = [&r](const char* k) {
+                auto f = r.find(k);
+                return (f != r.end() && f->value().is_bool()) ? (f->value().as_bool() ? 1 : 0) : -1;
+            };
+            p.skin_weights    = tri("skin_weights");
+            p.joint_positions = tri("joint_positions");
+            p.lock_scale      = tri("lock_scale_if_joint_position");
+        }
+
+        it = args.find("lods");
+        if (it != args.end() && it->value().is_object())
+        {
+            const boost::json::object& l = it->value().as_object();
+            const std::pair<const char*, S32> slots[] = {
+                { "lowest", LLModel::LOD_IMPOSTOR },
+                { "low",    LLModel::LOD_LOW },
+                { "medium", LLModel::LOD_MEDIUM },
+            };
+            for (const auto& [key, lod] : slots)
+            {
+                const std::string v = arg_str(l, key);
+                if (v.empty() || lower(v) == "auto") continue;
+                if (!gDirUtilp->fileExists(v))
+                {
+                    idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
+                                   std::string("lods.") + key + ": file not found: " + v);
+                    return;
+                }
+                p.lod_file[lod] = v;
+            }
+        }
+
+        const std::string phys = arg_str(args, "physics");
+        if (!phys.empty())
+        {
+            const std::string k = lower(phys);
+            if (idmcp_mesh_is_physics_keyword(k))
+            {
+                p.physics = k;
+            }
+            else if (gDirUtilp->fileExists(phys))
+            {
+                p.physics = phys;
+            }
+            else
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
+                               "physics: not none/high/medium/low/lowest/cube and no such file: " + phys);
+                return;
+            }
+        }
+
+        p.analyze = arg_bool(args, "analyze", false);
+        p.confirm = arg_bool(args, "confirm", false);
+        idmcp_mesh_upload_start(p, call);
+    }
+
     // Shared JSON-Schema fragment for the simple (image/sound/material) tools.
     const char* SCHEMA_SIMPLE =
         R"({"type":"object","properties":{)"
@@ -577,6 +686,25 @@ namespace
         R"("ease_out":{"type":"number"},)"
         R"("hand_pose":{"type":"integer"},)"
         R"("confirm":{"type":"boolean"}},"additionalProperties":false})";
+
+    const char* SCHEMA_MESH =
+        R"({"type":"object","properties":{)"
+        R"("path":{"type":"string"},)"
+        R"("name":{"type":"string"},)"
+        R"("dest":{"type":"string"},)"
+        R"("scale":{"type":"number"},)"
+        R"("textures":{"type":"boolean"},)"
+        R"("rigged":{"type":"object","properties":{)"
+            R"("skin_weights":{"type":"boolean"},)"
+            R"("joint_positions":{"type":"boolean"},)"
+            R"("lock_scale_if_joint_position":{"type":"boolean"}},"additionalProperties":false},)"
+        R"("lods":{"type":"object","properties":{)"
+            R"("medium":{"type":"string"},)"
+            R"("low":{"type":"string"},)"
+            R"("lowest":{"type":"string"}},"additionalProperties":false},)"
+        R"("physics":{"type":"string"},)"
+        R"("analyze":{"type":"boolean"},)"
+        R"("confirm":{"type":"boolean"}},"required":["path"],"additionalProperties":false})";
 }
 
 // ---------------------------------------------------------------------------
@@ -648,6 +776,33 @@ void idmcp_register_upload_tools(IDMCPToolRegistry& reg)
         t.input_schema = boost::json::parse(SCHEMA_SIMPLE);
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
         { run_upload_tool(args, call, UploadKind::Material); };
+        reg.add(std::move(t));
+    }
+
+    // upload.mesh ------------------------------------------------------------
+    {
+        IDMCPTool t;
+        t.name = "upload.mesh";
+        t.description =
+            "Upload one mesh model (.dae/.gltf/.glb) through the viewer's Upload "
+            "Model floater. {\"path\"} is required. Optional: {\"name\"}, "
+            "{\"dest\"} (default = Objects), {\"scale\"}, {\"textures\"} (upload "
+            "embedded textures, extra L$), {\"rigged\":{\"skin_weights\", "
+            "\"joint_positions\",\"lock_scale_if_joint_position\"}} (default = "
+            "whatever the model contains), {\"lods\":{\"medium\"|\"low\"|"
+            "\"lowest\": \"auto\" or a file path}}, {\"physics\"}: \"none\"|"
+            "\"high\"|\"medium\"|\"low\"|\"lowest\"|\"cube\"|file path (default "
+            "\"none\"), {\"analyze\"} (convex hull decomposition; needs a "
+            "physics shape other than \"none\"). WITHOUT "
+            "{\"confirm\":true} = dry run: returns the server's fee quote, land "
+            "impact, weights and triangle counts, spending nothing. With "
+            "{\"confirm\":true} = upload (costs L$). One mesh at a time; returns "
+            "a busy error if the Upload Model floater is already open or a previous "
+            "mesh upload is still waiting on the server.";
+        t.input_schema = boost::json::parse(SCHEMA_MESH);
+        t.timeout = 1500.0;
+        t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
+        { run_mesh_tool(args, call); };
         reg.add(std::move(t));
     }
 }
