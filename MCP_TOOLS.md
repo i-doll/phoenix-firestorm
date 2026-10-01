@@ -13,7 +13,7 @@ Custom fork (`ID` prefix). An in-process MCP server that lets an AI agent drive 
 
 Every mutating or identity-revealing tool passes a single RLV gate. A blocked call returns JSON-RPC error `-32011` with `{restriction, sources:[{object_id,root_id,attach_pt,name}], checkedAt}`. Use `rlv.getRestrictions` to see what's active and `rlv.canDo` to check a call before making it.
 
-**74 tools** across 20 areas.
+**98 tools** across 23 areas.
 
 ## Health
 
@@ -77,6 +77,36 @@ Talk to in-world scripted objects, HUDs, vendors, and **RLV relays** on any chan
 |---|---|---|
 | `script.read` | `item_id*`: string | Read an LSL script's source by {"item_id"} (UUID). Returns {text}. Blocked by RLV @viewscript. |
 | `script.write` | `item_id*`: string<br>`text*`: string<br>`target`: mono \| lsl2 \| luau \| lsl-luau | Replace a script's source and recompile. `mono` (default) and `lsl2` take **LSL** source; `lsl-luau` takes **LSL** source and compiles it to Luau; `luau` takes **Luau** source. `lsl-luau`/`luau` need region Luau support. Returns {compiled, errors?}. Blocked by RLV @viewscript. |
+
+## Gestures
+
+Author and drive gestures. A gesture is a trigger word and/or key binding plus an ordered list of steps (animation, sound, chat, wait). `gesture.create` makes an empty item, `gesture.write` fills it in, `gesture.activate` makes the trigger live.
+
+**A newly created gesture arrives with the server's default trigger `/hey` and replace-text `Hey!`.** `gesture.write` is a partial update, so omitting those keeps them — pass `trigger:""` and `replace_with:""` explicitly if you want a key-only gesture.
+
+Gestures sharing a key binding are **not** all fired at once: the viewer picks one at random from the matching set, which is how "9 copies on F2" gives variation rather than noise.
+
+| Tool | Params | Description |
+|---|---|---|
+| `gesture.list` | — | List the currently **active** gestures — the ones whose trigger words are live. Returns `{gestures:[{item_id, name, trigger, playing}]}`. Inactive gestures are ordinary inventory items; find them with `inventory.search`. Blocked by RLV @showinv. |
+| `gesture.read` | `item_id*`: string | Read a gesture. Returns `{name, trigger, replace_with, key, mask, active, steps[]}`. Steps are `{type:"animation", animation, asset_id, action:"start"\|"stop"}`, `{type:"sound", sound, asset_id}`, `{type:"chat", text}`, `{type:"wait", seconds, for_animations, for_key_release}`. A gesture with no asset yet reads as an empty step list. Blocked by RLV @showinv. |
+| `gesture.create` | `parent*`: string<br>`name*`: string | Create a new empty gesture in a folder. Returns the new item id; add trigger and steps with `gesture.write`, then `gesture.activate`. Blocked by RLV @edit. |
+| `gesture.write` | `item_id*`: string<br>`trigger`: string<br>`replace_with`: string<br>`key`: integer<br>`mask`: integer<br>`steps`: object[] | Update a gesture. Omitted fields keep their current value; `steps` replaces the whole list. Step `animation`/`sound` accept an inventory item name **or** a UUID; if a step also carries the `asset_id` that `gesture.read` returned, that wins, so read-modify-write round-trips exactly. `key` is a viewer keycode (F2=162, F3=163, F6=166); `mask` is 0 none / **1 Ctrl** / 2 Alt / **4 Shift**. Rename the item itself with `inventory.rename`. Serialized gestures are capped at 1000 bytes. Blocked by RLV @edit. |
+| `gesture.activate` | `item_id*`: string | Activate a gesture so its trigger word and key binding go live. Asynchronous — confirm with `gesture.list`. Returns `{accepted, active}`. |
+| `gesture.deactivate` | `item_id*`: string | Deactivate a gesture so its trigger stops firing. Returns `{accepted, active}`. |
+| `gesture.play` | `item_id*`: string | Play an **active** gesture now. Runs through the viewer's gesture manager, so RLV @sendgesture and chat restrictions apply as for a hand-triggered gesture. Note a suppressed play still returns `accepted:true` — the manager fails silently. |
+
+## Wearables
+
+Read and author clothing and body parts — textures, tint colours, and the visual params a human sees as sliders. Slot and param names come from `wearable.read`.
+
+**Writes are worn-only.** The viewer has no capability for saving an unworn wearable; every save path is keyed to a currently-worn `(type, index)`. `wearable.write` on an unworn item returns an error telling you to wear it first. Reads work either way.
+
+| Tool | Params | Description |
+|---|---|---|
+| `wearable.read` | `item_id*`: string | Read a wearable. Returns `{type, name, worn, textures{slot:uuid}, colors{slot:[r,g,b]}, params[{id, name, label, value, min, max, default}]}`. Slot names are the avatar texture-layer names for that wearable type; `params` is the tweakable set. Works worn or unworn. Blocked by RLV @showinv. |
+| `wearable.create` | `parent*`: string<br>`name*`: string<br>`type*`: string<br>`wear`: boolean | Create a wearable at default settings. `type` is one of shape, skin, hair, eyes, shirt, pants, shoes, socks, jacket, gloves, undershirt, underpants, skirt, alpha, tattoo, physics, universal. `wear` default true — it must be worn before `wearable.write` can change it. Returns `{accepted, item_id, wear_requested}`; the wear completes asynchronously and is subject to RLV wearable locks, so confirm with `appearance.getWorn`. Blocked by RLV @edit. |
+| `wearable.write` | `item_id*`: string<br>`name`: string<br>`textures`: object<br>`colors`: object<br>`params`: object | Change a **worn** wearable and save it. Any subset of `name`, `textures` `{slot: texture-uuid}`, `colors` `{slot: [r,g,b]}`, `params` `{name-or-id: value}`. Param values outside min/max are **rejected, not clamped**; colour writes to a slot with no colour channel (bodypaint, alpha) are rejected. All validation runs before any mutation, so a bad field never half-writes. Blocked by RLV @edit. |
 
 ## Appearance
 
@@ -206,6 +236,32 @@ Uploads cost real **L$**. Every upload tool is two-phase: a call **without** `co
 - **Confirmed results.** Image/sound/animation return real `item_id` + `asset_id` per file once the server finishes. Materials are fire-and-forget (no per-item callback) — the response reports the enqueue + estimated cost; confirm the actual items with `inventory.getFolder` on the dest.
 - **Batch = one response.** A batch fans out to N concurrent uploads and the tool replies once, when all N have reported (or pre-validation-failed).
 - **Mesh takes one file per call and can take minutes.** `upload.mesh` has a 25-minute timeout. It returns a busy error (-32006) if the Upload Model floater is already open or a previous mesh upload is still waiting on the server. Closing the floater before the upload is sent cancels the call; after that, the upload carries on. The dry run always includes `upload_blocked`; when it is true, `blocked_reason` says why a confirmed upload would be refused. A confirmed upload that timed out after being sent returns an error with `upload_sent: true` — it may still complete, so check inventory and balance before retrying.
+
+## Objects
+
+Build with what you uploaded: rez an item, edit it, texture it, fill its contents, set next-owner permissions, link it, and take it back. The tools work on rezzed objects and on your own worn attachments. They never touch your selection or the Build floater, so you can keep building while an agent works.
+
+**Targeting.** `object_id` is any prim of the object, from `objects.getNearby`, `avatars.getWorn`, or an `object.rez`/`object.attach` result. `link` picks one prim by the number `object.get` reports (1 = the root). Without `link`, a tool acts on the whole object. These link numbers can differ from LSL's `llGetLinkNumber`, so always take them from `object.get`.
+
+**Position and rotation.** `position` is in metres and `rotation` is `[x,y,z]` Euler degrees, as the Edit floater shows them. Both are relative to the region for a rezzed root, to the attachment point for a worn root, and to the root for a child link. `scale` changes one prim: the root, or the prim named by `link`.
+
+| Tool | Params | Description |
+|---|---|---|
+| `object.get` | `object_id*`: string<br>`faces`: boolean | Describe an object link by link: `{object_id, link_count, attachment_point, links:[{link, object_id, name, description, position, rotation, scale, face_count, permissions}]}`. `attachment_point` appears only for a worn object. `permissions` has `owner_id` and `base`/`owner`/`group`/`everyone`/`next_owner` as `{copy, modify, transfer}`. `faces:true` adds each face's `texture`, `material`, `color`, `alpha`, `repeats`, `offset`, `rotation`. Links whose name and permissions didn't arrive within 10 s are listed in `incomplete_links`. |
+| `object.edit` | `object_id*`: string<br>`link`: integer<br>`position`: [x,y,z]<br>`rotation`: [x,y,z]<br>`scale`: [x,y,z]<br>`name`: string<br>`description`: string | Move, rotate, scale, rename or describe an object you can modify. Without `link`, position and rotation move the whole object. Names and descriptions must be printable ASCII without `\|`. Returns the values the object reports once the region confirms (up to 10 s). Blocked by RLV @edit, @editobj, @editworld, @editattach, @interact. |
+| `object.setFaces` | `object_id*`: string<br>`faces*`: `"all"` or integer[]<br>`link`: integer<br>`texture`: string<br>`material`: string<br>`color`: [r,g,b]<br>`alpha`: number<br>`repeats`: [u,v]<br>`offset`: [u,v]<br>`rotation`: number | Texture, color and map faces. `"all"` without `link` covers every prim; a face list without `link` means the root. `texture` and `material` take an inventory item id (drop rules apply, so a no-copy item moves into the prim's contents) or a raw asset UUID. `material:"none"` removes a PBR material, and setting a texture removes one too. On a face with a PBR material, `repeats`, `offset` and `rotation` change the material's texture transform, and applying a material keeps the face's current mapping. Colors and alpha are 0-1; rotation is degrees. Returns `{object_id, faces:[{link, face, ok, error}]}`. Blocked by RLV @edit, @editobj, @editworld, @editattach, @interact. |
+| `object.contents` | `object_id*`: string<br>`link`: integer | List the items inside the root prim, or inside the prim named by `link`: `{object_id, items:[{item_id, name, type, permissions}]}`. The region only shows contents of objects you can modify, and returns error -32005 if the region can't send them. |
+| `object.addContents` | `object_id*`: string<br>`item_ids*`: string[]<br>`link`: integer<br>`running`: boolean | Put up to 32 inventory items into the object, as dragging them onto it would. Scripts start running unless `running:false`. A no-copy item leaves your inventory; worn items are refused. Returns `{object_id, items:[{item_id, name, result}]}`: `added`, `not_found` (sent but not seen within 20 s), or why it wasn't sent. If the call times out after sending, the error lists what was sent. Blocked by RLV @edit, @editobj, @editworld, @editattach, @interact, a locked attachment, or @unsit/@sittp while you sit on the object. |
+| `object.setPermissions` | `object_id*`: string<br>`next_owner*`: {`copy`, `modify`, `transfer`}: boolean<br>`contents`: boolean | Set next-owner permissions on a rezzed object you own; worn objects are refused, so rez them first. The next owner needs copy or transfer, so turning copy off keeps transfer on. `contents:true` sets the same on every item in the root prim. Returns `{object_id, next_owner, contents:[{item_id, name, result}]}`, where `result` is `sent` (the region doesn't confirm item updates), `unchanged` or `permission`. Bits missing from the object's base permissions stay off. Blocked by RLV @edit, @editobj, @editworld, @editattach, @interact. |
+| `object.link` | `object_ids*`: string[] | Link two or more of your rezzed objects in one region. The first becomes the root. Returns `{object_id, link_count}`. A link the region refuses (too many prims, too far apart) shows as a timeout. Blocked by RLV @edit, @editobj, @editworld, @interact. |
+| `object.unlink` | `object_id*`: string<br>`link`: integer | Unlink one prim (`link`), or every prim when `link` is omitted. Returns `{object_ids}`: the unlinked prims, then the root of what's left. Blocked by RLV @edit, @editobj, @editworld, @interact. |
+| `object.rez` | `item_id*`: string<br>`position`: [x,y,z]<br>`rotation`: [x,y,z] | Rez an object item. The default position is 2 m in front of you at your height. Returns `{object_id, name, position, rotation}`, plus `item_consumed:true` for a no-copy item. If the new object is no-modify or RLV blocks editing it, the result has `rotation_skipped` with the reason. Items holding several objects (coalesced) can't be rezzed. Waits up to 30 s; a timeout says the rez was sent and carries `item_consumed` for a no-copy item. Blocked by RLV @rez and @interact. |
+| `object.attach` | `item_id*`: string<br>`point*`: string<br>`replace`: boolean | Wear an object item on a named point: "Chest", "Spine", "Left Hand", "HUD Center", and so on, in any case. `replace:true` replaces what's on the point; the default adds alongside it. Returns `{object_id, item_id, point}`. Blocked by RLV attachment locks and @addattach. |
+| `object.take` | `object_id*`: string<br>`copy`: boolean<br>`folder`: string | Take a rezzed object you own into inventory, or a copy of it with `copy:true`. `folder` is a folder UUID, `"objects"` (default) or `"root"`. Returns `{item_id, name, folder_id, copy}`. Worn attachments are refused; detach them instead. A timeout after the request was sent names the folder to check. Blocked by RLV @edit, @editobj, @editworld, @interact, @rez, and @unsit while you sit on the object. |
+
+- **Edits wait for the region.** `object.edit`, `object.setPermissions`, `object.link` and `object.unlink` answer only once the region reports the change. A timeout (-32001) carries `sent` and, where known, `current`.
+- **Batch tools report per item.** `object.setFaces`, `object.addContents` and `object.setPermissions` with `contents` give a result for each face or item, and fail the whole call only when nothing could be done.
+- **The build loop.** `upload.mesh` → `object.rez` → `object.edit` → `object.setFaces` → `object.addContents` → `object.setPermissions` → `object.take`. Use `object.attach` instead of `object.rez` for something worn.
 
 ## Money (L$)
 
