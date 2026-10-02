@@ -28,6 +28,8 @@
 #include "llviewerprecompiledheaders.h"
 
 #include <boost/lexical_cast.hpp>
+#include <filesystem>
+#include <fstream>
 
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
@@ -524,6 +526,44 @@ S32 LLViewerShaderMgr::getShaderLevel(S32 type)
 //============================================================================
 // Shader Management
 
+// Cached program binaries are keyed by shader file names, not contents, so fold
+// every shader source into the cache version. Editing a shader then invalidates
+// the cache even when the viewer version string stays the same.
+static void hash_shader_sources(HBXXH128& hash_obj)
+{
+    const std::string shader_dir = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "shaders");
+#if LL_WINDOWS
+    const std::filesystem::path root(ll_convert<std::wstring>(shader_dir));
+#else
+    const std::filesystem::path root(shader_dir);
+#endif
+
+    std::vector<std::filesystem::path> files;
+    std::error_code ec;
+    for (std::filesystem::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+    {
+        if (it->is_regular_file(ec))
+        {
+            files.push_back(it->path());
+        }
+    }
+
+    if (ec)
+    {
+        LL_WARNS("ShaderLoading") << "Could not list shaders in " << shader_dir << ": " << ec.message() << LL_ENDL;
+    }
+
+    // directory iteration order is unspecified, sort so the hash is stable
+    std::sort(files.begin(), files.end());
+
+    for (const auto& file : files)
+    {
+        hash_obj.update(file.lexically_relative(root).generic_string());
+        std::ifstream stream(file, std::ios::binary);
+        hash_obj.update(stream);
+    }
+}
+
 void LLViewerShaderMgr::setShaders()
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -552,6 +592,7 @@ void LLViewerShaderMgr::setShaders()
         {
             HBXXH128 hash_obj;
             hash_obj.update(LLVersionInfo::instance().getVersion());
+            hash_shader_sources(hash_obj);
             current_cache_version = hash_obj.digest();
 
             old_cache_version = LLUUID(gSavedSettings.getString("RenderShaderCacheVersion"));
