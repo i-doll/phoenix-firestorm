@@ -28,7 +28,6 @@
 out vec4 frag_color;
 
 uniform samplerCube environmentMap;
-uniform sampler2D lightMap;
 uniform sampler2D lightFunc;
 
 uniform mat4 proj_mat; //screen space to light space
@@ -89,6 +88,7 @@ void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     out vec3 spec);
 
 GBufferInfo getGBuffer(vec2 screenpos);
+float sampleSpotShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 
 void main()
 {
@@ -111,19 +111,18 @@ void main()
         discard;
     }
 
+    GBufferInfo gb = getGBuffer(tc);
+
+    vec3 n = gb.normal;
+
     float shadow = 1.0;
 
     if (proj_shadow_idx >= 0)
     {
-        vec4 shd = texture(lightMap, tc);
-        shadow = (proj_shadow_idx==0)?shd.b:shd.a;
+        shadow = sampleSpotShadow(pos, n, tc);
         shadow += shadow_fade;
         shadow = clamp(shadow, 0.0, 1.0);
     }
-
-    GBufferInfo gb = getGBuffer(tc);
-
-    vec3 n = gb.normal;
 
     float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
     if (dist_atten <= 0.0)

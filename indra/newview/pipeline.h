@@ -93,6 +93,9 @@ extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_2D;
 class LLPipeline
 {
 public:
+    // upper bound for RenderProjectorShadowCount, one spot shadow camera per slot
+    static constexpr U32 MAX_PROJECTOR_SHADOWS = 16;
+
     LLPipeline();
     ~LLPipeline();
 
@@ -349,6 +352,7 @@ public:
     void generateSunShadow(LLCamera& camera);
     LLRenderTarget* getSunShadowTarget(U32 i);
     LLRenderTarget* getSpotShadowTarget(U32 i);
+    U32 getProjectorShadowCount() const;
 
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
@@ -749,7 +753,8 @@ public:
     // currently used render target pack
     RenderTargetPack* mRT;
 
-    LLRenderTarget          mSpotShadow[2];
+    LLRenderTarget          mSpotShadow[MAX_PROJECTOR_SHADOWS];
+    U32                     mSpotShadowAllocated = 0; // number of mSpotShadow targets currently allocated
 
     LLRenderTarget          mPbrBrdfLut;
     LLRenderTarget          mWaterExclusionMask;
@@ -810,15 +815,16 @@ public:
     LLVector3               mShadowFrustOrigin[4];
     LLCamera                mShadowCamera[8];
     LLVector3               mShadowExtents[4][2];
-    // TODO : separate Sun Shadow and Spot Shadow matrices
-    glm::mat4               mSunShadowMatrix[6];
-    glm::mat4               mShadowModelview[6];
-    glm::mat4               mShadowProjection[6];
+    glm::mat4               mSunShadowMatrix[4];
+    glm::mat4               mSpotShadowMatrix[MAX_PROJECTOR_SHADOWS];
+    // sun shadow matrices followed by spot shadow matrices
+    glm::mat4               mShadowModelview[4 + MAX_PROJECTOR_SHADOWS];
+    glm::mat4               mShadowProjection[4 + MAX_PROJECTOR_SHADOWS];
     glm::mat4               mReflectionModelView;
 
-    LLPointer<LLDrawable>   mShadowSpotLight[2];
-    F32                     mSpotLightFade[2];
-    LLPointer<LLDrawable>   mTargetShadowSpotLight[2];
+    LLPointer<LLDrawable>   mShadowSpotLight[MAX_PROJECTOR_SHADOWS];
+    F32                     mSpotLightFade[MAX_PROJECTOR_SHADOWS];
+    LLPointer<LLDrawable>   mTargetShadowSpotLight[MAX_PROJECTOR_SHADOWS];
 
     LLVector4               mSunClipPlanes;
     LLVector4               mSunOrthoClipPlanes;
@@ -1116,6 +1122,7 @@ public:
     static bool RenderUIBuffer;
     static S32 RenderShadowDetail;
     static S32 RenderShadowSplits;
+    static U32 RenderProjectorShadowCount;
     static bool RenderDeferredSSAO;
     static F32 RenderShadowResolutionScale;
     static bool RenderDelayCreation;
