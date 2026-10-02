@@ -33,15 +33,15 @@ uniform sampler2DShadow shadowMap3;
 #endif
 
 #if defined(SPOT_SHADOW)
-uniform sampler2DShadow shadowMap4;
-uniform sampler2DShadow shadowMap5;
+uniform sampler2DShadow shadowMap4; // shadow map of the projector being drawn
 #endif
 
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
 uniform vec2 shadow_res;
 uniform vec2 proj_shadow_res;
-uniform mat4 shadow_matrix[6];
+uniform mat4 shadow_matrix[4];
+uniform mat4 proj_shadow_matrix;
 uniform vec4 shadow_clip;
 uniform float shadow_bias;
 uniform float shadow_offset;
@@ -194,7 +194,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 #endif
 }
 
-float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+float sampleSpotShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 {
 #if defined(SPOT_SHADOW)
     float shadow = 0.0f;
@@ -214,16 +214,8 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
             float w = 1.0;
             w -= max(spos.z-far_split.z, 0.0)/transition_domain.z;
 
-            if (index == 0)
-            {
-                lpos = shadow_matrix[4]*spos;
-                shadow += pcfSpotShadow(shadowMap4, lpos, 0.8, spos.xy)*w;
-            }
-            else
-            {
-                lpos = shadow_matrix[5]*spos;
-                shadow += pcfSpotShadow(shadowMap5, lpos, 0.8, spos.xy)*w;
-            }
+            lpos = proj_shadow_matrix*spos;
+            shadow += pcfSpotShadow(shadowMap4, lpos, 0.8, spos.xy)*w;
             weight += w;
             shadow += max((pos.z+shadow_clip.z)/(shadow_clip.z-shadow_clip.w)*2.0-1.0, 0.0);
         }
