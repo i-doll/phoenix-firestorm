@@ -56,6 +56,14 @@ float pcfShadow(sampler2DShadow shadowMap, vec3 norm, vec4 stc, float bias_mul, 
 #if defined(SUN_SHADOW)
     float offset = shadow_bias * bias_mul;
     stc.xyz /= stc.w;
+
+    // outside this cascade's map (e.g. a reused map after a fast camera turn) there is no
+    // caster data, so treat it as lit instead of sampling the clamped border
+    if (any(lessThan(stc.xy, vec2(0.0))) || any(greaterThan(stc.xy, vec2(1.0))))
+    {
+        return 1.0;
+    }
+
     stc.z += offset * 2.0;
     stc.x = floor(stc.x*shadow_res.x + fract(pos_screen.y*shadow_res.y))/shadow_res.x; // add some chaotic jitter to X sample pos according to Y to disguise the snapping going on here
     float cs = texture(shadowMap, stc.xyz);

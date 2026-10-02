@@ -838,6 +838,11 @@ public:
     F32                     mLastSunShadowCameraFOV = 0.f;
     bool                    mSunShadowHistoryValid = false;
     U8                      mSunShadowFramesSkipped = 0;
+    // main camera sun shadow state from the last full update; reflection probe
+    // passes overwrite the live copies, so skipped updates rebuild from these
+    glm::mat4               mMainSunShadowModelview[4];
+    glm::mat4               mMainSunShadowProjection[4];
+    LLVector4               mMainSunClipPlanes;
 
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;
