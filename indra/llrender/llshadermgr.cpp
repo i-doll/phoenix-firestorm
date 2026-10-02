@@ -1304,6 +1304,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("proj_ambiance");
     mReservedUniforms.push_back("proj_shadow_idx");
     mReservedUniforms.push_back("shadow_fade");
+    mReservedUniforms.push_back("proj_shadow_matrix");
     mReservedUniforms.push_back("proj_focus");
     mReservedUniforms.push_back("proj_lod");
     mReservedUniforms.push_back("proj_ambient_lod");
@@ -1443,9 +1444,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("shadowMap2");
     mReservedUniforms.push_back("shadowMap3");
     mReservedUniforms.push_back("shadowMap4");
-    mReservedUniforms.push_back("shadowMap5");
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW5+1);
+    llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW4+1);
 
     mReservedUniforms.push_back("positionMap");
     mReservedUniforms.push_back("diffuseRect");

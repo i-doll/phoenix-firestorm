@@ -159,6 +159,7 @@ F32 LLPipeline::RenderResolutionMultiplier;
 bool LLPipeline::RenderUIBuffer;
 S32 LLPipeline::RenderShadowDetail;
 S32 LLPipeline::RenderShadowSplits;
+U32 LLPipeline::RenderProjectorShadowCount;
 bool LLPipeline::RenderDeferredSSAO;
 F32 LLPipeline::RenderShadowResolutionScale;
 bool LLPipeline::RenderDelayCreation;
@@ -568,7 +569,7 @@ void LLPipeline::init()
     // Enable features
     LLViewerShaderMgr::instance()->setShaders();
 
-    for (U32 i = 0; i < 2; ++i)
+    for (U32 i = 0; i < MAX_PROJECTOR_SHADOWS; ++i)
     {
         mSpotLightFade[i] = 1.f;
     }
@@ -616,6 +617,7 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderUIBuffer");
     connectRefreshCachedSettingsSafe("RenderShadowDetail");
     connectRefreshCachedSettingsSafe("RenderShadowSplits");
+    connectRefreshCachedSettingsSafe("RenderProjectorShadowCount");
     connectRefreshCachedSettingsSafe("RenderDeferredSSAO");
     connectRefreshCachedSettingsSafe("RenderShadowResolutionScale");
     connectRefreshCachedSettingsSafe("RenderDelayCreation");
@@ -1178,15 +1180,17 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
         U32 height = width;
 
         if (shadow_detail > 1)
-        { //allocate two spot shadow maps
+        { //allocate one spot shadow map per projector shadow slot
             U32 spot_shadow_map_width = width;
             U32 spot_shadow_map_height = height;
-            for (U32 i = 0; i < 2; i++)
+            releaseSpotShadowTargets();
+            for (U32 i = 0; i < RenderProjectorShadowCount; i++)
             {
                 if (!mSpotShadow[i].allocate(spot_shadow_map_width, spot_shadow_map_height, 0, true))
                 {
                     return false;
                 }
+                mSpotShadowAllocated = i + 1;
             }
         }
         else
@@ -1216,7 +1220,7 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
 
     if (shadow_detail > 1 && !gCubeSnapshot)
     {
-        for (U32 i = 0; i < 2; i++)
+        for (U32 i = 0; i < mSpotShadowAllocated; i++)
         {
             LLRenderTarget* shadow_target = getSpotShadowTarget(i);
             if (shadow_target)
@@ -1284,6 +1288,7 @@ void LLPipeline::refreshCachedSettings()
     RenderUIBuffer = gSavedSettings.getBOOL("RenderUIBuffer");
     RenderShadowDetail = gSavedSettings.getS32("RenderShadowDetail");
     RenderShadowSplits = gSavedSettings.getS32("RenderShadowSplits");
+    RenderProjectorShadowCount = llmin(gSavedSettings.getU32("RenderProjectorShadowCount"), MAX_PROJECTOR_SHADOWS);
     RenderDeferredSSAO = gSavedSettings.getBOOL("RenderDeferredSSAO");
     RenderShadowResolutionScale = gSavedSettings.getF32("RenderShadowResolutionScale");
     RenderDelayCreation = gSavedSettings.getBOOL("RenderDelayCreation");
@@ -1508,10 +1513,11 @@ void LLPipeline::releaseSpotShadowTargets()
 {
     if (!gCubeSnapshot) // hack to avoid freeing spot shadows during ReflectionMapManager init
     {
-        for (U32 i = 0; i < 2; i++)
+        for (U32 i = 0; i < MAX_PROJECTOR_SHADOWS; i++)
         {
             mSpotShadow[i].release();
         }
+        mSpotShadowAllocated = 0;
     }
 }
 
@@ -2116,7 +2122,7 @@ void LLPipeline::unlinkDrawable(LLDrawable *drawable)
         }
     }
 
-    for (U32 i = 0; i < 2; ++i)
+    for (U32 i = 0; i < MAX_PROJECTOR_SHADOWS; ++i)
     {
         if (mShadowSpotLight[i] == drawablep)
         {
@@ -9720,17 +9726,11 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
         }
     }
 
-    for (U32 i = 4; i < 6; i++)
+    // spot lights rebind this per light in setupSpotLight
+    S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW4);
+    if (channel > -1)
     {
-        S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i);
-        if (channel > -1)
-        {
-            LLRenderTarget* shadow_target = getSpotShadowTarget(i - 4);
-            if (shadow_target)
-            {
-                gGL.getTexUnit(channel)->bind(shadow_target, true);
-            }
-        }
+        gGL.getTexUnit(channel)->bind(getSpotShadowTarget(0), true);
     }
 }
 
@@ -9871,18 +9871,16 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
     stop_glerror();
 
-    F32 mat[16*6];
+    F32 mat[16*4];
     for (U32 i = 0; i < 16; i++)
     {
         mat[i] = glm::value_ptr(mSunShadowMatrix[0])[i];
         mat[i+16] = glm::value_ptr(mSunShadowMatrix[1])[i];
         mat[i+32] = glm::value_ptr(mSunShadowMatrix[2])[i];
         mat[i+48] = glm::value_ptr(mSunShadowMatrix[3])[i];
-        mat[i+64] = glm::value_ptr(mSunShadowMatrix[4])[i];
-        mat[i+80] = glm::value_ptr(mSunShadowMatrix[5])[i];
     }
 
-    shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 6, false, mat);
+    shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 4, false, mat);
 
     stop_glerror();
 
@@ -10203,7 +10201,7 @@ void LLPipeline::renderDeferredLighting()
 
             if (!gCubeSnapshot)
             {
-                for (U32 i = 0; i < 2; i++)
+                for (U32 i = 0; i < MAX_PROJECTOR_SHADOWS; i++)
                 {
                     mTargetShadowSpotLight[i] = NULL;
                 }
@@ -10777,8 +10775,9 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     shader.uniform1f(LLShaderMgr::PROJECTOR_RANGE, proj_range);
     shader.uniform1f(LLShaderMgr::PROJECTOR_AMBIANCE, params.mV[2]);
     S32 s_idx = -1;
+    const U32 shadow_count = getProjectorShadowCount();
 
-    for (U32 i = 0; i < 2; i++)
+    for (U32 i = 0; i < shadow_count; i++)
     {
         if (mShadowSpotLight[i] == drawablep)
         {
@@ -10791,22 +10790,36 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     if (s_idx >= 0)
     {
         shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f-mSpotLightFade[s_idx]);
+        shader.uniformMatrix4fv(LLShaderMgr::PROJECTOR_SHADOW_MATRIX, 1, false, glm::value_ptr(mSpotShadowMatrix[s_idx]));
+
+        S32 shadow_channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW4);
+        if (shadow_channel > -1)
+        {
+            gGL.getTexUnit(shadow_channel)->bind(getSpotShadowTarget(s_idx), true);
+        }
     }
     else
     {
         shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f);
     }
 
-    // make sure we're not already targeting the same spot light with both shadow maps
-    llassert(mTargetShadowSpotLight[0] != mTargetShadowSpotLight[1] || mTargetShadowSpotLight[0].isNull());
+    // a light already holding a target slot must not take a second one
+    bool already_targeted = false;
+    for (U32 i = 0; i < shadow_count; i++)
+    {
+        if (mTargetShadowSpotLight[i] == drawablep)
+        {
+            already_targeted = true;
+        }
+    }
 
-    if (!gCubeSnapshot)
+    if (!gCubeSnapshot && !already_targeted)
     {
         LLDrawable* potential = drawablep;
         //determine if this light is higher priority than one of the existing spot shadows
         F32 m_pri = volume->getSpotLightPriority();
 
-        for (U32 i = 0; i < 2; i++)
+        for (U32 i = 0; i < shadow_count; i++)
         {
             F32 pri = 0.f;
 
@@ -10824,9 +10837,6 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
             }
         }
     }
-
-    // make sure we didn't end up targeting the same spot light with both shadow maps
-    llassert(mTargetShadowSpotLight[0] != mTargetShadowSpotLight[1] || mTargetShadowSpotLight[0].isNull());
 
     LLViewerTexture* img = volume->getLightTexture();
 
@@ -11469,8 +11479,17 @@ LLRenderTarget* LLPipeline::getSunShadowTarget(U32 i)
 
 LLRenderTarget* LLPipeline::getSpotShadowTarget(U32 i)
 {
-    llassert(i < 2);
+    llassert(i < MAX_PROJECTOR_SHADOWS);
     return &mSpotShadow[i];
+}
+
+static_assert(LLViewerCamera::CAMERA_WATER0 - LLViewerCamera::CAMERA_SPOT_SHADOW0 == LLPipeline::MAX_PROJECTOR_SHADOWS,
+              "each projector shadow slot needs its own spot shadow camera");
+
+U32 LLPipeline::getProjectorShadowCount() const
+{
+    // limited by allocated targets so a raised setting waits for the shadow buffer resize
+    return RenderShadowDetail > 1 ? llmin(RenderProjectorShadowCount, mSpotShadowAllocated) : 0;
 }
 
 static LLTrace::BlockTimerStatHandle FTM_GEN_SUN_SHADOW("Gen Sun Shadow");
@@ -11646,8 +11665,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     glm::mat4 saved_view = get_current_modelview();
     glm::mat4 inv_view = glm::inverse(saved_view);
 
-    glm::mat4 view[6];
-    glm::mat4 proj[6];
+    glm::mat4 view[4 + MAX_PROJECTOR_SHADOWS];
+    glm::mat4 proj[4 + MAX_PROJECTOR_SHADOWS];
 
     LLVector3 caster_dir(environment.getIsSunUp() ? mSunDir : mMoonDir);
 
@@ -12145,10 +12164,16 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         }
     }
 
-    //hack to disable projector shadows
-    bool gen_shadow = RenderShadowDetail > 1;
+    const U32 shadow_count = getProjectorShadowCount();
 
-    if (gen_shadow)
+    // drop lights from slots beyond the current count so they don't linger if the count goes back up
+    for (U32 i = shadow_count; i < MAX_PROJECTOR_SHADOWS; i++)
+    {
+        mShadowSpotLight[i] = NULL;
+        mTargetShadowSpotLight[i] = NULL;
+    }
+
+    if (shadow_count > 0)
     {
         if (!gCubeSnapshot) //skip updating spot shadow maps during cubemap updates
         {
@@ -12156,17 +12181,36 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             F32 fade_amt = gFrameIntervalSeconds.value()
                 * (F32)llmax(LLTrace::get_frame_recording().getLastRecording().getSum(*velocity_stat) / LLTrace::get_frame_recording().getLastRecording().getDuration().value(), 1.0);
 
-            // should never happen
-            llassert(mTargetShadowSpotLight[0] != mTargetShadowSpotLight[1] || mTargetShadowSpotLight[0].isNull());
+            auto is_targeted = [&](const LLDrawable* drawable)
+            {
+                for (U32 j = 0; j < shadow_count; j++)
+                {
+                    if (mTargetShadowSpotLight[j] == drawable)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            auto is_held = [&](const LLDrawable* drawable)
+            {
+                for (U32 j = 0; j < shadow_count; j++)
+                {
+                    if (mShadowSpotLight[j] == drawable)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
 
             //update shadow targets
-            for (U32 i = 0; i < 2; i++)
+            for (U32 i = 0; i < shadow_count; i++)
             { //for each current shadow
                 LLViewerCamera::sCurCameraID = (LLViewerCamera::eCameraID)(LLViewerCamera::CAMERA_SPOT_SHADOW0 + i);
 
-                if (mShadowSpotLight[i].notNull() &&
-                    (mShadowSpotLight[i] == mTargetShadowSpotLight[0] ||
-                        mShadowSpotLight[i] == mTargetShadowSpotLight[1]))
+                if (mShadowSpotLight[i].notNull() && is_targeted(mShadowSpotLight[i]))
                 { //keep this spotlight
                     mSpotLightFade[i] = llmin(mSpotLightFade[i] + fade_amt, 1.f);
                 }
@@ -12175,24 +12219,22 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     mSpotLightFade[i] = llmax(mSpotLightFade[i] - fade_amt, 0.f);
 
                     if (mSpotLightFade[i] == 0.f || mShadowSpotLight[i].isNull())
-                    { //faded out, grab one of the pending spots (whichever one isn't already taken)
-                        if (mTargetShadowSpotLight[0] != mShadowSpotLight[(i + 1) % 2])
+                    { //faded out, grab the first pending spot no other slot has taken
+                        mShadowSpotLight[i] = NULL;
+                        for (U32 j = 0; j < shadow_count; j++)
                         {
-                            mShadowSpotLight[i] = mTargetShadowSpotLight[0];
-                        }
-                        else
-                        {
-                            mShadowSpotLight[i] = mTargetShadowSpotLight[1];
+                            if (mTargetShadowSpotLight[j].notNull() && !is_held(mTargetShadowSpotLight[j]))
+                            {
+                                mShadowSpotLight[i] = mTargetShadowSpotLight[j];
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
 
-        // this should never happen
-        llassert(mShadowSpotLight[0] != mShadowSpotLight[1] || mShadowSpotLight[0].isNull());
-
-        for (S32 i = 0; i < 2; i++)
+        for (U32 i = 0; i < shadow_count; i++)
         {
             set_current_modelview(saved_view);
             set_current_projection(saved_proj);
@@ -12258,7 +12300,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             set_current_modelview(view[i + 4]);
             set_current_projection(proj[i + 4]);
 
-            mSunShadowMatrix[i + 4] = trans * proj[i + 4] * view[i + 4] * inv_view;
+            mSpotShadowMatrix[i] = trans * proj[i + 4] * view[i + 4] * inv_view;
 
             set_last_modelview(mShadowModelview[i + 4]);
             set_last_projection(mShadowProjection[i + 4]);
@@ -12280,7 +12322,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 mSpotShadow[i].getViewport(gGLViewport);
                 mSpotShadow[i].clear();
 
-                static LLCullResult result[2];
+                static LLCullResult result[MAX_PROJECTOR_SHADOWS];
 
                 LLViewerCamera::sCurCameraID = (LLViewerCamera::eCameraID)(LLViewerCamera::CAMERA_SPOT_SHADOW0 + i);
 
@@ -12294,11 +12336,6 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             }
         }
     }
-    else
-    { //no spotlight shadows
-        mShadowSpotLight[0] = mShadowSpotLight[1] = NULL;
-    }
-
 
     if (!CameraOffset)
     {
