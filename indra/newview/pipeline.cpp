@@ -11562,6 +11562,25 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         mLastSunShadowCameraOrigin = camera_origin;
         mLastSunShadowCameraFOV = camera_fov;
         ++mSunShadowFramesSkipped;
+
+        // The kept shadow maps are fine, but the shadow matrices map from the
+        // camera's eye space and must follow this frame's view, or shadow
+        // lookups land on the wrong texels while the camera moves. Rebuild from
+        // the main camera state, since probe renders replaced the live copies.
+        const glm::mat4 inv_view = glm::inverse(get_current_modelview());
+        const glm::mat4 trans(0.5f, 0.0f, 0.0f, 0.0f,
+                              0.0f, 0.5f, 0.0f, 0.0f,
+                              0.0f, 0.0f, 0.5f, 0.0f,
+                              0.5f, 0.5f, 0.5f, 1.0f);
+        mSunClipPlanes = mMainSunClipPlanes;
+        for (U32 j = 0; j < 4; j++)
+        {
+            mSunShadowMatrix[j] = trans * mMainSunShadowProjection[j] * mMainSunShadowModelview[j] * inv_view;
+        }
+        for (U32 i = 0; i < getProjectorShadowCount(); i++)
+        {
+            mSpotShadowMatrix[i] = trans * mShadowProjection[i + 4] * mShadowModelview[i + 4] * inv_view;
+        }
         return;
     }
 
@@ -12365,6 +12384,13 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         mLastSunShadowCameraFOV = camera_fov;
         mSunShadowHistoryValid = true;
         mSunShadowFramesSkipped = 0;
+
+        for (U32 j = 0; j < 4; j++)
+        {
+            mMainSunShadowModelview[j] = mShadowModelview[j];
+            mMainSunShadowProjection[j] = mShadowProjection[j];
+        }
+        mMainSunClipPlanes = mSunClipPlanes;
     }
 
     if (!skip_avatar_update)
