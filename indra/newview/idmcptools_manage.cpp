@@ -1,6 +1,6 @@
 /**
  * @file idmcptools_manage.cpp
- * @brief <ID> MCP server: inventory organize (create/rename/move/delete) + give.
+ * @brief <ID> MCP server: inventory organize (create/rename/move/copy/delete) + give.
  *
  * Part of Five's custom Firestorm fork.
  *
@@ -18,6 +18,7 @@
 
 #include "llinventorymodel.h"
 #include "llinventoryfunctions.h"
+#include "llinventorymodelbackgroundfetch.h"
 #include "llviewerinventory.h"
 #include "llgiveinventory.h"
 #include "llpermissions.h"
@@ -62,6 +63,30 @@ namespace
         if (looks_like_uuid(s)) return LLUUID(s);
         if (s == "root")        return gInventory.getRootFolderID();
         return LLUUID::null;
+    }
+
+    bool in_library(const LLUUID& id)
+    {
+        const LLUUID& lib = gInventory.getLibraryRootFolderID();
+        return lib.notNull() && (id == lib || gInventory.isObjectDescendentOf(id, lib));
+    }
+
+    // copy_inventory_category copies only what has loaded, so a folder copy
+    // waits until every subfolder has.
+    bool tree_loaded(const LLUUID& cat_id)
+    {
+        if (!gInventory.isCategoryComplete(cat_id)) return false;
+        LLInventoryModel::cat_array_t*  cats  = nullptr;
+        LLInventoryModel::item_array_t* items = nullptr;
+        gInventory.getDirectDescendentsOf(cat_id, cats, items);
+        if (cats)
+        {
+            for (const LLPointer<LLViewerInventoryCategory>& cat : *cats)
+            {
+                if (!tree_loaded(cat->getUUID())) return false;
+            }
+        }
+        return true;
     }
 }
 
@@ -189,6 +214,116 @@ void idmcp_register_manage_tools(IDMCPToolRegistry& reg)
             }
             boost::json::object o; o["accepted"] = true;
             idmcp_tool_ok(call, o);
+        };
+        reg.add(std::move(t));
+    }
+
+    // inventory.copy ---------------------------------------------------------
+    {
+        IDMCPTool t;
+        t.name = "inventory.copy";
+        t.description =
+            "Copy an item or folder into another folder, as Copy and Paste would. {\"id\"}* (item or "
+            "folder, Library included) and {\"dest\"}* (folder UUID or \"root\"); {\"name\"} renames an "
+            "item's copy. No-copy items are refused, and left behind when copying a folder. Returns "
+            "{item_id} or {folder_id, skipped:[{item_id, name}]}; a folder's contents finish copying "
+            "shortly after the answer. Copying into an RLV-locked folder is refused.";
+        t.input_schema = boost::json::parse(
+            R"({"type":"object","properties":{"id":{"type":"string"},"dest":{"type":"string"},"name":{"type":"string"}},)"
+            R"("required":["id","dest"],"additionalProperties":false})");
+        t.gate = [](const boost::json::object& args, IDMCPGatePhase) -> IDMCPGateResult
+        {
+            if (!IDMCPRlvGate::isEnabled()) return IDMCPGateResult();
+            const LLUUID dest = resolve_parent(arg_str(args, "dest"));
+            if (dest.notNull() &&
+                RlvFolderLocks::instance().isLockedFolder(dest, RLV_LOCK_ANY,
+                                                          RlvFolderLocks::ST_MASK_ANY & ~RlvFolderLocks::ST_ROOTFOLDER))
+            {
+                return deny("locked-folder");
+            }
+            return IDMCPGateResult();
+        };
+        t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
+        {
+            const LLUUID id   = arg_uuid(args, "id");
+            const LLUUID dest = resolve_parent(arg_str(args, "dest"));
+            if (id.isNull() || dest.isNull())
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "id (UUID) and dest (folder UUID or \"root\") required");
+                return;
+            }
+            if (!gInventory.getCategory(dest) || in_library(dest))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "dest must be a folder in your inventory");
+                return;
+            }
+
+            if (LLViewerInventoryItem* item = gInventory.getItem(id))
+            {
+                LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback([call](const LLUUID& new_id)
+                {
+                    boost::json::object o;
+                    o["accepted"] = true;
+                    o["item_id"]  = new_id.asString();
+                    idmcp_tool_ok(call, o);
+                });
+                if (item->getIsLinkType())
+                {
+                    link_inventory_object(dest, item->getLinkedUUID(), cb);
+                    return;
+                }
+                if (!item->getPermissions().allowCopyBy(gAgent.getID()))
+                {
+                    idmcp_tool_err(call, IDMCP_ERR_PERMISSION, "item is no-copy; use inventory.move instead");
+                    return;
+                }
+                copy_inventory_item(gAgent.getID(), item->getPermissions().getOwner(), item->getUUID(), dest,
+                                    arg_str(args, "name"), cb);
+                return;
+            }
+
+            LLViewerInventoryCategory* cat = gInventory.getCategory(id);
+            if (!cat)
+            {
+                idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "no such item or folder");
+                return;
+            }
+            if (id == dest || gInventory.isObjectDescendentOf(dest, id))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "can't copy a folder into itself");
+                return;
+            }
+            if (!tree_loaded(id))
+            {
+                LLInventoryModelBackgroundFetch::instance().start(id, true);
+                idmcp_tool_err(call, IDMCP_ERR_CAP_UNAVAIL, "the folder hasn't finished loading; try again in a few seconds");
+                return;
+            }
+            // The same rule copy_inventory_category_content uses to leave an item behind.
+            boost::json::array skipped;
+            LLInventoryModel::cat_array_t  sub_cats;
+            LLInventoryModel::item_array_t sub_items;
+            gInventory.collectDescendents(id, sub_cats, sub_items, LLInventoryModel::EXCLUDE_TRASH);
+            for (const LLPointer<LLViewerInventoryItem>& sub : sub_items)
+            {
+                if (!sub->getIsLinkType() &&
+                    !sub->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID(), gAgent.getGroupID()))
+                {
+                    boost::json::object s;
+                    s["item_id"] = sub->getUUID().asString();
+                    s["name"]    = sub->getName();
+                    skipped.push_back(std::move(s));
+                }
+            }
+            copy_inventory_category(&gInventory, cat, dest, LLUUID::null, false,
+                [call, skipped](const LLUUID& new_id)
+                {
+                    boost::json::object o;
+                    o["accepted"]  = true;
+                    o["folder_id"] = new_id.asString();
+                    o["skipped"]   = skipped;
+                    idmcp_tool_ok(call, o);
+                });
         };
         reg.add(std::move(t));
     }
