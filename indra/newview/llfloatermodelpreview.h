@@ -27,6 +27,7 @@
 #ifndef LL_LLFLOATERMODELPREVIEW_H
 #define LL_LLFLOATERMODELPREVIEW_H
 
+#include "idmodelpreviewhost.h" // <ID>
 #include "llfloaternamedesc.h"
 #include "llfloatermodeluploadbase.h"
 #include "llmeshrepository.h"
@@ -49,7 +50,7 @@ public:
 };
 typedef std::map<std::string, LLJointOverrideData> joint_override_data_map_t;
 
-class LLFloaterModelPreview : public LLFloaterModelUploadBase
+class LLFloaterModelPreview : public LLFloaterModelUploadBase, public IDModelPreviewHost // <ID/>
 {
 public:
 
@@ -135,10 +136,15 @@ public:
 
     bool isModelUploadAllowed();
 
+    // <ID> IDModelPreviewHost: options come from this floater's widgets
+    /*virtual*/ IDModelPreviewSettings getPreviewSettings();
+    /*virtual*/ void addPreviewLog(const std::string& str, bool flash);
+    /*virtual*/ void addPreviewLog(const std::string& message, const LLSD& args, bool flash, S32 lod);
+    // </ID>
+
 protected:
     friend class LLModelPreview;
     friend class LLMeshFilePicker;
-    friend class IDMCPMeshUploadJob; // <ID> MCP upload.mesh drives the floater
     friend class LLPhysicsDecomp;
 
     void        onDescriptionKeystroke(LLUICtrl*);
@@ -226,9 +232,7 @@ private:
 
     void createSmoothComboBox(LLComboBox* combo_box, float min, float max);
 
-    static std::string getBoundingBoxCubePath();
     typedef std::map<std::string, std::string> lod_sources_map_t;
-    void fillLODSourceStatistics(lod_sources_map_t& lod_sources) const;
 
     LLUUID mDestinationFolderId;
     LLButton* mUploadBtn;

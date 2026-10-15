@@ -18,8 +18,9 @@
  * (idmcp_upload_detail::material_upload). Cost estimation mirrors
  * get_bulk_upload_expected_cost.
  *
- * Mesh is different: it needs the Upload Model floater, so upload.mesh only
- * parses and validates its args here and hands off to idmcp_meshupload.cpp.
+ * Mesh is different: it runs the mesh importer in stages, so upload.mesh
+ * only parses and validates its args here and hands off to
+ * idmcp_meshupload.cpp.
  * Its dry run asks the server for a fee quote rather than estimating locally.
  */
 
@@ -784,8 +785,8 @@ void idmcp_register_upload_tools(IDMCPToolRegistry& reg)
         IDMCPTool t;
         t.name = "upload.mesh";
         t.description =
-            "Upload one mesh model (.dae/.gltf/.glb) through the viewer's Upload "
-            "Model floater. {\"path\"} is required. Optional: {\"name\"}, "
+            "Upload one mesh model (.dae/.gltf/.glb) through the viewer's mesh "
+            "importer. {\"path\"} is required. Optional: {\"name\"}, "
             "{\"dest\"} (default = Objects), {\"scale\"}, {\"textures\"} (upload "
             "embedded textures, extra L$), {\"rigged\":{\"skin_weights\", "
             "\"joint_positions\",\"lock_scale_if_joint_position\"}} (default = "
@@ -796,9 +797,8 @@ void idmcp_register_upload_tools(IDMCPToolRegistry& reg)
             "physics shape other than \"none\"). WITHOUT "
             "{\"confirm\":true} = dry run: returns the server's fee quote, land "
             "impact, weights and triangle counts, spending nothing. With "
-            "{\"confirm\":true} = upload (costs L$). One mesh at a time; returns "
-            "a busy error if the Upload Model floater is already open or a previous "
-            "mesh upload is still waiting on the server.";
+            "{\"confirm\":true} = upload (costs L$). Up to 4 mesh uploads run at "
+            "once, alongside the Upload Model floater; a 5th returns a busy error.";
         t.input_schema = boost::json::parse(SCHEMA_MESH);
         t.timeout = 1500.0;
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)

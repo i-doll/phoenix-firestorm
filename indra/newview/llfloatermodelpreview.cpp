@@ -416,7 +416,7 @@ void LLFloaterModelPreview::initModelPreview()
         tex_height <<= 1;
     }
 
-    mModelPreview = new LLModelPreview(tex_width, tex_height, this);
+    mModelPreview = new LLModelPreview(tex_width, tex_height, this, this); // <ID/> host and UI
     mModelPreview->setPreviewTarget(PREVIEW_CAMERA_DISTANCE);
     mModelPreview->setDetailsCallback(boost::bind(&LLFloaterModelPreview::setDetails, this, _1, _2, _3));
     mModelPreview->setModelUpdatedCallback(boost::bind(&LLFloaterModelPreview::modelUpdated, this, _1));
@@ -588,7 +588,7 @@ void LLFloaterModelPreview::onClickCalculateBtn()
     mModelPhysicsFee.clear();
 
     lod_sources_map_t lod_sources;
-    fillLODSourceStatistics(lod_sources);
+    mModelPreview->fillLODSourceStatistics(lod_sources); // <ID/>
 
     gMeshRepo.uploadModel(mModelPreview->mUploadData, lod_sources, mModelPreview->mPreviewScale,
                           childGetValue("upload_textures").asBoolean(),
@@ -1056,14 +1056,24 @@ bool LLFloaterModelPreview::handleScrollWheel(S32 x, S32 y, S32 clicks)
 /*virtual*/
 void LLFloaterModelPreview::onOpen(const LLSD& key)
 {
-    LLModelPreview::sIgnoreLoadedCallback = false;
+    // <ID> Per preview: other previews keep loading
+    if (mModelPreview)
+    {
+        mModelPreview->mIgnoreLoadedCallback = false;
+    }
+    // </ID>
     requestAgentUploadPermissions();
 }
 
 /*virtual*/
 void LLFloaterModelPreview::onClose(bool app_quitting)
 {
-    LLModelPreview::sIgnoreLoadedCallback = true;
+    // <ID> Per preview: other previews keep loading
+    if (mModelPreview)
+    {
+        mModelPreview->mIgnoreLoadedCallback = true;
+    }
+    // </ID>
 }
 
 //static
@@ -1206,7 +1216,7 @@ void LLFloaterModelPreview::onPhysicsUseLOD(LLUICtrl* ctrl, void* userdata)
     }
     else if (which_mode == cube_mode)
     {
-        sInstance->loadModel(LLModel::LOD_PHYSICS, getBoundingBoxCubePath());
+        sInstance->loadModel(LLModel::LOD_PHYSICS, LLModelPreview::getBoundingBoxCubePath()); // <ID/>
     }
 
     LLModelPreview *model_preview = sInstance->mModelPreview;
@@ -1506,90 +1516,9 @@ void LLFloaterModelPreview::createSmoothComboBox(LLComboBox* combo_box, float mi
     }
 }
 
-std::string get_source_file_format(const std::string& filename)
-{
-    const std::string extension = gDirUtilp->getExtension(filename);
-    if (extension == "gltf"
-        || extension == "glb")
-    {
-        return "gltf";
-    }
-    else if (extension == "dae")
-    {
-        return "dae";
-    }
-    else if (extension == "slm")
-    {
-        return "slm";
-    }
-    else
-    {
-        return "unknown file";
-    }
-}
-
-std::string LLFloaterModelPreview::getBoundingBoxCubePath()
-{
-    std::string path = gDirUtilp->getAppRODataDir();
-    gDirUtilp->append(path, "cube.dae");
-    return path;
-}
-
-void LLFloaterModelPreview::fillLODSourceStatistics(LLFloaterModelPreview::lod_sources_map_t& lod_sources) const
-{
-    lod_sources.clear();
-
-    // This doesn't nessesarily reflect the actual source of meshes, just user choices,
-    // some meshes could have been matched from different lods, but should be good
-    // enough for statistics.
-    for (S32 lod = 0; lod <= LLModel::LOD_HIGH; ++lod)
-    {
-        const std::string &lod_string = lod_name[lod];
-        if (mLODMode[lod] == LLModelPreview::USE_LOD_ABOVE)
-        {
-            lod_sources[lod_string] = "lod above";
-        }
-        else if (mLODMode[lod] == LLModelPreview::MESH_OPTIMIZER_AUTO
-            || mLODMode[lod] == LLModelPreview::MESH_OPTIMIZER_PRECISE
-            || mLODMode[lod] == LLModelPreview::MESH_OPTIMIZER_SLOPPY)
-        {
-            lod_sources[lod_string] = "generated";
-        }
-        else if (mLODMode[lod] == LLModelPreview::LOD_FROM_FILE)
-        {
-            const std::string& file = mModelPreview->mLODFile[lod];
-            lod_sources[lod_string] = get_source_file_format(file);
-        }
-        else
-        {
-            lod_sources[lod_string] = "unknown source";
-        }
-    }
-    if (mModelPreview->mLODFile[LLModel::LOD_PHYSICS].empty())
-    {
-        if (mModelPreview->mPhysicsSearchLOD >= 0 && mModelPreview->mPhysicsSearchLOD <= 3)
-        {
-            lod_sources["physics"] = lod_name[mModelPreview->mPhysicsSearchLOD];
-        }
-        else
-        {
-            lod_sources["physics"] = "none";
-        }
-    }
-    else
-    {
-        const std::string& file = mModelPreview->mLODFile[LLModel::LOD_PHYSICS];
-        const std::string cube = getBoundingBoxCubePath();
-        if (cube != file) // check for "cube.dae"
-        {
-            lod_sources["physics"] = get_source_file_format(file);
-        }
-        else
-        {
-            lod_sources["physics"] = "bounding box";
-        }
-    }
-}
+// <ID> get_source_file_format, getBoundingBoxCubePath and
+// fillLODSourceStatistics moved to LLModelPreview so they work without the
+// floater.
 
 //-----------------------------------------------------------------------------
 // onMouseCaptureLost()
@@ -1606,28 +1535,9 @@ void LLFloaterModelPreview::onMouseCaptureLostModelPreview(LLMouseHandler* handl
 //static
 void LLFloaterModelPreview::addStringToLog(const std::string& message, const LLSD& args, bool flash, S32 lod)
 {
-    if (sInstance && sInstance->hasString(message))
+    if (sInstance)
     {
-        std::string str;
-        switch (lod)
-        {
-        case LLModel::LOD_IMPOSTOR: str = "LOD0 "; break;
-        case LLModel::LOD_LOW:      str = "LOD1 "; break;
-        case LLModel::LOD_MEDIUM:   str = "LOD2 "; break;
-        case LLModel::LOD_PHYSICS:  str = "PHYS "; break;
-        case LLModel::LOD_HIGH:     str = "LOD3 ";   break;
-        default: break;
-        }
-
-        LLStringUtil::format_map_t args_msg;
-        LLSD::map_const_iterator iter = args.beginMap();
-        LLSD::map_const_iterator end = args.endMap();
-        for (; iter != end; ++iter)
-        {
-            args_msg[iter->first] = iter->second.asString();
-        }
-        str += sInstance->getString(message, args_msg);
-        sInstance->addStringToLogTab(str, flash);
+        sInstance->addPreviewLog(message, args, flash, lod); // <ID/> formatting moved there
     }
 }
 
@@ -1927,7 +1837,7 @@ void LLFloaterModelPreview::onUpload(void* user_data)
     }
 
     lod_sources_map_t lod_sources;
-    mp->fillLODSourceStatistics(lod_sources);
+    mp->mModelPreview->fillLODSourceStatistics(lod_sources); // <ID/>
 
     gMeshRepo.uploadModel(mp->mModelPreview->mUploadData, lod_sources, mp->mModelPreview->mPreviewScale,
                           mp->childGetValue("upload_textures").asBoolean(),
@@ -2278,4 +2188,65 @@ bool LLFloaterModelPreview::isModelLoading()
     }
     return false;
 }
+
+// <ID> IDModelPreviewHost
+IDModelPreviewSettings LLFloaterModelPreview::getPreviewSettings()
+{
+    IDModelPreviewSettings settings;
+    settings.name            = getChild<LLUICtrl>("description_form")->getValue().asString();
+    settings.import_scale    = (F32)childGetValue("import_scale").asReal();
+    settings.pelvis_offset   = (F32)childGetValue("pelvis_offset").asReal();
+    settings.upload_textures = childGetValue("upload_textures").asBoolean();
+    settings.upload_skin     = childGetValue("upload_skin").asBoolean();
+    settings.upload_joints   = childGetValue("upload_joints").asBoolean();
+    settings.crease_angle    = (F32)childGetValue("crease_angle").asReal();
+
+    for (S32 lod = 0; lod < NUM_LOD; ++lod)
+    {
+        if (LLComboBox* lod_combo = findChild<LLComboBox>("lod_source_" + lod_name[lod]))
+        {
+            settings.lod_source[lod] = lod_combo->getCurrentIndex();
+        }
+        if (LLCtrlSelectionInterface* iface = childGetSelectionInterface("lod_mode_" + lod_name[lod]))
+        {
+            settings.lod_limit_mode[lod] = iface->getFirstSelectedIndex();
+        }
+        settings.lod_triangle_limit[lod]  = childGetValue("lod_triangle_limit_" + lod_name[lod]).asInteger();
+        settings.lod_error_threshold[lod] = (F32)childGetValue("lod_error_threshold_" + lod_name[lod]).asReal();
+    }
+    return settings;
+}
+
+void LLFloaterModelPreview::addPreviewLog(const std::string& str, bool flash)
+{
+    addStringToLogTab(str, flash);
+}
+
+void LLFloaterModelPreview::addPreviewLog(const std::string& message, const LLSD& args, bool flash, S32 lod)
+{
+    if (!hasString(message))
+    {
+        return;
+    }
+
+    std::string str;
+    switch (lod)
+    {
+    case LLModel::LOD_IMPOSTOR: str = "LOD0 "; break;
+    case LLModel::LOD_LOW:      str = "LOD1 "; break;
+    case LLModel::LOD_MEDIUM:   str = "LOD2 "; break;
+    case LLModel::LOD_PHYSICS:  str = "PHYS "; break;
+    case LLModel::LOD_HIGH:     str = "LOD3 ";   break;
+    default: break;
+    }
+
+    LLStringUtil::format_map_t args_msg;
+    for (LLSD::map_const_iterator iter = args.beginMap(); iter != args.endMap(); ++iter)
+    {
+        args_msg[iter->first] = iter->second.asString();
+    }
+    str += getString(message, args_msg);
+    addStringToLogTab(str, flash);
+}
+// </ID>
 

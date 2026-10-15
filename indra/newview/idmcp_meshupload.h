@@ -1,6 +1,6 @@
 /**
  * @file idmcp_meshupload.h
- * @brief <ID> MCP server: upload.mesh job (drives the Upload Model floater).
+ * @brief <ID> MCP server: upload.mesh job (drives LLModelPreview without its floater).
  *
  * Part of Five's custom Firestorm fork. Custom code carries an `ID` prefix.
  */
@@ -20,11 +20,11 @@ struct IDMCPMeshUploadParams
     LLUUID      dest;                 // null = the Objects folder
     F32         scale           = 1.f;
     bool        textures        = false;
-    int         skin_weights    = -1; // -1 = keep what the floater detected, 0 = off, 1 = on
+    int         skin_weights    = -1; // -1 = keep what the model contains, 0 = off, 1 = on
     int         joint_positions = -1;
     int         lock_scale      = -1;
     std::string lod_file[3];          // by LLModel::LOD_IMPOSTOR..LOD_MEDIUM; empty = auto
-    std::string physics = "none";     // a keyword (lower case) or a file path; none = floater default
+    std::string physics = "none";     // a keyword (lower case) or a file path
     bool        analyze = false;
     bool        confirm = false;
 };
