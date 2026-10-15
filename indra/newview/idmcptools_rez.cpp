@@ -1,6 +1,6 @@
 /**
  * @file idmcptools_rez.cpp
- * @brief <ID> MCP server: object.rez, object.attach and object.take.
+ * @brief <ID> MCP server: object.rez, object.create, object.attach and object.take.
  *
  * Part of Five's custom Firestorm fork. Custom code carries an `ID` prefix.
  *
@@ -33,6 +33,8 @@
 #include "llviewerobjectlist.h"     // gObjectList
 #include "llviewerregion.h"
 #include "llvoavatarself.h"         // gAgentAvatarp
+#include "llvolumemessage.h"
+#include "material_codes.h"         // LL_MCODE_WOOD
 #include "message.h"
 #include "rlvactions.h"
 #include "rlvcommon.h"              // rlvPredCanWearItem
@@ -95,6 +97,38 @@ namespace
             out.insert(o->getID());
         }
         return out;
+    }
+
+    // args "position" (region metres), or 2 m in front of the avatar at its
+    // height. On failure answers `call` and returns false.
+    bool parse_target(const boost::json::object& args, const IDMCPCallPtr& call, LLViewerRegion* region,
+                      LLVector3& target)
+    {
+        const F32 width = region->getWidth();
+        if (args.contains("position"))
+        {
+            if (!argNums(args, "position", 3, target.mV))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "position must be [x, y, z] region metres");
+                return false;
+            }
+            if (target.mV[VX] < 0.f || target.mV[VX] >= width || target.mV[VY] < 0.f || target.mV[VY] >= width
+                || target.mV[VZ] < 0.f || target.mV[VZ] > BUILD_HEIGHT)
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
+                               llformat("position must be inside this region (x and y 0 to %.0f, z 0 to %.0f)",
+                                        width, BUILD_HEIGHT));
+                return false;
+            }
+            return true;
+        }
+        LLVector3 ahead = gAgent.getAtAxis();
+        ahead.mV[VZ] = 0.f;
+        if (ahead.normalize() < 0.01f) ahead = LLVector3::x_axis;
+        target = region->getPosRegionFromGlobal(gAgent.getPositionGlobal()) + ahead * 2.f;
+        target.mV[VX] = llclamp(target.mV[VX], 0.f, width - 0.01f);
+        target.mV[VY] = llclamp(target.mV[VY], 0.f, width - 0.01f);
+        return true;
     }
 
     // Packed like LLToolDragAndDrop::dropObject (lltooldraganddrop.cpp:1887-2062).
@@ -264,34 +298,8 @@ namespace
             idmcp_tool_err(call, IDMCP_ERR_NOT_LOGGED_IN, "no current region");
             return;
         }
-        const F32 width = region->getWidth();
         LLVector3 target;
-        if (args.contains("position"))
-        {
-            if (!argNums(args, "position", 3, target.mV))
-            {
-                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "position must be [x, y, z] region metres");
-                return;
-            }
-            if (target.mV[VX] < 0.f || target.mV[VX] >= width || target.mV[VY] < 0.f || target.mV[VY] >= width
-                || target.mV[VZ] < 0.f || target.mV[VZ] > BUILD_HEIGHT)
-            {
-                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
-                               llformat("position must be inside this region (x and y 0 to %.0f, z 0 to %.0f)",
-                                        width, BUILD_HEIGHT));
-                return;
-            }
-        }
-        else
-        {
-            // 2 m in front of the avatar, at avatar height.
-            LLVector3 ahead = gAgent.getAtAxis();
-            ahead.mV[VZ] = 0.f;
-            if (ahead.normalize() < 0.01f) ahead = LLVector3::x_axis;
-            target = region->getPosRegionFromGlobal(gAgent.getPositionGlobal()) + ahead * 2.f;
-            target.mV[VX] = llclamp(target.mV[VX], 0.f, width - 0.01f);
-            target.mV[VY] = llclamp(target.mV[VY], 0.f, width - 0.01f);
-        }
+        if (!parse_target(args, call, region, target)) return;
         LLVector3  deg;
         const bool has_rot = args.contains("rotation");
         if (has_rot && !argNums(args, "rotation", 3, deg.mV))
@@ -318,6 +326,231 @@ namespace
             gInventory.deleteObject(job->mItemId);   // `item` is gone after this line
             gInventory.notifyObservers();
         }
+        Job::launch(job);
+    }
+
+    // ---- object.create -----------------------------------------------------------
+
+    constexpr F64 CREATE_LIMIT = 30.0;
+    constexpr F32 PRIM_MIN     = 0.01f;
+    constexpr F32 PRIM_MAX     = 64.f;
+
+    // The build tool's shapes, with the volume params LLToolPlacer::addObject sends.
+    struct Shape
+    {
+        const char* name;
+        U8          profile;
+        U8          path;
+        F32         begin_s, end_s;
+        F32         begin_t, end_t;
+        F32         ratio_x, ratio_y;
+        F32         shear_x;
+        bool        tilted;   // the build tool rezzes it turned 90 degrees about Y
+    };
+
+    const Shape SHAPES[] = {
+        { "box",           LL_PCODE_PROFILE_SQUARE,      LL_PCODE_PATH_LINE,   0.f,   1.f,   0.f, 1.f,  1.f, 1.f,   0.f,  false },
+        { "prism",         LL_PCODE_PROFILE_SQUARE,      LL_PCODE_PATH_LINE,   0.f,   1.f,   0.f, 1.f,  0.f, 1.f,  -0.5f, false },
+        { "pyramid",       LL_PCODE_PROFILE_SQUARE,      LL_PCODE_PATH_LINE,   0.f,   1.f,   0.f, 1.f,  0.f, 0.f,   0.f,  false },
+        { "tetrahedron",   LL_PCODE_PROFILE_EQUALTRI,    LL_PCODE_PATH_LINE,   0.f,   1.f,   0.f, 1.f,  0.f, 0.f,   0.f,  false },
+        { "cylinder",      LL_PCODE_PROFILE_CIRCLE,      LL_PCODE_PATH_LINE,   0.f,   1.f,   0.f, 1.f,  1.f, 1.f,   0.f,  false },
+        { "half_cylinder", LL_PCODE_PROFILE_CIRCLE,      LL_PCODE_PATH_LINE,   0.25f, 0.75f, 0.f, 1.f,  1.f, 1.f,   0.f,  false },
+        { "cone",          LL_PCODE_PROFILE_CIRCLE,      LL_PCODE_PATH_LINE,   0.f,   1.f,   0.f, 1.f,  0.f, 0.f,   0.f,  false },
+        { "half_cone",     LL_PCODE_PROFILE_CIRCLE,      LL_PCODE_PATH_LINE,   0.25f, 0.75f, 0.f, 1.f,  0.f, 0.f,   0.f,  false },
+        { "sphere",        LL_PCODE_PROFILE_CIRCLE_HALF, LL_PCODE_PATH_CIRCLE, 0.f,   1.f,   0.f, 1.f,  1.f, 1.f,   0.f,  true  },
+        { "half_sphere",   LL_PCODE_PROFILE_CIRCLE_HALF, LL_PCODE_PATH_CIRCLE, 0.f,   1.f,   0.f, 0.5f, 1.f, 1.f,   0.f,  false },
+        { "torus",         LL_PCODE_PROFILE_CIRCLE,      LL_PCODE_PATH_CIRCLE, 0.f,   1.f,   0.f, 1.f,  1.f, 0.25f, 0.f,  true  },
+        { "tube",          LL_PCODE_PROFILE_SQUARE,      LL_PCODE_PATH_CIRCLE, 0.f,   1.f,   0.f, 1.f,  1.f, 0.25f, 0.f,  true  },
+        { "ring",          LL_PCODE_PROFILE_EQUALTRI,    LL_PCODE_PATH_CIRCLE, 0.f,   1.f,   0.f, 1.f,  1.f, 0.25f, 0.f,  true  },
+    };
+
+    const Shape* find_shape(const std::string& name)
+    {
+        const std::string want = lower(name);
+        for (const Shape& sh : SHAPES)
+        {
+            if (want == sh.name) return &sh;
+        }
+        return nullptr;
+    }
+
+    // LLToolPlacer::addObject without FLAGS_CREATE_SELECTED, so nothing gets
+    // selected and the default build preferences aren't applied.
+    void send_add(LLViewerRegion* region, const Shape& sh, const LLVector3& target, const LLVector3& size,
+                  const LLQuaternion& rot)
+    {
+        LLVolumeParams vp;
+        vp.setType(sh.profile, sh.path);
+        vp.setBeginAndEndS(sh.begin_s, sh.end_s);
+        vp.setBeginAndEndT(sh.begin_t, sh.end_t);
+        vp.setRatio(sh.ratio_x, sh.ratio_y);
+        vp.setShear(sh.shear_x, 0.f);
+
+        LLMessageSystem* msg = gMessageSystem;
+        msg->newMessageFast(_PREHASH_ObjectAdd);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->addUUIDFast(_PREHASH_GroupID, FSCommon::getGroupForRezzing());
+        msg->nextBlockFast(_PREHASH_ObjectData);
+        msg->addU8Fast(_PREHASH_Material, LL_MCODE_WOOD);
+        msg->addU32Fast(_PREHASH_AddFlags, 0);
+        LLVolumeMessage::packVolumeParams(&vp, msg);
+        msg->addU8Fast(_PREHASH_PCode, LL_PCODE_VOLUME);
+        msg->addVector3Fast(_PREHASH_Scale, size);
+        msg->addQuatFast(_PREHASH_Rotation, rot);
+        msg->addVector3Fast(_PREHASH_RayStart, target);
+        msg->addVector3Fast(_PREHASH_RayEnd, target);
+        msg->addU8Fast(_PREHASH_BypassRaycast, (U8)1);
+        msg->addU8Fast(_PREHASH_RayEndIsIntersection, (U8)false);
+        msg->addU8Fast(_PREHASH_State, (U8)0);
+        msg->addUUIDFast(_PREHASH_RayTargetID, LLUUID::null);
+        msg->sendReliable(region->getHost());
+    }
+
+    class CreateJob : public Job
+    {
+    public:
+        CreateJob(const IDMCPCallPtr& call, U64 region_handle, const LLVector3& target, const LLVector3& size,
+                  std::set<LLUUID> before)
+            : Job(call, CREATE_LIMIT), mRegionHandle(region_handle), mTarget(target), mSize(size),
+              mBefore(std::move(before)) {}
+
+        std::string mShape;
+
+    protected:
+        void tick(F64) override
+        {
+            if (mFound.isNull())
+            {
+                find_new();
+                return;
+            }
+            LLViewerObject* o = gObjectList.findObject(mFound);
+            if (!o || o->isDead())
+            {
+                fail(IDMCP_ERR_NOT_FOUND, "the new object disappeared");
+                return;
+            }
+            if (mMoved && !posMatches(o->getPositionRegion(), mTarget)) return;
+            boost::json::object out;
+            out["object_id"] = o->getID().asString();
+            out["shape"]     = mShape;
+            out["position"]  = vecJson(o->getPosition());
+            out["rotation"]  = eulerDegJson(o->getRotation());
+            out["scale"]     = vecJson(o->getScale());
+            if (!mPosNote.empty()) out["position_skipped"] = mPosNote;
+            succeed(std::move(out));
+        }
+
+        std::string timeoutMessage() const override
+        {
+            return mFound.isNull() ? "the create request was sent but the new object didn't appear in time; the land may not "
+                                     "allow building here. Check objects.getNearby before retrying"
+                                   : "the object was created but the region didn't confirm the position in time";
+        }
+
+        boost::json::object timeoutData() const override
+        {
+            boost::json::object sent;
+            sent["shape"]    = mShape;
+            sent["position"] = vecJson(mTarget);
+            sent["scale"]    = vecJson(mSize);
+            boost::json::object data;
+            data["sent"] = std::move(sent);
+            if (mFound.notNull()) data["object_id"] = mFound.asString();
+            return data;
+        }
+
+    private:
+        // The region doesn't say which object it made: take the first new owned
+        // root near the target with the size we asked for.
+        void find_new()
+        {
+            for (const LLUUID& id : own_roots_near(mRegionHandle, mTarget))
+            {
+                if (mBefore.count(id)) continue;
+                LLViewerObject* o = gObjectList.findObject(id);
+                if (!o || !scaleMatches(o->getScale(), mSize)) continue;
+                mFound = id;
+                if (posMatches(o->getPositionRegion(), mTarget)) return;
+                // The region may set it down off the target; moving it there is an edit.
+                const IDMCPGateResult g = rlvEdit(o);
+                if (!g.allowed)
+                {
+                    mPosNote = rlvErrorMessage(g);
+                    return;
+                }
+                sendTransform(o, (U8)(UPD_POSITION | UPD_LINKED_SETS), mTarget, LLQuaternion(), LLVector3::zero);
+                mMoved = true;
+                return;
+            }
+        }
+
+        U64              mRegionHandle = 0;
+        LLVector3        mTarget;
+        LLVector3        mSize;
+        std::set<LLUUID> mBefore;   // owned roots near the target before the create
+        LLUUID           mFound;
+        bool             mMoved = false;
+        std::string      mPosNote;  // why the position wasn't corrected
+    };
+
+    void run_create(const boost::json::object& args, const IDMCPCallPtr& call)
+    {
+        const std::string shape_arg = argStr(args, "shape");
+        const Shape* sh = find_shape(shape_arg.empty() ? "box" : shape_arg);
+        if (!sh)
+        {
+            std::string names;
+            for (const Shape& s : SHAPES) names += (names.empty() ? "" : ", ") + std::string(s.name);
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "unknown shape: " + shape_arg + " (one of " + names + ")");
+            return;
+        }
+        LLViewerRegion* region = gAgent.getRegion();
+        if (!region)
+        {
+            idmcp_tool_err(call, IDMCP_ERR_NOT_LOGGED_IN, "no current region");
+            return;
+        }
+        LLVector3 target;
+        if (!parse_target(args, call, region, target)) return;
+        LLVector3 size(0.5f, 0.5f, 0.5f);
+        if (args.contains("scale"))
+        {
+            if (!argNums(args, "scale", 3, size.mV))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "scale must be [x, y, z] metres");
+                return;
+            }
+            for (F32 v : size.mV)
+            {
+                if (v < PRIM_MIN || v > PRIM_MAX)
+                {
+                    idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
+                                   llformat("each scale value must be %.2f to %.0f metres", PRIM_MIN, PRIM_MAX));
+                    return;
+                }
+            }
+        }
+        LLQuaternion rot;
+        if (sh->tilted) rot.setQuat(90.f * DEG_TO_RAD, LLVector3::y_axis);
+        if (args.contains("rotation"))
+        {
+            LLVector3 deg;
+            if (!argNums(args, "rotation", 3, deg.mV))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "rotation must be [x, y, z] in degrees");
+                return;
+            }
+            rot = quatFromEulerDeg(deg);
+        }
+
+        auto job = std::make_shared<CreateJob>(call, region->getHandle(), target, size,
+                                               own_roots_near(region->getHandle(), target));
+        job->mShape = sh->name;
+        // The request gate ran this frame, so it is the commit check for the create.
+        send_add(region, *sh, target, size, rot);
         Job::launch(job);
     }
 
@@ -674,6 +907,35 @@ void idmcp_register_rez_tools(IDMCPToolRegistry& reg)
         t.gate    = gate_rez;
         t.timeout = 45.0;
         t.invoke  = [](const boost::json::object& args, const IDMCPCallPtr& call) { run_rez(args, call); };
+        reg.add(std::move(t));
+    }
+
+    // object.create ------------------------------------------------------------
+    {
+        IDMCPTool t;
+        t.name = "object.create";
+        t.description =
+            "Create a new prim in the world, like the build tool's Create button. {\"shape\"}: "
+            "box (default), prism, pyramid, tetrahedron, cylinder, half_cylinder, cone, half_cone, "
+            "sphere, half_sphere, torus, tube or ring. {\"position\"} [x,y,z] region metres "
+            "(default 2 m in front of you, at your height); {\"scale\"} [x,y,z] metres, 0.01 to 64 "
+            "(default 0.5 each); {\"rotation\"} [x,y,z] degrees (default the build tool's: sphere, "
+            "torus, tube and ring are turned 90 degrees about Y). The prim gets the default plywood "
+            "texture and the name \"Object\". Waits up to 30 s and returns {object_id, shape, position, "
+            "rotation, scale}; use object_id with object.edit, object.setFaces, object.addContents and "
+            "object.link. If RLV blocks editing, the prim stays where the region put it and the result "
+            "has position_skipped with the reason. Blocked by RLV @rez and @interact.";
+        t.input_schema = boost::json::parse(
+            R"({"type":"object","properties":{"shape":{"type":"string","enum":["box","prism","pyramid",)"
+            R"("tetrahedron","cylinder","half_cylinder","cone","half_cone","sphere","half_sphere","torus",)"
+            R"("tube","ring"]},)"
+            R"("position":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
+            R"("scale":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
+            R"("rotation":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},)"
+            R"("additionalProperties":false})");
+        t.gate    = gate_rez;
+        t.timeout = 45.0;
+        t.invoke  = [](const boost::json::object& args, const IDMCPCallPtr& call) { run_create(args, call); };
         reg.add(std::move(t));
     }
 
