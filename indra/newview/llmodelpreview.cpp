@@ -76,7 +76,16 @@
 #include "llworld.h"
 // </AW: opensim-limits>
 
-bool LLModelPreview::sIgnoreLoadedCallback = false;
+// <ID> The preview also runs without a floater (MCP upload.mesh), several at
+// once. Read upload options through mHost->getPreviewSettings(), log through
+// mHost->addPreviewLog(), and touch widgets only through mUI, which is null
+// without a floater. The floater's sInstance and static log would reach the
+// wrong preview, so the compiler refuses them from here on.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC poison sInstance addStringToLog
+#endif
+// </ID>
+
 // <FS:Beq> fix up and restore stuff removed by lab
 // // Extra configurability, to be exposed later in xml (LLModelPreview probably
 // // should become UI control at some point or get split into preview control)
@@ -95,6 +104,11 @@ bool LLModelPreview::sIgnoreLoadedCallback = false;
 // static const F32 PREVIEW_ZOOM_LIMIT(10.f);
 // </FS:Beq>
 static const std::string DEFAULT_PHYSICS_MESH_NAME = "default_physics_shape";
+
+// <ID> A loader that outlives its preview still calls back with the preview's
+// address, so loadedCallback() checks here before touching it. Main thread only.
+static std::set<const LLModelPreview*> sLivePreviews;
+// </ID>
 const F32 SKIN_WEIGHT_CAMERA_DISTANCE = 16.f;
 
 #include "glod/glod.h" // <FS:Beq/> More flexible LOD generation
@@ -111,7 +125,7 @@ const std::array<std::string,5> LLModelPreview::sSuffixVarNames
 // </FS:Beq>
 
 // <FS:Beq> More flexible LOD generation
-bool stop_gloderror()
+bool stop_gloderror(IDModelPreviewHost* host) // <ID/> log to the preview's host
 {
     GLuint error = glodGetError();
 
@@ -120,7 +134,7 @@ bool stop_gloderror()
         std::ostringstream out;
         out << "GLOD error detected, cannot generate LOD (try another method?): " << std::hex << error;
         LL_WARNS("MeshUpload") << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        host->addPreviewLog(out.str(), true);
         return true;
     }
 
@@ -209,8 +223,10 @@ static bool FindModel(const LLModelLoader::scene& scene, const std::string& name
 // LLModelPreview
 //-----------------------------------------------------------------------------
 
-LLModelPreview::LLModelPreview(S32 width, S32 height, LLFloater* fmp)
+LLModelPreview::LLModelPreview(S32 width, S32 height, IDModelPreviewHost* host, LLFloaterModelPreview* ui)
     : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE, false), LLMutex()
+    , mHost(host) // <ID>
+    , mUI(ui)     // <ID>
     , mLodsQuery()
     , mLodsWithParsingError()
     , mPelvisZOffset(0.0f)
@@ -260,16 +276,17 @@ LLModelPreview::LLModelPreview(S32 width, S32 height, LLFloater* fmp)
 
     mViewOption["show_textures"] = false;
 
-    mFMP = fmp;
     glodInit(); // <FS:Beq/> Improved LOD generation
     mHasPivot = false;
     mModelPivot = LLVector3(0.0f, 0.0f, 0.0f);
 
     createPreviewAvatar();
+    sLivePreviews.insert(this); // <ID/>
 }
 
 LLModelPreview::~LLModelPreview()
 {
+    sLivePreviews.erase(this); // <ID/>
     LLMutexLock lock(this);
 
     if (mModelLoader)
@@ -306,9 +323,10 @@ void LLModelPreview::updateDimentionsAndOffsets()
 
     std::set<LLModel*> accounted;
 
-    mPelvisZOffset = mFMP ? (F32)mFMP->childGetValue("pelvis_offset").asReal() : 3.0f;
+    const IDModelPreviewSettings settings = mHost->getPreviewSettings(); // <ID>
+    mPelvisZOffset = settings.pelvis_offset;
 
-    if (mFMP && mFMP->childGetValue("upload_joints").asBoolean())
+    if (settings.upload_joints)
     {
         // FIXME if preview avatar ever gets reused, this fake mesh ID stuff will fail.
         // see also call to addAttachmentPosOverride.
@@ -336,7 +354,7 @@ void LLModelPreview::updateDimentionsAndOffsets()
         }
     }
 
-    F32 scale = mFMP ? (F32)mFMP->childGetValue("import_scale").asReal()*2.f : 2.f;
+    F32 scale = settings.import_scale * 2.f;
 
     mDetailsSignal((F32)(mPreviewScale[0] * scale), (F32)(mPreviewScale[1] * scale), (F32)(mPreviewScale[2] * scale));
 
@@ -361,7 +379,7 @@ bool LLModelPreview::matchMaterialOrder(LLModel* lod, LLModel* ref, int& refFace
         std::ostringstream out;
         out << "LOD model " << lod->getName() << "'s materials are not a subset of the High LOD (reference) model " << ref->getName();
         LL_DEBUGS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
         return false;
     }
 
@@ -371,7 +389,7 @@ bool LLModelPreview::matchMaterialOrder(LLModel* lod, LLModel* ref, int& refFace
         std::ostringstream out;
         out << "LOD model " << lod->getName() << " has more materials than the High LOD (reference) model " << ref->getName();
         LL_DEBUGS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
         // We passed isMaterialListSubset, so materials are a subset, but subset isn't supposed to be
         // larger than original and if we keep going, reordering will cause a crash
         return false;
@@ -416,7 +434,7 @@ bool LLModelPreview::matchMaterialOrder(LLModel* lod, LLModel* ref, int& refFace
                 LL_DEBUGS("MESHSKININFO") << out.str() << LL_ENDL;
                 if (mImporterDebug)
                 {
-                    LLFloaterModelPreview::addStringToLog(out, false);
+                    mHost->addPreviewLog(out.str(), false);
                 }
             // The material is not in the submesh, add a placeholder.
                 // this is appended to the existing data so we'll need to reorder
@@ -449,7 +467,7 @@ bool LLModelPreview::matchMaterialOrder(LLModel* lod, LLModel* ref, int& refFace
         std::ostringstream out;
         out << "Material of LOD model " << lod->getName() << " has more materials than the reference " << ref->getName() << ".";
         LL_INFOS("MESHSKININFO") << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
         return false;
     }
 
@@ -476,11 +494,10 @@ void LLModelPreview::rebuildUploadData()
 
     //fill uploaddata instance vectors from scene data
 
-    std::string requested_name = mFMP->getChild<LLUICtrl>("description_form")->getValue().asString();
+    const IDModelPreviewSettings settings = mHost->getPreviewSettings(); // <ID>
+    std::string requested_name = settings.name;
 
-    LLSpinCtrl* scale_spinner = mFMP->getChild<LLSpinCtrl>("import_scale");
-
-    F32 scale = (F32)scale_spinner->getValue().asReal();
+    F32 scale = settings.import_scale;
 
     LLMatrix4 scale_mat;
     scale_mat.initScale(LLVector3(scale, scale, scale));
@@ -569,7 +586,7 @@ void LLModelPreview::rebuildUploadData()
                             out << " in LOD" << i;
                             out << " list failed. Searching for alternative among LOD lists.";
                             LL_INFOS() << out.str() << LL_ENDL;
-                            LLFloaterModelPreview::addStringToLog(out, false);
+                            mHost->addPreviewLog(out.str(), false);
                         }
 
                         int searchLOD = (i > LLModel::LOD_HIGH) ? LLModel::LOD_HIGH : i;
@@ -621,7 +638,7 @@ void LLModelPreview::rebuildUploadData()
                                 out << " for LOD" << i;
                                 out << " of " << instance.mLabel;
                                 LL_INFOS() << out.str() << LL_ENDL;
-                                LLFloaterModelPreview::addStringToLog(out, false);
+                                mHost->addPreviewLog(out.str(), false);
                             }
                             break;
                         }
@@ -639,7 +656,7 @@ void LLModelPreview::rebuildUploadData()
                             std::ostringstream out;
                             out << "Indexed match of model index " << idx << " at LOD " << i << " to model named " << lod_model->mLabel;
                             LL_INFOS() << out.str() << LL_ENDL;
-                            LLFloaterModelPreview::addStringToLog(out, false);
+                            mHost->addPreviewLog(out.str(), false);
                         }
                     }
                     else if (mImporterDebug)
@@ -647,7 +664,7 @@ void LLModelPreview::rebuildUploadData()
                         std::ostringstream out;
                         out << "LOD" << i << ": List of models does not include index " << idx << " scene is missing a LOD model";
                         LL_INFOS() << out.str() << LL_ENDL;
-                        LLFloaterModelPreview::addStringToLog(out, false);
+                        mHost->addPreviewLog(out.str(), false);
                     }
                 }
                 if (mWarnOfUnmatchedPhyicsMeshes && !lod_model && (i == LLModel::LOD_PHYSICS))
@@ -662,7 +679,7 @@ void LLModelPreview::rebuildUploadData()
                         lod_model = mDefaultPhysicsShapeP;
                     }
                     LL_WARNS() << out.str() << LL_ENDL;
-                    LLFloaterModelPreview::addStringToLog(out, mDefaultPhysicsShapeP.isNull()); // Flash log tab if no default.
+                    mHost->addPreviewLog(out.str(), mDefaultPhysicsShapeP.isNull()); // Flash log tab if no default.
                 }
 
                 if (lod_model)
@@ -679,7 +696,7 @@ void LLModelPreview::rebuildUploadData()
                             out << "Assigning LOD" << i << " for " << instance.mLabel << " to found match " << lod_model->mLabel;
                         }
                         LL_INFOS() << out.str() << LL_ENDL;
-                        LLFloaterModelPreview::addStringToLog(out, false);
+                        mHost->addPreviewLog(out.str(), false);
                     }
                     instance.mLOD[i] = lod_model;
                 }
@@ -709,7 +726,7 @@ void LLModelPreview::rebuildUploadData()
                                 out << "No corresponding model for " << instance.mLabel << " found in LOD" << i << "scene/dae";
                             }
                             LL_INFOS() << out.str() << LL_ENDL;
-                            LLFloaterModelPreview::addStringToLog(out, false);
+                            mHost->addPreviewLog(out.str(), false);
                         }
                         // </FS:Beq>
                     }
@@ -719,9 +736,9 @@ void LLModelPreview::rebuildUploadData()
             LLModel* high_lod_model = instance.mLOD[LLModel::LOD_HIGH];
             if (!high_lod_model)
             {
-                LLFloaterModelPreview::addStringToLog("Model " + instance.mLabel + " has no High Lod (LOD3).", true);
+                mHost->addPreviewLog("Model " + instance.mLabel + " has no High Lod (LOD3).", true);
                 load_state = LLModelLoader::ERROR_HIGH_LOD_MODEL_MISSING; // <FS:Beq/> FIRE-30965 Cleanup braindead mesh parsing error handlers
-                mFMP->childDisable("calculate_btn");
+                if (mUI) mUI->childDisable("calculate_btn");
             }
             else
             {
@@ -735,13 +752,12 @@ void LLModelPreview::rebuildUploadData()
                     if (instance.mLOD[i] && !matchMaterialOrder(instance.mLOD[i],high_lod_model, refFaceCnt, modelFaceCnt))
                     // </FS:Beq>
                     {
-                        LLFloaterModelPreview::addStringToLog("Model " + instance.mLabel + " has mismatching materials between lods." , true);
+                        mHost->addPreviewLog("Model " + instance.mLabel + " has mismatching materials between lods." , true);
                         load_state = LLModelLoader::ERROR_MATERIALS_NOT_A_SUBSET; // <FS:Beq/> more descriptive errors
-                        mFMP->childDisable("calculate_btn");
+                        if (mUI) mUI->childDisable("calculate_btn");
                     }
                 }
-                LLFloaterModelPreview* fmp = (LLFloaterModelPreview*)mFMP;
-                bool upload_skinweights = fmp && fmp->childGetValue("upload_skin").asBoolean();
+                bool upload_skinweights = settings.upload_skin;
                 if (upload_skinweights && high_lod_model->mSkinInfo.mJointNames.size() > 0)
                 {
                     LLQuaternion bind_rot = LLSkinningUtil::getUnscaledQuaternion(LLMatrix4(high_lod_model->mSkinInfo.mBindShapeMatrix));
@@ -757,7 +773,7 @@ void LLModelPreview::rebuildUploadData()
                         out << bind_rot;
                         LL_WARNS() << out.str() << LL_ENDL;
 
-                        LLFloaterModelPreview::addStringToLog(out, getLoadState() != LLModelLoader::WARNING_BIND_SHAPE_ORIENTATION);
+                        mHost->addPreviewLog(out.str(), getLoadState() != LLModelLoader::WARNING_BIND_SHAPE_ORIENTATION);
                         load_state = LLModelLoader::WARNING_BIND_SHAPE_ORIENTATION;
                     }
                 }
@@ -766,7 +782,7 @@ void LLModelPreview::rebuildUploadData()
             mUploadData.push_back(instance);
 
             // if uploading textures, make sure textures are present
-            if (mFMP->childGetValue("upload_textures").asBoolean()) // too early to cheack if still loading
+            if (settings.upload_textures) // too early to cheack if still loading
             {
                 for (auto& mat_pair : instance.mMaterial)
                 {
@@ -817,10 +833,10 @@ void LLModelPreview::rebuildUploadData()
                     out << " A model " << mModel[lod][model_ind]->mLabel << " in the scene for LOD" << lod << " was not used - orphaned/mismatching lod models are not supported";
                     // </FS:Beq>
                     LL_INFOS() << out.str() << LL_ENDL;
-                    LLFloaterModelPreview::addStringToLog(out, true);
+                    mHost->addPreviewLog(out.str(), true);
                 }
                 load_state = LLModelLoader::ERROR_LOD_MODEL_MISMATCH;
-                mFMP->childDisable("calculate_btn");
+                if (mUI) mUI->childDisable("calculate_btn");
             }
         }
     }
@@ -858,11 +874,16 @@ void LLModelPreview::rebuildUploadData()
     //clamp scale so that total imported model bounding box is smaller than 240m on a side
     max_import_scale = llmin(max_import_scale, 240.f / max_axis);
 
-    scale_spinner->setMaxValue(max_import_scale);
-
-    if (max_import_scale < scale)
+    mMaxImportScale = max_import_scale; // <ID>
+    if (mUI)
     {
-        scale_spinner->setValue(max_import_scale);
+        LLSpinCtrl* scale_spinner = mUI->getChild<LLSpinCtrl>("import_scale");
+        scale_spinner->setMaxValue(max_import_scale);
+
+        if (max_import_scale < scale)
+        {
+            scale_spinner->setValue(max_import_scale);
+        }
     }
 
 }
@@ -986,7 +1007,7 @@ void LLModelPreview::loadModel(std::string filename, S32 lod, bool force_disable
         out << "Invalid level of detail: ";
         out << lod;
         LL_WARNS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
         assert(lod >= LLModel::LOD_IMPOSTOR && lod < LLModel::NUM_LODS);
         if (mModelLoader == nullptr)
         {
@@ -1005,7 +1026,7 @@ void LLModelPreview::loadModel(std::string filename, S32 lod, bool force_disable
         {
             // this is the initial file picking. Close the whole floater
             // if we don't have a base model to show for high LOD.
-            mFMP->closeFloater(false);
+            if (mUI) mUI->closeFloater(false);
         }
         mLoading = false;
         return;
@@ -1104,26 +1125,31 @@ void LLModelPreview::loadModel(std::string filename, S32 lod, bool force_disable
     }
     mModelLoader->start();
 
-    mFMP->childSetTextArg("status", "[STATUS]", mFMP->getString("status_reading_file"));
+    if (mUI) mUI->childSetTextArg("status", "[STATUS]", mUI->getString("status_reading_file"));
 
     setPreviewLOD(lod);
 
+    if (!mUI) // <ID/> the rest only updates the floater
+    {
+        return;
+    }
+
     if (getLoadState() >= LLModelLoader::ERROR_PARSING)
     {
-        mFMP->childDisable("ok_btn");
-        mFMP->childDisable("calculate_btn");
+        mUI->childDisable("ok_btn");
+        mUI->childDisable("calculate_btn");
     }
 
     if (lod == mPreviewLOD)
     {
-        mFMP->childSetValue("lod_file_" + lod_name[lod], mLODFile[lod]);
+        mUI->childSetValue("lod_file_" + lod_name[lod], mLODFile[lod]);
     }
     else if (lod == LLModel::LOD_PHYSICS)
     {
-        mFMP->childSetValue("physics_file", mLODFile[lod]);
+        mUI->childSetValue("physics_file", mLODFile[lod]);
     }
 
-    mFMP->openFloater();
+    mUI->openFloater();
 }
 
 void LLModelPreview::setPhysicsFromLOD(S32 lod)
@@ -1136,7 +1162,7 @@ void LLModelPreview::setPhysicsFromLOD(S32 lod)
         mModel[LLModel::LOD_PHYSICS] = mModel[lod];
         mScene[LLModel::LOD_PHYSICS] = mScene[lod];
         mLODFile[LLModel::LOD_PHYSICS].clear();
-        mFMP->childSetValue("physics_file", mLODFile[LLModel::LOD_PHYSICS]);
+        if (mUI) mUI->childSetValue("physics_file", mLODFile[LLModel::LOD_PHYSICS]);
         mVertexBuffer[LLModel::LOD_PHYSICS].clear();
         rebuildUploadData();
         refresh();
@@ -1150,7 +1176,7 @@ void LLModelPreview::setPhysicsFromPreset(S32 preset)
 
     mPhysicsSearchLOD = -1;
     mLODFile[LLModel::LOD_PHYSICS].clear();
-    mFMP->childSetValue("physics_file", mLODFile[LLModel::LOD_PHYSICS]);
+    if (mUI) mUI->childSetValue("physics_file", mLODFile[LLModel::LOD_PHYSICS]);
     mVertexBuffer[LLModel::LOD_PHYSICS].clear();
     if(preset == 1)
     {
@@ -1221,9 +1247,7 @@ void LLModelPreview::clearIncompatible(S32 lod)
         // Remove previously scheduled work
         mLodsQuery.clear();
 
-        LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
-        if (!fmp)
-            return;
+        const IDModelPreviewSettings settings = mHost->getPreviewSettings(); // <ID>
 
         // Schedule new work
         for (S32 i = LLModel::LOD_HIGH; i >= 0; --i)
@@ -1231,10 +1255,7 @@ void LLModelPreview::clearIncompatible(S32 lod)
             if (mModel[i].empty())
             {
                 // Base model was replaced, regenerate this lod if applicable
-                LLComboBox* lod_combo = mFMP->findChild<LLComboBox>("lod_source_" + lod_name[i]);
-                if (!lod_combo) return;
-
-                S32 lod_mode = lod_combo->getCurrentIndex();
+                S32 lod_mode = settings.lod_source[i];
                 if (lod_mode != LOD_FROM_FILE)
                 {
                     mLodsQuery.push_back(i);
@@ -1245,7 +1266,7 @@ void LLModelPreview::clearIncompatible(S32 lod)
         // Subscribe if we have pending work and not subscribed yet
         if (!mLodsQuery.empty() && subscribe_for_generation)
         {
-            doOnIdleRepeating(lodQueryCallback);
+            subscribeLodQuery();
         }
     }
 }
@@ -1258,12 +1279,12 @@ void LLModelPreview::clearGLODGroup()
         for (std::map<LLPointer<LLModel>, U32>::iterator iter = mObject.begin(); iter != mObject.end(); ++iter)
         {
             glodDeleteObject(iter->second);
-            stop_gloderror();
+            stop_gloderror(mHost);
         }
         mObject.clear();
 
         glodDeleteGroup(mGroup);
-        stop_gloderror();
+        stop_gloderror(mHost);
         mGroup = 0;
     }
 }
@@ -1287,9 +1308,9 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
     }
 
     mLodsWithParsingError.erase(std::remove(mLodsWithParsingError.begin(), mLodsWithParsingError.end(), loaded_lod), mLodsWithParsingError.end());
-    if (mLodsWithParsingError.empty())
+    if (mLodsWithParsingError.empty() && mUI)
     {
-        mFMP->childEnable("calculate_btn");
+        mUI->childEnable("calculate_btn");
     }
 
     // Copy determinations about rig so UI will reflect them
@@ -1366,9 +1387,9 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
             }
         }
 
-        if (mFMP)
+        if (mUI)
         {
-            LLFloaterModelPreview* fmp = (LLFloaterModelPreview*)mFMP;
+            LLFloaterModelPreview* fmp = mUI;
 
             if (skin_weights)
             { //enable uploading/previewing of skin weights if present in .slm file
@@ -1478,7 +1499,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
                                 std::ostringstream out;
                                 out << "High LOD has submodels";
                                 LL_INFOS() << out.str() << LL_ENDL;
-                                LLFloaterModelPreview::addStringToLog(out, false);
+                                mHost->addPreviewLog(out.str(), false);
                             }
                             break;
                         }
@@ -1506,7 +1527,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
                         std::ostringstream out;
                         out << "Loaded LOD " << loaded_lod << ": correct names" << (name_based ? "" : "NOT ") << "found; submodels " << (has_submodels ? "" : "NOT ") << "found";
                         LL_INFOS() << out.str() << LL_ENDL;
-                        LLFloaterModelPreview::addStringToLog(out, false);
+                        mHost->addPreviewLog(out.str(), false);
                     }
 
                     if (!name_based && !has_submodels)
@@ -1528,7 +1549,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
                                     out << " for LOD " << loaded_lod;
                                     out << " doesn't match the base model. Renaming to " << name;
                                     LL_WARNS() << out.str() << LL_ENDL;
-                                    LLFloaterModelPreview::addStringToLog(out, false);
+                                    mHost->addPreviewLog(out.str(), false);
                                 }
                                 mModel[loaded_lod][idx]->mLabel = name;
                                 // Rename the correspondent instance as well
@@ -1560,21 +1581,21 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
     }
 
     mLoading = false;
-    if (mFMP)
+    if (!mBaseModel.empty())
     {
-        if (!mBaseModel.empty())
+        std::string model_name = mBaseModel.front()->getName();
+        if (mUI)
         {
-            std::string model_name = mBaseModel.front()->getName();
-            LLLineEditor* description_form = mFMP->getChild<LLLineEditor>("description_form");
+            LLLineEditor* description_form = mUI->getChild<LLLineEditor>("description_form");
             if (description_form->getText().empty())
             {
                 description_form->setText(model_name);
             }
-            // Add info to log that loading is complete (purpose: separator between loading and other logs)
-            LLSD args;
-            args["MODEL_NAME"] = model_name; // Teoretically shouldn't be empty, but might be better idea to add filename here
-            LLFloaterModelPreview::addStringToLog("ModelLoaded", args, false, loaded_lod);
         }
+        // Add info to log that loading is complete (purpose: separator between loading and other logs)
+        LLSD args;
+        args["MODEL_NAME"] = model_name; // Teoretically shouldn't be empty, but might be better idea to add filename here
+        mHost->addPreviewLog("ModelLoaded", args, false, loaded_lod);
     }
     refresh();
 
@@ -1608,7 +1629,7 @@ void LLModelPreview::generateNormals()
         return;
     }
 
-    F32 angle_cutoff = (F32)mFMP->childGetValue("crease_angle").asReal();
+    F32 angle_cutoff = mHost->getPreviewSettings().crease_angle; // <ID>
 
     mRequestedCreaseAngle[which_lod] = angle_cutoff;
 
@@ -1708,7 +1729,7 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
         std::ostringstream out;
         out << "Invalid level of detail: " << which_lod;
         LL_WARNS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, false);
+        mHost->addPreviewLog(out.str(), false);
         assert(which_lod >= -1 && which_lod < LLModel::NUM_LODS);
         return;
     }
@@ -1727,7 +1748,7 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
         shader->unbind();
     }
 
-    stop_gloderror();
+    stop_gloderror(mHost);
     static U32 cur_name = 1;
 
     S32 limit = -1;
@@ -1766,16 +1787,14 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
 
     F32 lod_error_threshold = 0;
 
+    const IDModelPreviewSettings settings = mHost->getPreviewSettings(); // <ID>
+
     // The LoD should be in range from Lowest to High
     if (which_lod > -1 && which_lod < NUM_LOD)
     {
-        LLCtrlSelectionInterface* iface = mFMP->childGetSelectionInterface("lod_mode_" + lod_name[which_lod]);
-        if (iface)
-        {
-            lod_mode = iface->getFirstSelectedIndex();
-        }
+        lod_mode = settings.lod_limit_mode[which_lod];
 
-        lod_error_threshold = (F32)mFMP->childGetValue("lod_error_threshold_" + lod_name[which_lod]).asReal();
+        lod_error_threshold = settings.lod_error_threshold[which_lod];
     }
 
     if (which_lod != -1)
@@ -1790,7 +1809,7 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
         // The LoD should be in range from Lowest to High
         if (which_lod > -1 && which_lod < NUM_LOD)
         {
-            limit = mFMP->childGetValue("lod_triangle_limit_" + lod_name[which_lod]).asInteger();
+            limit = settings.lod_triangle_limit[which_lod];
             //convert from "scene wide" to "non-instanced" triangle limit
             limit = (S32)((F32)limit*triangle_ratio);
         }
@@ -1823,7 +1842,7 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
             mObject[mdl] = cur_name++;
 
             glodNewObject(mObject[mdl], mGroup, GLOD_DISCRETE);
-            stop_gloderror();
+            stop_gloderror(mHost);
 
             if (first_model && !mdl->mSkinWeights.empty())
             { //regenerate vertex buffer for skinned models to prevent animation feedback during LOD generation
@@ -1881,11 +1900,11 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
                     glodInsertElements( mObject[ mdl ], i, GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, (U8*)index_strider.get(), 0, 0.f, &vbo );
                     // </FS:ND>
                 }
-                stop_gloderror();
+                stop_gloderror(mHost);
             }
 
             glodBuildObject(mObject[mdl]);
-            stop_gloderror();
+            stop_gloderror(mHost);
         }
     }
 
@@ -1932,13 +1951,13 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
         mRequestedErrorThreshold[lod] = lod_error_threshold;
 
         glodGroupParameteri(mGroup, GLOD_ADAPT_MODE, lod_mode);
-        stop_gloderror();
+        stop_gloderror(mHost);
 
         glodGroupParameteri(mGroup, GLOD_ERROR_MODE, GLOD_OBJECT_SPACE_ERROR);
-        stop_gloderror();
+        stop_gloderror(mHost);
 
         glodGroupParameterf(mGroup, GLOD_OBJECT_SPACE_ERROR_THRESHOLD, lod_error_threshold);
-        stop_gloderror();
+        stop_gloderror(mHost);
 
         if (lod_mode != GLOD_TRIANGLE_BUDGET)
         {
@@ -1950,9 +1969,9 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
             glodGroupParameteri(mGroup, GLOD_MAX_TRIANGLES, triangle_count + 1);
         }
 
-        stop_gloderror();
+        stop_gloderror(mHost);
         glodAdaptGroup(mGroup);
-        stop_gloderror();
+        stop_gloderror(mHost);
 
         for (U32 mdl_idx = 0; mdl_idx < mBaseModel.size(); ++mdl_idx)
         {
@@ -1960,7 +1979,7 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
 
             GLint patch_count = 0;
             glodGetObjectParameteriv(mObject[base], GLOD_NUM_PATCHES, &patch_count);
-            stop_gloderror();
+            stop_gloderror(mHost);
 
             LLVolumeParams volume_params;
             volume_params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
@@ -1972,11 +1991,11 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
 
             GLint* sizes = new GLint[patch_count * 2];
             glodGetObjectParameteriv(mObject[base], GLOD_PATCH_SIZES, sizes);
-            stop_gloderror();
+            stop_gloderror(mHost);
 
             GLint* names = new GLint[patch_count];
             glodGetObjectParameteriv(mObject[base], GLOD_PATCH_NAMES, names);
-            stop_gloderror();
+            stop_gloderror(mHost);
 
             mModel[lod][mdl_idx]->setNumVolumeFaces(patch_count);
 
@@ -2034,7 +2053,7 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
 
                     glodFillElements( mObject[ base ], names[ i ], GL_UNSIGNED_SHORT, (U8*)index_strider.get(), &vbo );
                     // </FS:ND>
-                    stop_gloderror();
+                    stop_gloderror(mHost);
                 }
                 else
                 {
@@ -2076,7 +2095,7 @@ void LLModelPreview::genGlodLODs(S32 which_lod, U32 decimation, bool enforce_tri
                 {
                     std::ostringstream out;
                     out << "Invalid face generated during LOD generation.";
-                    LLFloaterModelPreview::addStringToLog(out,true);
+                    mHost->addPreviewLog(out.str(), true);
                     LL_ERRS() << out.str() << LL_ENDL;
                 }
             }
@@ -2268,7 +2287,7 @@ F32 LLModelPreview::genMeshOptimizerPerModel(LLModel *base_model, LLModel *targe
             << " new Indices: " << size_new_indices
             << " original count: " << size_indices ;
         LL_WARNS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
     }
     else
     {
@@ -2280,7 +2299,7 @@ F32 LLModelPreview::genMeshOptimizerPerModel(LLModel *base_model, LLModel *targe
                 << " new Indices: " << size_new_indices
                 << " original count: " << size_indices << " (result error:" << result_error << ")";
             LL_DEBUGS() << out.str() << LL_ENDL;
-            LLFloaterModelPreview::addStringToLog(out, true);
+            mHost->addPreviewLog(out.str(), true);
         }
         // </FS:Beq>
     }
@@ -2369,7 +2388,7 @@ F32 LLModelPreview::genMeshOptimizerPerModel(LLModel *base_model, LLModel *targe
                                 << " original count: " << size_indices
                                 << " error treshold: " << error_threshold;
                             LL_DEBUGS() << out.str() << LL_ENDL;
-                            LLFloaterModelPreview::addStringToLog(out, true);
+                            mHost->addPreviewLog(out.str(), true);
                         }
                         // U16 vertices overflow shouldn't happen, but just in case
                         size_new_indices = 0;
@@ -2548,7 +2567,7 @@ F32 LLModelPreview::genMeshOptimizerPerFace(LLModel *base_model, LLModel *target
             << " original count: " << size_indices
             << " error treshold: " << error_threshold;
         LL_WARNS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
     }
     else
     {
@@ -2562,7 +2581,7 @@ F32 LLModelPreview::genMeshOptimizerPerFace(LLModel *base_model, LLModel *target
                 << " original count: " << size_indices
                 << " error treshold: " << error_threshold << " (result error:" << result_error << ")";
             LL_DEBUGS("MeshUpload") << out.str() << LL_ENDL;
-            LLFloaterModelPreview::addStringToLog(out, true);
+            mHost->addPreviewLog(out.str(), true);
         }
         // </FS:Beq>
     }
@@ -2591,7 +2610,7 @@ F32 LLModelPreview::genMeshOptimizerPerFace(LLModel *base_model, LLModel *target
                 << " original count: " << size_indices
                 << " error treshold: " << error_threshold;
             LL_INFOS("MeshUpload") << out.str() << LL_ENDL;
-            LLFloaterModelPreview::addStringToLog(out, true);
+            mHost->addPreviewLog(out.str(), true);
         }
 
         // Face got optimized away
@@ -2634,7 +2653,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         std::ostringstream out;
         out << "Generating lod " << which_lod << " using meshoptimizer";
         LL_INFOS("MeshUpload") << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, false);
+        mHost->addPreviewLog(out.str(), false);
     }
     // </FS:Beq>
     // Allow LoD from -1 to LLModel::LOD_PHYSICS
@@ -2643,7 +2662,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         std::ostringstream out;
         out << "Invalid level of detail: " << which_lod;
         LL_WARNS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true); // <FS:Beq/> if you don't flash the log tab on error when do you?
+        mHost->addPreviewLog(out.str(), true); // <FS:Beq/> if you don't flash the log tab on error when do you?
         llassert(which_lod >= -1 && which_lod < LLModel::NUM_LODS);
         return;
     }
@@ -2668,14 +2687,12 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
     F32 triangle_limit = 0;
     F32 lod_error_threshold = 1; //100%
 
+    const IDModelPreviewSettings settings = mHost->getPreviewSettings(); // <ID>
+
     // If requesting a single lod
     if (which_lod > -1 && which_lod < NUM_LOD)
     {
-        LLCtrlSelectionInterface* iface = mFMP->childGetSelectionInterface("lod_mode_" + lod_name[which_lod]);
-        if (iface)
-        {
-            lod_mode = iface->getFirstSelectedIndex();
-        }
+        lod_mode = settings.lod_limit_mode[which_lod];
 
         if (lod_mode == LIMIT_TRIANGLES)
         {
@@ -2691,7 +2708,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
             {
 
                 // UI spacifies limit for all models of single lod
-                triangle_limit = (F32)mFMP->childGetValue("lod_triangle_limit_" + lod_name[which_lod]).asReal();
+                triangle_limit = (F32)settings.lod_triangle_limit[which_lod];
 
             }
             // meshoptimizer doesn't use triangle limit, it uses indices limit, so convert it to aproximate ratio
@@ -2701,7 +2718,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         else
         {
             // UI shows 0 to 100%, but meshoptimizer works with 0 to 1
-            lod_error_threshold = (F32)mFMP->childGetValue("lod_error_threshold_" + lod_name[which_lod]).asReal() / 100.f;
+            lod_error_threshold = settings.lod_error_threshold[which_lod] / 100.f;
         }
     }
     else
@@ -2942,7 +2959,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                                 << " resulting ratio " << precise_ratio
                                 << " simplified using per model method.";
                             LL_INFOS() << out.str() << LL_ENDL;
-                            LLFloaterModelPreview::addStringToLog(out, false);
+                            mHost->addPreviewLog(out.str(), false);
                         }
                         // </FS:Beq>
                         meshes_simplified++;
@@ -2960,7 +2977,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                             << " resulting ratio " << sloppy_ratio
                             << " sloppily simplified using per model method.";
                         LL_INFOS() << out.str() << LL_ENDL;
-                        LLFloaterModelPreview::addStringToLog(out, false);
+                        mHost->addPreviewLog(out.str(), false);
                         // </FS:Beq>
                         meshes_sloppy_simplified++;
                     }
@@ -2978,7 +2995,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                             << " resulting ratio " << precise_ratio
                             << " simplified using per model method.";
                         LL_WARNS() << out.str() << LL_ENDL;
-                        LLFloaterModelPreview::addStringToLog(out, true);
+                        mHost->addPreviewLog(out.str(), true);
                         // </FS:Beq>
                     meshes_simplified++;
                 }
@@ -3048,8 +3065,18 @@ void LLModelPreview::updateStatusMessages()
         TOOTHIN = 16
 // </FS:Beq>
     };
+    // <ID> mPhysicsErrors publishes these bits under the class's names
+    static_assert(U32(PhysicsError::NOHAVOK) == U32(PHYSICS_ERROR_NOHAVOK)
+                  && U32(PhysicsError::DEGENERATE) == U32(PHYSICS_ERROR_DEGENERATE)
+                  && U32(PhysicsError::TOOMANYHULLS) == U32(PHYSICS_ERROR_TOOMANYHULLS)
+                  && U32(PhysicsError::TOOMANYVERTSINHULL) == U32(PHYSICS_ERROR_TOOMANYVERTSINHULL)
+                  && U32(PhysicsError::TOOTHIN) == U32(PHYSICS_ERROR_TOOTHIN),
+                  "keep PhysicsError in step with LLModelPreview::PhysicsError");
+    // </ID>
 
     assert_main_thread();
+
+    const IDModelPreviewSettings settings = mHost->getPreviewSettings(); // <ID>
 
     U32 has_physics_error{ PhysicsError::NONE }; // physics error bitmap
     //triangle/vertex/submesh count for each mesh asset for each lod
@@ -3077,7 +3104,7 @@ void LLModelPreview::updateStatusMessages()
         if (!model_high_lod)
         {
             setLoadState(LLModelLoader::ERROR_HIGH_LOD_MODEL_MISSING); // <FS:Beq/> FIRE-30965 Cleanup braindead mesh parsing error handlers
-            mFMP->childDisable("calculate_btn");
+            if (mUI) mUI->childDisable("calculate_btn");
             continue;
         }
 
@@ -3087,7 +3114,7 @@ void LLModelPreview::updateStatusMessages()
             if (!lod_model)
             {
                 setLoadState(LLModelLoader::ERROR_LOD_MODEL_MISMATCH); // <FS:Beq/> FIRE-30965 Cleanup braindead mesh parsing error handlers
-                mFMP->childDisable("calculate_btn");
+                if (mUI) mUI->childDisable("calculate_btn");
             }
             else
             {
@@ -3113,17 +3140,17 @@ void LLModelPreview::updateStatusMessages()
                     std::ostringstream out;
                     out << "Instance " << lod_model->mLabel << " LOD " << i << " Verts: " << cur_verts;
                     LL_INFOS() << out.str() << LL_ENDL;
-                    LLFloaterModelPreview::addStringToLog(out, false);
+                    mHost->addPreviewLog(out.str(), false);
 
                     out.str("");
                     out << "Instance " << lod_model->mLabel << " LOD " << i << " Tris:  " << cur_tris;
                     LL_INFOS() << out.str() << LL_ENDL;
-                    LLFloaterModelPreview::addStringToLog(out, false);
+                    mHost->addPreviewLog(out.str(), false);
 
                     out.str("");
                     out << "Instance " << lod_model->mLabel << " LOD " << i << " Faces: " << cur_submeshes;
                     LL_INFOS() << out.str() << LL_ENDL;
-                    LLFloaterModelPreview::addStringToLog(out, false);
+                    mHost->addPreviewLog(out.str(), false);
 
                     out.str("");
                     LLModel::material_list::iterator mat_iter = lod_model->mMaterialList.begin();
@@ -3131,7 +3158,7 @@ void LLModelPreview::updateStatusMessages()
                     {
                         out << "Instance " << lod_model->mLabel << " LOD " << i << " Material " << *(mat_iter);
                         LL_INFOS() << out.str() << LL_ENDL;
-                        LLFloaterModelPreview::addStringToLog(out, false);
+                        mHost->addPreviewLog(out.str(), false);
                         out.str("");
                         mat_iter++;
                     }
@@ -3221,9 +3248,12 @@ void LLModelPreview::updateStatusMessages()
         // </FS>
     }
 
-    mFMP->childSetTextArg("submeshes_info", "[SUBMESHES]", llformat("%d", total_submeshes[LLModel::LOD_HIGH]));
-
-    std::string mesh_status_na = mFMP->getString("mesh_status_na");
+    std::string mesh_status_na;
+    if (mUI)
+    {
+        mUI->childSetTextArg("submeshes_info", "[SUBMESHES]", llformat("%d", total_submeshes[LLModel::LOD_HIGH]));
+        mesh_status_na = mUI->getString("mesh_status_na");
+    }
 
     S32 upload_status[LLModel::LOD_HIGH + 1];
 
@@ -3240,8 +3270,11 @@ void LLModelPreview::updateStatusMessages()
 
         if (total_tris[lod] > 0)
         {
-            mFMP->childSetValue(lod_triangles_name[lod], llformat("%d", total_tris[lod]));
-            mFMP->childSetValue(lod_vertices_name[lod], llformat("%d", total_verts[lod]));
+            if (mUI)
+            {
+                mUI->childSetValue(lod_triangles_name[lod], llformat("%d", total_tris[lod]));
+                mUI->childSetValue(lod_vertices_name[lod], llformat("%d", total_verts[lod]));
+            }
         }
         else
         {
@@ -3262,8 +3295,11 @@ void LLModelPreview::updateStatusMessages()
                 }
             }
 
-            mFMP->childSetValue(lod_triangles_name[lod], mesh_status_na);
-            mFMP->childSetValue(lod_vertices_name[lod], mesh_status_na);
+            if (mUI)
+            {
+                mUI->childSetValue(lod_triangles_name[lod], mesh_status_na);
+                mUI->childSetValue(lod_vertices_name[lod], mesh_status_na);
+            }
         }
 
         if (lod != lod_high)
@@ -3305,21 +3341,29 @@ void LLModelPreview::updateStatusMessages()
             }
         }
 
-        LLIconCtrl* icon = mFMP->getChild<LLIconCtrl>(lod_icon_name[lod]);
-        LLUIImagePtr img = LLUI::getUIImage(lod_status_image[upload_status[lod]]);
-        icon->setVisible(true);
-        icon->setImage(img);
-
         if (upload_status[lod] >= 2)
         {
             mModelNoErrors = false;
         }
 
-        if (lod == mPreviewLOD)
+        // <ID>
+        mLodStatus[lod] = upload_status[lod];
+        mLodStatusMessage[lod] = message;
+        // </ID>
+
+        if (mUI)
         {
-            mFMP->childSetValue("lod_status_message_text", mFMP->getString(message));
-            icon = mFMP->getChild<LLIconCtrl>("lod_status_message_icon");
+            LLIconCtrl* icon = mUI->getChild<LLIconCtrl>(lod_icon_name[lod]);
+            LLUIImagePtr img = LLUI::getUIImage(lod_status_image[upload_status[lod]]);
+            icon->setVisible(true);
             icon->setImage(img);
+
+            if (lod == mPreviewLOD)
+            {
+                mUI->childSetValue("lod_status_message_text", mUI->getString(message));
+                icon = mUI->getChild<LLIconCtrl>("lod_status_message_icon");
+                icon->setImage(img);
+            }
         }
 
         updateLodControls(lod);
@@ -3347,7 +3391,7 @@ void LLModelPreview::updateStatusMessages()
                     std::ostringstream out;
                     out << "Physical model " << mdl->mLabel << " exceeds vertex per hull limitations.";
                     LL_INFOS() << out.str() << LL_ENDL;
-                    LLFloaterModelPreview::addStringToLog(out, true);
+                    mHost->addPreviewLog(out.str(), true);
                     out.str("");
                     // </FS:Beq>
                     break;
@@ -3361,7 +3405,7 @@ void LLModelPreview::updateStatusMessages()
                 std::ostringstream out;
                 out << "Physical model " << mdl->mLabel << " exceeds 256 hull limitation.";
                 LL_INFOS() << out.str() << LL_ENDL;
-                LLFloaterModelPreview::addStringToLog(out, true);
+                mHost->addPreviewLog(out.str(), true);
                 out.str("");
                 // </FS:Beq>
                 has_physics_error |= PhysicsError::TOOMANYHULLS;
@@ -3388,51 +3432,56 @@ void LLModelPreview::updateStatusMessages()
     //    }
     //}
 
-    auto physStatusIcon = mFMP->getChild<LLIconCtrl>("physics_status_message_icon");
+    mPhysicsErrors = has_physics_error; // <ID>
 
-    if (has_physics_error != PhysicsError::NONE)
+    if (mUI)
     {
-        mFMP->childSetVisible("physics_status_message_text", true); //display or clear
-        physStatusIcon->setVisible(true);
-        // The order here is important.
-        if (has_physics_error & PhysicsError::TOOMANYHULLS)
+        auto physStatusIcon = mUI->getChild<LLIconCtrl>("physics_status_message_icon");
+
+        if (has_physics_error != PhysicsError::NONE)
         {
-            mFMP->childSetValue("physics_status_message_text", mFMP->getString("phys_status_hull_limit_exceeded"));
-            LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Error");
-            physStatusIcon->setImage(img);
-        }
-        else if (has_physics_error & PhysicsError::TOOMANYVERTSINHULL)
-        {
-            mFMP->childSetValue("physics_status_message_text", mFMP->getString("phys_status_vertex_limit_exceeded"));
-            LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Error");
-            physStatusIcon->setImage(img);
-        }
-        else if (has_physics_error & PhysicsError::DEGENERATE)
-        {
-            mFMP->childSetValue("physics_status_message_text", mFMP->getString("phys_status_degenerate_triangles"));
-            LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Error");
-            physStatusIcon->setImage(img);
-        }
+            mUI->childSetVisible("physics_status_message_text", true); //display or clear
+            physStatusIcon->setVisible(true);
+            // The order here is important.
+            if (has_physics_error & PhysicsError::TOOMANYHULLS)
+            {
+                mUI->childSetValue("physics_status_message_text", mUI->getString("phys_status_hull_limit_exceeded"));
+                LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Error");
+                physStatusIcon->setImage(img);
+            }
+            else if (has_physics_error & PhysicsError::TOOMANYVERTSINHULL)
+            {
+                mUI->childSetValue("physics_status_message_text", mUI->getString("phys_status_vertex_limit_exceeded"));
+                LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Error");
+                physStatusIcon->setImage(img);
+            }
+            else if (has_physics_error & PhysicsError::DEGENERATE)
+            {
+                mUI->childSetValue("physics_status_message_text", mUI->getString("phys_status_degenerate_triangles"));
+                LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Error");
+                physStatusIcon->setImage(img);
+            }
 // <FS:Beq> fIRE-31602 thin mesh physics warning
-        else if (has_physics_error & PhysicsError::TOOTHIN)
-        {
-            mFMP->childSetValue("physics_status_message_text", mFMP->getString("phys_status_too_thin"));
-            LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Warning");
-            physStatusIcon->setImage(img);
-        }
+            else if (has_physics_error & PhysicsError::TOOTHIN)
+            {
+                mUI->childSetValue("physics_status_message_text", mUI->getString("phys_status_too_thin"));
+                LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Warning");
+                physStatusIcon->setImage(img);
+            }
 // </FS:Beq>
+            else
+            {
+                // This should not happen
+                mUI->childSetValue("physics_status_message_text", mUI->getString("phys_status_unknown_error"));
+                LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Warning");
+                physStatusIcon->setImage(img);
+            }
+        }
         else
         {
-            // This should not happen
-            mFMP->childSetValue("physics_status_message_text", mFMP->getString("phys_status_unknown_error"));
-            LLUIImagePtr img = LLUI::getUIImage("ModelImport_Status_Warning");
-            physStatusIcon->setImage(img);
+            mUI->childSetVisible("physics_status_message_text", false); //display or clear
+            physStatusIcon->setVisible(false);
         }
-    }
-    else
-    {
-        mFMP->childSetVisible("physics_status_message_text", false); //display or clear
-        physStatusIcon->setVisible(false);
     }
 // </FS:Beq>
 
@@ -3444,12 +3493,12 @@ void LLModelPreview::updateStatusMessages()
         std::ostringstream out;
         out << "Loader returned errors, model can't be uploaded";
         LL_INFOS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
         // </FS:Beq>
     }
 
-    bool uploadingSkin = mFMP->childGetValue("upload_skin").asBoolean();
-    bool uploadingJointPositions = mFMP->childGetValue("upload_joints").asBoolean();
+    bool uploadingSkin = settings.upload_skin;
+    bool uploadingJointPositions = settings.upload_joints;
 
     if (uploadingSkin)
     {
@@ -3461,7 +3510,7 @@ void LLModelPreview::updateStatusMessages()
             std::ostringstream out;
             out << "Invalid rig, there might be issues with uploading Joint positions";
             LL_INFOS() << out.str() << LL_ENDL;
-            LLFloaterModelPreview::addStringToLog(out, true);
+            mHost->addPreviewLog(out.str(), true);
             // </FS:Beq>
         }
     }
@@ -3471,7 +3520,7 @@ void LLModelPreview::updateStatusMessages()
         LLMutexLock lock(this);
         if (mModelLoader)
         {
-            if (!areTexturesReady() && mFMP->childGetValue("upload_textures").asBoolean())
+            if (!areTexturesReady() && settings.upload_textures)
             {
                 // Some textures are still loading, prevent upload until they are done
                 mModelNoErrors = false;
@@ -3479,27 +3528,35 @@ void LLModelPreview::updateStatusMessages()
         }
     }
 
+    // <ID> The rest only updates the floater's widgets
+    if (!mUI)
+    {
+        mModelUpdatedSignal(true);
+        return;
+    }
+    // </ID>
+
     // <FS:Beq> Improve the error checking the TO DO here is no longer applicable but not an FS comment so edited to stop it being picked up
     //if (!mModelNoErrors || mHasDegenerate)
     if (!gSavedSettings.getBOOL("FSIgnoreClientsideMeshValidation") && (!mModelNoErrors || (has_physics_error > PhysicsError::NOHAVOK))) // block for all cases of phsyics error except NOHAVOK
     // </FS:Beq>
     {
-        mFMP->childDisable("ok_btn");
-        mFMP->childDisable("calculate_btn");
+        mUI->childDisable("ok_btn");
+        mUI->childDisable("calculate_btn");
     }
     else
     {
-        mFMP->childEnable("ok_btn");
-        mFMP->childEnable("calculate_btn");
+        mUI->childEnable("ok_btn");
+        mUI->childEnable("calculate_btn");
     }
 
     if (mModelNoErrors && mLodsWithParsingError.empty())
     {
-        mFMP->childEnable("calculate_btn");
+        mUI->childEnable("calculate_btn");
     }
     else
     {
-        mFMP->childDisable("calculate_btn");
+        mUI->childDisable("calculate_btn");
     }
 
     //add up physics triangles etc
@@ -3543,25 +3600,25 @@ void LLModelPreview::updateStatusMessages()
 
     if (phys_tris > 0)
     {
-        mFMP->childSetTextArg("physics_triangles", "[TRIANGLES]", llformat("%d", phys_tris));
+        mUI->childSetTextArg("physics_triangles", "[TRIANGLES]", llformat("%d", phys_tris));
     }
     else
     {
-        mFMP->childSetTextArg("physics_triangles", "[TRIANGLES]", mesh_status_na);
+        mUI->childSetTextArg("physics_triangles", "[TRIANGLES]", mesh_status_na);
     }
 
     if (phys_hulls > 0)
     {
-        mFMP->childSetTextArg("physics_hulls", "[HULLS]", llformat("%d", phys_hulls));
-        mFMP->childSetTextArg("physics_points", "[POINTS]", llformat("%d", phys_points));
+        mUI->childSetTextArg("physics_hulls", "[HULLS]", llformat("%d", phys_hulls));
+        mUI->childSetTextArg("physics_points", "[POINTS]", llformat("%d", phys_points));
     }
     else
     {
-        mFMP->childSetTextArg("physics_hulls", "[HULLS]", mesh_status_na);
-        mFMP->childSetTextArg("physics_points", "[POINTS]", mesh_status_na);
+        mUI->childSetTextArg("physics_hulls", "[HULLS]", mesh_status_na);
+        mUI->childSetTextArg("physics_points", "[POINTS]", mesh_status_na);
     }
 
-    LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
+    LLFloaterModelPreview* fmp = mUI;
     if (fmp)
     {
         if (phys_tris > 0 || phys_hulls > 0)
@@ -3682,25 +3739,25 @@ void LLModelPreview::updateStatusMessages()
 
     if (which_mode == file_mode)
     {
-        mFMP->childEnable("physics_file");
-        mFMP->childEnable("physics_browse");
+        mUI->childEnable("physics_file");
+        mUI->childEnable("physics_browse");
     }
     else
     {
-        mFMP->childDisable("physics_file");
-        mFMP->childDisable("physics_browse");
+        mUI->childDisable("physics_file");
+        mUI->childDisable("physics_browse");
     }
 
-    LLSpinCtrl* crease = mFMP->getChild<LLSpinCtrl>("crease_angle");
+    LLSpinCtrl* crease = mUI->getChild<LLSpinCtrl>("crease_angle");
 
     if (mRequestedCreaseAngle[mPreviewLOD] == -1.f)
     {
-        mFMP->childSetColor("crease_label", LLColor4::grey);
+        mUI->childSetColor("crease_label", LLColor4::grey);
         crease->forceSetValue(75.f);
     }
     else
     {
-        mFMP->childSetColor("crease_label", LLColor4::white);
+        mUI->childSetColor("crease_label", LLColor4::white);
         crease->forceSetValue(mRequestedCreaseAngle[mPreviewLOD]);
     }
 
@@ -3715,7 +3772,7 @@ void LLModelPreview::updateLodControls(S32 lod)
         std::ostringstream out;
         out << "Invalid level of detail: " << lod;
         LL_WARNS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, false);
+        mHost->addPreviewLog(out.str(), false);
         assert(lod >= LLModel::LOD_IMPOSTOR && lod <= LLModel::LOD_HIGH);
         return;
     }
@@ -3735,37 +3792,40 @@ void LLModelPreview::updateLodControls(S32 lod)
     };
     const U32 num_file_controls = sizeof(file_controls) / sizeof(char*);
 
-    LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
-    if (!fmp) return;
-
-    LLComboBox* lod_combo = mFMP->findChild<LLComboBox>("lod_source_" + lod_name[lod]);
-    if (!lod_combo) return;
-
-    S32 lod_mode = lod_combo->getCurrentIndex();
+    // <ID> The source comes from the host; only the widgets need the floater.
+    LLFloaterModelPreview* fmp = mUI;
+    S32 lod_mode = mHost->getPreviewSettings().lod_source[lod];
+    // </ID>
     if (lod_mode == LOD_FROM_FILE) // LoD from file
     {
-        fmp->mLODMode[lod] = LOD_FROM_FILE;
-        for (U32 i = 0; i < num_file_controls; ++i)
+        if (fmp)
         {
-            mFMP->childSetVisible(file_controls[i] + lod_name[lod], true);
-        }
+            fmp->mLODMode[lod] = LOD_FROM_FILE;
+            for (U32 i = 0; i < num_file_controls; ++i)
+            {
+                fmp->childSetVisible(file_controls[i] + lod_name[lod], true);
+            }
 
-        for (U32 i = 0; i < num_lod_controls; ++i)
-        {
-            mFMP->childSetVisible(lod_controls[i] + lod_name[lod], false);
+            for (U32 i = 0; i < num_lod_controls; ++i)
+            {
+                fmp->childSetVisible(lod_controls[i] + lod_name[lod], false);
+            }
         }
     }
     else if (lod_mode == USE_LOD_ABOVE) // use LoD above
     {
-        fmp->mLODMode[lod] = USE_LOD_ABOVE;
-        for (U32 i = 0; i < num_file_controls; ++i)
+        if (fmp)
         {
-            mFMP->childSetVisible(file_controls[i] + lod_name[lod], false);
-        }
+            fmp->mLODMode[lod] = USE_LOD_ABOVE;
+            for (U32 i = 0; i < num_file_controls; ++i)
+            {
+                fmp->childSetVisible(file_controls[i] + lod_name[lod], false);
+            }
 
-        for (U32 i = 0; i < num_lod_controls; ++i)
-        {
-            mFMP->childSetVisible(lod_controls[i] + lod_name[lod], false);
+            for (U32 i = 0; i < num_lod_controls; ++i)
+            {
+                fmp->childSetVisible(lod_controls[i] + lod_name[lod], false);
+            }
         }
 
         if (lod < LLModel::LOD_HIGH)
@@ -3781,7 +3841,7 @@ void LLModelPreview::updateLodControls(S32 lod)
             }
         }
     }
-    else // auto generate, the default case for all LoDs except High
+    else if (fmp) // auto generate, the default case for all LoDs except High
     {
         // <FS:Beq> FIRE-32267 - Allow GLOD to be default
         // fmp->mLODMode[lod] = MESH_OPTIMIZER_AUTO;
@@ -3799,24 +3859,24 @@ void LLModelPreview::updateLodControls(S32 lod)
 
         for (U32 i = 0; i < num_file_controls; ++i)
         {
-            mFMP->getChildView(file_controls[i] + lod_name[lod])->setVisible(false);
+            fmp->getChildView(file_controls[i] + lod_name[lod])->setVisible(false);
         }
 
         for (U32 i = 0; i < num_lod_controls; ++i)
         {
-            mFMP->getChildView(lod_controls[i] + lod_name[lod])->setVisible(true);
+            fmp->getChildView(lod_controls[i] + lod_name[lod])->setVisible(true);
         }
 
 
-        LLSpinCtrl* threshold = mFMP->getChild<LLSpinCtrl>("lod_error_threshold_" + lod_name[lod]);
-        LLSpinCtrl* limit = mFMP->getChild<LLSpinCtrl>("lod_triangle_limit_" + lod_name[lod]);
+        LLSpinCtrl* threshold = fmp->getChild<LLSpinCtrl>("lod_error_threshold_" + lod_name[lod]);
+        LLSpinCtrl* limit = fmp->getChild<LLSpinCtrl>("lod_triangle_limit_" + lod_name[lod]);
 
         limit->setMaxValue((F32)mMaxTriangleLimit);
         limit->forceSetValue(mRequestedTriangleCount[lod]);
 
         threshold->forceSetValue(mRequestedErrorThreshold[lod]);
 
-        mFMP->getChild<LLComboBox>("lod_mode_" + lod_name[lod])->selectNthItem(mRequestedLoDMode[lod]);
+        fmp->getChild<LLComboBox>("lod_mode_" + lod_name[lod])->selectNthItem(mRequestedLoDMode[lod]);
 
         if (mRequestedLoDMode[lod] == 0 || mRequestedLoDMode[lod] == GENERATE) // <FS:Beq/> FIRE-32267 - Allow GLOD to be default
         {
@@ -3929,7 +3989,7 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
                 out << num_vertices << " vertices and ";
                 out << num_indices << " indices";
                 LL_WARNS() << out.str() << LL_ENDL;
-                LLFloaterModelPreview::addStringToLog(out, true);
+                mHost->addPreviewLog(out.str(), true);
             }
 
             LLStrider<LLVector3> vertex_strider;
@@ -4058,7 +4118,7 @@ void LLModelPreview::update()
 
         if (subscribe_for_generation)
         {
-            doOnIdleRepeating(lodQueryCallback);
+            subscribeLodQuery();
         }
     }
 
@@ -4090,7 +4150,7 @@ void LLModelPreview::createPreviewAvatar(void)
         std::ostringstream out;
         out << "Failed to create preview avatar for upload model window";
         LL_INFOS() << out.str() << LL_ENDL;
-        LLFloaterModelPreview::addStringToLog(out, true);
+        mHost->addPreviewLog(out.str(), true);
         // </FS:Beq>
     }
 }
@@ -4118,10 +4178,21 @@ void LLModelPreview::loadedCallback(
     S32 lod,
     void* opaque)
 {
-    if(LLModelPreview::sIgnoreLoadedCallback)
-        return;
-
+    // <ID> The preview may have been deleted mid-load, and the callback must
+    // come from its current loader (&scene is that loader's mScene).
     LLModelPreview* pPreview = static_cast<LLModelPreview*>(opaque);
+    if (!sLivePreviews.count(pPreview) || !pPreview->mModelLoader || &pPreview->mModelLoader->mScene != &scene)
+        return;
+    if (pPreview->mIgnoreLoadedCallback)
+    {
+        // The loader deletes itself after this; don't keep a pointer to it.
+        LLMutexLock lock(pPreview);
+        pPreview->mModelLoader = nullptr;
+        pPreview->mLoading = false;
+        return;
+    }
+    // </ID>
+
     LLMutexLock lock(pPreview);
     if (pPreview && pPreview->mModelLoader)
     {
@@ -4133,7 +4204,7 @@ void LLModelPreview::loadedCallback(
         {
             if (iter_out->has("Message"))
             {
-                LLFloaterModelPreview::addStringToLog(iter_out->get("Message"), *iter_out, true, pPreview->mModelLoader->mLod);
+                pPreview->mHost->addPreviewLog(iter_out->get("Message"), *iter_out, true, pPreview->mModelLoader->mLod);
             }
         }
         pPreview->mModelLoader->clearLog();
@@ -4199,10 +4270,9 @@ void LLModelPreview::lookupLODModelFiles(S32 lod)
 
         if (gDirUtilp->fileExists(lod_file_to_check))
         {
-            LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
-            if (fmp)
+            if (mUI)
             {
-                fmp->setCtrlLoadFromFile(next_lod);
+                mUI->setCtrlLoadFromFile(next_lod);
             }
             loadModel(lod_file_to_check, next_lod);
         }
@@ -4311,6 +4381,13 @@ bool LLModelPreview::render()
     LLMutexLock lock(this);
     mNeedsUpdate = false;
 
+    // <ID> Nothing to draw into without a floater
+    if (!mUI)
+    {
+        return false;
+    }
+    // </ID>
+
     bool show_edges = mViewOption["show_edges"];
     bool show_joint_overrides = mViewOption["show_joint_overrides"];
     bool show_joint_positions = mViewOption["show_joint_positions"];
@@ -4369,11 +4446,11 @@ bool LLModelPreview::render()
         gUIProgram.unbind();
     }
 
-    LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
+    LLFloaterModelPreview* fmp = mUI;
 
     bool has_skin_weights = false;
-    bool upload_skin = mFMP->childGetValue("upload_skin").asBoolean();
-    bool upload_joints = mFMP->childGetValue("upload_joints").asBoolean();
+    bool upload_skin = mUI->childGetValue("upload_skin").asBoolean();
+    bool upload_joints = mUI->childGetValue("upload_joints").asBoolean();
 
     if (upload_joints != mLastJointUpdate)
     {
@@ -4418,7 +4495,7 @@ bool LLModelPreview::render()
 
                     show_skin_weight = upload_skin && auto_enable_show_weights();
                     mViewOption["show_skin_weight"] = show_skin_weight;
-                    mFMP->childSetValue("show_skin_weight", show_skin_weight);
+                    mUI->childSetValue("show_skin_weight", show_skin_weight);
                     fmp->setViewOptionEnabled("show_skin_weight", upload_skin);
                     fmp->setViewOptionEnabled("show_joint_overrides", upload_skin);
                     fmp->setViewOptionEnabled("show_joint_positions", upload_skin);
@@ -4441,17 +4518,17 @@ bool LLModelPreview::render()
                     fmp->setViewOptionEnabled("show_joint_positions", upload_skin);
                 }
                 // </FS:Beq>
-                mFMP->childEnable("upload_skin");
+                mUI->childEnable("upload_skin");
                 // mFMP->childSetValue("show_skin_weight", show_skin_weight); // <FS:Beq/> BUG-229632
 
             }
             else if ((flags & LEGACY_RIG_FLAG_TOO_MANY_JOINTS) > 0)
             {
-                mFMP->childSetVisible("skin_too_many_joints", true);
+                mUI->childSetVisible("skin_too_many_joints", true);
             }
             else if ((flags & LEGACY_RIG_FLAG_UNKNOWN_JOINT) > 0)
             {
-                mFMP->childSetVisible("skin_unknown_joint", true);
+                mUI->childSetVisible("skin_unknown_joint", true);
             }
             // <FS:Beq> defensive code to wanr for incorrect flags - no behavioural change
             else
@@ -4463,7 +4540,7 @@ bool LLModelPreview::render()
     }
     else
     {
-        mFMP->childDisable("upload_skin");
+        mUI->childDisable("upload_skin");
         if (fmp)
         {
             mViewOption["show_skin_weight"] = false;
@@ -4472,20 +4549,20 @@ bool LLModelPreview::render()
             fmp->disableViewOption("show_joint_positions");
 
             show_skin_weight = false;
-            mFMP->childSetValue("show_skin_weight", false);
+            mUI->childSetValue("show_skin_weight", false);
             fmp->setViewOptionEnabled("show_skin_weight", show_skin_weight);
         }
     }
 
     if (upload_skin && !has_skin_weights)
     { //can't upload skin weights if model has no skin weights
-        mFMP->childSetValue("upload_skin", false);
+        mUI->childSetValue("upload_skin", false);
         upload_skin = false;
     }
 
     if (!upload_skin && upload_joints)
     { //can't upload joints if not uploading skin weights
-        mFMP->childSetValue("upload_joints", false);
+        mUI->childSetValue("upload_joints", false);
         upload_joints = false;
     }
 
@@ -4504,27 +4581,27 @@ bool LLModelPreview::render()
 
     if (upload_skin && upload_joints)
     {
-        mFMP->childEnable("lock_scale_if_joint_position");
+        mUI->childEnable("lock_scale_if_joint_position");
     }
     else
     {
-        mFMP->childDisable("lock_scale_if_joint_position");
-        mFMP->childSetValue("lock_scale_if_joint_position", false);
+        mUI->childDisable("lock_scale_if_joint_position");
+        mUI->childSetValue("lock_scale_if_joint_position", false);
     }
 
     //Only enable joint offsets if it passed the earlier critiquing
     if (isRigValidForJointPositionUpload())
     {
-        mFMP->childSetEnabled("upload_joints", upload_skin);
+        mUI->childSetEnabled("upload_joints", upload_skin);
     }
 
-    F32 physics_explode = (F32)mFMP->childGetValue("physics_explode").asReal();
+    F32 physics_explode = (F32)mUI->childGetValue("physics_explode").asReal();
 
     LLGLDepthTest gls_depth(GL_TRUE); // SL-12781 re-enable z-buffer for 3D model preview
 
     LLRect preview_rect;
 
-    preview_rect = mFMP->getChildView("preview_panel")->getRect();
+    preview_rect = mUI->getChildView("preview_panel")->getRect();
 
     F32 aspect = (F32)preview_rect.getWidth() / preview_rect.getHeight();
 
@@ -4582,7 +4659,7 @@ bool LLModelPreview::render()
 
     if (!mModel[mPreviewLOD].empty())
     {
-        mFMP->childEnable("reset_btn");
+        mUI->childEnable("reset_btn");
 
         bool regen = mVertexBuffer[mPreviewLOD].empty();
         if (!regen)
@@ -5159,28 +5236,27 @@ void LLModelPreview::setPreviewLOD(S32 lod)
     {
         mPreviewLOD = lod;
 
-        LLComboBox* combo_box = mFMP->getChild<LLComboBox>("preview_lod_combo");
-        combo_box->setCurrentByIndex((NUM_LOD - 1) - mPreviewLOD); // combo box list of lods is in reverse order
-        mFMP->childSetValue("lod_file_" + lod_name[mPreviewLOD], mLODFile[mPreviewLOD]);
-
-        LLColor4 highlight_color = LLUIColorTable::instance().getColor("MeshImportTableHighlightColor");
-        LLColor4 normal_color = LLUIColorTable::instance().getColor("MeshImportTableNormalColor");
-
-        for (S32 i = 0; i <= LLModel::LOD_HIGH; ++i)
+        if (mUI) // <ID/>
         {
-            const LLColor4& color = (i == lod) ? highlight_color : normal_color;
+            LLComboBox* combo_box = mUI->getChild<LLComboBox>("preview_lod_combo");
+            combo_box->setCurrentByIndex((NUM_LOD - 1) - mPreviewLOD); // combo box list of lods is in reverse order
+            mUI->childSetValue("lod_file_" + lod_name[mPreviewLOD], mLODFile[mPreviewLOD]);
 
-            mFMP->childSetColor(lod_status_name[i], color);
-            mFMP->childSetColor(lod_label_name[i], color);
-            mFMP->childSetColor(lod_triangles_name[i], color);
-            mFMP->childSetColor(lod_vertices_name[i], color);
-        }
+            LLColor4 highlight_color = LLUIColorTable::instance().getColor("MeshImportTableHighlightColor");
+            LLColor4 normal_color = LLUIColorTable::instance().getColor("MeshImportTableNormalColor");
 
-        LLFloaterModelPreview* fmp = (LLFloaterModelPreview*)mFMP;
-        if (fmp)
-        {
+            for (S32 i = 0; i <= LLModel::LOD_HIGH; ++i)
+            {
+                const LLColor4& color = (i == lod) ? highlight_color : normal_color;
+
+                mUI->childSetColor(lod_status_name[i], color);
+                mUI->childSetColor(lod_label_name[i], color);
+                mUI->childSetColor(lod_triangles_name[i], color);
+                mUI->childSetColor(lod_vertices_name[i], color);
+            }
+
             // make preview repopulate tab
-            fmp->clearAvatarTab();
+            mUI->clearAvatarTab();
         }
     }
     refresh();
@@ -5195,7 +5271,7 @@ void LLModelPreview::warnTextureScaling()
         out << "One or more textures in this model were scaled to be within the allowed limits.";
         LL_INFOS() << out.str() << LL_ENDL;
         LLSD args;
-        LLFloaterModelPreview::addStringToLog("ModelTextureScaling", args, true, -1);
+        mHost->addPreviewLog("ModelTextureScaling", args, true, -1);
     }
 }
 
@@ -5242,15 +5318,22 @@ void LLModelPreview::textureLoadedCallback(
     }
 }
 
-// static
+// <ID> Runs per preview: the handle in subscribeLodQuery() stops the
+// callback once its preview is gone.
+void LLModelPreview::subscribeLodQuery()
+{
+    LLHandle<LLModelPreview> handle = getHandle();
+    doOnIdleRepeating([handle]()
+    {
+        LLModelPreview* preview = handle.get();
+        return !preview || preview->lodQueryCallback();
+    });
+}
+
 bool LLModelPreview::lodQueryCallback()
 {
-    // not the best solution, but model preview belongs to floater
-    // so it is an easy way to check that preview still exists.
-    LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
-    if (fmp && fmp->mModelPreview)
     {
-        LLModelPreview* preview = fmp->mModelPreview;
+        LLModelPreview* preview = this;
         if (preview->mLodsQuery.size() > 0)
         {
             S32 lod = preview->mLodsQuery.back();
@@ -5282,10 +5365,10 @@ bool LLModelPreview::lodQueryCallback()
 // <FS:Beq> Improved LOD generation
 void LLModelPreview::onLODGLODParamCommit(S32 lod, bool enforce_tri_limit)
 {
-    if (mFMP && !mLODFrozen)
+    if (!mLODFrozen)
     {
         genGlodLODs(lod, 3, enforce_tri_limit);
-        mFMP->refresh();
+        if (mUI) mUI->refresh();
         refresh();
         mDirty = true;
     }
@@ -5293,12 +5376,104 @@ void LLModelPreview::onLODGLODParamCommit(S32 lod, bool enforce_tri_limit)
 }
 void LLModelPreview::onLODMeshOptimizerParamCommit(S32 requested_lod, bool enforce_tri_limit, S32 mode)
 {
-    if (mFMP && !mLODFrozen) // <FS:Beq> minor sidestep of potential crash
+    if (!mLODFrozen) // <FS:Beq> minor sidestep of potential crash
     {
         genMeshOptimizerLODs(requested_lod, mode, 3, enforce_tri_limit);
-        mFMP->refresh(); // <FS:Beq/> BUG-231970 Fix b0rken upload floater refresh
+        if (mUI) mUI->refresh(); // <FS:Beq/> BUG-231970 Fix b0rken upload floater refresh
         refresh();
         mDirty = true;
     }
 }
 
+// <ID> Moved from LLFloaterModelPreview so it works without the floater. The
+// floater's mLODMode tracked the lod_source_* combos, which the host settings
+// now report directly.
+static std::string get_source_file_format(const std::string& filename)
+{
+    const std::string extension = gDirUtilp->getExtension(filename);
+    if (extension == "gltf"
+        || extension == "glb")
+    {
+        return "gltf";
+    }
+    else if (extension == "dae")
+    {
+        return "dae";
+    }
+    else if (extension == "slm")
+    {
+        return "slm";
+    }
+    else
+    {
+        return "unknown file";
+    }
+}
+
+//static
+std::string LLModelPreview::getBoundingBoxCubePath()
+{
+    std::string path = gDirUtilp->getAppRODataDir();
+    gDirUtilp->append(path, "cube.dae");
+    return path;
+}
+
+void LLModelPreview::fillLODSourceStatistics(std::map<std::string, std::string>& lod_sources)
+{
+    lod_sources.clear();
+
+    const IDModelPreviewSettings settings = mHost->getPreviewSettings();
+
+    // This doesn't nessesarily reflect the actual source of meshes, just user choices,
+    // some meshes could have been matched from different lods, but should be good
+    // enough for statistics.
+    for (S32 lod = 0; lod <= LLModel::LOD_HIGH; ++lod)
+    {
+        const std::string &lod_string = lod_name[lod];
+        const S32 mode = settings.lod_source[lod];
+        if (mode == USE_LOD_ABOVE)
+        {
+            lod_sources[lod_string] = "lod above";
+        }
+        else if (mode == MESH_OPTIMIZER_AUTO
+            || mode == MESH_OPTIMIZER_PRECISE
+            || mode == MESH_OPTIMIZER_SLOPPY)
+        {
+            lod_sources[lod_string] = "generated";
+        }
+        else if (mode == LOD_FROM_FILE)
+        {
+            const std::string& file = mLODFile[lod];
+            lod_sources[lod_string] = get_source_file_format(file);
+        }
+        else
+        {
+            lod_sources[lod_string] = "unknown source";
+        }
+    }
+    if (mLODFile[LLModel::LOD_PHYSICS].empty())
+    {
+        if (mPhysicsSearchLOD >= 0 && mPhysicsSearchLOD <= 3)
+        {
+            lod_sources["physics"] = lod_name[mPhysicsSearchLOD];
+        }
+        else
+        {
+            lod_sources["physics"] = "none";
+        }
+    }
+    else
+    {
+        const std::string& file = mLODFile[LLModel::LOD_PHYSICS];
+        const std::string cube = getBoundingBoxCubePath();
+        if (cube != file) // check for "cube.dae"
+        {
+            lod_sources["physics"] = get_source_file_format(file);
+        }
+        else
+        {
+            lod_sources["physics"] = "bounding box";
+        }
+    }
+}
+// </ID>

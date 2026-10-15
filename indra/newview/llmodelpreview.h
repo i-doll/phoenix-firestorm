@@ -28,6 +28,7 @@
 #ifndef LL_LLMODELPREVIEW_H
 #define LL_LLMODELPREVIEW_H
 
+#include "idmodelpreviewhost.h" // <ID>
 #include "lldynamictexture.h"
 #include "llfloatermodelpreview.h"
 #include "llmeshrepository.h"
@@ -139,9 +140,10 @@ public:
     } eLoDLimit;
 
 public:
-    // Todo: model preview shouldn't need floater dependency, it
-    // should just expose data to floater, not control flaoter like it does
-    LLModelPreview(S32 width, S32 height, LLFloater* fmp);
+    // <ID> host supplies upload options and takes log lines; ui is the floater
+    // whose widgets mirror the preview, or null when running without one.
+    LLModelPreview(S32 width, S32 height, IDModelPreviewHost* host, LLFloaterModelPreview* ui);
+    // </ID>
     virtual ~LLModelPreview();
 
     void resetPreviewTarget();
@@ -158,7 +160,7 @@ public:
     void rotate(F32 yaw_radians, F32 pitch_radians);
     void zoom(F32 zoom_amt);
     void pan(F32 right, F32 up);
-    virtual bool needsRender() { return mNeedsUpdate; }
+    virtual bool needsRender() { return mNeedsUpdate && mUI; } // <ID> nothing to draw into without a floater
     void setPreviewLOD(S32 lod);
     void clearModel(S32 lod);
     void getJointAliases(JointMap& joint_map);
@@ -197,7 +199,10 @@ public:
     void setLegacyRigFlags(U32 rigFlags) { mLegacyRigFlags = rigFlags; }
 
     static void textureLoadedCallback(bool success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* src_aux, S32 discard_level, bool final, void* userdata);
-    static bool lodQueryCallback();
+    // <ID> Per preview: several previews can generate LODs at once.
+    bool lodQueryCallback();
+    void subscribeLodQuery();
+    // </ID>
 
     boost::signals2::connection setDetailsCallback(const details_signal_t::slot_type& cb){ return mDetailsSignal.connect(cb); }
     boost::signals2::connection setModelLoadedCallback(const model_loaded_signal_t::slot_type& cb){ return mModelLoadedSignal.connect(cb); }
@@ -206,11 +211,33 @@ public:
     void setLoadState(U32 state) { mLoadState = state; }
     U32 getLoadState() { return mLoadState; }
 
-    static bool         sIgnoreLoadedCallback;
+    // <ID> Per preview, so closing the floater doesn't drop other previews' loads.
+    bool                mIgnoreLoadedCallback{ false };
+    // </ID>
     std::vector<S32> mLodsQuery;
     std::vector<S32> mLodsWithParsingError;
     bool mHasDegenerate;
     bool areTexturesReady() { return !mNumOfFetchingTextures; }
+
+    // <ID> Validation results, kept as data so callers without a floater can
+    // read them. updateStatusMessages() fills them.
+    enum PhysicsError
+    {
+        PHYSICS_ERROR_NONE = 0,
+        PHYSICS_ERROR_NOHAVOK = 1,
+        PHYSICS_ERROR_DEGENERATE = 2,
+        PHYSICS_ERROR_TOOMANYHULLS = 4,
+        PHYSICS_ERROR_TOOMANYVERTSINHULL = 8,
+        PHYSICS_ERROR_TOOTHIN = 16
+    };
+    U32         mPhysicsErrors{ PHYSICS_ERROR_NONE };   // PhysicsError bits
+    S32         mLodStatus[NUM_LOD]{};                  // 0 good, 1 warning, 2 error
+    std::string mLodStatusMessage[NUM_LOD];             // floater string name, e.g. "mesh_status_good"
+    F32         mMaxImportScale{ 0.f };                 // largest scale the region allows; 0 until known
+
+    void fillLODSourceStatistics(std::map<std::string, std::string>& lod_sources);
+    static std::string getBoundingBoxCubePath();
+    // </ID>
 
 protected:
     bool                matchMaterialOrder(LLModel* lod, LLModel* ref, int& refFaceCnt, int& modelFaceCnt );    // <FS:Beq/> FIRE-30965 Cleanup mesh material parsing
@@ -276,7 +303,10 @@ protected:
     friend class IDMCPMeshUploadJob; // <ID> MCP upload.mesh drives the preview
     friend class LLPhysicsDecomp;
 
-    LLFloater*  mFMP;
+    // <ID> Split by purpose so the preview can run without a floater.
+    IDModelPreviewHost*     mHost;  // never null
+    LLFloaterModelPreview*  mUI;    // null without a floater; guard every use
+    // </ID>
 
     LLPointer<LLViewerFetchedTexture> mUVGuideTexture; // <FS:Beq> Add UV Guide texture overlay
     bool        mNeedsUpdate;

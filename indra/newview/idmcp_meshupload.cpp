@@ -4,16 +4,18 @@
  *
  * Part of Five's custom Firestorm fork. Custom code carries an `ID` prefix.
  *
- * LLModelPreview can't run without its floater, so the job opens the stock
- * Upload Model floater, loads the file, sets the floater's widgets, then calls
- * gMeshRepo.uploadModel with its own fee/upload observers. One job at a time:
- * the floater is a singleton. An idle callback moves the job through its
- * stages, each with a time limit.
+ * Each job owns an LLModelPreview with no floater behind it: the job is the
+ * preview's host (idmodelpreviewhost.h), supplying the upload options and
+ * collecting the importer log. It loads the file, applies the options, then
+ * calls gMeshRepo.uploadModel with its own fee/upload observers. Several jobs
+ * run at once, and the Upload Model floater stays free for the user. An idle
+ * callback moves every job through its stages, each with a time limit.
  *
- * Lifetime: sActive owns the job. The fee observer methods run on the mesh
- * upload thread, which holds a raw pointer to the job, so the job is never
+ * Lifetime: sJobs owns the jobs. The fee observer methods run on the mesh
+ * upload thread, which holds a raw pointer to the job, so a job is never
  * released while a fee or upload request is in flight, even after the MCP
- * call has been answered.
+ * call has been answered. Its preview is deleted once the call is answered
+ * and no model is loading (deleting it mid-load would block on the loader).
  */
 
 #include "llviewerprecompiledheaders.h"
@@ -21,25 +23,27 @@
 #include "idmcp_meshupload.h"
 #include "idmcpserver.h"
 
-#include "llbutton.h"
+#include "llagent.h"                // gAgent
 #include "llcallbacklist.h"         // gIdleCallbacks
-#include "llcombobox.h"
-#include "llfloatermodelpreview.h"
-#include "llfloaterreg.h"
+#include "llcorehttputil.h"
+#include "llcoros.h"
 #include "llmeshrepository.h"       // gMeshRepo
 #include "llmodel.h"
 #include "llmodelloader.h"
-#include "llmodelpreview.h"         // lod_name[]
+#include "llmodelpreview.h"
 #include "llmutex.h"
 #include "llsdutil.h"               // llsd_clone
 #include "llstatusbar.h"            // gStatusBar
 #include "lltimer.h"
 #include "lluploadfloaterobservers.h"
 #include "llviewercontrol.h"        // gSavedSettings
-#include "llviewertexteditor.h"
 
+#include <algorithm>
+#include <atomic>
 #include <deque>
+#include <map>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -50,24 +54,87 @@ namespace
     constexpr F64 ANALYZE_LIMIT = 300.0;
     constexpr F64 QUOTE_LIMIT   = 60.0;
     constexpr F64 UPLOAD_LIMIT  = 300.0;
-    // A request that never calls back would pin the job (and the busy error)
-    // forever. After this long past its stage deadline the job is parked in
-    // sParked instead: leaked, never freed, so the raw pointer stays valid.
+    // A request that never calls back would pin the job forever. After this
+    // long past its stage deadline the job is parked in sParked instead:
+    // leaked, never freed, so the raw pointer stays valid.
     constexpr F64 ABANDON_GRACE = 600.0;
     constexpr int SETTLE_TICKS  = 3;   // idle ticks the preview must stay idle
+    constexpr size_t MAX_JOBS   = 4;   // each job holds a preview avatar and every LOD of its model
+    constexpr size_t MAX_LOG_LINES = 500;
+    // Nothing is drawn, but the preview is a dynamic texture and needs a size.
+    constexpr S32 PREVIEW_TEXTURE_SIZE = 16;
 
-    // physics_lod_combo item order (floater_model_preview.xml:872-881).
-    constexpr S32 PHYS_NONE = 0, PHYS_HIGH = 1, PHYS_MEDIUM = 2,
-                  PHYS_LOW = 3, PHYS_LOWEST = 4, PHYS_CUBE = 5;
-
-    S32 physics_combo_index(const std::string& k)
+    // The physics LOD for "high".."lowest" (the floater's physics_lod_combo).
+    S32 physics_lod(const std::string& k)
     {
-        if (k == "high")   return PHYS_HIGH;
-        if (k == "medium") return PHYS_MEDIUM;
-        if (k == "low")    return PHYS_LOW;
-        if (k == "lowest") return PHYS_LOWEST;
-        if (k == "cube")   return PHYS_CUBE;
-        return PHYS_NONE;
+        if (k == "high")   return LLModel::LOD_HIGH;
+        if (k == "medium") return LLModel::LOD_MEDIUM;
+        if (k == "low")    return LLModel::LOD_LOW;
+        return LLModel::LOD_IMPOSTOR;
+    }
+
+    // English text of the floater strings the preview reports
+    // (floater_model_preview.xml).
+    const char* lod_status_text(const std::string& name)
+    {
+        if (name == "mesh_status_submesh_mismatch")  return "Levels of detail have a different number of textureable faces.";
+        if (name == "mesh_status_mesh_mismatch")     return "Levels of detail have a different number of mesh instances.";
+        if (name == "mesh_status_too_many_vertices") return "Level of detail has too many vertices.";
+        if (name == "mesh_status_missing_lod")       return "Missing required level of detail.";
+        return nullptr;
+    }
+
+    const char* physics_status_text(U32 errors)
+    {
+        // Same priority as LLModelPreview::updateStatusMessages.
+        if (errors & LLModelPreview::PHYSICS_ERROR_TOOMANYHULLS)       return "Some models exceed the hull limit (256); try 'simplify'.";
+        if (errors & LLModelPreview::PHYSICS_ERROR_TOOMANYVERTSINHULL) return "Some physical hulls exceed the vertex limit (256); try an alternative 'Analyze Method'.";
+        if (errors & LLModelPreview::PHYSICS_ERROR_DEGENERATE)         return "The physics mesh is too dense or contains degenerate triangles. Use Analyze/Simplify to resolve.";
+        if (errors & LLModelPreview::PHYSICS_ERROR_TOOTHIN)            return "One or more dimensions is less than 0.5m, only hull-based (analyzed) physics shapes will work correctly.";
+        return nullptr;
+    }
+
+    // The floater registers the progress callbacks (which let a request be
+    // cancelled) and reads the parameter defaults when it is built. Do the
+    // same here, so analyze works even if the floater has never been opened.
+    // The decomposition thread fills mStageID itself. False when there is no
+    // decomposer.
+    bool decomp_setup(LLPhysicsDecomp::decomp_params& defaults)
+    {
+        LLConvexDecomposition* cd = LLConvexDecomposition::getInstance();
+        if (!cd || !gMeshRepo.mDecompThread)
+        {
+            return false;
+        }
+
+        const LLCDStageData* stages = nullptr;
+        const S32 stage_count = cd->getStages(&stages);
+        for (S32 j = 0; j < stage_count; ++j)
+        {
+            cd->registerCallback(j, LLPhysicsDecomp::llcdCallback);
+        }
+
+        const LLCDParam* params = nullptr;
+        const S32 param_count = cd->getParameters(&params);
+        for (S32 i = 0; i < param_count; ++i)
+        {
+            switch (params[i].mType)
+            {
+            case LLCDParam::LLCD_FLOAT:
+                defaults[params[i].mName] = LLSD(params[i].mDefault.mFloat);
+                break;
+            case LLCDParam::LLCD_INTEGER:
+            case LLCDParam::LLCD_ENUM:
+                defaults[params[i].mName] = LLSD(params[i].mDefault.mIntOrEnumValue);
+                break;
+            case LLCDParam::LLCD_BOOLEAN:
+                defaults[params[i].mName] = LLSD(params[i].mDefault.mBool);
+                break;
+            default:
+                break;
+            }
+        }
+        return true;
     }
 }
 
@@ -79,9 +146,15 @@ bool idmcp_mesh_is_physics_keyword(const std::string& k)
 class IDMCPMeshUploadJob
     : public LLWholeModelFeeObserver
     , public LLWholeModelUploadObserver
+    , public IDModelPreviewHost
+    , public std::enable_shared_from_this<IDMCPMeshUploadJob>
 {
 public:
     static void start(const IDMCPMeshUploadParams& p, const IDMCPCallPtr& call);
+
+    // The preview is deliberately not deleted here: this only runs with a
+    // live preview at viewer exit, when deleting textures is no longer safe.
+    ~IDMCPMeshUploadJob() override = default;
 
     // LLWholeModelFeeObserver: called on the mesh upload thread.
     void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url) override;
@@ -92,9 +165,40 @@ public:
     void onModelUploadSuccessWithResponse(const LLSD& response) override;
     void onModelUploadFailure() override;
 
+    // IDModelPreviewHost
+    IDModelPreviewSettings getPreviewSettings() override { return mSettings; }
+    void addPreviewLog(const std::string& str, bool flash) override;
+    void addPreviewLog(const std::string& message, const LLSD& args, bool flash, S32 lod) override;
+
 private:
     enum class Stage { Loading, Configuring, Analyzing, Quoting, Uploading };
     enum class Reply { Pending, Ok, Failed };   // not "None": X11 #defines None
+    enum class Perm  { Pending, Granted, Denied, Failed };
+
+    // The floater's DecompRequest reports to the floater; this one reports
+    // to its job.
+    class DecompRequest : public LLPhysicsDecomp::Request
+    {
+    public:
+        DecompRequest(const std::string& stage, LLModel* mdl, const LLPhysicsDecomp::decomp_params& params,
+                      const std::weak_ptr<IDMCPMeshUploadJob>& job)
+            : mModel(mdl), mJob(job)
+        {
+            mStage    = stage;
+            mDecompID = &mdl->mDecompID;
+            mParams   = params;
+            assignData(mdl);
+        }
+
+        // Called on the decomposition thread.
+        S32 statusCallback(const char*, S32, S32) override { return mContinue; }
+        // Called on the main thread.
+        void completed() override;
+
+        std::atomic<S32>   mContinue{ 1 };
+        LLPointer<LLModel> mModel;
+        std::weak_ptr<IDMCPMeshUploadJob> mJob;
+    };
 
     IDMCPMeshUploadJob(const IDMCPMeshUploadParams& p, const IDMCPCallPtr& call)
         : mParams(p), mCall(call) {}
@@ -105,40 +209,51 @@ private:
 
     void tick();
     void enter(Stage s, F64 limit);
-    bool settled(LLModelPreview* mp);
+    bool settled();
     bool requestPending();
-    LLFloaterModelPreview* floater() const;
+    void requestUploadPermission();
 
-    void loadNext(LLFloaterModelPreview* fmp);
-    bool configure(LLFloaterModelPreview* fmp);
-    bool startAnalyze(LLFloaterModelPreview* fmp);
-    void sendQuote(LLFloaterModelPreview* fmp);
-    void handleQuote(LLFloaterModelPreview* fmp);
-    void sendUpload(LLFloaterModelPreview* fmp, const std::string& url);
+    void loadFile(S32 lod, const std::string& path);
+    void loadNext();
+    bool configure();
+    bool startAnalyze();
+    void onDecompCompleted(DecompRequest* req);
+    void cancelDecomposition();
+    void sendQuote();
+    void handleQuote();
+    void sendUpload(const std::string& url);
     void handleUpload();
-    std::string uploadBlock(LLFloaterModelPreview* fmp, int& code, boost::json::object& data) const;
+    std::string uploadBlock(int& code, boost::json::object& data) const;
 
-    boost::json::array logLines(LLFloaterModelPreview* fmp) const;
-    boost::json::array statusLines(LLFloaterModelPreview* fmp) const;
+    boost::json::array logLines() const;
+    boost::json::array statusLines() const;
     void fail(int code, const std::string& msg, boost::json::value data = boost::json::value());
     void succeed(boost::json::object result);
     void finish();
-    bool closeWhenLoaderDone();
+    bool deletePreviewWhenIdle();
     void cancel();
     void release();
 
-    static std::shared_ptr<IDMCPMeshUploadJob> sActive;
+    static std::vector<std::shared_ptr<IDMCPMeshUploadJob>> sJobs;
     static std::vector<std::shared_ptr<IDMCPMeshUploadJob>> sParked;
 
-    IDMCPMeshUploadParams mParams;
-    IDMCPCallPtr          mCall;
-    LLHandle<LLFloater>   mFloater;
+    IDMCPMeshUploadParams  mParams;
+    IDMCPCallPtr           mCall;
+    IDModelPreviewSettings mSettings;
+    bool                   mLockScale = false;   // lock_scale_if_joint_position
+    LLModelPreview*        mPreview = nullptr;   // owned; see deletePreviewWhenIdle()
+    std::deque<std::string> mLog;
+
+    LLPhysicsDecomp::decomp_params        mDecompParams;
+    std::set<LLPointer<DecompRequest>>    mDecompRequests;
+
+    Perm        mPerm = Perm::Pending;
+    std::string mPermError;
 
     Stage mStage         = Stage::Loading;
     F64   mStageDeadline = 0.0;
     int   mSettleTicks   = 0;
-    bool  mFinished      = false;   // call answered; only waiting on in-flight HTTP
-    bool  mClosePending  = false;   // finished, but the floater's loader is still running
+    bool  mFinished      = false;   // call answered; only waiting on the loader or in-flight HTTP
     std::deque<std::pair<S32, std::string>> mPendingLoads;   // (LLModel lod, path)
 
     S32   mQuotedPrice = 0;
@@ -153,16 +268,17 @@ private:
     LLSD        mUploadResponse;
 };
 
-std::shared_ptr<IDMCPMeshUploadJob>              IDMCPMeshUploadJob::sActive;
+std::vector<std::shared_ptr<IDMCPMeshUploadJob>> IDMCPMeshUploadJob::sJobs;
 std::vector<std::shared_ptr<IDMCPMeshUploadJob>> IDMCPMeshUploadJob::sParked;
 
 // ---- start ----------------------------------------------------------------
 
 void IDMCPMeshUploadJob::start(const IDMCPMeshUploadParams& p, const IDMCPCallPtr& call)
 {
-    if (sActive || LLFloaterReg::instanceVisible("upload_model"))
+    if (sJobs.size() >= MAX_JOBS)
     {
-        idmcp_tool_err(call, IDMCP_ERR_BUSY, "upload model floater is in use");
+        idmcp_tool_err(call, IDMCP_ERR_BUSY,
+                       llformat("%d mesh uploads are already running; retry when one finishes", (S32)sJobs.size()));
         return;
     }
     if (p.analyze && p.physics == "none")
@@ -170,21 +286,22 @@ void IDMCPMeshUploadJob::start(const IDMCPMeshUploadParams& p, const IDMCPCallPt
         idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "analyze needs a physics shape, but physics is \"none\"");
         return;
     }
-    if (p.analyze && !gMeshRepo.mDecompThread)
+    if (p.joint_positions == 1 && p.skin_weights == 0)
+    {
+        idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "rigged.joint_positions needs rigged.skin_weights");
+        return;
+    }
+
+    std::shared_ptr<IDMCPMeshUploadJob> job(new IDMCPMeshUploadJob(p, call));
+    if (p.analyze && !decomp_setup(job->mDecompParams))
     {
         idmcp_tool_err(call, IDMCP_ERR_CAP_UNAVAIL, "convex decomposition isn't available in this viewer build");
         return;
     }
 
-    LLFloaterModelPreview* fmp = LLFloaterReg::showTypedInstance<LLFloaterModelPreview>("upload_model");
-    if (!fmp)
-    {
-        idmcp_tool_err(call, IDMCP_ERR_CAP_UNAVAIL, "could not open the upload model floater");
-        return;
-    }
-
-    std::shared_ptr<IDMCPMeshUploadJob> job(new IDMCPMeshUploadJob(p, call));
-    job->mFloater = fmp->getHandle();
+    job->mSettings.name            = p.name;
+    job->mSettings.import_scale    = p.scale;
+    job->mSettings.upload_textures = p.textures;
     for (S32 lod = LLModel::LOD_IMPOSTOR; lod <= LLModel::LOD_MEDIUM; ++lod)
     {
         if (!p.lod_file[lod].empty())
@@ -197,19 +314,21 @@ void IDMCPMeshUploadJob::start(const IDMCPMeshUploadParams& p, const IDMCPCallPt
         job->mPendingLoads.emplace_back(LLModel::LOD_PHYSICS, p.physics);
     }
 
-    sActive = job;
+    job->mPreview = new LLModelPreview(PREVIEW_TEXTURE_SIZE, PREVIEW_TEXTURE_SIZE, job.get(), nullptr);
+
+    sJobs.push_back(job);
+    if (sJobs.size() == 1)
+    {
+        gIdleCallbacks.addFunction(&IDMCPMeshUploadJob::onIdle, nullptr);
+    }
     std::weak_ptr<IDMCPMeshUploadJob> weak = job;
     call->setCleanup([weak]
     {
         if (auto j = weak.lock()) j->cancel();
     });
-    gIdleCallbacks.addFunction(&IDMCPMeshUploadJob::onIdle, nullptr);
 
-    // Same reset the floater's own "Reset" does (onReset), then load by path.
-    fmp->resetUploadOptions();
-    fmp->initModelPreview();
-    fmp->getChild<LLUICtrl>("description_form")->setValue(p.name);
-    fmp->loadModel(LLModel::LOD_HIGH, p.path, true);
+    job->requestUploadPermission();
+    job->loadFile(LLModel::LOD_HIGH, p.path);
     job->enter(Stage::Loading, LOAD_LIMIT);
 }
 
@@ -218,14 +337,56 @@ void idmcp_mesh_upload_start(const IDMCPMeshUploadParams& p, const IDMCPCallPtr&
     IDMCPMeshUploadJob::start(p, call);
 }
 
+// Same request as LLFloaterModelUploadBase::requestAgentUploadPermissions.
+void IDMCPMeshUploadJob::requestUploadPermission()
+{
+    const std::string url = gAgent.getRegionCapability("MeshUploadFlag");
+    if (url.empty())
+    {
+        // The floater lets the upload through when the region lacks the cap.
+        mPerm = Perm::Granted;
+        return;
+    }
+
+    std::weak_ptr<IDMCPMeshUploadJob> weak = shared_from_this();
+    LLCoros::instance().launch("IDMCPMeshUploadJob::requestUploadPermission", [weak, url]()
+    {
+        LLCore::HttpRequest::policy_t policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+        LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t adapter =
+            std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("MeshUploadFlag", policy);
+        LLCore::HttpRequest::ptr_t request = std::make_shared<LLCore::HttpRequest>();
+
+        LLSD result = adapter->getAndSuspend(request, url);
+        LLCore::HttpStatus status =
+            LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS]);
+
+        std::shared_ptr<IDMCPMeshUploadJob> job = weak.lock();
+        if (!job)
+        {
+            return;
+        }
+        if (!status)
+        {
+            job->mPerm      = Perm::Failed;
+            job->mPermError = status.toString();
+            return;
+        }
+        // Same test as LLFloaterModelPreview::onPermissionsReceived.
+        const std::string upload_status = result["mesh_upload_status"].asString();
+        job->mPerm = (upload_status.empty() || upload_status == "valid") ? Perm::Granted : Perm::Denied;
+    });
+}
+
 // ---- idle driver ----------------------------------------------------------
 
 void IDMCPMeshUploadJob::onIdle(void*)
 {
-    // Local copy: release() resets sActive, which must not destroy the job
-    // while tick() is still on the stack.
-    std::shared_ptr<IDMCPMeshUploadJob> self = sActive;
-    if (self) self->tick();
+    // Copy: tick() can release jobs, which edits sJobs.
+    const std::vector<std::shared_ptr<IDMCPMeshUploadJob>> jobs = sJobs;
+    for (const auto& job : jobs)
+    {
+        job->tick();
+    }
 }
 
 void IDMCPMeshUploadJob::tick()
@@ -234,7 +395,7 @@ void IDMCPMeshUploadJob::tick()
 
     if (mFinished)
     {
-        if (mClosePending && !closeWhenLoaderDone())
+        if (!deletePreviewWhenIdle())
         {
             return;
         }
@@ -245,7 +406,7 @@ void IDMCPMeshUploadJob::tick()
         else if (now > mStageDeadline + ABANDON_GRACE)
         {
             LL_WARNS("IDMCP") << "upload.mesh: request never called back; parking job" << LL_ENDL;
-            sParked.push_back(sActive);
+            sParked.push_back(shared_from_this());
             release();
         }
         return;
@@ -259,8 +420,7 @@ void IDMCPMeshUploadJob::tick()
     }
 
     // Once sent, the upload thread works from its own copy of the instance
-    // list, so the floater is no longer needed, and the upload may still
-    // complete (and charge) after a timeout.
+    // list, so the upload may still complete (and charge) after a timeout.
     if (mStage == Stage::Uploading)
     {
         if (now > mStageDeadline)
@@ -276,73 +436,65 @@ void IDMCPMeshUploadJob::tick()
         return;
     }
 
-    LLFloaterModelPreview* fmp = floater();
-    // A closed floater is destroyed a frame later (mortician), so check isDead too.
-    if (!fmp || fmp->isDead() || !fmp->mModelPreview)
-    {
-        fail(IDMCP_ERR_CAP_UNAVAIL, "upload model floater was closed");
-        return;
-    }
     if (now > mStageDeadline)
     {
         fail(IDMCP_ERR_TIMEOUT, std::string("timed out while ") + stageName(mStage));
         return;
     }
 
-    LLModelPreview* mp = fmp->mModelPreview;
+    LLModelPreview* mp = mPreview;
     // The loader thread sets the error state before its callback reaches the
     // main thread. Wait for that callback (it clears mModelLoader) before
-    // reacting, or closing the floater can leave the preview with a dangling
-    // loader pointer.
+    // reacting, so the preview is never deleted while it still loads.
     if (!mp->mModelLoader && mp->getLoadState() >= LLModelLoader::ERROR_PARSING)
     {
         boost::json::object data;
-        data["log"] = logLines(fmp);
+        data["log"] = logLines();
         fail(IDMCP_ERR_INVALID_PARAMS, "the model failed to load", std::move(data));
         return;
     }
 
-    // Does draw()'s work, so a minimized viewer still progresses.
+    // The floater's draw() does this for its own preview.
     mp->update();
 
     switch (mStage)
     {
     case Stage::Loading:
-        if (!settled(mp)) return;
+        if (!settled()) return;
         if (!mPendingLoads.empty())
         {
-            loadNext(fmp);
+            loadNext();
             return;
         }
-        if (configure(fmp))
+        if (configure())
         {
             enter(Stage::Configuring, LOAD_LIMIT);
         }
         return;
 
     case Stage::Configuring:
-        if (!settled(mp)) return;
+        if (!settled()) return;
         if (mParams.analyze)
         {
-            if (startAnalyze(fmp))
+            if (startAnalyze())
             {
                 enter(Stage::Analyzing, ANALYZE_LIMIT);
             }
             return;
         }
-        sendQuote(fmp);
+        sendQuote();
         return;
 
     case Stage::Analyzing:
-        if (!fmp->mCurRequest.empty() || !settled(mp)) return;
-        sendQuote(fmp);
+        if (!mDecompRequests.empty() || !settled()) return;
+        sendQuote();
         return;
 
     case Stage::Quoting:
-        handleQuote(fmp);
+        handleQuote();
         return;
 
-    case Stage::Uploading:   // handled before the floater checks
+    case Stage::Uploading:   // handled before the preview checks
         return;
     }
 }
@@ -355,12 +507,13 @@ void IDMCPMeshUploadJob::enter(Stage s, F64 limit)
 }
 
 // The preview is idle when nothing is loading, LOD generation has drained and
-// the floater's draw() has consumed the dirty flag. Require a few ticks in a
-// row, because some steps (refresh, LOD queries) re-dirty it a frame later.
-bool IDMCPMeshUploadJob::settled(LLModelPreview* mp)
+// update() has consumed the dirty flag. Require a few ticks in a row, because
+// some steps (refresh, LOD queries) re-dirty it a frame later.
+bool IDMCPMeshUploadJob::settled()
 {
+    LLModelPreview* mp = mPreview;
     const bool idle = !mp->mLoading && mp->mModelLoader == nullptr && !mp->mGenLOD && mp->mLodsQuery.empty() && !mp->mDirty
-                      && (!mParams.textures || mp->areTexturesReady());
+                      && (!mSettings.upload_textures || mp->areTexturesReady());
     mSettleTicks = idle ? mSettleTicks + 1 : 0;
     return mSettleTicks >= SETTLE_TICKS;
 }
@@ -373,11 +526,6 @@ bool IDMCPMeshUploadJob::requestPending()
     return false;
 }
 
-LLFloaterModelPreview* IDMCPMeshUploadJob::floater() const
-{
-    return static_cast<LLFloaterModelPreview*>(mFloater.get());
-}
-
 const char* IDMCPMeshUploadJob::stageName(Stage s)
 {
     switch (s)
@@ -385,7 +533,7 @@ const char* IDMCPMeshUploadJob::stageName(Stage s)
     case Stage::Loading:     return "loading the model";
     case Stage::Configuring: return "applying upload options";
     case Stage::Analyzing:   return "analyzing the physics shape";
-    case Stage::Quoting:     return "waiting for the fee quote";
+    case Stage::Quoting:     return "waiting for the fee quote and upload permission";
     case Stage::Uploading:   return "uploading";
     }
     return "working";
@@ -403,27 +551,38 @@ S32 IDMCPMeshUploadJob::triangles(LLModelPreview* mp, S32 lod)
 
 // ---- stages -----------------------------------------------------------------
 
-void IDMCPMeshUploadJob::loadNext(LLFloaterModelPreview* fmp)
+// What LLFloaterModelPreview::loadModel does before handing the file over.
+void IDMCPMeshUploadJob::loadFile(S32 lod, const std::string& path)
+{
+    LLModelPreview* mp = mPreview;
+    mp->mLoading = true;
+    if (lod == LLModel::LOD_PHYSICS)
+    {
+        mp->mPhysicsSearchLOD = lod;
+        mp->mWarnOfUnmatchedPhyicsMeshes = false;
+    }
+    mp->loadModel(path, lod, true);
+}
+
+void IDMCPMeshUploadJob::loadNext()
 {
     const auto [lod, path] = mPendingLoads.front();
     mPendingLoads.pop_front();
     if (lod != LLModel::LOD_PHYSICS)
     {
-        fmp->getChild<LLComboBox>("lod_source_" + lod_name[lod])->setCurrentByIndex(LLModelPreview::LOD_FROM_FILE);
+        mSettings.lod_source[lod] = LLModelPreview::LOD_FROM_FILE;
     }
-    fmp->loadModel(lod, path, true);
+    loadFile(lod, path);
     enter(Stage::Loading, LOAD_LIMIT);   // each file gets its own load window
 }
 
-// Sets the option widgets and fires each commit callback, so the floater
-// reacts as it would to a click. Fails the call and returns false on a
-// rigged option the model can't satisfy. upload_skin and upload_joints are
-// always written (an unset option means "what the model contains"), and
-// mFirstSkinUpdate is cleared so render() never applies the user's
-// FSMeshUploadAutoEnableWeights setting over them.
-bool IDMCPMeshUploadJob::configure(LLFloaterModelPreview* fmp)
+// Applies the options the way the floater's widgets would, and marks the
+// preview dirty as their commit callbacks do. Fails the call and returns
+// false on a rigged option the model can't satisfy. An unset rigged option
+// means "what the model contains".
+bool IDMCPMeshUploadJob::configure()
 {
-    LLModelPreview* mp = fmp->mModelPreview;
+    LLModelPreview* mp = mPreview;
 
     bool has_skin = false, has_joints = false;
     for (const auto& mdl : mp->mModel[LLModel::LOD_HIGH])
@@ -442,46 +601,61 @@ bool IDMCPMeshUploadJob::configure(LLFloaterModelPreview* fmp)
         fail(IDMCP_ERR_INVALID_PARAMS, "rigged.joint_positions: the model has no joint offsets");
         return false;
     }
+    // The floater only offers skin weights for a rig it accepts, and joint
+    // positions for a rig valid for them. Say why rather than uploading the
+    // model without its rig.
+    const U32 rig_flags = mp->getLegacyRigFlags();
+    if (has_skin && mParams.skin_weights != 0 && rig_flags != LEGACY_RIG_OK)
+    {
+        const char* why = (rig_flags & LEGACY_RIG_FLAG_TOO_MANY_JOINTS) ? "the rig uses too many joints"
+                        : (rig_flags & LEGACY_RIG_FLAG_UNKNOWN_JOINT)   ? "the rig uses joints the viewer doesn't know"
+                        : "the rig failed validation";
+        boost::json::object data;
+        data["log"] = logLines();
+        fail(IDMCP_ERR_INVALID_PARAMS,
+             std::string("rigged.skin_weights: ") + why + "; pass \"skin_weights\":false to upload it unrigged",
+             std::move(data));
+        return false;
+    }
+    if (has_joints && mParams.skin_weights != 0 && mParams.joint_positions != 0 && !mp->isRigValidForJointPositionUpload())
+    {
+        boost::json::object data;
+        data["log"] = logLines();
+        fail(IDMCP_ERR_INVALID_PARAMS,
+             "rigged.joint_positions: the rig isn't valid for joint positions; pass \"joint_positions\":false to upload without them",
+             std::move(data));
+        return false;
+    }
 
-    mp->mFirstSkinUpdate = false;
-
+    // The floater's render() enforces the same dependencies on its checkboxes:
+    // joints need skin, and lock scale needs both.
     const bool want_skin   = mParams.skin_weights   < 0 ? has_skin   : mParams.skin_weights == 1;
-    const bool want_joints = mParams.joint_positions < 0 ? has_joints : mParams.joint_positions == 1;
+    const bool want_joints = want_skin && (mParams.joint_positions < 0 ? has_joints : mParams.joint_positions == 1);
+    mSettings.upload_skin   = want_skin;
+    mSettings.upload_joints = want_joints;
+    mLockScale = want_skin && want_joints && mParams.lock_scale == 1;
+    mp->mDirty = true;
 
-    auto set_and_commit = [fmp](const char* name, const LLSD& value)
+    // LLFloaterModelPreview::onPhysicsUseLOD. A physics file was loaded in
+    // the Loading stage; "none" leaves the physics shape unset.
+    if (mParams.physics == "cube")
     {
-        LLUICtrl* ctrl = fmp->getChild<LLUICtrl>(name);
-        ctrl->setValue(value);
-        ctrl->onCommit();
-    };
-    set_and_commit("import_scale", LLSD((F64)mParams.scale));
-    set_and_commit("upload_textures", LLSD(mParams.textures));
-    set_and_commit("upload_skin", LLSD(want_skin));
-    set_and_commit("upload_joints", LLSD(want_joints));
-    if (mParams.lock_scale >= 0)      set_and_commit("lock_scale_if_joint_position", LLSD(mParams.lock_scale == 1));
-
-    LLComboBox* phys = fmp->getChild<LLComboBox>("physics_lod_combo");
-    if (!idmcp_mesh_is_physics_keyword(mParams.physics))
-    {
-        // The file was loaded in the Loading stage. Last item is "From file".
-        phys->setCurrentByIndex(phys->getItemCount() - 1);
+        mp->setPhysicsFromPreset(1);   // loads cube_phys.dae
     }
-    else if (mParams.physics == "none")
+    else if (idmcp_mesh_is_physics_keyword(mParams.physics) && mParams.physics != "none")
     {
-        // No commit: onPhysicsUseLOD treats index 0 as a LOD index.
-        phys->setCurrentByIndex(PHYS_NONE);
+        mp->setPhysicsFromLOD(physics_lod(mParams.physics));
     }
-    else
-    {
-        phys->setCurrentByIndex(physics_combo_index(mParams.physics));
-        phys->onCommit();
-    }
+    mp->refresh();
+    mp->updateStatusMessages();
     return true;
 }
 
-bool IDMCPMeshUploadJob::startAnalyze(LLFloaterModelPreview* fmp)
+// LLFloaterModelPreview::onPhysicsStageExecute, reporting to this job.
+bool IDMCPMeshUploadJob::startAnalyze()
 {
-    if (fmp->mModelPreview->mModel[LLModel::LOD_PHYSICS].empty())
+    LLModelPreview* mp = mPreview;
+    if (mp->mModel[LLModel::LOD_PHYSICS].empty())
     {
         fail(IDMCP_ERR_INVALID_PARAMS, "analyze: there is no physics shape to analyze");
         return false;
@@ -495,36 +669,87 @@ bool IDMCPMeshUploadJob::startAnalyze(LLFloaterModelPreview* fmp)
         fail(IDMCP_ERR_CAP_UNAVAIL, "convex decomposition isn't available in this viewer build");
         return false;
     }
-    fmp->getChild<LLButton>(stage)->onCommit();
+
+    for (LLModel* mdl : mp->mModel[LLModel::LOD_PHYSICS])
+    {
+        if (!mdl) continue;
+        LLPointer<DecompRequest> request = new DecompRequest(stage, mdl, mDecompParams, weak_from_this());
+        mDecompRequests.insert(request);
+        gMeshRepo.mDecompThread->submitRequest(request);
+    }
     return true;
 }
 
-void IDMCPMeshUploadJob::sendQuote(LLFloaterModelPreview* fmp)
+// Same as LLFloaterModelPreview::DecompRequest::completed.
+void IDMCPMeshUploadJob::DecompRequest::completed()
 {
-    LLModelPreview* mp = fmp->mModelPreview;
+    if (!mContinue)
+    {
+        return;
+    }
+    mModel->setConvexHullDecomposition(mHull, mHullMesh);
+    if (std::shared_ptr<IDMCPMeshUploadJob> job = mJob.lock())
+    {
+        job->onDecompCompleted(this);
+    }
+}
+
+void IDMCPMeshUploadJob::onDecompCompleted(DecompRequest* req)
+{
+    mDecompRequests.erase(LLPointer<DecompRequest>(req));
+    if (mPreview)
+    {
+        mPreview->mDirty = true;
+        mPreview->refresh();
+    }
+}
+
+void IDMCPMeshUploadJob::cancelDecomposition()
+{
+    // By value: set elements are const, and a const LLPointer only hands out
+    // a const pointer.
+    for (LLPointer<DecompRequest> req : mDecompRequests)
+    {
+        req->mContinue = 0;
+    }
+    mDecompRequests.clear();
+}
+
+void IDMCPMeshUploadJob::sendQuote()
+{
+    LLModelPreview* mp = mPreview;
     if (!mp->mModelNoErrors)
     {
         boost::json::object data;
-        data["log"] = logLines(fmp);
-        data["status"] = statusLines(fmp);
+        data["log"] = logLines();
+        data["status"] = statusLines();
         fail(IDMCP_ERR_INVALID_PARAMS, "the importer rejected the model", std::move(data));
         return;
     }
 
-    // rebuildUploadData reads the item name from description_form.
-    fmp->getChild<LLUICtrl>("description_form")->setValue(mParams.name);
     mp->rebuildUploadData();
     if (mp->getLoadState() >= LLModelLoader::ERROR_PARSING)
     {
         boost::json::object data;
-        data["log"] = logLines(fmp);
-        data["status"] = statusLines(fmp);
+        data["log"] = logLines();
+        data["status"] = statusLines();
         fail(IDMCP_ERR_INVALID_PARAMS, "the importer rejected the model", std::move(data));
         return;
     }
+    // The floater clamps its scale spinner to this; say so instead.
+    if (mp->mMaxImportScale > 0.f && mSettings.import_scale > mp->mMaxImportScale)
+    {
+        boost::json::object data;
+        data["max_scale"] = mp->mMaxImportScale;
+        fail(IDMCP_ERR_INVALID_PARAMS,
+             llformat("scale %.3f is too large for this model in this region; the most is %.3f",
+                      mSettings.import_scale, mp->mMaxImportScale),
+             std::move(data));
+        return;
+    }
 
-    LLFloaterModelPreview::lod_sources_map_t lod_sources;
-    fmp->fillLODSourceStatistics(lod_sources);
+    std::map<std::string, std::string> lod_sources;
+    mp->fillLODSourceStatistics(lod_sources);
 
     {
         LLMutexLock lock(&mReplyMutex);
@@ -533,15 +758,12 @@ void IDMCPMeshUploadJob::sendQuote(LLFloaterModelPreview* fmp)
     enter(Stage::Quoting, QUOTE_LIMIT);
     // Same arguments as LLFloaterModelPreview::onClickCalculateBtn.
     gMeshRepo.uploadModel(mp->mUploadData, lod_sources, mp->mPreviewScale,
-                          fmp->childGetValue("upload_textures").asBoolean(),
-                          fmp->childGetValue("upload_skin").asBoolean(),
-                          fmp->childGetValue("upload_joints").asBoolean(),
-                          fmp->childGetValue("lock_scale_if_joint_position").asBoolean(),
+                          mSettings.upload_textures, mSettings.upload_skin, mSettings.upload_joints, mLockScale,
                           std::string(), mParams.dest, false,
                           getWholeModelFeeObserverHandle());
 }
 
-void IDMCPMeshUploadJob::handleQuote(LLFloaterModelPreview* fmp)
+void IDMCPMeshUploadJob::handleQuote()
 {
     Reply       reply;
     LLSD        fee;
@@ -559,6 +781,8 @@ void IDMCPMeshUploadJob::handleQuote(LLFloaterModelPreview* fmp)
         fail(IDMCP_ERR_CAP_UNAVAIL, error);
         return;
     }
+    // uploadBlock() needs the answer; the stage deadline still applies.
+    if (mPerm == Perm::Pending) return;
 
     const S32 price   = fee["upload_price"].asInteger();
     const S32 balance = gStatusBar ? gStatusBar->getBalance() : -1;
@@ -567,7 +791,7 @@ void IDMCPMeshUploadJob::handleQuote(LLFloaterModelPreview* fmp)
 
     if (!mParams.confirm)
     {
-        LLModelPreview* mp = fmp->mModelPreview;
+        LLModelPreview* mp = mPreview;
         const LLSD& b = fee["upload_price_breakdown"];
 
         boost::json::object breakdown;
@@ -597,13 +821,13 @@ void IDMCPMeshUploadJob::handleQuote(LLFloaterModelPreview* fmp)
         o["land_impact"]     = mLandImpact;
         o["weights"]         = std::move(weights);
         o["triangles"]       = std::move(tris);
-        o["warnings"]        = logLines(fmp);
+        o["warnings"]        = logLines();
         o["balance"]         = balance;
         o["affordable"]      = (balance < 0) || (balance >= price);
 
         int                 block_code = 0;
         boost::json::object block_data;
-        const std::string   block = uploadBlock(fmp, block_code, block_data);
+        const std::string   block = uploadBlock(block_code, block_data);
         o["upload_blocked"] = !block.empty();
         if (!block.empty()) o["blocked_reason"] = block;
         succeed(std::move(o));
@@ -612,7 +836,7 @@ void IDMCPMeshUploadJob::handleQuote(LLFloaterModelPreview* fmp)
 
     int                 block_code = 0;
     boost::json::object block_data;
-    const std::string   block = uploadBlock(fmp, block_code, block_data);
+    const std::string   block = uploadBlock(block_code, block_data);
     if (!block.empty())
     {
         fail(block_code, block, std::move(block_data));
@@ -627,46 +851,48 @@ void IDMCPMeshUploadJob::handleQuote(LLFloaterModelPreview* fmp)
         fail(IDMCP_ERR_PERMISSION, "insufficient L$ balance", std::move(data));
         return;
     }
-    sendUpload(fmp, url);
+    sendUpload(url);
 }
 
 // Why the floater's own Upload button would refuse this model; empty when it
 // wouldn't. Sets the error code and any error data for the confirmed path.
-std::string IDMCPMeshUploadJob::uploadBlock(LLFloaterModelPreview* fmp, int& code, boost::json::object& data) const
+std::string IDMCPMeshUploadJob::uploadBlock(int& code, boost::json::object& data) const
 {
-    if (!fmp->mHasUploadPerm)
+    if (mPerm == Perm::Denied)
     {
         code = IDMCP_ERR_PERMISSION;
-        return "mesh upload permission isn't confirmed for this account (no payment info on file, or the permission check hasn't answered)";
+        return "this account isn't allowed to upload mesh (no payment info on file?)";
     }
-    // Based on the check in LLModelPreview::updateStatusMessages
-    // (llmodelpreview.cpp:3484), but deliberately stricter than the floater in
-    // practice: the floater re-enables Calculate/Upload regardless of physics
-    // errors, while this blocks degenerate or over-limit physics shapes, which
-    // the server rejects anyway. has_physics_error is a local there; it also
-    // decides what physics_status_message_text shows (llmodelpreview.cpp:
-    // 3393-3436). TOOTHIN (any mesh under 0.5 m on an axis, so most worn
-    // items) is only a warning and doesn't block. The text shows the too-thin
-    // string only when no real error is set, because those take priority.
-    LLUICtrl* phys_text = fmp->getChild<LLUICtrl>("physics_status_message_text");
-    const bool physics_error = phys_text->getVisible()
-        && phys_text->getValue().asString() != fmp->getString("phys_status_too_thin");
+    if (mPerm == Perm::Failed)
+    {
+        code = IDMCP_ERR_PERMISSION;
+        return "the mesh upload permission check failed: " + mPermError;
+    }
+    // Based on the check in LLModelPreview::updateStatusMessages, but
+    // deliberately stricter than the floater in practice: the floater
+    // re-enables Calculate/Upload regardless of physics errors, while this
+    // blocks degenerate or over-limit physics shapes, which the server
+    // rejects anyway. TOOTHIN (any mesh under 0.5 m on an axis, so most worn
+    // items) is only a warning and doesn't block.
+    const U32 physics_error = mPreview->mPhysicsErrors
+        & (LLModelPreview::PHYSICS_ERROR_DEGENERATE | LLModelPreview::PHYSICS_ERROR_TOOMANYHULLS
+           | LLModelPreview::PHYSICS_ERROR_TOOMANYVERTSINHULL);
     if (!gSavedSettings.getBOOL("FSIgnoreClientsideMeshValidation")
-        && (!fmp->mModelPreview->mModelNoErrors || physics_error))
+        && (!mPreview->mModelNoErrors || physics_error))
     {
         code           = IDMCP_ERR_INVALID_PARAMS;
-        data["log"]    = logLines(fmp);
-        data["status"] = statusLines(fmp);
+        data["log"]    = logLines();
+        data["status"] = statusLines();
         return "the importer blocks uploading this model (physics validation)";
     }
     return std::string();
 }
 
-void IDMCPMeshUploadJob::sendUpload(LLFloaterModelPreview* fmp, const std::string& url)
+void IDMCPMeshUploadJob::sendUpload(const std::string& url)
 {
-    LLModelPreview* mp = fmp->mModelPreview;
-    LLFloaterModelPreview::lod_sources_map_t lod_sources;
-    fmp->fillLODSourceStatistics(lod_sources);
+    LLModelPreview* mp = mPreview;
+    std::map<std::string, std::string> lod_sources;
+    mp->fillLODSourceStatistics(lod_sources);
 
     {
         LLMutexLock lock(&mReplyMutex);
@@ -676,10 +902,7 @@ void IDMCPMeshUploadJob::sendUpload(LLFloaterModelPreview* fmp, const std::strin
     // Same arguments as LLFloaterModelPreview::onUpload. mUploadData is the
     // set the quote was computed from; don't rebuild it.
     gMeshRepo.uploadModel(mp->mUploadData, lod_sources, mp->mPreviewScale,
-                          fmp->childGetValue("upload_textures").asBoolean(),
-                          fmp->childGetValue("upload_skin").asBoolean(),
-                          fmp->childGetValue("upload_joints").asBoolean(),
-                          fmp->childGetValue("lock_scale_if_joint_position").asBoolean(),
+                          mSettings.upload_textures, mSettings.upload_skin, mSettings.upload_joints, mLockScale,
                           url, mParams.dest, true,
                           LLHandle<LLWholeModelFeeObserver>(), getWholeModelUploadObserverHandle());
 }
@@ -755,35 +978,73 @@ void IDMCPMeshUploadJob::onModelUploadFailure()
     mUploadReply = Reply::Failed;
 }
 
+// ---- importer log -------------------------------------------------------------
+
+void IDMCPMeshUploadJob::addPreviewLog(const std::string& str, bool)
+{
+    std::string line = str;
+    LLStringUtil::trim(line);
+    if (line.empty()) return;
+    mLog.push_back(line);
+    if (mLog.size() > MAX_LOG_LINES)
+    {
+        mLog.pop_front();
+    }
+}
+
+// The floater turns these into its localized strings; without it, report
+// the string name and its arguments.
+void IDMCPMeshUploadJob::addPreviewLog(const std::string& message, const LLSD& args, bool flash, S32 lod)
+{
+    std::string line;
+    switch (lod)
+    {
+    case LLModel::LOD_IMPOSTOR: line = "LOD0 "; break;
+    case LLModel::LOD_LOW:      line = "LOD1 "; break;
+    case LLModel::LOD_MEDIUM:   line = "LOD2 "; break;
+    case LLModel::LOD_PHYSICS:  line = "PHYS "; break;
+    case LLModel::LOD_HIGH:     line = "LOD3 "; break;
+    default: break;
+    }
+    line += message;
+
+    std::string sep = ": ";
+    for (LLSD::map_const_iterator it = args.beginMap(); it != args.endMap(); ++it)
+    {
+        if (it->first == "Message") continue;   // loader warnings repeat their name here
+        line += sep + it->first + "=" + it->second.asString();
+        sep = ", ";
+    }
+    addPreviewLog(line, flash);
+}
+
 // ---- finishing --------------------------------------------------------------
 
-boost::json::array IDMCPMeshUploadJob::logLines(LLFloaterModelPreview* fmp) const
+boost::json::array IDMCPMeshUploadJob::logLines() const
 {
     boost::json::array out;
-    if (!fmp || !fmp->mUploadLogText) return out;
-
-    std::istringstream in(fmp->mUploadLogText->getText());
-    std::string line;
-    while (std::getline(in, line))
+    for (const std::string& line : mLog)
     {
-        LLStringUtil::trim(line);
-        if (!line.empty()) out.emplace_back(line);
+        out.emplace_back(line);
     }
     return out;
 }
 
-// The floater's LOD and physics status messages, when they have text.
-boost::json::array IDMCPMeshUploadJob::statusLines(LLFloaterModelPreview* fmp) const
+// LOD and physics problems the preview found, in the floater's wording.
+boost::json::array IDMCPMeshUploadJob::statusLines() const
 {
     boost::json::array out;
-    if (!fmp) return out;
-    for (const char* name : { "lod_status_message_text", "physics_status_message_text" })
+    if (!mPreview) return out;
+    for (S32 lod = LLModel::LOD_HIGH; lod >= LLModel::LOD_IMPOSTOR; --lod)
     {
-        // physics_status_message_text is hidden without being cleared.
-        if (!fmp->getChildView(name)->getVisible()) continue;
-        std::string text = fmp->childGetValue(name).asString();
-        LLStringUtil::trim(text);
-        if (!text.empty()) out.emplace_back(text);
+        if (const char* text = lod_status_text(mPreview->mLodStatusMessage[lod]))
+        {
+            out.emplace_back(lod_name[lod] + ": " + text);
+        }
+    }
+    if (const char* text = physics_status_text(mPreview->mPhysicsErrors))
+    {
+        out.emplace_back(std::string("physics: ") + text);
     }
     return out;
 }
@@ -807,39 +1068,26 @@ void IDMCPMeshUploadJob::succeed(boost::json::object result)
 void IDMCPMeshUploadJob::finish()
 {
     mFinished = true;
-    LLFloaterModelPreview* fmp = floater();
-    if (fmp && !fmp->mCurRequest.empty())
+    cancelDecomposition();
+    // A load still running is dropped when it lands rather than processed,
+    // so the preview can be deleted sooner.
+    if (mPreview)
     {
-        LLFloaterModelPreview::onPhysicsStageCancel(nullptr, nullptr);
-    }
-    // Never close while the preview's loader thread is running: if its
-    // callback lands after onClose, the preview keeps a pointer to the deleted
-    // loader and ~LLModelPreview crashes calling shutdown() on it.
-    if (fmp && !fmp->isDead() && fmp->mModelPreview && fmp->mModelPreview->mModelLoader)
-    {
-        mClosePending = true;
-        return;
-    }
-    if (fmp)
-    {
-        fmp->closeFloater(false);
+        mPreview->mIgnoreLoadedCallback = true;
     }
 }
 
-// Closes the floater once its loader has finished. Returns true when nothing
-// is left to close.
-bool IDMCPMeshUploadJob::closeWhenLoaderDone()
+// Deletes the preview once no model is loading: ~LLModelPreview would block
+// the main thread until the loader thread finished. Returns true when there
+// is no preview left.
+bool IDMCPMeshUploadJob::deletePreviewWhenIdle()
 {
-    LLFloaterModelPreview* fmp = floater();
-    if (fmp && !fmp->isDead() && fmp->mModelPreview && fmp->mModelPreview->mModelLoader)
+    if (mPreview && mPreview->mModelLoader)
     {
         return false;
     }
-    if (fmp && !fmp->isDead())
-    {
-        fmp->closeFloater(false);
-    }
-    mClosePending = false;
+    delete mPreview;
+    mPreview = nullptr;
     return true;
 }
 
@@ -851,6 +1099,12 @@ void IDMCPMeshUploadJob::cancel()
 
 void IDMCPMeshUploadJob::release()
 {
-    gIdleCallbacks.deleteFunction(&IDMCPMeshUploadJob::onIdle, nullptr);
-    sActive.reset();
+    // Keep this job alive until the function returns: the erase may drop the
+    // last reference while tick() is still on the stack.
+    std::shared_ptr<IDMCPMeshUploadJob> self = shared_from_this();
+    sJobs.erase(std::remove(sJobs.begin(), sJobs.end(), self), sJobs.end());
+    if (sJobs.empty())
+    {
+        gIdleCallbacks.deleteFunction(&IDMCPMeshUploadJob::onIdle, nullptr);
+    }
 }
