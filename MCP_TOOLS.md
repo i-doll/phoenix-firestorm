@@ -13,7 +13,7 @@ Custom fork (`ID` prefix). An in-process MCP server that lets an AI agent drive 
 
 Every mutating or identity-revealing tool passes a single RLV gate. A blocked call returns JSON-RPC error `-32011` with `{restriction, sources:[{object_id,root_id,attach_pt,name}], checkedAt}`. Use `rlv.getRestrictions` to see what's active and `rlv.canDo` to check a call before making it.
 
-**98 tools** across 23 areas.
+**102 tools** across 23 areas.
 
 ## Health
 
@@ -26,6 +26,7 @@ Every mutating or identity-revealing tool passes a single RLV gate. A blocked ca
 | Tool | Params | Description |
 |---|---|---|
 | `viewer.notify` | `text*`: string<br>`title`: string<br>`tip`: boolean | Post a toast to the viewer to get the user's attention. `text` is the body; optional `title` shows on the first line. Default is a persistent notify toast (stays until dismissed, kept in the notification well); `tip:true` gives a lighter toast that fades on its own. |
+| `viewer.getGrid` | — | **Call at the start of every turn, before any other tool** — the user can relog onto another grid between turns. Which grid the user is logged in to: `grid` is `agni` (the main Second Life grid: real L$, real inventory, real people), `aditi` (the Second Life beta grid, for testing: its L$ is test money and accounts get plenty of it, so spending it is fine; nothing there carries over to the main grid), or `other` (e.g. OpenSim); `label` is the grid's display name. |
 
 ## Chat (in-world, via LSL bridge)
 
@@ -173,7 +174,10 @@ Embodiment: find things around you, move to/among them, know where you are, and 
 
 | Tool | Params | Description |
 |---|---|---|
-| `vision.snapshot` | `width`: integer<br>`height`: integer<br>`hide_ui`: boolean<br>`show_hud`: boolean<br>`format`: jpeg \| png<br>`quality`: integer<br>`to_file`: boolean | Render the current 3D view as an image you can look at — the avatar's eyes. `width` default 1024 (256–2048), `height` from window aspect, `hide_ui` default true, `format` jpeg (default)/png, `quality` (jpeg) default 80. `show_hud:true` includes your HUD overlays (the viewer UI itself stays hidden) — use it to see HUD buttons before `hud.click`. Returns `{format, width, height, image_base64}`, or `{..., path}` with `to_file:true`. No RLV gate (own view). |
+| `vision.snapshot` | `width`: integer<br>`height`: integer<br>`hide_ui`: boolean<br>`show_hud`: boolean<br>`format`: jpeg \| png<br>`quality`: integer<br>`to_file`: boolean<br>`camera`: user \| agent | Render the current 3D view as an image you can look at — the avatar's eyes. `width` default 1024 (256–2048), `height` from window aspect, `hide_ui` default true, `format` jpeg (default)/png, `quality` (jpeg) default 80. `show_hud:true` includes your HUD overlays (the viewer UI itself stays hidden) — use it to see HUD buttons before `hud.click`. `camera:"agent"` renders from your own camera (see `camera.set`) instead of the user's view; UI and HUDs are never shown in it. Returns `{format, width, height, image_base64}`, or `{..., path}` with `to_file:true`. No RLV gate on the user's view; the agent camera re-checks its RLV limits on every shot. |
+| `camera.set` | `object_id`: string<br>`avatar_id`: string<br>`global_position`: number[3]<br>`eye`: number[3]<br>`distance`: number<br>`yaw_deg`: number<br>`pitch_deg`: number<br>`fov_deg`: number | Place your own camera, separate from the user's — it never moves their view. Aim at **exactly one** of `object_id`, `avatar_id` or `global_position`. Then give `eye` (global `[x,y,z]`) or orbit the target: `distance` (default frames the whole target), `yaw_deg` (which side of the target the camera sits on, as a heading from it: 0=East, 90=North; default the side facing you, or in front of you when the target is you), `pitch_deg` (above the target, default 15). `fov_deg` is vertical, default the user's. Returns `{set, eye, target, distance, yaw_deg, pitch_deg, fov_deg}`. The pose stays until the next `camera.set` or `camera.clear`. Blocked by RLV camera distance limits (`@camdistmax`/`@setcam_avdistmax`/`@setcam_origindistmax` and their mins, measured from your head; the error's `limit_m` gives the limit) and by `@setcam_unlock` unless the target is you. |
+| `camera.get` | — | Your camera's pose: `{set:false}`, or the same shape `camera.set` returns. |
+| `camera.clear` | — | Remove your camera. Returns `{set:false}`. |
 
 ## Animation overlay (AO)
 
@@ -240,9 +244,9 @@ Uploads cost real **L$**. Every upload tool is two-phase: a call **without** `co
 
 ## Objects
 
-Build with what you uploaded: rez an item, edit it, texture it, fill its contents, set next-owner permissions, link it, and take it back. The tools work on rezzed objects and on your own worn attachments. They never touch your selection or the Build floater, so you can keep building while an agent works.
+Build with what you uploaded or from new prims: create a prim or rez an item, edit it, texture it, fill its contents, set next-owner permissions, link it, and take it back. The tools work on rezzed objects and on your own worn attachments. They never touch your selection or the Build floater, so you can keep building while an agent works.
 
-**Targeting.** `object_id` is any prim of the object, from `objects.getNearby`, `avatars.getWorn`, or an `object.rez`/`object.attach` result. `link` picks one prim by the number `object.get` reports (1 = the root). Without `link`, a tool acts on the whole object. These link numbers can differ from LSL's `llGetLinkNumber`, so always take them from `object.get`.
+**Targeting.** `object_id` is any prim of the object, from `objects.getNearby`, `avatars.getWorn`, or an `object.create`/`object.rez`/`object.attach` result. `link` picks one prim by the number `object.get` reports (1 = the root). Without `link`, a tool acts on the whole object. These link numbers can differ from LSL's `llGetLinkNumber`, so always take them from `object.get`.
 
 **Position and rotation.** `position` is in metres and `rotation` is `[x,y,z]` Euler degrees, as the Edit floater shows them. Both are relative to the region for a rezzed root, to the attachment point for a worn root, and to the root for a child link. `scale` changes one prim: the root, or the prim named by `link`.
 
@@ -258,13 +262,14 @@ Build with what you uploaded: rez an item, edit it, texture it, fill its content
 | `object.setPermissions` | `object_id*`: string<br>`next_owner*`: {`copy`, `modify`, `transfer`}: boolean<br>`contents`: boolean | Set next-owner permissions on a rezzed object you own; worn objects are refused, so rez them first. The next owner needs copy or transfer, so turning copy off keeps transfer on. `contents:true` sets the same on every item in the root prim. Returns `{object_id, next_owner, contents:[{item_id, name, result}]}`, where `result` is `sent` (the region doesn't confirm item updates), `unchanged` or `permission`. Bits missing from the object's base permissions stay off. Blocked by RLV @edit, @editobj, @editworld, @editattach, @interact. |
 | `object.link` | `object_ids*`: string[] | Link two or more of your rezzed objects in one region. The first becomes the root. Returns `{object_id, link_count}`. A link the region refuses (too many prims, too far apart) shows as a timeout. Blocked by RLV @edit, @editobj, @editworld, @interact. |
 | `object.unlink` | `object_id*`: string<br>`link`: integer | Unlink one prim (`link`), or every prim when `link` is omitted. Returns `{object_ids}`: the unlinked prims, then the root of what's left. Blocked by RLV @edit, @editobj, @editworld, @interact. |
+| `object.create` | `shape`: string<br>`position`: [x,y,z]<br>`scale`: [x,y,z]<br>`rotation`: [x,y,z] | Create a new prim, as the Build floater's Create button does. `shape` is `box` (default), `prism`, `pyramid`, `tetrahedron`, `cylinder`, `half_cylinder`, `cone`, `half_cone`, `sphere`, `half_sphere`, `torus`, `tube` or `ring`. The default position is 2 m in front of you at your height; `scale` is 0.01 to 64 m per axis (default 0.5). Without `rotation`, sphere, torus, tube and ring are turned 90° about Y, as the Build floater makes them. The prim is named "Object" with the default plywood texture; your Build preferences aren't applied. Returns `{object_id, shape, position, rotation, scale}`. If RLV blocks editing, the prim stays where the region put it and the result has `position_skipped` with the reason. Waits up to 30 s; on land where you can't build, the call times out. Blocked by RLV @rez and @interact. |
 | `object.rez` | `item_id*`: string<br>`position`: [x,y,z]<br>`rotation`: [x,y,z] | Rez an object item. The default position is 2 m in front of you at your height. Returns `{object_id, name, position, rotation}`, plus `item_consumed:true` for a no-copy item. If the new object is no-modify or RLV blocks editing it, the result has `rotation_skipped` with the reason. Items holding several objects (coalesced) can't be rezzed. Waits up to 30 s; a timeout says the rez was sent and carries `item_consumed` for a no-copy item. Blocked by RLV @rez and @interact. |
 | `object.attach` | `item_id*`: string<br>`point*`: string<br>`replace`: boolean | Wear an object item on a named point: "Chest", "Spine", "Left Hand", "HUD Center", and so on, in any case. `replace:true` replaces what's on the point; the default adds alongside it. Returns `{object_id, item_id, point}`. Blocked by RLV attachment locks and @addattach. |
 | `object.take` | `object_id*`: string<br>`copy`: boolean<br>`folder`: string | Take a rezzed object you own into inventory, or a copy of it with `copy:true`. `folder` is a folder UUID, `"objects"` (default) or `"root"`. Returns `{item_id, name, folder_id, copy}`. Worn attachments are refused; detach them instead. A timeout after the request was sent names the folder to check. Blocked by RLV @edit, @editobj, @editworld, @interact, @rez, and @unsit while you sit on the object. |
 
 - **Edits wait for the region.** `object.edit`, `object.setPermissions`, `object.link` and `object.unlink` answer only once the region reports the change. A timeout (-32001) carries `sent` and, where known, `current`.
 - **Batch tools report per item.** `object.setFaces`, `object.addContents`, `object.copyContents`, `object.removeContents` and `object.setPermissions` with `contents` give a result for each face or item, and fail the whole call only when nothing could be done.
-- **The build loop.** `upload.mesh` → `object.rez` → `object.edit` → `object.setFaces` → `object.addContents` → `object.setPermissions` → `object.take`. Use `object.attach` instead of `object.rez` for something worn.
+- **The build loop.** `upload.mesh` → `object.rez` (or `object.create` for a new prim) → `object.edit` → `object.setFaces` → `object.addContents` → `object.setPermissions` → `object.take`. Use `object.attach` instead of `object.rez` for something worn.
 
 ## Money (L$)
 
