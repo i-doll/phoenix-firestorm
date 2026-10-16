@@ -16,6 +16,7 @@
 #include "llviewercontrol.h"
 #include "llcontrol.h"
 #include "llnotificationsutil.h"   // viewer.notify toast
+#include "llviewernetwork.h"       // LLGridManager (viewer.getGrid)
 
 #include "rlvactions.h"
 #include "idmcprlvgate.h"
@@ -591,6 +592,30 @@ void IDMCPServer::registerCoreTools()
             LLNotificationsUtil::add(tip ? "SystemMessageTip" : "SystemMessage", sd);
 
             boost::json::object o; o["shown"] = true;
+            idmcp_tool_ok(call, o);
+        };
+        mRegistry.add(std::move(t));
+    }
+
+    {
+        IDMCPTool t;
+        t.name = "viewer.getGrid";
+        t.description =
+            "Call this at the start of every turn, before any other tool, to confirm "
+            "which grid the user is logged in to; they can relog onto another grid "
+            "between turns. {\"grid\"} is \"agni\" (the main Second Life grid: real "
+            "L$, real inventory, real people), \"aditi\" (the Second Life beta grid, "
+            "for testing: its L$ is test money and accounts get plenty of it, so "
+            "spending it is fine; nothing there carries over to the main grid), or \"other\" (e.g. an OpenSim grid); {\"label\"} is the "
+            "grid's display name.";
+        t.input_schema = boost::json::parse(
+            R"({"type":"object","properties":{},"additionalProperties":false})");
+        t.invoke = [](const boost::json::object&, const IDMCPCallPtr& call)
+        {
+            LLGridManager* gm = LLGridManager::getInstance();
+            boost::json::object o;
+            o["grid"]  = gm->isInSLMain() ? "agni" : gm->isInSLBeta() ? "aditi" : "other";
+            o["label"] = gm->getGridLabel();
             idmcp_tool_ok(call, o);
         };
         mRegistry.add(std::move(t));
