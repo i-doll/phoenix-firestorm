@@ -148,6 +148,38 @@ namespace idmcp_obj
         return true;
     }
 
+    bool argNextOwner(const boost::json::object& args, const IDMCPCallPtr& call, U32& out)
+    {
+        auto it = args.find("next_owner");
+        if (it == args.end() || !it->value().is_object())
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "next_owner must be {copy, modify, transfer}");
+            return false;
+        }
+        const boost::json::object& no = it->value().as_object();
+        out = 0;
+        const std::pair<const char*, U32> bits[] = {
+            { "copy", PERM_COPY }, { "modify", PERM_MODIFY }, { "transfer", PERM_TRANSFER } };
+        for (const auto& [key, bit] : bits)
+        {
+            auto b = no.find(key);
+            if (b == no.end() || !b->value().is_bool())
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
+                               "next_owner needs copy, modify and transfer, each true or false");
+                return false;
+            }
+            if (b->value().as_bool()) out |= bit;
+        }
+        if (!(out & (PERM_COPY | PERM_TRANSFER)))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
+                           "the next owner needs copy or transfer (the region turns transfer on otherwise)");
+            return false;
+        }
+        return true;
+    }
+
     // ---- JSON output -----------------------------------------------------------
 
     double round5(F64 v)
@@ -1277,33 +1309,8 @@ namespace
                            "next-owner permissions can't be changed while the object is worn; rez it first");
             return;
         }
-        auto it = args.find("next_owner");
-        if (it == args.end() || !it->value().is_object())
-        {
-            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "next_owner must be {copy, modify, transfer}");
-            return;
-        }
-        const boost::json::object& no = it->value().as_object();
         U32 want = 0;
-        const std::pair<const char*, U32> bits[] = {
-            { "copy", PERM_COPY }, { "modify", PERM_MODIFY }, { "transfer", PERM_TRANSFER } };
-        for (const auto& [key, bit] : bits)
-        {
-            auto b = no.find(key);
-            if (b == no.end() || !b->value().is_bool())
-            {
-                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
-                               "next_owner needs copy, modify and transfer, each true or false");
-                return;
-            }
-            if (b->value().as_bool()) want |= bit;
-        }
-        if (!(want & (PERM_COPY | PERM_TRANSFER)))
-        {
-            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
-                           "the next owner needs copy or transfer (the region turns transfer on otherwise)");
-            return;
-        }
+        if (!argNextOwner(args, call, want)) return;
         auto job = std::make_shared<PermsJob>(call, t.root, want, argBool(args, "contents", false));
         Job::launch(job);
         job->begin();

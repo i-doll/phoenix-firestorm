@@ -49,6 +49,9 @@ namespace idmcp_obj
     bool        argNum(const boost::json::object& args, const char* key, F64& out);
     // True when args[key] is an array of exactly n numbers.
     bool        argNums(const boost::json::object& args, const char* key, size_t n, F32* out);
+    // Reads args "next_owner" {copy, modify, transfer} into a PERM_* mask. On
+    // failure answers `call` with INVALID_PARAMS and returns false.
+    bool        argNextOwner(const boost::json::object& args, const IDMCPCallPtr& call, U32& out);
 
     // ---- JSON output -----------------------------------------------------------
     double              round5(F64 v);

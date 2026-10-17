@@ -15,7 +15,9 @@
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
+#include "idmcptools_object.h"      // idmcp_obj::argNextOwner, maskJson
 
+#include "llinventorydefines.h"     // LLInventoryItemFlags
 #include "llinventorymodel.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodelbackgroundfetch.h"
@@ -31,6 +33,8 @@
 
 namespace
 {
+    constexpr U32 PERM_CMT = PERM_COPY | PERM_MODIFY | PERM_TRANSFER;
+
     bool looks_like_uuid(const std::string& s)
     {
         return s.size() == 36 && s[8] == '-' && s[13] == '-' && s[18] == '-' && s[23] == '-';
@@ -167,6 +171,140 @@ void idmcp_register_manage_tools(IDMCPToolRegistry& reg)
             }
             boost::json::object o; o["accepted"] = true;
             idmcp_tool_ok(call, o);
+        };
+        reg.add(std::move(t));
+    }
+
+    // inventory.setPermissions -----------------------------------------------
+    {
+        IDMCPTool t;
+        t.name = "inventory.setPermissions";
+        t.description =
+            "Set the next-owner permissions of items in your inventory, as the item's Properties "
+            "window does. {\"item_ids\"}*: one or more item UUIDs (a link sets the item it points to); "
+            "{\"next_owner\"}*: {copy, modify, transfer} booleans; the next owner needs copy or "
+            "transfer. Returns {items:[{item_id, name, result, next_owner}]} where result is set, "
+            "unchanged, failed (the server kept the old permissions), not_found, not_loaded (load it "
+            "with inventory.getItem first) or permission (you don't own it, can't transfer it, or its "
+            "permissions can't be restricted). Turning copy off keeps transfer on, and bits missing "
+            "from the item's base permissions stay off.";
+        t.input_schema = boost::json::parse(
+            R"({"type":"object","properties":{"item_ids":{"type":"array","items":{"type":"string"},"minItems":1},)"
+            R"("next_owner":{"type":"object","properties":{"copy":{"type":"boolean"},"modify":{"type":"boolean"},"transfer":{"type":"boolean"}},)"
+            R"("required":["copy","modify","transfer"],"additionalProperties":false}},)"
+            R"("required":["item_ids","next_owner"],"additionalProperties":false})");
+        t.timeout = 30.0;
+        t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
+        {
+            U32 want = 0;
+            if (!idmcp_obj::argNextOwner(args, call, want)) return;
+            auto ids = args.find("item_ids");
+            if (ids == args.end() || !ids->value().is_array() || ids->value().as_array().empty())
+            {
+                idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "item_ids must be a non-empty array of item UUIDs");
+                return;
+            }
+
+            struct Batch
+            {
+                IDMCPCallPtr       call;
+                boost::json::array items;
+                size_t             pending = 0;
+            };
+            struct Update
+            {
+                size_t                          index;
+                LLPointer<LLViewerInventoryItem> item;
+                U32                             expect;
+            };
+            auto batch  = std::make_shared<Batch>();
+            batch->call = call;
+            std::vector<Update> updates;
+
+            // The checks and update of LLSidepanelItemInfo::updatePermissions.
+            for (const boost::json::value& v : ids->value().as_array())
+            {
+                boost::json::object r;
+                const std::string s = v.is_string() ? std::string(v.as_string().c_str()) : std::string();
+                r["item_id"] = s;
+                LLViewerInventoryItem* item = looks_like_uuid(s) ? gInventory.getItem(LLUUID(s)) : nullptr;
+                if (item && item->getIsLinkType()) item = item->getLinkedItem();
+                if (!item || in_library(item->getUUID()))
+                {
+                    r["result"] = "not_found";
+                    batch->items.push_back(std::move(r));
+                    continue;
+                }
+                r["item_id"] = item->getUUID().asString();
+                r["name"]    = item->getName();
+                const LLPermissions& old = item->getPermissions();
+                if (!item->isFinished())
+                {
+                    r["result"] = "not_loaded";
+                }
+                else if (old.getOwner() != gAgent.getID() ||
+                         !old.allowOperationBy(PERM_TRANSFER, gAgent.getID()) ||
+                         LLInventoryType::cannotRestrictPermissions(item->getInventoryType()))
+                {
+                    r["result"] = "permission";
+                }
+                else
+                {
+                    LLPermissions perm(old);
+                    perm.setNextOwnerBits(gAgent.getID(), LLUUID::null, true, want);
+                    if (PERM_CMT & ~want)
+                    {
+                        perm.setNextOwnerBits(gAgent.getID(), LLUUID::null, false, PERM_CMT & ~want);
+                    }
+                    if (perm == old)
+                    {
+                        r["result"]     = "unchanged";
+                        r["next_owner"] = idmcp_obj::maskJson(old.getMaskNextOwner());
+                    }
+                    else
+                    {
+                        LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
+                        new_item->setPermissions(perm);
+                        if (item->getType() == LLAssetType::AT_OBJECT)
+                        {
+                            // Apply the new next-owner bits when the object is next rezzed.
+                            new_item->setFlags(new_item->getFlags() | LLInventoryItemFlags::II_FLAGS_OBJECT_SLAM_PERM);
+                        }
+                        updates.push_back({ batch->items.size(), new_item,
+                                            perm.getMaskNextOwner() & old.getMaskBase() });
+                    }
+                }
+                batch->items.push_back(std::move(r));
+            }
+
+            batch->pending = updates.size();
+            if (updates.empty())
+            {
+                boost::json::object o;
+                o["items"] = batch->items;
+                idmcp_tool_ok(call, o);
+                return;
+            }
+            for (const Update& u : updates)
+            {
+                // AIS has already applied the server's copy of the item when this runs.
+                LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(
+                    [batch, index = u.index, id = u.item->getUUID(), expect = u.expect](const LLUUID&)
+                    {
+                        boost::json::object& r = batch->items[index].as_object();
+                        const LLViewerInventoryItem* now = gInventory.getItem(id);
+                        const U32 got = now ? now->getPermissions().getMaskNextOwner() : 0;
+                        r["result"] = (now && (got & PERM_CMT) == (expect & PERM_CMT)) ? "set" : "failed";
+                        if (now) r["next_owner"] = idmcp_obj::maskJson(got);
+                        if (--batch->pending == 0)
+                        {
+                            boost::json::object o;
+                            o["items"] = batch->items;
+                            idmcp_tool_ok(batch->call, o);
+                        }
+                    });
+                update_inventory_item(u.item.get(), cb);
+            }
         };
         reg.add(std::move(t));
     }
