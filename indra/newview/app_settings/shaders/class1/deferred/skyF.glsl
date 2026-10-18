@@ -108,9 +108,17 @@ void main()
 
         float  rel_pos_lightnorm = vary_LightNormPosDot;
         float optic_d = rel_pos_lightnorm;
-        vec3  halo_22 = halo22(optic_d);
-        color.rgb += rainbow(optic_d);
-        color.rgb += halo_22;
+        // Both terms are scaled by their sky setting, which is zero for most skies. The
+        // conditions are uniform, so skipping the fetches (and the rainbow's pow) leaves
+        // control flow uniform and changes nothing where the setting is zero.
+        if (moisture_level > 0.0)
+        {
+            color.rgb += rainbow(optic_d);
+        }
+        if (ice_level > 0.0)
+        {
+            color.rgb += halo22(optic_d);
+        }
         color.rgb *= 2.;
         color.rgb = clamp(color.rgb, vec3(0), vec3(5));
 

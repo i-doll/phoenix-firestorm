@@ -197,22 +197,6 @@ void main()
     float facing = gl_FrontFacing ? 1.0 : -1.0;
     norm *= facing;
 
-    float scol = 1.0;
-    vec3 sunlit;
-    vec3 amblit;
-    vec3 additive;
-    vec3 atten;
-    calcAtmosphericVarsLinear(pos.xyz, norm, light_dir, sunlit, amblit, additive, atten);
-    if (classic_mode > 0)
-        sunlit *= 1.35;
-    vec3 sunlit_linear = sunlit;
-
-    vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
-
-#ifdef HAS_SUN_SHADOW
-    scol = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
-#endif
-
     vec3 orm = texture(specularMap, metallic_roughness_texcoord.xy).rgb; //orm is packed into "emissiveRect" to keep the data in linear color space
 
     float perceptualRoughness = orm.g * roughnessFactor;
@@ -228,6 +212,9 @@ void main()
     // emissiveMap here is a vanilla RGB texture encoded as sRGB, manually convert to linear
     colorEmissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
 
+    // Clip and alpha-test once every mipmapped fetch is done (as pbropaqueF does) but before
+    // the atmospherics and the shadow PCF, so rejected fragments -- masked foliage, the far
+    // side of a mirror or the water plane -- stop paying for lighting they never output.
     mirrorClip(vary_position);
     waterClip(pos);
 #ifdef HAS_ALPHA_MASK
@@ -235,6 +222,22 @@ void main()
     {
         discard;
     }
+#endif
+
+    float scol = 1.0;
+    vec3 sunlit;
+    vec3 amblit;
+    vec3 additive;
+    vec3 atten;
+    calcAtmosphericVarsLinear(pos.xyz, norm, light_dir, sunlit, amblit, additive, atten);
+    if (classic_mode > 0)
+        sunlit *= 1.35;
+    vec3 sunlit_linear = sunlit;
+
+    vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
+
+#ifdef HAS_SUN_SHADOW
+    scol = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
 #endif
 
     // PBR IBL

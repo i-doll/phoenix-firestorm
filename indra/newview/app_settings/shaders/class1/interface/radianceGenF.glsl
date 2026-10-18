@@ -134,23 +134,39 @@ vec4 prefilterEnvMap(vec3 R)
 
     float numMips = max_probe_lod+1;
 
+    // Everything importanceSample_GGX derives from the normal alone is the same for every
+    // sample of this texel: the tangent frame (two crosses, two normalizes) and the phi jitter
+    // (a sin). Build them once instead of once per sample.
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float phiJitter = random(N.xz) * 0.1;
+    vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangentX = normalize(cross(up, N));
+    vec3 tangentY = normalize(cross(N, tangentX));
+
+    // Solid angle of 1 pixel across all cube faces
+    float omegaP = 4.0 * PI / (6.0 * envMapDim * envMapDim);
+
     for(uint i = 0u; i < numSamples; i++) {
         vec2 Xi = hammersley2d(i, numSamples);
-        vec3 H = importanceSample_GGX(Xi, roughness, N);
-        vec3 L = 2.0 * dot(V, H) * H - V;
-        float dotNL = clamp(dot(N, L), 0.0, 1.0);
+
+        // importanceSample_GGX, with the per-texel terms above hoisted out.
+        float phi = 2.0 * PI * Xi.x + phiJitter;
+        float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha2 - 1.0) * Xi.y));
+        float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+        vec3 H = normalize(tangentX * (sinTheta * cos(phi)) + tangentY * (sinTheta * sin(phi)) + N * cosTheta);
+
+        // N == V here, so N.H and V.H are the same number and L.N reduces to 2(N.H)^2 - 1.
+        float dotNH = clamp(dot(N, H), 0.0, 1.0);
+        vec3 L = 2.0 * dotNH * H - V;
+        float dotNL = clamp(2.0 * dotNH * dotNH - 1.0, 0.0, 1.0);
         if(dotNL > 0.0) {
             // Filtering based on https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
 
-            float dotNH = clamp(dot(N, H), 0.0, 1.0);
-            float dotVH = clamp(dot(V, H), 0.0, 1.0);
-
-            // Probability Distribution Function
-            float pdf = D_GGX(dotNH, roughness) * dotNH / (4.0 * dotVH) + 0.0001;
+            // Probability Distribution Function. D * NdotH / (4 VdotH) with NdotH == VdotH.
+            float pdf = D_GGX(dotNH, roughness) * 0.25 + 0.0001;
             // Slid angle of current smple
             float omegaS = 1.0 / (float(numSamples) * pdf);
-            // Solid angle of 1 pixel across all cube faces
-            float omegaP = 4.0 * PI / (6.0 * envMapDim * envMapDim);
             // Biased (+1.0) mip level for better result
             float mipLevel = roughness == 0.0 ? 0.0 : clamp(0.5 * log2(omegaS / omegaP) + 1.0, 0.0f, max_probe_lod);
             color += textureLod(reflectionProbes, vec4(L, sourceIdx), mipLevel) * dotNL;

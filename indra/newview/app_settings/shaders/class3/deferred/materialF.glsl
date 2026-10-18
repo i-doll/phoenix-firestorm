@@ -287,7 +287,9 @@ float getShadow(vec3 pos, vec3 norm)
 {
 #ifdef HAS_SUN_SHADOW
     #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
-        return sampleDirectionalShadow(pos, norm, vary_texcoord0.xy);
+        // A screen coordinate, as every other caller passes: it seeds the PCF jitter, and the
+        // diffuse uv that used to go here made the jitter follow the texture's tiling instead.
+        return sampleDirectionalShadow(pos, norm, gl_FragCoord.xy / screen_res);
     #else
         return 1;
     #endif

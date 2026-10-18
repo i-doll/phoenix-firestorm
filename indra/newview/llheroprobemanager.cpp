@@ -513,10 +513,14 @@ void LLHeroProbeManager::updateUniforms()
     modelview.loadu(gGLModelView);
     LLVector4a oa; // scratch space for transformed origin
     oa.set(0, 0, 0, 0);
-    mHeroData.heroProbeCount = 1;
+    // Zero when no mirror is in range: tapHeroProbe skips its box/sphere weight and cubemap
+    // fetch on every reflective fragment instead of blending against stale probe data.
+    mHeroData.heroProbeCount = 0;
 
     if (mNearestHero != nullptr && !mNearestHero->isDead())
     {
+        mHeroData.heroProbeCount = 1;
+
         if (mNearestHero->getReflectionProbeIsBox())
         {
             LLVector3 s = mNearestHero->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));

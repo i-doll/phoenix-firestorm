@@ -597,7 +597,14 @@ void pbrIbl(vec3 diffuseColor,
     // compensation raised rough reflective materials enough to look self-lit under probes.
     vec2 brdf = BRDF(clamp(nv, 0.0, 1.0), 1.0-perceptualRough);
     diffuseOut = irradiance * diffuseColor * ao;
-    specularOut = radiance * (specularColor * brdf.x + brdf.y) * ao;
+    // Specular occlusion rather than the diffuse scalar. A polished surface seen head-on reflects
+    // mostly what is in front of it, not the crease it sits in, so the cosine-weighted visibility
+    // over-darkens it, while at grazing angles it is occluded a little more; the two converge as
+    // the lobe widens. Identical at ao = 1 and bounded to [0, 1], so it cannot add energy the
+    // way multiple-scattering compensation did. The fit takes linear (alpha) roughness, as in
+    // Filament's use of it, not the perceptual value.
+    float specAO = computeSpecularAO(clamp(nv, 0.0, 1.0), ao, perceptualRough * perceptualRough);
+    specularOut = radiance * (specularColor * brdf.x + brdf.y) * specAO;
 }
 
 

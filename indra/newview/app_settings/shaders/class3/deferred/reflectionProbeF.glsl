@@ -781,6 +781,118 @@ vec3 sampleProbeAmbient(vec3 pos, vec3 dir, vec3 amblit)
     return col[1]+col[0];
 }
 
+// sampleProbeAmbient and sampleProbes in one walk of the probe list.
+//
+// The two loops visit the same probes and derive the same weights: sphereWeight never reads its
+// direction argument, and boxIntersect's depth term depends only on the position, not on the box
+// scale the irradiance tap pads by. So each probe's weight, distance weight and uniform loads are
+// shared here, and only the two parallax intersections and fetches remain per lobe. The result is
+// identical to calling both functions.
+//
+//  norm    - surface normal, for the irradiance (SH) lobe
+//  refDir  - reflection lookup direction, for the radiance lobe
+void sampleProbesAmbientAndGloss(vec3 pos, vec3 norm, vec3 refDir, float lod, vec3 amblit,
+                                 out vec3 ambenv, out vec3 glossenv)
+{
+    float wsum[2];
+    wsum[0] = 0;
+    wsum[1] = 0;
+
+    float dwsum[2];
+    dwsum[0] = 0;
+    dwsum[1] = 0;
+
+    vec3 amb[2];
+    amb[0] = vec3(0);
+    amb[1] = vec3(0);
+
+    vec3 gloss[2];
+    gloss[0] = vec3(0);
+    gloss[1] = vec3(0);
+
+    for (int idx = 0; idx < probeInfluences; ++idx)
+    {
+        int i = probeIndex[idx];
+        int p = clamp(abs(refIndex[i].w), 0, 1);
+
+        if (p == 0 && !sample_automatic)
+        {
+            continue;
+        }
+
+        vec3 c = refSphere[i].xyz;
+        float w = 0;
+        float dw = 0;
+        vec3 vr; // radiance parallax point
+        vec3 vi; // irradiance parallax point
+
+        if (refIndex[i].w < 0)
+        {  // box probe -- tapRefMap pads by 1, tapIrradianceMap by 3
+            float d = 0;
+            vr = boxIntersect(pos, refDir, refBox[i], d, 1.0);
+            vi = boxIntersect(pos, norm, refBox[i], d, 3.0);
+
+            w = max(d, 0.001);
+            dw = boxDistanceWeight(d, refParams[i].z);
+        }
+        else
+        { // sphere probe
+            float r = refSphere[i].w;
+            float rr = refIndex[i].w < 1 ? 4096.0*4096.0 : r * r; // see tapRefMap on automatic probes
+
+            vr = sphereIntersect(pos, refDir, c, rr);
+            vi = sphereIntersect(pos, norm, c, rr);
+
+            w = sphereWeight(pos, refDir, c, r, refParams[i], dw);
+        }
+
+        // Radiance, as tapRefMap.
+        vr = env_mat * (vr - c);
+        vec3 refcol = textureLod(reflectionProbes, vec4(vr, refIndex[i].x), lod).rgb * refParams[i].y;
+
+        // Irradiance, as tapIrradianceMap.
+        vi = env_mat * (vi - c);
+        float len2 = dot(vi, vi);
+        vec3 sampleDir = len2 > 1e-12 ? vi * inversesqrt(len2) : env_mat * norm;
+        vec3 irrcol = evalSHIrradiance(sampleDir, refIndex[i].x) * refParams[i].x;
+        irrcol = mix(amblit, irrcol, min(refParams[i].x, 1.0));
+
+        gloss[p] += refcol * w;
+        amb[p] += irrcol * w;
+        wsum[p] += w;
+        dwsum[p] += dw;
+    }
+
+    // mix automatic and manual probes -- the same weights apply to both lobes
+    if (sample_automatic && wsum[0] > 0.0)
+    { // some automatic probes were sampled
+        float inv0 = 1.0/wsum[0];
+        gloss[0] *= inv0;
+        amb[0] *= inv0;
+        if (wsum[1] > 0.0)
+        { //some manual probes were sampled, mix between the two
+            float inv1 = 1.0/wsum[1];
+            float m = min(dwsum[1], 1.0);
+            gloss[1] = mix(gloss[0], gloss[1] * inv1, m);
+            amb[1] = mix(amb[0], amb[1] * inv1, m);
+            gloss[0] = vec3(0);
+            amb[0] = vec3(0);
+        }
+    }
+    else if (wsum[1] > 0.0)
+    {
+        // manual probes were sampled but no automatic probes were
+        float inv1 = 1.0/wsum[1];
+        gloss[1] *= inv1;
+        amb[1] *= inv1;
+        gloss[0] = vec3(0);
+        amb[0] = vec3(0);
+    }
+
+    glossenv = gloss[1] + gloss[0];
+    ambenv = amb[1] + amb[0];
+}
+
 #if defined(HERO_PROBES)
 
 uniform vec4 clipPlane;
@@ -788,6 +900,13 @@ uniform samplerCubeArray   heroProbes;
 
 void tapHeroProbe(inout vec3 glossenv, vec3 pos, vec3 norm, float glossiness)
 {
+    // No mirror in range (see LLHeroProbeManager::updateUniforms), or a surface too rough for
+    // the hero probe to receive any weight below -- either way the result is glossenv itself.
+    if (heroProbeCount < 1 || glossiness <= 0.75)
+    {
+        return;
+    }
+
     float clipDist = dot(pos.xyz, clipPlane.xyz) + clipPlane.w;
     float w = 0;
     float dw = 0;
@@ -840,11 +959,16 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
 
     ambenv = amblit;
 
-    if (classic_mode == 0)
-        ambenv = sampleProbeAmbient(pos, norm, amblit);
-
     float lod = perceptualRoughness*reflection_lods;
-    glossenv = sampleProbes(pos, refnormpersp, lod);
+
+    if (classic_mode == 0)
+    {
+        sampleProbesAmbientAndGloss(pos, norm, refnormpersp, lod, amblit, ambenv, glossenv);
+    }
+    else
+    {
+        glossenv = sampleProbes(pos, refnormpersp, lod);
+    }
 
 #if defined(SSR)
     // Skip the march only where it would contribute nothing anyway. Asking the SSR unit for its
@@ -954,7 +1078,10 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 
     ambenv = amblit;
 
-    if (classic_mode == 0)
+    // Both lobes in one probe walk when both are wanted; see sampleProbesAmbientAndGloss.
+    bool fused = classic_mode == 0 && glossiness > 0.0;
+
+    if (classic_mode == 0 && !fused)
         ambenv = sampleProbeAmbient(pos, norm, amblit);
 
     if (glossiness > 0.0)
@@ -972,7 +1099,14 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
         vec3 dominantDir = getSpecularDominantDir(norm.xyz, normalize(refnormpersp), perceptualRoughness);
 
         float lod = perceptualRoughness*reflection_lods;
-        glossenv = sampleProbes(pos, dominantDir, lod);
+        if (fused)
+        {
+            sampleProbesAmbientAndGloss(pos, norm, dominantDir, lod, amblit, ambenv, glossenv);
+        }
+        else
+        {
+            glossenv = sampleProbes(pos, dominantDir, lod);
+        }
     }
 
     if (envIntensity > 0.0)

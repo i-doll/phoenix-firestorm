@@ -35,10 +35,15 @@ uniform vec2 delta;
 uniform vec2 screen_res;
 uniform vec3 kern[4];
 uniform float kern_scale;
+uniform mat4 inv_proj;
 
 in vec2 vary_fragcoord;
 
 vec4 getPosition(vec2 pos_screen);
+vec4 getPositionWithDepth(vec2 pos_screen, float depth);
+float getDepth(vec2 pos_screen);
+bool isFarDepth(float d);
+float ndcZFromScreenDepth(float d);
 vec4 getNorm(vec2 pos_screen);
 
 void main()
@@ -56,6 +61,14 @@ void main()
 
     // relax tolerance according to distance to avoid speckling artifacts, as angles and distances are a lot more abrupt within a small screen area at larger distances
     float pointplanedist_tolerance_pow2 = pos.z*pos.z*0.00005;
+
+    // Each tap only needs its distance from this fragment's plane, dot(n, P) - dot(n, pos), where
+    // P = inv_proj * ndc / w. Fold n into the matrix once here and that becomes two dot products
+    // per tap instead of a full unprojection.
+    vec4 nRow = vec4(dot(norm.xyz, inv_proj[0].xyz), dot(norm.xyz, inv_proj[1].xyz),
+                     dot(norm.xyz, inv_proj[2].xyz), dot(norm.xyz, inv_proj[3].xyz));
+    vec4 wRow = vec4(inv_proj[0].w, inv_proj[1].w, inv_proj[2].w, inv_proj[3].w);
+    float nDotPos = dot(norm.xyz, pos.xyz);
 
     // perturb sampling origin slightly in screen-space to hide edge-ghosting artifacts where smoothing radius is quite large
     tc *= screen_res;
@@ -79,9 +92,9 @@ void main()
     {
         vec2 samptc = tc + k[i].z*dlt*2.0;
         samptc /= screen_res;
-        vec3 samppos = getPosition(samptc).xyz;
+        vec4 sampndc = vec4(samptc * 2.0 - 1.0, ndcZFromScreenDepth(getDepth(samptc)), 1.0);
 
-        float d = dot(norm.xyz, samppos.xyz-pos.xyz);// dist from plane
+        float d = dot(nRow, sampndc) / dot(wRow, sampndc) - nDotPos; // dist from plane
 
         if (d*d <= pointplanedist_tolerance_pow2)
         {
@@ -94,9 +107,9 @@ void main()
     {
         vec2 samptc = tc - k[i].z*dlt*2.0;
         samptc /= screen_res;
-        vec3 samppos = getPosition(samptc).xyz;
+        vec4 sampndc = vec4(samptc * 2.0 - 1.0, ndcZFromScreenDepth(getDepth(samptc)), 1.0);
 
-        float d = dot(norm.xyz, samppos.xyz-pos.xyz);// dist from plane
+        float d = dot(nRow, sampndc) / dot(wRow, sampndc) - nDotPos; // dist from plane
 
         if (d*d <= pointplanedist_tolerance_pow2)
         {

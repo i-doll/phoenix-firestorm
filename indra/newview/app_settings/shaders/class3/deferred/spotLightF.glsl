@@ -190,9 +190,14 @@ void main()
                 lit = clamp(nl * dist_atten, 0.0, 1.0);
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * PUNCTUAL_LIGHT_SCALE * shadow;
+            // Ambiance is scaled by proj_ambiance throughout, and most projectors leave it at zero:
+            // skip the mipmapped cookie fetch then. The condition is uniform.
+            if (proj_ambiance != 0.0)
+            {
+                amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * PUNCTUAL_LIGHT_SCALE * shadow;
 
-            final_color += diffuseColor.rgb * amb_rgb;
+                final_color += diffuseColor.rgb * amb_rgb;
+            }
         }
     }
     else
@@ -222,8 +227,13 @@ void main()
                 amb_da += (nl*0.5+0.5) * proj_ambiance;
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * shadow;
-            final_color += diffuse.rgb * amb_rgb * max(dot(-normalize(lv), n), 0.0);
+            // See the PBR branch: zero ambiance contributes exactly nothing here either (where lit
+            // exceeds 1 and the clamp goes negative, nl > 0 and the facing factor is zero).
+            if (proj_ambiance != 0.0)
+            {
+                amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * shadow;
+                final_color += diffuse.rgb * amb_rgb * max(dot(-normalize(lv), n), 0.0);
+            }
         }
 
         if (spec.a > 0.0)
