@@ -130,6 +130,12 @@ int getStartIndex(vec3 pos)
     return 1;
 #endif
 }
+
+int getEndIndex(vec3 pos)
+{
+    int idx = clamp(int(floor(-pos.z)), 0, 255);
+    return min(refBucket[idx].y, refmapCount);
+}
 // call before sampleRef
 // populate "probeIndex" with N probe indices that influence pos where N is REF_SAMPLE_COUNT
 void preProbeSample(vec3 pos)
@@ -145,10 +151,12 @@ void preProbeSample(vec3 pos)
 #if REFMAP_LEVEL > 0
 
     int start = getStartIndex(pos);
+    int end = getEndIndex(pos);
     bool scan_all = false;
 
-    // TODO: make some sort of structure that reduces the number of distance checks
-    for (int i = start; i < refmapCount && probeInfluences < REF_SAMPLE_COUNT; ++i)
+    // The depth bucket bounds the scan even when a truncated neighbor list needs a fallback.
+    // A spatial structure could additionally reject probes at the same depth but far to the side.
+    for (int i = start; i < end && probeInfluences < REF_SAMPLE_COUNT; ++i)
     {
         // found an influencing probe
         if (shouldSampleProbe(i, pos))

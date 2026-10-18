@@ -98,7 +98,7 @@ public:
         // list of neighbor indices
         GLint refNeighbor[4096];
 
-        GLint refBucket[256][4]; // lookup table for which index to start with for the given Z depth
+        GLint refBucket[256][4]; // x/y: first/one-past-last probe index for the given Z depth
         // numbrer of active refmaps
         GLint refmapCount;
 
