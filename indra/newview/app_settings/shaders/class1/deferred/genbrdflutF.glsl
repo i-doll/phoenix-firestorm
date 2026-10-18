@@ -132,7 +132,9 @@ vec2 BRDF(float NoV, float roughness)
             // Vis * VdotH * NdotL / NdotH, short by the 4 that Vis carries in its denominator
             // -- restored once on the way out rather than per sample.
             float V_pdf = V_SmithGGXCorrelated(dotNV, dotNL, roughness) * dotVH * dotNL / dotNH;
-            float Fc = pow(1.0 - dotVH, 5.0);
+            float f = 1.0 - dotVH;
+            float f2 = f * f;
+            float Fc = f2 * f2 * f;
             LUT += vec2((1.0 - Fc) * V_pdf, Fc * V_pdf);
         }
     }

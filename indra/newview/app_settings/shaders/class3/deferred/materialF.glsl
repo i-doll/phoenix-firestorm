@@ -170,7 +170,9 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 npos, vec3 diffuse, vec4 spe
             float nv = dot(n, npos);
             float vh = dot(npos, h);
             float sa = nh;
-            float fres = pow(1 - dot(h, npos), 5)*0.4 + 0.5;
+            float f = 1 - dot(h, npos);
+            float f2 = f * f;
+            float fres = (f2 * f2 * f) * 0.4 + 0.5;
 
             float gtdenom = 2 * nh;
             float gt = max(0, min(gtdenom * nv / vh, gtdenom * da / vh));
@@ -392,7 +394,9 @@ void main()
             float lit = min(nl*6.0, 1.0);
 
             float sa = nh;
-            float fres = pow(1 - vh, 5) * 0.4+0.5;
+            float f = 1 - vh;
+            float f2 = f * f;
+            float fres = (f2 * f2 * f) * 0.4 + 0.5;
             float gtdenom = 2 * nh;
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 

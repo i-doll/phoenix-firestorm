@@ -144,9 +144,7 @@ void main()
     }
 
     lv = proj_origin-pos.xyz;
-    vec3  h, l, v = -normalize(pos);
-    float nh, nl, nv, vh, lightDist;
-    calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
+    vec3 v = -normalize(pos);
 
     vec3 diffuse = gb.albedo.rgb;
     vec4 spec    = gb.specular;
@@ -167,6 +165,7 @@ void main()
         calcDiffuseSpecular(baseColor, metallic, diffuseColor, specularColor);
         vec3 diffPunc = vec3(0);
         vec3 specPunc = vec3(0);
+        float nl;
 
         // We need this additional test inside a light's frustum since a spotlight's ambiance can be applied
         if (proj_tc.x > 0.0 && proj_tc.x < 1.0
@@ -202,6 +201,11 @@ void main()
     }
     else
     {
+        // These legacy angular terms are independent of the PBR lighting above.
+        vec3 h, l;
+        float nh, nl, nv, vh, lightDist;
+        calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
+
         float envIntensity = gb.envIntensity;
 
         diffuse = srgb_to_linear(diffuse);
@@ -240,7 +244,9 @@ void main()
         {
             dlit *= min(nl*6.0, 1.0) * dist_atten;
 
-            float fres = pow(1 - vh, 5)*0.4+0.5;
+            float f = 1 - vh;
+            float f2 = f * f;
+            float fres = (f2 * f2 * f) * 0.4 + 0.5;
 
             float gtdenom = 2 * nh;
             float gt = max(0, min(gtdenom * nv / vh, gtdenom * nl / vh));

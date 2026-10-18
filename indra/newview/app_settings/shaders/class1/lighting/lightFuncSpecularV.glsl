@@ -25,7 +25,10 @@
 
 float calcDirectionalSpecular(vec3 view, vec3 n, vec3 l)
 {
-    return pow(max(dot(reflect(view, n),l), 0.0),8.0);
+    float spec = max(dot(reflect(view, n), l), 0.0);
+    spec *= spec;
+    spec *= spec;
+    return spec * spec;
 }
 
 float calcDirectionalLightSpecular(inout vec4 specular, vec3 view, vec3 n, vec3 l, vec3 lightCol, float da)
