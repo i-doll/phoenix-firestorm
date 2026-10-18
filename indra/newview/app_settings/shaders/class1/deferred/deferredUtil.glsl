@@ -639,7 +639,10 @@ vec3 diffuse(PBRInfo pbrInputs)
 // Implementation of fresnel from [4], Equation 15
 vec3 specularReflection(PBRInfo pbrInputs)
 {
-    return pbrInputs.reflectance0 + (pbrInputs.reflectance90 - pbrInputs.reflectance0) * pow(clamp(1.0 - pbrInputs.VdotH, 0.0, 1.0), 5.0);
+    // Schlick's fixed fifth power needs only three multiplies.
+    float f = clamp(1.0 - pbrInputs.VdotH, 0.0, 1.0);
+    float f2 = f * f;
+    return pbrInputs.reflectance0 + (pbrInputs.reflectance90 - pbrInputs.reflectance0) * (f2 * f2 * f);
 }
 
 // Specular visibility (aka Vis), the geometric attenuation G with the microfacet BRDF's
