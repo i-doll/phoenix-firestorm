@@ -10092,7 +10092,10 @@ void LLPipeline::renderDeferredLighting()
             {  // paint shadow/SSAO light map (direct lighting lightmap)
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - sun shadow");
 
-                LLGLSLShader& sun_shader = gCubeSnapshot ? gDeferredSunProbeProgram : gDeferredSunProgram;
+                // The existing shadow-only variant also covers zero-strength SSAO, without
+                // adding a per-fragment branch to the normal SSAO shader.
+                const bool skip_ssao = gCubeSnapshot || (RenderDeferredSSAO && RenderSSAOFactor == 0.f);
+                LLGLSLShader& sun_shader = skip_ssao ? gDeferredSunProbeProgram : gDeferredSunProgram;
                 bindDeferredShader(sun_shader, deferred_light_target);
                 // <ID:PCSS> Soft sun shadows only in this full screen pass, alpha and water keep the
                 // fixed filter. The filter radius is half the penumbra: tan(0.265 deg) per meter for the real sun.
@@ -10123,7 +10126,7 @@ void LLPipeline::renderDeferredLighting()
             deferred_light_target->flush();
         }
 
-        if (RenderDeferredSSAO && !gCubeSnapshot)
+        if (RenderDeferredSSAO && !gCubeSnapshot && RenderShadowBlurSize != 0.f)
         {
             // soften direct lighting lightmap
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - soften shadow");
