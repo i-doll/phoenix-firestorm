@@ -408,11 +408,17 @@ collectedColor = vec4(1, 0, 1, 1);
         {
             for (int i = 0; i < totalSamples; i++)
             {
-                vec2 sampleUV = fract(POISSON3D_SAMPLES[i].xy + vec2(random(tc), random(tc + vec2(17.0, 59.0))));
-                float radius = sqrt(sampleUV.x);
-                float angle = 6.28318530718 * sampleUV.y;
-                vec2 coeffs = radius * vec2(cos(angle), sin(angle));
-                vec3 reflectionDirectionRandomized = rayDirection + ((firstBasis * coeffs.x + secondBasis * coeffs.y) * glossiness);
+                vec3 reflectionDirectionRandomized = rayDirection;
+                // Mirrors and transparent SSR use zero spread. Keep the same ray without
+                // computing the random disk sample (two hashes, sqrt, sin and cos).
+                if (glossiness > 0.0)
+                {
+                    vec2 sampleUV = fract(POISSON3D_SAMPLES[i].xy + vec2(random(tc), random(tc + vec2(17.0, 59.0))));
+                    float radius = sqrt(sampleUV.x);
+                    float angle = 6.28318530718 * sampleUV.y;
+                    vec2 coeffs = radius * vec2(cos(angle), sin(angle));
+                    reflectionDirectionRandomized += (firstBasis * coeffs.x + secondBasis * coeffs.y) * glossiness;
+                }
 
                 //float hitDepth;
 
