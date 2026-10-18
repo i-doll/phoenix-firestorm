@@ -1371,6 +1371,7 @@ void LLReflectionMapManager::updateUniforms()
             0.f); // unused
 
         S32 ni = nc; // neighbor ("index") - index into refNeighbor to write indices for current reflection probe's neighbors
+        bool neighbors_truncated = false;
         {
             //LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("rmmsu - refNeighbors");
             //pack neghbor list
@@ -1379,11 +1380,6 @@ void LLReflectionMapManager::updateUniforms()
 
             for (auto& neighbor : refmap->mNeighbors)
             {
-                if (ni >= 4096)
-                { // out of space
-                    break;
-                }
-
                 // mProbeIndex alone decides this. getReflectionMaps clears it on every probe it
                 // leaves out, so it already carries occlusion, completeness and the cube slot,
                 // and it is the only one of those that agrees with the list the shader will
@@ -1396,16 +1392,22 @@ void LLReflectionMapManager::updateUniforms()
                     continue;
                 }
 
+                if (ni >= 4096 || neighbor_count >= max_neighbors)
+                {
+                    neighbors_truncated = true;
+                    break;
+                }
+
                 // this neighbor may be sampled
                 mProbeData.refNeighbor[ni++] = idx;
 
                 neighbor_count++;
-                if (neighbor_count >= max_neighbors)
-                {
-                    break;
-                }
             }
         }
+
+        // A partial list cannot justify ending the shader's probe search. Use a negative
+        // count to request a full scan without enlarging the uniform block.
+        mProbeData.refIndex[count][2] = neighbors_truncated ? -1 : ni - nc;
 
         if (nc == ni)
         {
@@ -1414,8 +1416,6 @@ void LLReflectionMapManager::updateUniforms()
         }
         else
         {
-            mProbeData.refIndex[count][2] = ni - nc;
-
             // move the cursor forward
             nc = ni;
             if (nc % 4 != 0)
@@ -1423,7 +1423,6 @@ void LLReflectionMapManager::updateUniforms()
                 nc += 4 - (nc % 4);
             }
         }
-
 
         count++;
     }

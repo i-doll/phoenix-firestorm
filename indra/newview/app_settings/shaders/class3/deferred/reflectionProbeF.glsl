@@ -145,6 +145,7 @@ void preProbeSample(vec3 pos)
 #if REFMAP_LEVEL > 0
 
     int start = getStartIndex(pos);
+    bool scan_all = false;
 
     // TODO: make some sort of structure that reduces the number of distance checks
     for (int i = start; i < refmapCount && probeInfluences < REF_SAMPLE_COUNT; ++i)
@@ -160,7 +161,11 @@ void preProbeSample(vec3 pos)
             }
 
             int neighborIdx = refIndex[i].y;
-            if (neighborIdx != -1)
+            if (refIndex[i].z < 0)
+            { // The CPU could not pack every neighbor. Keep scanning the depth-sorted list.
+                scan_all = true;
+            }
+            if (!scan_all && neighborIdx != -1)
             {
                 int neighborCount = refIndex[i].z;
 

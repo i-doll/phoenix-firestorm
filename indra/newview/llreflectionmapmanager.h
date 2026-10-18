@@ -91,7 +91,7 @@ public:
         // indices used by probe:
         //  [i][0] - cubemap array index for this probe
         //  [i][1] - index into "refNeighbor" for probes that intersect this probe
-        //  [i][2] - number of probes  that intersect this probe, or -1 for no neighbors
+        //  [i][2] - packed neighbor count, or -1 if truncated (shader must scan all probes)
         //  [i][3] - priority (probe type stored in sign bit - positive for spheres, negative for boxes)
         GLint refIndex[LL_MAX_REFLECTION_PROBE_COUNT][4];
 
