@@ -36,14 +36,26 @@ uniform vec3 sun_dir;
 uniform float shadow_bias;
 
 vec4 getNorm(vec2 pos_screen);
-vec4 getPosition(vec2 pos_screen);
+vec4 getPositionWithDepth(vec2 pos_screen, float depth);
+float getDepth(vec2 pos_screen);
+bool isFarDepth(float d);
 
 float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 
 void main()
 {
     vec2 pos_screen = vary_fragcoord.xy;
-    vec4 pos        = getPosition(pos_screen);
+    float depth     = getDepth(pos_screen);
+
+    // Sky: every term below already resolves to fully lit out here (beyond the last shadow
+    // split), so skip the normal fetch and the reconstruction.
+    if (isFarDepth(depth))
+    {
+        frag_color = vec4(1.0);
+        return;
+    }
+
+    vec4 pos        = getPositionWithDepth(pos_screen, depth);
     vec4 norm       = getNorm(pos_screen);
 
     vec4 col;

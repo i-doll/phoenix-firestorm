@@ -10099,11 +10099,11 @@ void LLPipeline::renderDeferredLighting()
                 bindDeferredShader(sun_shader, deferred_light_target);
                 // <ID:PCSS> Soft sun shadows only in this full screen pass, alpha and water keep the
                 // fixed filter. The filter radius is half the penumbra: tan(0.265 deg) per meter for the real sun.
-                if (!gCubeSnapshot)
+                // Reflection probes share the probe program with the SSAO-off path, so they reset it to 0.
                 {
                     static LLCachedControl<F32> sun_softness(gSavedSettings, "IDRenderSunShadowSoftness", 1.f);
                     static LLStaticHashedString s_sun_shadow_softness("sun_shadow_softness");
-                    sun_shader.uniform1f(s_sun_shadow_softness, 0.004625f * llmax((F32)sun_softness, 0.f));
+                    sun_shader.uniform1f(s_sun_shadow_softness, gCubeSnapshot ? 0.f : 0.004625f * llmax((F32)sun_softness, 0.f));
                 }
                 // </ID:PCSS>
                 mScreenTriangleVB->setBuffer();

@@ -175,10 +175,15 @@ void main()
             float amb_da = 0.0;
 
             lv = normalize(lv);
-            pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
+
+            // pbrPunctual's own NdotL, so the ambiance below sees the same value either way. Only
+            // a front-facing fragment uses the lobes, so the BRDF is evaluated inside the test.
+            nl = clamp(dot(n.xyz, lv), 0.0, 1.0);
 
             if (dot(n.xyz, lv) > 0.0)
             {
+                pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
+
                 amb_da += (nl*0.5 + 0.5) * proj_ambiance;
 
                 dlit = getProjectedLightDiffuseColor( l_dist, proj_tc.xy );

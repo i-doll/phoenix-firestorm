@@ -760,7 +760,9 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
     float lightDist = length(lv);
 
     float dist = lightDist / lightSize;
-    if (dist <= 1.0)
+    // Back-facing: pbrPunctual's NdotL is zero, so the light contributes exactly nothing.
+    // Forward passes evaluate every light slot per fragment, so skip the BRDF entirely.
+    if (dist <= 1.0 && dot(n, lv) > 0.0)
     {
         lv /= max(lightDist, 1e-8);
 
