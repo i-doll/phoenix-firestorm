@@ -43,6 +43,10 @@ namespace idmcp
     // Family variant, which the sim does not answer for others' attachments.
     void onObjectProperties(LLMessageSystem* msg);
 
+    // ScriptRunningReply hook (a script's compiler and running state for
+    // object.setScriptExperience), called from LLLiveLSLEditor::processScriptRunningReply.
+    void onScriptRunningReply(LLMessageSystem* msg);
+
     // Agent chat bridge hooks, called from FSLSLBridge::lslToViewer. A message
     // heard on an agent-opened bridge listen, and open/close/error status for a
     // requested listen. (channel is S32/int.)

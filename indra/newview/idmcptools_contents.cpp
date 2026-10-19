@@ -1,6 +1,6 @@
 /**
  * @file idmcptools_contents.cpp
- * @brief <ID> MCP server: object.contents, addContents, copyContents and removeContents (task inventory).
+ * @brief <ID> MCP server: object.contents, addContents, copyContents, removeContents and setScriptExperience (task inventory), and experience.list.
  *
  * Part of Five's custom Firestorm fork. Custom code carries an `ID` prefix.
  *
@@ -14,25 +14,37 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "idmcptools_object.h"
+#include "idmcp.h"                   // idmcp::onScriptRunningReply
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
 
 #include "llagent.h"
+#include "llassetstorage.h"         // gAssetStorage
+#include "llcallbacklist.h"         // doAfterInterval
+#include "llcorehttputil.h"
+#include "llexperiencecache.h"
+#include "llfilesystem.h"
 #include "llinventorydefines.h"     // TASK_INVENTORY_ITEM_KEY
 #include "llinventorymodel.h"       // gInventory
 #include "llinventoryobserver.h"
 #include "lltimer.h"                // time_corrected
 #include "lltooldraganddrop.h"      // isInventoryDropAcceptable (public static)
 #include "llviewerinventory.h"
+#include "llviewerassetupload.h"    // LLScriptAssetUpload
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"     // gObjectList
+#include "llviewerregion.h"
+#include "message.h"
+#include "roles_constants.h"       // GP_OBJECT_MANIPULATE
 #include "rlvactions.h"
 #include "rlvdefines.h"
 #include "rlvlocks.h"               // gRlvAttachmentLocks
 
 #include <algorithm>
+#include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -896,6 +908,401 @@ namespace
         Job::launch(job);
         job->begin();
     }
+
+    // ---- experience.list ---------------------------------------------------------------
+
+    // The experiences the agent can compile scripts for, as the script editor's
+    // experience list. False when the region has no GetCreatorExperiences cap.
+    bool fetch_creator_experiences(const std::function<void(bool ok, const std::vector<LLUUID>& ids)>& fn)
+    {
+        LLViewerRegion* region = gAgent.getRegion();
+        const std::string url = region ? region->getCapability("GetCreatorExperiences") : std::string();
+        if (url.empty()) return false;
+        LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpGet(url,
+            [fn](const LLSD& result)
+            {
+                std::vector<LLUUID> ids;
+                for (const LLSD& id : llsd::inArray(result["experience_ids"])) ids.push_back(id.asUUID());
+                fn(true, ids);
+            },
+            [fn](const LLSD&) { fn(false, std::vector<LLUUID>()); });
+        return true;
+    }
+
+    constexpr F32 NAMES_LIMIT = 5.f;
+
+    void run_list_experiences(const IDMCPCallPtr& call)
+    {
+        const bool sent = fetch_creator_experiences([call](bool ok, const std::vector<LLUUID>& ids)
+        {
+            if (!ok)
+            {
+                idmcp_tool_err(call, IDMCP_ERR_CAP_UNAVAIL, "couldn't fetch your experiences; try again");
+                return;
+            }
+            // A name lookup can stay unanswered, so after NAMES_LIMIT the reply
+            // goes out with whatever names arrived.
+            struct Names
+            {
+                std::vector<LLUUID>           ids;
+                std::map<LLUUID, std::string> names;
+                std::set<LLUUID>              answered;
+                bool                          done = false;
+            };
+            auto names = std::make_shared<Names>();
+            for (const LLUUID& id : ids)
+            {
+                if (id.notNull() && std::find(names->ids.begin(), names->ids.end(), id) == names->ids.end())
+                {
+                    names->ids.push_back(id);
+                }
+            }
+            auto reply = [call, names]()
+            {
+                if (names->done) return;
+                names->done = true;
+                boost::json::array list;
+                for (const LLUUID& id : names->ids)
+                {
+                    boost::json::object e;
+                    e["experience_id"] = id.asString();
+                    auto it = names->names.find(id);
+                    if (it != names->names.end()) e["name"] = it->second;
+                    list.push_back(std::move(e));
+                }
+                boost::json::object o;
+                o["experiences"] = std::move(list);
+                idmcp_tool_ok(call, o);
+            };
+            if (names->ids.empty())
+            {
+                reply();
+                return;
+            }
+            doAfterInterval(reply, NAMES_LIMIT);
+            for (const LLUUID& id : names->ids)
+            {
+                LLExperienceCache::instance().get(id, [names, reply, id](const LLSD& exp)
+                {
+                    if (exp.has(LLExperienceCache::NAME)) names->names[id] = exp[LLExperienceCache::NAME].asString();
+                    names->answered.insert(id);
+                    if (names->answered.size() == names->ids.size()) reply();
+                });
+            }
+        });
+        if (!sent) idmcp_tool_err(call, IDMCP_ERR_CAP_UNAVAIL, "GetCreatorExperiences capability unavailable");
+    }
+
+    // ---- object.setScriptExperience ------------------------------------------------
+
+    IDMCPGateResult rlv_script_experience(const LLViewerObject* root)
+    {
+        IDMCPGateResult g = rlvEdit(root);
+        if (!g.allowed) return g;
+        // As the script editor, which won't save a script in a locked attachment.
+        if (IDMCPRlvGate::isEnabled() && root && gRlvAttachmentLocks.isLockedAttachment(root))
+        {
+            return IDMCPRlvGate::deny(RLV_BHVR_DETACH, "detach");
+        }
+        return IDMCPRlvGate::checkBehaviour(RLV_BHVR_VIEWSCRIPT, "viewscript");
+    }
+
+    IDMCPGateResult gate_script_experience(const boost::json::object& args, IDMCPGatePhase)
+    {
+        return rlv_script_experience(findRoot(args));
+    }
+
+    class ExperienceJob;
+    std::vector<std::weak_ptr<ExperienceJob>> g_script_state_waiters;
+
+    // The experience is only set when a script compiles, so this downloads the
+    // script's source and recompiles it with the new experience, as saving it
+    // from the script editor does. Like the editor, it asks the region for the
+    // script's compiler and running state and keeps them unless told otherwise.
+    class ExperienceJob : public Job
+    {
+    public:
+        // An empty target or running == nullopt means keep the script's own.
+        ExperienceJob(const IDMCPCallPtr& call, const Target& t, const LLUUID& item_id, const LLUUID& experience_id,
+                      const std::string& target, std::optional<bool> running)
+            : Job(call, ADD_LIMIT), mRootId(t.root->getID()), mPrimId(t.prim->getID()), mLink(t.link),
+              mItemId(item_id), mExperienceId(experience_id), mTarget(target), mRunning(running)
+        {
+        }
+
+        void begin(const std::weak_ptr<ExperienceJob>& self)
+        {
+            mSelf = self;
+            LLViewerObject* prim = gObjectList.findObject(mPrimId);
+            if (prim) mFetch.start(prim);
+            if ((mTarget.empty() || !mRunning.has_value()) && prim && prim->getRegion())
+            {
+                mStatePending = true;
+                g_script_state_waiters.push_back(self);
+                LLMessageSystem* msg = gMessageSystem;
+                msg->newMessageFast(_PREHASH_GetScriptRunning);
+                msg->nextBlockFast(_PREHASH_Script);
+                msg->addUUIDFast(_PREHASH_ObjectID, mPrimId);
+                msg->addUUIDFast(_PREHASH_ItemID, mItemId);
+                msg->sendReliable(prim->getRegion()->getHost());
+            }
+            if (mExperienceId.isNull()) return;
+
+            mExperiencesPending = fetch_creator_experiences([self](bool ok, const std::vector<LLUUID>& ids)
+            {
+                std::shared_ptr<ExperienceJob> job = self.lock();
+                if (!job) return;
+                job->mExperiencesPending = false;
+                job->mExperiencesFailed  = !ok;
+                job->mAllowed            = ids;
+            });
+            mExperiencesFailed = !mExperiencesPending;
+        }
+
+        bool waitingForState() const { return mStatePending; }
+
+        void onScriptState(const LLUUID& object_id, const LLUUID& item_id, bool running, const std::string& target)
+        {
+            if (!mStatePending || object_id != mPrimId || item_id != mItemId) return;
+            mStatePending = false;
+            if (mTarget.empty()) mTarget = target;
+            if (!mRunning.has_value()) mRunning = running;
+        }
+
+    protected:
+        void tick(F64) override
+        {
+            if (mStep != Step::Listing) return;   // the download and upload callbacks finish the job
+
+            LLViewerObject* prim = gObjectList.findObject(mPrimId);
+            if (!prim || prim->isDead() || !prim->getRegion())
+            {
+                fail(IDMCP_ERR_NOT_FOUND, "the object is gone (deleted, taken or out of range)");
+                return;
+            }
+            if (!mFetch.done()) return;
+            mContentsArrived = true;
+            if (mExperiencesPending) return;
+            if (mFetch.failed())
+            {
+                fail(IDMCP_ERR_CAP_UNAVAIL, "the region couldn't send the object's contents; try again");
+                return;
+            }
+            const LLViewerInventoryItem* item = find_item(mFetch.items(), mItemId);
+            if (!item)
+            {
+                fail(IDMCP_ERR_NOT_FOUND, "that item isn't in the object's contents");
+                return;
+            }
+            if (item->getType() != LLAssetType::AT_LSL_TEXT)
+            {
+                fail(IDMCP_ERR_INVALID_PARAMS, "that item isn't a script");
+                return;
+            }
+            if (!gAgent.allowOperation(PERM_COPY, item->getPermissions(), GP_OBJECT_MANIPULATE) ||
+                !gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
+            {
+                fail(IDMCP_ERR_PERMISSION, "you need copy and modify permission on the script");
+                return;
+            }
+            if (mExperienceId.notNull())
+            {
+                if (mExperiencesFailed)
+                {
+                    fail(IDMCP_ERR_CAP_UNAVAIL, "couldn't fetch the experiences you can use; try again");
+                    return;
+                }
+                if (std::find(mAllowed.begin(), mAllowed.end(), mExperienceId) == mAllowed.end())
+                {
+                    fail(IDMCP_ERR_INVALID_PARAMS, "you can't add scripts to that experience; experience.list shows the ones you can");
+                    return;
+                }
+            }
+            if (mStatePending) return;
+            if (mTarget.empty() || !mRunning.has_value())
+            {
+                fail(IDMCP_ERR_CAP_UNAVAIL, "the region didn't report the script's state; try again");
+                return;
+            }
+            mName = item->getName();
+            const LLUUID owner_id = item->getPermissions().getOwner();
+            const LLUUID asset_id = item->getAssetUUID();
+            mFetch.stop();
+
+            mStep = Step::Downloading;
+            std::weak_ptr<ExperienceJob> self = mSelf;
+            gAssetStorage->getInvItemAsset(
+                prim->getRegion()->getHost(), gAgentID, gAgentSessionID, owner_id, mPrimId, mItemId, asset_id,
+                LLAssetType::AT_LSL_TEXT,
+                [self](const LLUUID& asset_uuid, LLAssetType::EType type, void*, S32 status, LLExtStat)
+                {
+                    std::shared_ptr<ExperienceJob> job = self.lock();
+                    if (!job || job->finished()) return;
+                    if (status != 0)
+                    {
+                        job->fail(IDMCP_ERR_NOT_FOUND, "couldn't download the script's source");
+                        return;
+                    }
+                    LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
+                    std::string source(file.getSize(), '\0');
+                    if (!source.empty()) file.read((U8*)source.data(), (S32)source.size());
+                    while (!source.empty() && source.back() == '\0') source.pop_back();
+                    job->upload(source);
+                },
+                nullptr, true);
+        }
+
+        void teardown() override { mFetch.stop(); }
+
+        std::string timeoutMessage() const override
+        {
+            switch (mStep)
+            {
+            case Step::Listing:
+                return mContentsArrived ? "the region didn't report the script's state in time; try again"
+                                     : "the object's contents didn't arrive in time; try again";
+            case Step::Downloading: return "the script's source didn't arrive in time; try again";
+            default:                return "the script was sent but the region didn't answer in time; check it in the script editor";
+            }
+        }
+
+    private:
+        enum class Step { Listing, Downloading, Uploading };
+
+        void upload(const std::string& source)
+        {
+            LLViewerObject* prim = gObjectList.findObject(mPrimId);
+            if (!prim || prim->isDead() || !prim->getRegion())
+            {
+                fail(IDMCP_ERR_NOT_FOUND, "the object is gone (deleted, taken or out of range)");
+                return;
+            }
+            // Commit point: a restriction may have arrived while the source downloaded.
+            if (failIfDenied(rlv_script_experience(prim->getRootEdit()))) return;
+            const std::string url = prim->getRegion()->getCapability("UpdateScriptTask");
+            if (url.empty())
+            {
+                fail(IDMCP_ERR_CAP_UNAVAIL, "UpdateScriptTask capability unavailable");
+                return;
+            }
+
+            mStep = Step::Uploading;
+            std::weak_ptr<ExperienceJob> self = mSelf;
+            LLResourceUploadInfo::ptr_t info = std::make_shared<LLScriptAssetUpload>(
+                mPrimId, mItemId, mTarget, *mRunning, mExperienceId, source,
+                [self](LLUUID, LLUUID, LLUUID, LLSD response)
+                {
+                    std::shared_ptr<ExperienceJob> job = self.lock();
+                    if (job) job->succeed(job->result_data(response));
+                },
+                [self](LLUUID, LLUUID, LLSD, std::string reason) -> bool
+                {
+                    std::shared_ptr<ExperienceJob> job = self.lock();
+                    if (job) job->fail(IDMCP_ERR_PERMISSION, "script upload failed: " + reason);
+                    return false;
+                });
+            LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
+        }
+
+        boost::json::object result_data(const LLSD& response) const
+        {
+            boost::json::object o;
+            o["object_id"] = mRootId.asString();
+            if (mLink) o["link"] = mLink;
+            o["item_id"] = mItemId.asString();
+            o["name"]    = mName;
+            if (mExperienceId.notNull()) o["experience_id"] = mExperienceId.asString();
+            else                         o["experience_id"] = nullptr;
+            o["running"] = *mRunning;
+            o["target"]  = mTarget;
+            if (response.has("compiled")) o["compiled"] = response["compiled"].asBoolean();
+            if (response.has("errors") && response["errors"].isArray())
+            {
+                boost::json::array errs;
+                for (const LLSD& e : llsd::inArray(response["errors"]))
+                {
+                    boost::json::value ev;
+                    ev = e.asString();
+                    errs.push_back(std::move(ev));
+                }
+                o["errors"] = std::move(errs);
+            }
+            return o;
+        }
+
+        std::weak_ptr<ExperienceJob> mSelf;
+        LLUUID              mRootId;
+        LLUUID              mPrimId;
+        S32                 mLink = 0;
+        LLUUID              mItemId;
+        LLUUID              mExperienceId;
+        std::string         mTarget;
+        std::optional<bool> mRunning;
+        bool                mStatePending = false;
+        bool                mContentsArrived = false;
+        Step                mStep         = Step::Listing;
+        std::string         mName;
+        bool                mExperiencesPending = false;
+        bool                mExperiencesFailed  = false;
+        std::vector<LLUUID> mAllowed;
+        ContentsFetch       mFetch;
+    };
+
+    void run_set_script_experience(const boost::json::object& args, const IDMCPCallPtr& call)
+    {
+        Target t;
+        if (!resolve(args, call, t)) return;
+        if (!requireModify(t, call)) return;
+        const std::string item = argStr(args, "item_id");
+        if (!isUuid(item))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "item_id must be a UUID");
+            return;
+        }
+        const std::string exp = argStr(args, "experience_id");
+        if (exp != "none" && !isUuid(exp))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "experience_id must be a UUID or \"none\"");
+            return;
+        }
+        const std::string target = argStr(args, "target");
+        if (!target.empty() && target != "lsl2" && target != "mono" && target != "luau" && target != "lsl-luau")
+        {
+            idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "target must be lsl2, mono, luau, or lsl-luau");
+            return;
+        }
+        auto job = std::make_shared<ExperienceJob>(call, t, LLUUID(item), exp == "none" ? LLUUID::null : LLUUID(exp),
+                                                   target,
+                                                   args.contains("running") ? std::optional<bool>(argBool(args, "running", true))
+                                                                            : std::nullopt);
+        Job::launch(job);
+        job->begin(job);
+    }
+}
+
+void idmcp::onScriptRunningReply(LLMessageSystem* msg)
+{
+    if (g_script_state_waiters.empty()) return;
+    LLUUID object_id, item_id;
+    msg->getUUIDFast(_PREHASH_Script, _PREHASH_ObjectID, object_id);
+    msg->getUUIDFast(_PREHASH_Script, _PREHASH_ItemID, item_id);
+    bool running = false, mono = false, luau = false, luau_language = false;
+    msg->getBOOLFast(_PREHASH_Script, _PREHASH_Running, running);
+    msg->getBOOLFast(_PREHASH_Script, "Mono", mono);
+    msg->getBOOLFast(_PREHASH_Script, "Luau", luau);
+    msg->getBOOLFast(_PREHASH_Script, "LuauLanguage", luau_language);
+    // Same mapping as LLLiveLSLEditor::processScriptRunningReply.
+    const std::string target = luau ? (luau_language ? "luau" : "lsl-luau") : (mono ? "mono" : "lsl2");
+
+    std::vector<std::weak_ptr<ExperienceJob>> waiters;
+    waiters.swap(g_script_state_waiters);
+    for (const std::weak_ptr<ExperienceJob>& w : waiters)
+    {
+        std::shared_ptr<ExperienceJob> job = w.lock();
+        if (!job || job->finished()) continue;
+        job->onScriptState(object_id, item_id, running, target);
+        if (!job->finished() && job->waitingForState()) g_script_state_waiters.push_back(w);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -984,6 +1391,43 @@ void idmcp_register_contents_tools(IDMCPToolRegistry& reg)
         t.gate    = gate_add_contents;
         t.timeout = 60.0;
         t.invoke  = [](const boost::json::object& args, const IDMCPCallPtr& call) { run_remove_contents(args, call); };
+        reg.add(std::move(t));
+    }
+
+    // experience.list ----------------------------------------------------------------
+    {
+        IDMCPTool t;
+        t.name = "experience.list";
+        t.description =
+            "List the experiences you can compile scripts for, for object.setScriptExperience. "
+            "Returns {experiences:[{experience_id, name}]}.";
+        t.input_schema = boost::json::parse(R"({"type":"object","properties":{},"additionalProperties":false})");
+        t.timeout = 30.0;
+        t.invoke  = [](const boost::json::object&, const IDMCPCallPtr& call) { run_list_experiences(call); };
+        reg.add(std::move(t));
+    }
+
+    // object.setScriptExperience ---------------------------------------------------
+    {
+        IDMCPTool t;
+        t.name = "object.setScriptExperience";
+        t.description =
+            "Set or clear the experience of a script inside an object. Call experience.list first for "
+            "the experience_id. {\"object_id\"}*, {\"item_id\"}* "
+            "(a script from object.contents), {\"experience_id\"}* (UUID, or \"none\" to clear), "
+            "{\"link\"} for a script in one prim instead of the root. The script keeps its compiler and "
+            "running state unless you pass {\"target\"} (as script.write) or {\"running\"}. Recompiles "
+            "the script, which resets it. Needs modify permission on the object and copy and modify on the script. Returns {object_id, "
+            "item_id, name, experience_id, running, target, compiled, errors?}. Blocked by RLV @viewscript, "
+            "@edit, @editobj, @editworld, @editattach, @interact or a locked attachment.";
+        t.input_schema = boost::json::parse(
+            R"({"type":"object","properties":{"object_id":{"type":"string"},"link":{"type":"integer"},)"
+            R"("item_id":{"type":"string"},"experience_id":{"type":"string"},"running":{"type":"boolean"},)"
+            R"("target":{"type":"string","enum":["mono","lsl2","luau","lsl-luau"]}},)"
+            R"("required":["object_id","item_id","experience_id"],"additionalProperties":false})");
+        t.gate    = gate_script_experience;
+        t.timeout = 60.0;
+        t.invoke  = [](const boost::json::object& args, const IDMCPCallPtr& call) { run_set_script_experience(args, call); };
         reg.add(std::move(t));
     }
 }
