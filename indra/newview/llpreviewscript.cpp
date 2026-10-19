@@ -99,6 +99,7 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 #include "fsscriptlibrary.h"
+#include "idmcp.h"  // <ID> embedded MCP server facade
 
 // NaCl - LSL Preprocessor
 #include "fslslpreproc.h"
@@ -3410,6 +3411,7 @@ void LLLiveLSLEditor::onSave(void* userdata, bool close_after_save, bool sync)
 // static
 void LLLiveLSLEditor::processScriptRunningReply(LLMessageSystem* msg, void**)
 {
+    idmcp::onScriptRunningReply(msg); // <ID> object.setScriptExperience
     LLUUID item_id;
     LLUUID object_id;
     msg->getUUIDFast(_PREHASH_Script, _PREHASH_ObjectID, object_id);
