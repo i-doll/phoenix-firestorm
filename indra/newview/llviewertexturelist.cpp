@@ -1403,7 +1403,7 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
     // budget for the complete sweep (including offscreen cleanup). This scan
     // is cheap and bounded; it does not recalculate pixel areas for candidates.
     std::unordered_set<LLViewerFetchedTexture*> urgent_updates;
-    const U32 scan_count = llmin((U32)mUUIDMap.size(), 512U);
+   const U32 scan_count = llmin((U32)mUUIDMap.size(), 2048U);
     auto urgent_iter = mUUIDMap.upper_bound(mLastUrgentUpdateKey);
     for (U32 scanned = 0; scanned < scan_count && urgent_updates.size() < 32 && !mUUIDMap.empty(); ++scanned)
     {
@@ -1451,6 +1451,52 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
         // Updating can erase map entries. Reacquire the iterator by key.
         urgent_iter = mUUIDMap.upper_bound(mLastUrgentUpdateKey);
     }
+
+    // <FS:Trish> Fetch priority refresh lane
+    // Keep the fetcher's priorities current for the textures it is actually working on. A
+    // request's priority is only re-sent when that texture's decode priority is recomputed, and
+    // the full sweep below takes seconds to come round in a busy region. Moving fast across
+    // mainland, the textures just driven past kept the priority they had up close for that long,
+    // and the waiter queue -- which is sorted by it -- kept serving them ahead of the region being
+    // entered. The fetching set is a small fraction of the list, so a cheap scan for it with its
+    // own round-robin refreshes every live request within a fraction of a second.
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - fetch priorities");
+        static constexpr U32 FETCH_REFRESH_SCAN_COUNT = 2048;
+        const F32 refresh_deadline = timer.getElapsedTimeF32() + max_time * 0.15f;
+        const U32 refresh_scan_count = llmin((U32)mUUIDMap.size(), FETCH_REFRESH_SCAN_COUNT);
+        auto refresh_iter = mUUIDMap.upper_bound(mLastFetchRefreshKey);
+        for (U32 scanned = 0; scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned)
+        {
+            if (timer.getElapsedTimeF32() >= refresh_deadline)
+            {
+                break;
+            }
+            if (refresh_iter == mUUIDMap.end())
+            {
+                refresh_iter = mUUIDMap.begin();
+            }
+            mLastFetchRefreshKey = refresh_iter->first;
+
+            LLViewerFetchedTexture* candidate = refresh_iter->second.get();
+            if (!candidate->isFetching() || urgent_updates.count(candidate))
+            {
+                ++refresh_iter;
+                continue;
+            }
+
+            LLPointer<LLViewerFetchedTexture> imagep = refresh_iter->second;
+            updateImageDecodePriority(imagep);
+            if (imagep->isInImageList())
+            {
+                imagep->updateFetch();
+                urgent_updates.insert(imagep.get());
+            }
+            // Updating can erase map entries. Reacquire the iterator by key.
+            refresh_iter = mUUIDMap.upper_bound(mLastFetchRefreshKey);
+        }
+    }
+    // </FS:Trish>
 
     typedef std::vector<LLPointer<LLViewerFetchedTexture> > entries_list_t;
     entries_list_t entries;

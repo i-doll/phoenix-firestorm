@@ -242,6 +242,7 @@ private:
     uuid_map_t mUUIDMap;
     LLTextureKey mLastUpdateKey;
     LLTextureKey mLastUrgentUpdateKey;
+    LLTextureKey mLastFetchRefreshKey; // <FS:Trish/> round-robin position of the fetch priority refresh
     // Ready requests left over from the last frame: carried for time, or seen before the fetcher
     // had published the result (the notification can land just ahead of it).
     std::vector<LLUUID> mReadyRequestBacklog;
