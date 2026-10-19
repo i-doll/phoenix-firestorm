@@ -912,6 +912,7 @@ void LLViewerTextureList::updateImages(F32 max_time)
         LL_INFOS("Texture") << "Texture list: textures=" << mUUIDMap.size()
                             << " create_queue=" << mCreateTextureList.size()
                             << " downscale_queue=" << mDownScaleQueue.size()
+                            << " ready_backlog=" << mReadyRequestBacklog.size()
                             << " budget_ms=" << max_time * 1000.f
                             << " discard_bias=" << LLViewerTexture::sDesiredDiscardBias
                             << LL_ENDL;
