@@ -1222,8 +1222,12 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
         imagep->postCreateTexture();
         imagep->mCreatePending = false;
 
+        // <FS:Trish> Downscale only under memory pressure (see LLViewerLODTexture::processTextureStats)
+        //if (imagep->hasGLTexture() && imagep->getDiscardLevel() < imagep->getDesiredDiscardLevel() &&
+        //   (imagep->getDesiredDiscardLevel() <= MAX_DISCARD_LEVEL))
         if (imagep->hasGLTexture() && imagep->getDiscardLevel() < imagep->getDesiredDiscardLevel() &&
-           (imagep->getDesiredDiscardLevel() <= MAX_DISCARD_LEVEL))
+           (imagep->getDesiredDiscardLevel() <= MAX_DISCARD_LEVEL) && LLViewerTexture::sDesiredDiscardBias > 1.f)
+        // </FS:Trish>
         {
             // NOTE: this may happen if the desired discard reduces while a decode is in progress and does not
             // necessarily indicate a problem, but if log occurrences excede that of dsiplay_stats: FPS,
@@ -1237,6 +1241,20 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
             break;
         }
     }
+
+    // <FS:Trish> Downscale only under memory pressure
+    // Entries queued while memory was tight can outlive the pressure. Once VRAM is back under
+    // target, release them without the GPU work -- this queue used to keep forcing at least five
+    // downscales a frame, past the time budget, for thousands of textures that no longer needed it.
+    if (!mDownScaleQueue.empty() && LLViewerTexture::sDesiredDiscardBias <= 1.f)
+    {
+        while (!mDownScaleQueue.empty())
+        {
+            mDownScaleQueue.front()->mDownScalePending = false;
+            mDownScaleQueue.pop();
+        }
+    }
+    // </FS:Trish>
 
     if (!mDownScaleQueue.empty() && gPipeline.mDownResMap.isComplete())
     {
