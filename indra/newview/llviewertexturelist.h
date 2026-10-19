@@ -242,6 +242,10 @@ private:
     uuid_map_t mUUIDMap;
     LLTextureKey mLastUpdateKey;
     LLTextureKey mLastUrgentUpdateKey;
+    // Ready requests left over from the last frame: carried for time, or seen before the fetcher
+    // had published the result (the notification can land just ahead of it).
+    std::vector<LLUUID> mReadyRequestBacklog;
+    std::vector<LLUUID> mReadyRequestRecheck;
 
     image_list_t mImageList;
 

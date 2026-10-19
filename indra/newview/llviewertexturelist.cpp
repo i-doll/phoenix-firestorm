@@ -1196,7 +1196,24 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
         // should
         bool redundant_load = imagep->hasGLTexture() && imagep->getDiscardLevel() <= imagep->getDesiredDiscardLevel();
 
-        if (!redundant_load)
+        // Nothing can see or use this texture any more (typically the departed region's, after a
+        // teleport): its desired level is "not wanted", and it has no faces, volumes, boost,
+        // callbacks or raw-image consumers. Uploading it would spend this frame's creation budget
+        // -- which is first come, first served -- on a texture queued for a downscale straight
+        // after, ahead of the ones the new view is waiting for. Take the same path as a redundant
+        // load: drop the decoded data and clear the pending state. It is fetched again if ever
+        // wanted.
+        const bool unwanted_load = !redundant_load &&
+            imagep->getDesiredDiscardLevel() > MAX_DISCARD_LEVEL &&
+            imagep->getBoostLevel() == LLGLTexture::BOOST_NONE &&
+            imagep->getTotalNumFaces() == 0 &&
+            imagep->getNumVolumes(LLRender::LIGHT_TEX) == 0 &&
+            imagep->getNumVolumes(LLRender::SCULPT_TEX) == 0 &&
+            !imagep->hasCallbacks() &&
+            !imagep->needsToSaveRawImage() &&
+            !imagep->forSculpt();
+
+        if (!redundant_load && !unwanted_load)
         {
            imagep->createTexture();
         }
@@ -1330,6 +1347,58 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     LLTimer timer;
+
+    // Collect results the fetcher has finished, every frame, instead of when the sweep below
+    // happens to reach each texture. updateFetch() alone is cheap -- it is the decode-priority
+    // pass (a pixel area per face) that makes the sweep slow -- and priorities do not need
+    // recomputing just to pick up data. Bounded by its own slice of the budget; leftovers carry
+    // over to the next frame rather than being dropped.
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - ready requests");
+        std::vector<LLUUID> ready;
+        LLAppViewer::getTextureFetch()->takeReadyRequests(ready);
+        std::vector<LLUUID> recheck;
+        recheck.swap(mReadyRequestRecheck);
+        if (!mReadyRequestBacklog.empty())
+        {
+            ready.insert(ready.begin(), mReadyRequestBacklog.begin(), mReadyRequestBacklog.end());
+            mReadyRequestBacklog.clear();
+        }
+
+        auto service = [this](const LLUUID& id, bool first_look) -> void
+        {
+            for (S32 type = TEX_LIST_STANDARD; type <= TEX_LIST_SCALE; ++type)
+            {
+                LLPointer<LLViewerFetchedTexture> imagep = findImage(id, (ETexListType)type);
+                if (imagep.notNull() && imagep->isFetching() && imagep->isInImageList())
+                {
+                    imagep->updateFetch();
+                    if (first_look && imagep->isFetching())
+                    {
+                        // Look once more next frame in case the result was not published yet.
+                        mReadyRequestRecheck.push_back(id);
+                    }
+                }
+            }
+        };
+
+        const F32 ready_budget = max_time * 0.25f;
+        size_t i = 0;
+        for (; i < recheck.size() && timer.getElapsedTimeF32() < ready_budget; ++i)
+        {
+            service(recheck[i], false);
+        }
+        for (size_t j = 0; j < ready.size(); ++j)
+        {
+            if (timer.getElapsedTimeF32() >= ready_budget)
+            {
+                mReadyRequestBacklog.assign(ready.begin() + j, ready.end());
+                break;
+            }
+            service(ready[j], true);
+        }
+    }
+
     // Give visible textures a small extra pass while reserving most of the
     // budget for the complete sweep (including offscreen cleanup). This scan
     // is cheap and bounded; it does not recalculate pixel areas for candidates.
@@ -1348,6 +1417,17 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
         }
         mLastUrgentUpdateKey = urgent_iter->first;
         LLPointer<LLViewerFetchedTexture> imagep = urgent_iter->second;
+
+        // Spend the urgent slots only on textures that can still improve. A visible texture
+        // already at full resolution (or a missing asset) gains nothing from an early visit, and
+        // used to fill the 32 slots in a busy view, while one that is still grey or blurry
+        // waited for the sweep. Checked before the face walk because it is cheaper.
+        if (imagep->getGLTexture() == nullptr || imagep->isMissingAsset() || imagep->getDiscardLevel() == 0)
+        {
+            ++urgent_iter;
+            continue;
+        }
+
         bool visible = imagep->isJustBound();
         U32 checked_faces = 0;
         for (U32 ch = 0; !visible && ch < LLRender::NUM_TEXTURE_CHANNELS; ++ch)

@@ -2222,6 +2222,19 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
     {
         if ((decode_priority > 0)
             && (mRawDiscardLevel < 0 || mRawDiscardLevel == INVALID_DISCARD_LEVEL)
+            && mFetchState > 1 // 1 - initial, make sure fetcher did at least something
+            && LLTextureFetch::isTransientFetchFailure(mFetchState, mLastHttpGetStatus))
+        {
+            // Finished without data, but not because the asset is gone: a transient HTTP failure,
+            // or a worker aborted before it sent anything (a teleport zeroes every texture's
+            // priority, which aborts exactly these). Both branches below are permanent -- one
+            // greys the texture out until it is refreshed, the other caps it at whatever blurry
+            // level it has now -- so leave the texture as it was. The next updateFetch() visit
+            // makes a fresh request at the current desired discard.
+            destroyRawImage();
+        }
+        else if ((decode_priority > 0)
+            && (mRawDiscardLevel < 0 || mRawDiscardLevel == INVALID_DISCARD_LEVEL)
             && mFetchState > 1) // 1 - initial, make sure fetcher did at least something
         {
             // We finished but received no data
@@ -3345,6 +3358,26 @@ void LLViewerLODTexture::processTextureStats()
         // If the image has not been significantly visible in a while, we don't want it
         mDesiredDiscardLevel = llmin(mMinDesiredDiscardLevel, (S8)(MAX_DISCARD_LEVEL + 1));
         mDesiredDiscardLevel = llmin(mDesiredDiscardLevel, (S32)mLoadedCallbackDesiredDiscardLevel);
+
+        // Under memory pressure, give back the VRAM of a texture nothing in the scene uses any
+        // more. This branch never scaled down, so after a teleport the departed region's textures
+        // kept their full resolution until the 30 s lazy flush deleted them (longer while a
+        // material still referenced them). They kept the memory estimate high, which kept the
+        // discard bias high, which is what holds the new region's textures at low resolution.
+        // Without pressure nothing changes, so revisiting an area still finds it sharp.
+        // scaleDown() clamps to the texture's own smallest mip.
+        if (LLViewerTexture::sDesiredDiscardBias > 1.f &&
+            !mForceToSaveRawImage &&
+            getTotalNumFaces() == 0 &&
+            getNumVolumes(LLRender::LIGHT_TEX) == 0 &&
+            getNumVolumes(LLRender::SCULPT_TEX) == 0)
+        {
+            const S32 current_discard = getDiscardLevel();
+            if (current_discard >= 0 && current_discard < getMaxDiscardLevel())
+            {
+                scaleDown();
+            }
+        }
     }
     else if (!mFullWidth  || !mFullHeight)
     {

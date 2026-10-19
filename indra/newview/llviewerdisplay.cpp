@@ -1003,6 +1003,13 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 {
                     max_image_decode_time = llmax(max_image_decode_time, 0.005f);
                 }
+                if (gTeleportDisplay && gAgent.getTeleportState() == LLAgent::TELEPORT_ARRIVING)
+                {
+                    // Only the arrival screen is drawn while ARRIVING, which exists to let the
+                    // destination's textures fetch, decode and upload. Frame time is not what
+                    // anyone is looking at, so spend it there.
+                    max_image_decode_time = 0.015f;
+                }
                 gTextureList.updateImages(max_image_decode_time);
             }
 
