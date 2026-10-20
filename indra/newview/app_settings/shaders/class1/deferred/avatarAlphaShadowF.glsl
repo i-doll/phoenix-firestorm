@@ -34,13 +34,22 @@ in float target_pos_x;
 in vec2 vary_texcoord0;
 uniform vec4 color;
 
-void shadowDitherDiscard(float alpha, float opaque_threshold);
-
 void main()
 {
     float alpha = texture(diffuseMap, vary_texcoord0.xy).a * color.a;
 
-    shadowDitherDiscard(alpha, minimum_alpha);
+    if (alpha < 0.05) // treat as totally transparent
+    {
+        discard;
+    }
+
+    if (alpha < minimum_alpha) // treat as semi-transparent
+    {
+      if (fract(0.5*floor(target_pos_x / pos_w )) < 0.25)
+      {
+        discard;
+      }
+    }
 
     frag_color = vec4(1,1,1,1);
 }

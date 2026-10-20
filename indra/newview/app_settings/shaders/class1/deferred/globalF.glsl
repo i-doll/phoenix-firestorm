@@ -40,35 +40,6 @@ void mirrorClip(vec3 pos)
     }
 }
 
-// Coverage test for a semi-transparent shadow caster.
-//
-// Below 0.05 the caster is treated as fully transparent, and from opaque_threshold up as fully
-// opaque. In between it keeps a share of shadow-map texels equal to its alpha, on an ordered 4x4
-// Bayer pattern, so the PCF filter reconstructs a shadow whose density follows the material.
-// The pattern this replaces dropped every other column whatever the alpha, so a faint veil and a
-// nearly solid leaf cast the same half-strength striped shadow.
-//
-// The Bayer rank is built from the texel's bits rather than read from a table: a dynamically
-// indexed constant array can be placed in local memory on some drivers.
-void shadowDitherDiscard(float alpha, float opaque_threshold)
-{
-    if (alpha < 0.05)
-    {
-        discard;
-    }
-
-    if (alpha < opaque_threshold)
-    {
-        uvec2 p = uvec2(gl_FragCoord.xy) & 3u;
-        uint xy = p.x ^ p.y;
-        uint rank = ((xy & 1u) << 3) | ((p.y & 1u) << 2) | (xy & 2u) | (p.y >> 1);
-        if (alpha < (float(rank) + 0.5) * (1.0 / 16.0))
-        {
-            discard;
-        }
-    }
-}
-
  // Octahedron normal vector encoding
  // https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
  //
