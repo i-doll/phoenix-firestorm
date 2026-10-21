@@ -513,6 +513,6 @@ void main()
     frag_data[2] = encodeNormalGeo(tnorm, geom_normal * (gl_FrontFacing ? 1.0 : -1.0), GBUFFER_FLAG_HAS_PBR);
 
 #if defined(HAS_EMISSIVE)
-    frag_data[3] = max(vec4(mix_emissive,0), vec4(0));                                                // PBR linear Emissive (sampler-decoded, float attachment stores it verbatim)
+    frag_data[3] = max(vec4(mix_emissive,0), vec4(0));                                                // PBR linear Emissive (converted in pbrterrainUtilF, float attachment stores it verbatim)
 #endif
 }

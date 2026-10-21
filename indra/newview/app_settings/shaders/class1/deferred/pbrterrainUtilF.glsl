@@ -58,6 +58,8 @@
 in vec3 vary_vertex_normal;
 #endif
 
+vec3 srgb_to_linear(vec3 c);
+
 // A relatively agressive threshold for terrain material mixing sampling
 // cutoff. This ensures that only one or two materials are used in most places,
 // making PBR terrain blending more performant. Should be greater than 0 to work.
@@ -164,11 +166,10 @@ PBRMix sample_pbr(
     )
 {
     PBRMix mix;
-    // Colour arrives linear: lldrawpoolterrain binds base colour and emissive through
-    // ALSamplers::AnisoWrapSRGB, the same GLTF_COLOR_SAMPLER LLFetchedGLTFMaterial::bind
-    // uses, so the hardware decodes on the fetch. Data slots (orm, normal) bind without it
-    // and are read raw.
+    // Base colour and emissive are sRGB-encoded and bound without hardware decode, so convert
+    // them to linear here. Data slots (orm, normal) are linear and read raw.
     mix.col = textureGrad(tex_col, uv, uv_ddx, uv_ddy);
+    mix.col.rgb = srgb_to_linear(mix.col.rgb);
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_OCCLUSION)
     mix.orm = textureGrad(tex_orm, uv, uv_ddx, uv_ddy).xyz;
 #elif (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
@@ -178,7 +179,7 @@ PBRMix sample_pbr(
     mix.vNt = textureGrad(tex_vNt, uv, uv_ddx, uv_ddy).xyz*2.0-1.0;
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
-    mix.emissive = textureGrad(tex_emissive, uv, uv_ddx, uv_ddy).xyz;
+    mix.emissive = srgb_to_linear(textureGrad(tex_emissive, uv, uv_ddx, uv_ddy).xyz);
 #endif
     return mix;
 }

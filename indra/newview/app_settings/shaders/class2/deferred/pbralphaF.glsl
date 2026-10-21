@@ -23,10 +23,9 @@
  * $/LicenseInfo$
  */
 
-// NOTE: base colour and emissive are NOT converted here. Their samplers ask the hardware
-// to decode (GLTF_COLOR_SAMPLER, pushGLTFBatchIndexed), which converts each texel before
-// filtering rather than after -- converting a blend taken in sRGB space is what made
-// minified albedo read too dark. Doing it here as well would convert twice.
+// NOTE: base colour and emissive textures are sRGB-encoded and bound without hardware sRGB
+// decode, so they are converted to linear here, as pbropaqueF does. Skipping the conversion
+// treats the encoded values as linear and washes the colour out towards grey.
 
 /*[EXTRA_CODE_HERE]*/
 
@@ -93,6 +92,7 @@ uniform vec4 light_attenuation[8];
 uniform vec3 light_diffuse[8];
 uniform vec2 light_deferred_attenuation[8];
 
+vec3 srgb_to_linear(vec3 c);
 vec3 linear_to_srgb(vec3 c);
 
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
@@ -157,6 +157,7 @@ void main()
 
 
     vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
+    basecolor.rgb = srgb_to_linear(basecolor.rgb);
 
     vec3 col = vertex_color.rgb * basecolor.rgb;
 
@@ -216,7 +217,7 @@ void main()
     // emissiveColor is the emissive color factor from GLTF and is already in linear space
     vec3 colorEmissive = emissiveColor;
     // emissiveMap here is a vanilla RGB texture encoded as sRGB, manually convert to linear
-    colorEmissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
+    colorEmissive *= srgb_to_linear(texture(emissiveMap, emissive_texcoord.xy).rgb);
 
     // Clip and alpha-test once every mipmapped fetch is done (as pbropaqueF does) but before
     // the atmospherics and the shadow PCF, so rejected fragments -- masked foliage, the far
@@ -373,6 +374,7 @@ in vec4 vertex_color;
 uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
 #endif
 
+vec3 srgb_to_linear(vec3 c);
 vec3 linear_to_srgb(vec3 c);
 
 
@@ -383,6 +385,7 @@ void main()
     vec3  pos         = vary_position;
 
     vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
+    basecolor.rgb = srgb_to_linear(basecolor.rgb);
 #ifdef HAS_ALPHA_MASK
     if (basecolor.a < minimum_alpha)
     {
@@ -395,7 +398,7 @@ void main()
     // emissiveColor is the emissive color factor from GLTF and is already in linear space
     vec3 colorEmissive = emissiveColor;
     // emissiveMap here is a vanilla RGB texture encoded as sRGB, manually convert to linear
-    colorEmissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
+    colorEmissive *= srgb_to_linear(texture(emissiveMap, emissive_texcoord.xy).rgb);
 
 
     float a = basecolor.a*vertex_color.a;
