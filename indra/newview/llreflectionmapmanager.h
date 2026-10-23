@@ -141,6 +141,13 @@ public:
     // reset all state on the next update
     void reset();
 
+    // <FS:Trish> 
+    void invalidate();
+
+    static bool cullLogEnabled();
+    static void logCull(const char* reason, const LLReflectionMap* probe);
+    // </FS:Trish>
+
     // pause all updates other than the default probe
     // duration - number of seconds to pause (default 10)
     void pause(F32 duration = 10.f);
@@ -192,6 +199,17 @@ private:
     // get a free cube index
     // returns -1 if allocation failed
     S32 allocateCubeIndex();
+
+    // <FS:Trish> 
+    void assignCubeIndex(LLReflectionMap* probe);
+    void releaseCubeIndex(LLReflectionMap* probe, const char* reason);
+    bool evictCubeIndex(U32 budget);
+    void clearSlotOwners();
+
+    std::vector<LLReflectionMap*> mSlotOwner;
+    
+    bool mInvalidate = false;
+    // </FS:Trish>
 
     // update the neighbors of the given probe
     void updateNeighbors(LLReflectionMap* probe);

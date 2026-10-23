@@ -131,6 +131,15 @@ LLSpatialGroup::~LLSpatialGroup()
         sZombieGroups--;
     }
 
+    // <FS:Trish> Probes can outlive their group
+    if (mReflectionProbe.notNull())
+    {
+        mReflectionProbe->mGroup = nullptr;
+        mReflectionProbe->mOrphaned = true;
+        mReflectionProbe->mOrphanTime = gFrameTimeSeconds;
+    }
+    // </FS:Trish>
+
     sNodeCount--;
 
     clearDrawMap();

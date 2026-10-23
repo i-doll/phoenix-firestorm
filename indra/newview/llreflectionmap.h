@@ -97,7 +97,9 @@ public:
     bool isActive() const;
 
     // perform occlusion query/readback
-    void doOcclusion(const LLVector4a& eye);
+    // <FS:Trish>
+    void doOcclusion(const LLVector4a& eye, bool in_frustum = true);
+    // </FS:Trish>
 
     // return false if this probe isn't currently relevant (for example, disabled due to graphics preferences)
     bool isRelevant() const;
@@ -162,6 +164,17 @@ public:
     GLuint mOcclusionQuery = 0;
     bool mOccluded = false;
     U32 mOcclusionPendingFrames = 0;
+
+    // <FS:Trish> Probe culling stability
+    U8 mOccludedResults = 0;
+    bool mDiscardOcclusionResult = false;
+    bool mInView = false;
+    S32 mRetainedCubeIndex = -1;
+    bool mRetainedComplete = false;
+    bool mOrphaned = false;
+    F32 mOrphanTime = 0.f;
+    LLVector4a mGroupCenter;
+    // </FS:Trish>
 
     ProbeType mType;
 };

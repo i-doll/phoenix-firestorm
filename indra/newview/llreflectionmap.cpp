@@ -39,6 +39,7 @@ extern U32 get_box_fan_indices(LLCamera* camera, const LLVector4a& center);
 
 LLReflectionMap::LLReflectionMap()
 {
+    mGroupCenter.clear(); // <FS:Trish/>
 }
 
 LLReflectionMap::~LLReflectionMap()
@@ -304,7 +305,8 @@ F32 LLReflectionMap::getNearClip() const
     {
         ret = mViewerObject->getReflectionProbeNearClip();
     }
-    else if (mGroup)
+    //else if (mGroup)
+    else if (mGroup || mOrphaned) // <FS:Trish/> an orphaned probe is an automatic probe
     {
         ret = mRadius * 0.5f; // default to half radius for automatic object probes
     }
@@ -395,8 +397,12 @@ bool LLReflectionMap::isRelevant() const
     // Automatic        true       false
 
     const bool is_manual    = mViewerObject != nullptr ;
-    const bool is_automatic = mGroup != nullptr && !is_manual;
-    const bool is_terrain   = mGroup == nullptr;
+    // <FS:Trish> An orphan lost its group but is an automatic probe (see mOrphaned)
+    //const bool is_automatic = mGroup != nullptr && !is_manual;
+    //const bool is_terrain   = mGroup == nullptr;
+    const bool is_automatic = (mGroup != nullptr || mOrphaned) && !is_manual;
+    const bool is_terrain   = mGroup == nullptr && !mOrphaned;
+    // </FS:Trish>
 
     if (is_automatic && mInsideManualProbe)
     {
@@ -426,7 +432,8 @@ bool LLReflectionMap::isRelevant() const
 }
 
 
-void LLReflectionMap::doOcclusion(const LLVector4a& eye)
+//void LLReflectionMap::doOcclusion(const LLVector4a& eye)
+void LLReflectionMap::doOcclusion(const LLVector4a& eye, bool in_frustum) // <FS:Trish/>
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     if (LLGLSLShader::sProfileEnabled)
@@ -448,8 +455,22 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
     if (o.getLength3().getF32() < dist)
     { // eye is inside radius, don't attempt to occlude
         mOccluded = false;
+        mOccludedResults = 0; // <FS:Trish/>
         return;
     }
+
+    // <FS:Trish> 
+    if (!in_frustum)
+    {
+        mOccluded = false;
+        mOccludedResults = 0;
+        if (mOcclusionQuery != 0)
+        { // whatever is in flight was issued for a view that no longer applies
+            mDiscardOcclusionResult = true;
+        }
+        return;
+    }
+    // </FS:Trish>
 
     if (mOcclusionQuery == 0)
     { // no query was previously issued, allocate one and issue
@@ -468,12 +489,44 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
         {
             do_query = true;
             glGetQueryObjectuiv(mOcclusionQuery, GL_QUERY_RESULT, &result);
-            mOccluded = result == 0;
+            // <FS:Trish> Cull on the 2nd occluded result in a row
+            // Then show again on the first visible case so probe become less flaky.
+            //mOccluded = result == 0;
+            if (mDiscardOcclusionResult)
+            {
+                mDiscardOcclusionResult = false;
+            }
+            else if (result == 0)
+            {
+                if (mOccludedResults < 255)
+                {
+                    ++mOccludedResults;
+                }
+                const bool was_occluded = mOccluded;
+                mOccluded = mOccludedResults >= 2;
+                if (mOccluded && !was_occluded)
+                {
+                    LLReflectionMapManager::logCull("occluded", this);
+                }
+            }
+            else
+            {
+                mOccludedResults = 0;
+                mOccluded = false;
+            }
+            // </FS:Trish>
             mOcclusionPendingFrames = 0;
         }
         else
         {
             mOcclusionPendingFrames++;
+            // <FS:Trish> If we reach here, the result is most likely from an old frame, likely needs to be discarded
+            constexpr U32 MAX_TRUSTED_PENDING_FRAMES = 3;
+            if (mOcclusionPendingFrames > MAX_TRUSTED_PENDING_FRAMES)
+            {
+                mOccluded = false;
+            }
+            // </FS:Trish>
         }
     }
 

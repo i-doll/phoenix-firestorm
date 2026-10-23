@@ -3023,7 +3023,10 @@ void LLEnvironment::DayTransition::animate()
 
     // pause probe updates and reset reflection maps on sky change
     gPipeline.mReflectionMapManager.pause((F32)mTransitionTime);
-    gPipeline.mReflectionMapManager.reset();
+    // <FS:Trish> Keep probes through the transition and regenerate them after it.
+    //gPipeline.mReflectionMapManager.reset();
+    gPipeline.mReflectionMapManager.invalidate();
+    // </FS:Trish>
 
     mSky = mStartSky->buildClone();
     mBlenderSky = std::make_shared<LLSettingsBlenderTimeDelta>(mSky, mStartSky, mNextInstance->getSky(), mTransitionTime);
@@ -3626,7 +3629,10 @@ namespace
 
             // clear reflection probes and pause updates during sky change
             gPipeline.mReflectionMapManager.pause((F32)transition);
-            gPipeline.mReflectionMapManager.reset();
+            // <FS:Trish> keep rendering, regenerate afterwards
+            //gPipeline.mReflectionMapManager.reset();
+            gPipeline.mReflectionMapManager.invalidate();
+            // </FS:Trish>
 
             mBlenderSky = std::make_shared<LLSettingsBlenderTimeDelta>(target_sky, start_sky, psky, transition);
             mBlenderSky->setOnFinished(
