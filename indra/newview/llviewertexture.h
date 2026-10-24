@@ -247,6 +247,11 @@ public:
 
     // estimated free memory for textures, by bias calculation
     static F32 sFreeVRAMMegabytes;
+    // <FS:Trish> The other inputs of that calculation, kept for the pipeline diagnostics log
+    static F32 sVRAMUsedMegabytes;
+    static F32 sVRAMTargetMegabytes;
+    static bool sSystemMemoryLow;
+    // </FS:Trish>
 
     enum EDebugTexels
     {

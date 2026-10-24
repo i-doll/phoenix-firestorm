@@ -92,6 +92,11 @@ LLFrameTimer LLViewerTexture::sEvaluationTimer;
 F32 LLViewerTexture::sDesiredDiscardBias = 0.f;
 S32 LLViewerTexture::sSnapshotDiscardBoost = 0; // <FS:Trish/>
 U32 LLViewerTexture::sBiasTexturesUpdated = 0;
+// <FS:Trish>
+F32 LLViewerTexture::sVRAMUsedMegabytes = 0.f;
+F32 LLViewerTexture::sVRAMTargetMegabytes = 0.f;
+bool LLViewerTexture::sSystemMemoryLow = false;
+// </FS:Trish>
 
 S32 LLViewerTexture::sMaxSculptRez = 128; //max sculpt image size
 constexpr S32 MAX_CACHED_RAW_IMAGE_AREA = 64 * 64;
@@ -604,6 +609,12 @@ void LLViewerTexture::updateClass()
 
     bool is_sys_low = isSystemMemoryLow();
     bool is_low = is_sys_low || over_pct > 0.f;
+
+    // <FS:Trish>
+    sVRAMUsedMegabytes = used;
+    sVRAMTargetMegabytes = target;
+    sSystemMemoryLow = is_sys_low;
+    // </FS:Trish>
 
     static bool was_low = false;
 
@@ -3385,17 +3396,21 @@ void LLViewerLODTexture::processTextureStats()
         mDesiredDiscardLevel = llmin(mMinDesiredDiscardLevel, (S8)(MAX_DISCARD_LEVEL + 1));
         mDesiredDiscardLevel = llmin(mDesiredDiscardLevel, (S32)mLoadedCallbackDesiredDiscardLevel);
 
-        // <FS:Trish> Free faceless textures under memory pressure
-         if (LLViewerTexture::sDesiredDiscardBias > 1.f &&
-            mBoostLevel == LLGLTexture::BOOST_NONE &&
-            !mForceToSaveRawImage &&
-            getTotalNumFaces() == 0 &&
-            getNumVolumes(LLRender::LIGHT_TEX) == 0 &&
-            getNumVolumes(LLRender::SCULPT_TEX) == 0 &&
-            hasGLTexture())
-        {
-            destroyTexture();
-        }
+        // <FS:Trish> Free faceless textures under memory pressure -- disabled. In a busy scene the
+        // bias sits above 1 for as long as you stay there, so this destroyed textures on every
+        // pass, and the ones coming back into view (PBR materials before their faces register,
+        // anything just off screen) paid a full refetch, decode and upload each time: grey
+        // flashes, and hitching while moving.
+        // if (LLViewerTexture::sDesiredDiscardBias > 1.f &&
+        //    mBoostLevel == LLGLTexture::BOOST_NONE &&
+        //    !mForceToSaveRawImage &&
+        //    getTotalNumFaces() == 0 &&
+        //    getNumVolumes(LLRender::LIGHT_TEX) == 0 &&
+        //    getNumVolumes(LLRender::SCULPT_TEX) == 0 &&
+        //    hasGLTexture())
+        //{
+        //    destroyTexture();
+        //}
         // </FS:Trish>
     }
     else if (!mFullWidth  || !mFullHeight)

@@ -924,6 +924,11 @@ void LLViewerTextureList::updateImages(F32 max_time)
                             << " ready_backlog=" << mReadyRequestBacklog.size()
                             << " budget_ms=" << max_time * 1000.f
                             << " discard_bias=" << LLViewerTexture::sDesiredDiscardBias
+                            // <FS:Trish> What the bias is reacting to
+                            << " vram_used_mb=" << LLViewerTexture::sVRAMUsedMegabytes
+                            << " vram_target_mb=" << LLViewerTexture::sVRAMTargetMegabytes
+                            << " sys_mem_low=" << LLViewerTexture::sSystemMemoryLow
+                            // </FS:Trish>
                             << LL_ENDL;
     }
 }
