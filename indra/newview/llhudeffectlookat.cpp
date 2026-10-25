@@ -610,7 +610,8 @@ bool LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
                 }
                 else
                 {
-                    mTargetOffsetGlobal.setVec(object->getPositionGlobal() + (LLVector3d)(position * object->getRotationRegion()));
+                    // position is relative to the render position/rotation, the same as calcTargetPosition() uses
+                    mTargetOffsetGlobal.setVec(gAgent.getPosGlobalFromAgent(object->getRenderPosition() + position * object->getRenderRotation()));
                     mTargetObject = nullptr;
                 }
             }
