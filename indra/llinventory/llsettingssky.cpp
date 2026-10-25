@@ -620,7 +620,7 @@ void LLSettingsSky::blend(LLSettingsBase::ptr_t &end, F64 blendf)
         mMaxY = lerp(mMaxY, other->mMaxY, (F32)blendf);
         mGamma = lerp(mGamma, other->mGamma, (F32)blendf);
         mCloudVariance = lerp(mCloudVariance, other->mCloudVariance, (F32)blendf);
-        mCloudShadow = lerp(mCloudShadow, other->mCloudShadow, (F32)blendf);
+        // mCloudShadow is blended above, depending on cloud textures
         mCloudScale = lerp(mCloudScale, other->mCloudScale, (F32)blendf);
         lerpVector2(mScrollRate, other->mScrollRate, (F32)blendf);
         lerpColor(mCloudPosDensity1, other->mCloudPosDensity1, (F32)blendf);

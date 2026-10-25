@@ -500,7 +500,7 @@ namespace
                 }
                 else if (specials.find(key_name) != specials.end())
                 {
-                    updateSpecial(*it, mix);
+                    updateSpecial(*it, mix, settings);
                 }
                 else if (skips.find(key_name) == skips.end())
                 {
@@ -591,7 +591,7 @@ namespace
 
         LLSettingsBase::stringset_t getSpecialKeys() const;
         void                        resetSpecial();
-        void                        updateSpecial(const typename Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix);
+        void                        updateSpecial(const typename Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix, LLSD &settings);
 
     private:
         typedef std::map<std::string, LLUUID>   key_to_expid_t;
@@ -657,7 +657,7 @@ namespace
     }
 
     template<>
-    void LLSettingsInjected<LLSettingsVOSky>::updateSpecial(const typename LLSettingsInjected<LLSettingsVOSky>::Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix)
+    void LLSettingsInjected<LLSettingsVOSky>::updateSpecial(const typename LLSettingsInjected<LLSettingsVOSky>::Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix, LLSD &settings)
     {
         bool is_texture = true;
         if (injection->mKeyName == SETTING_SUN_TEXTUREID)
@@ -690,8 +690,7 @@ namespace
             is_texture = false;
             if (!injection->mBlendIn)
                 mix = 1.0 - mix;
-            stringset_t dummy;
-            LLSD settings = this->cloneSettings();
+            // Write into the caller's settings
             F64 value = settings[injection->mKeyName].asReal();
             if (this->getCloudNoiseTextureId().isNull())
             {
@@ -703,7 +702,6 @@ namespace
             F64 result = lerp((F32)value, (F32)injection->mValue.asReal(), (F32)mix);
             injection->mLastValue = LLSD::Real(result);
             settings[injection->mKeyName] = injection->mLastValue;
-            this->setSettings(settings);
         }
 
         // Unfortunately I don't have a per texture blend factor.  We'll just pick the one that is furthest along.
@@ -714,7 +712,7 @@ namespace
     }
 
     template<>
-    void LLSettingsInjected<LLSettingsVOWater>::updateSpecial(const typename LLSettingsInjected<LLSettingsVOWater>::Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix)
+    void LLSettingsInjected<LLSettingsVOWater>::updateSpecial(const typename LLSettingsInjected<LLSettingsVOWater>::Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix, LLSD & /*settings*/)
     {
         if (injection->mKeyName == SETTING_NORMAL_MAP)
         {
