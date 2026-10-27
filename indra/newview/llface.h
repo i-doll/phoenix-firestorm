@@ -328,6 +328,12 @@ private:
     // gFrameTimeSeconds when mPixelArea was last updated
     F32         mLastPixelAreaUpdate = 0.f;
 
+    // <FS:Trish> FIRE-37045 Results of the last full calcPixelArea(), returned while it is throttled
+    F32         mCosAngleToViewDir = 1.f;
+    F32         mPixelRadius = 0.f;
+    bool        mPixelAreaInFrustum = true;
+    // </FS:Trish>
+
     // virtual size of face in texture area  (mPixelArea adjusted by texture repeats)
     // used to determine desired resolution of texture
     F32         mVSize;

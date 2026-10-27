@@ -2459,7 +2459,12 @@ bool LLFace::calcPixelArea(F32& cos_angle_to_view_dir, F32& radius)
     // don't update every frame
     if (gFrameTimeSeconds - mLastPixelAreaUpdate < PIXEL_AREA_UPDATE_PERIOD)
     {
-        return true;
+        // <FS:Trish> FIRE-37045 Hand back the last results, otherwise garbage output
+        // can have consequences for callers (TextureAnims unexpectedly pausing)
+        cos_angle_to_view_dir = mCosAngleToViewDir;
+        radius = mPixelRadius;
+        return mPixelAreaInFrustum;
+        // </FS:Trish>
     }
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_FACE;
@@ -2583,6 +2588,11 @@ bool LLFace::calcPixelArea(F32& cos_angle_to_view_dir, F32& radius)
         if(!camera->AABBInFrustum(center, size))
         {
             mImportanceToCamera = 0.f ;
+            // <FS:Trish> FIRE-37045
+            mCosAngleToViewDir = cos_angle_to_view_dir;
+            mPixelRadius = radius;
+            mPixelAreaInFrustum = false;
+            // </FS:Trish>
             return false ;
         }
         if(cos_angle_to_view_dir > camera->getCosHalfFov()) //the center is within the view frustum
@@ -2611,6 +2621,11 @@ bool LLFace::calcPixelArea(F32& cos_angle_to_view_dir, F32& radius)
         mImportanceToCamera = LLFace::calcImportanceToCamera(cos_angle_to_view_dir, dist) ;
     }
 
+    // <FS:Trish> FIRE-37045
+    mCosAngleToViewDir = cos_angle_to_view_dir;
+    mPixelRadius = radius;
+    mPixelAreaInFrustum = true;
+    // </FS:Trish>
     return true ;
 }
 
