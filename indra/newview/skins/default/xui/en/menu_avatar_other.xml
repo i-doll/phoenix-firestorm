@@ -210,6 +210,14 @@
       <menu_item_call.on_click
        function="Avatar.ReloadAvatar" />
     </menu_item_call>
+    <menu_item_call
+      label="Worn Items..."
+      name="Worn Items">
+      <menu_item_call.on_click
+       function="Avatar.ShowWornItems" />
+      <menu_item_call.on_enable
+       function="Avatar.EnableShowWornItems" />
+    </menu_item_call>
     <!-- </ID> -->
 
    <menu_item_separator />

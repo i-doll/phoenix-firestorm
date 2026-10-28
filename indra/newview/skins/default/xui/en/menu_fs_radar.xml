@@ -89,6 +89,15 @@
 		<menu_item_call.on_enable
 			function="Nearby.People.CanReloadAvatar" />
 	</menu_item_call>
+	<menu_item_call
+		label="Worn Items..."
+		layout="topleft"
+		name="ShowWornItems">
+		<menu_item_call.on_click
+			function="Nearby.People.ShowWornItems" />
+		<menu_item_call.on_enable
+			function="Nearby.People.CanShowWornItems" />
+	</menu_item_call>
 	<!-- </ID> -->
 	<menu name="MarkAvatar" label="Mark...">
 		<menu_item_call

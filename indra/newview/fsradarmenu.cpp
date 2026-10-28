@@ -44,6 +44,7 @@
 #include "llviewermenu.h"           // for gMenuHolder
 #include "rlvactions.h"
 #include "rlvhandler.h"
+#include "idfloaterwornitems.h"  // <ID>
 
 namespace FSFloaterRadarMenu
 {
@@ -91,6 +92,7 @@ LLContextMenu* FSRadarMenu::createMenu()
         registrar.add("Nearby.People.TrackAvatar",              boost::bind(&FSRadarMenu::onTrackAvatarMenuItemClick,       this));
         registrar.add("Nearby.People.FaceTowardsAvatar",        boost::bind(&FSRadarMenu::onFaceTowardsAvatarMenuItemClick, this));
         registrar.add("Nearby.People.ReloadAvatar",             boost::bind(&FSRadarMenu::onReloadAvatarMenuItemClick,      this)); // <ID>
+        registrar.add("Nearby.People.ShowWornItems",            boost::bind(&IDFloaterWornItems::show,                      id)); // <ID>
         registrar.add("Nearby.People.SetRenderMode",            boost::bind(&FSRadarMenu::onSetRenderMode,                  this, _2));
         registrar.add("Nearby.People.SetAvatarMarkColor",       boost::bind(&LLNetMap::setAvatarMarkColor,                  id, _2));
         registrar.add("Nearby.People.ClearAvatarMarkColor",     boost::bind(&LLNetMap::clearAvatarMarkColor,                id));
@@ -104,6 +106,7 @@ LLContextMenu* FSRadarMenu::createMenu()
         enable_registrar.add("Nearby.People.CheckRenderMode",   boost::bind(&FSRadarMenu::checkSetRenderMode,               this, _2));
         enable_registrar.add("Nearby.People.CanFaceTowardsAvatar", boost::bind(&FSRadarMenu::canFaceTowardsAvatar,          this));
         enable_registrar.add("Nearby.People.CanReloadAvatar",    boost::bind(&FSRadarMenu::canReloadAvatar,                 this)); // <ID>
+        enable_registrar.add("Nearby.People.CanShowWornItems",   boost::bind(&IDFloaterWornItems::canShow,                  id)); // <ID>
 
         // create the context menu from the XUI
         return createFromFile("menu_fs_radar.xml");

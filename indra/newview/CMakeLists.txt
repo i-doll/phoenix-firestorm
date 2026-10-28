@@ -94,6 +94,7 @@ set(viewer_SOURCE_FILES
     idsenderhighlight.cpp  # <ID> Sender-based chat highlighting
     idkeywordhighlight.cpp  # <ID> Keyword-based chat highlighting
     idfloaterkeywordcolors.cpp  # <ID> Keyword color settings floater
+    idfloaterwornitems.cpp  # <ID> Another avatar's worn attachments
     idmcpserver.cpp  # <ID> Embedded MCP server
     idmcpconnection.cpp  # <ID> Embedded MCP server: connection
     idmcprlvgate.cpp  # <ID> Embedded MCP server: RLV gate
@@ -1007,6 +1008,7 @@ set(viewer_HEADER_FILES
     idmcptools_object.h  # <ID> Embedded MCP server: object build helpers
     idsearchmodel.h  # <ID> Embedded MCP server: headless dir search
     idfloaterkeywordcolors.h  # <ID> Keyword color settings floater
+    idfloaterwornitems.h  # <ID> Another avatar's worn attachments
     alfloaterregiontracker.h
     animationexplorer.h
     ao.h
