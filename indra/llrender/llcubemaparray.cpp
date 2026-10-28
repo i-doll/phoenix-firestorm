@@ -113,26 +113,46 @@ LLCubeMapArray::LLCubeMapArray(LLCubeMapArray& lhs, U32 width, U32 count) : mTex
     // Allocate a new cubemap array with the same criteria as the incoming cubemap array
     allocate(mWidth, lhs.mImage->getComponents(), count, lhs.mImage->getUseMipMaps(), lhs.mHDR);
 
-    // Copy each cubemap from the incoming array to the new array
-    U32 min_count = std::min(count, lhs.mCount);
-    for (U32 i = 0; i < min_count * 6; ++i)
+    // <FS:Trish> allocate() leaves no array, so the old loop copied nothing???
+    //// Copy each cubemap from the incoming array to the new array
+    //U32 min_count = std::min(count, lhs.mCount);
+    //for (U32 i = 0; i < min_count * 6; ++i)
+    //{
+    //    U32 src_resolution = lhs.mWidth;
+    //    U32 dst_resolution = mWidth;
+    //    {
+    //        GLint components = GL_RGB;
+    //        if (mImage->getComponents() == 4)
+    //            components = GL_RGBA;
+    //        // GLint format = GL_RGB; // <FS:Beq/> unused
+    //
+    //        // Handle different resolutions by scaling the image
+    //        LLPointer<LLImageRaw> src_image = new LLImageRaw(lhs.mWidth, lhs.mWidth, lhs.mImage->getComponents());
+    //        glGetTexImage(GL_TEXTURE_CUBE_MAP_ARRAY, 0, components, GL_UNSIGNED_BYTE, src_image->getData());
+    //
+    //        LLPointer<LLImageRaw> scaled_image = src_image->scaled(mWidth, mWidth);
+    //        glTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, 0, 0, i, mWidth, mWidth, 1, components, GL_UNSIGNED_BYTE, scaled_image->getData());
+    //    }
+    //}
+
+    // Copy the cubemaps
+    if (lhs.mWidth == mWidth && gGLManager.mGLVersion >= 4.29f) // glCopyImageSubData is GL 4.3; on Linux it is linked directly, not a pointer
     {
-        U32 src_resolution = lhs.mWidth;
-        U32 dst_resolution = mWidth;
+        const U32 layers = std::min(count, lhs.mCount) * 6;
+        U32 mip = 0;
+        for (U32 mip_resolution = mWidth; mip_resolution >= 1; mip_resolution /= 2, ++mip)
         {
-            GLint components = GL_RGB;
-            if (mImage->getComponents() == 4)
-                components = GL_RGBA;
-            // GLint format = GL_RGB; // <FS:Beq/> unused
+            glCopyImageSubData(lhs.getGLName(), GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, 0,
+                getGLName(), GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, 0,
+                mip_resolution, mip_resolution, layers);
 
-            // Handle different resolutions by scaling the image
-            LLPointer<LLImageRaw> src_image = new LLImageRaw(lhs.mWidth, lhs.mWidth, lhs.mImage->getComponents());
-            glGetTexImage(GL_TEXTURE_CUBE_MAP_ARRAY, 0, components, GL_UNSIGNED_BYTE, src_image->getData());
-
-            LLPointer<LLImageRaw> scaled_image = src_image->scaled(mWidth, mWidth);
-            glTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, 0, 0, i, mWidth, mWidth, 1, components, GL_UNSIGNED_BYTE, scaled_image->getData());
+            if (!mImage->getUseMipMaps())
+            {
+                break;
+            }
         }
     }
+    // </FS:Trish>
 }
 
 LLCubeMapArray::~LLCubeMapArray()
