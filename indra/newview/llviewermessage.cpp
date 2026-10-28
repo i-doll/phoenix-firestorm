@@ -90,6 +90,7 @@
 #include "llscriptruntimeperms.h"
 #include "llselectmgr.h"
 #include "idmcp.h"  // <ID> embedded MCP server facade
+#include "idfloaterwornitems.h"  // <ID> worn items floater
 #include "llstartup.h"
 #include "llsky.h"
 #include "llslurl.h"
@@ -4924,6 +4925,8 @@ void process_object_properties(LLMessageSystem *msg, void**user_data)
     // (avatars.getWorn name resolution). The Family variant does not answer for
     // other avatars' attachments, so we use the full ObjectProperties reply.
     idmcp::onObjectProperties(msg);
+
+    IDFloaterWornItems::processObjectProperties(msg); // <ID>
 }
 // </FS:Techwolf Lupindo> area search
 

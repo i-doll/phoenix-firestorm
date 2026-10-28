@@ -197,6 +197,7 @@
 #include "idfloaterinventorydestinationconfig.h"
 // </ID:i.doll>
 #include "idfloaterkeywordcolors.h"
+#include "idfloaterwornitems.h"
 #include "floatermedialists.h"
 #include "fsareasearch.h"
 #include "fsfloateraddtocontactset.h"
@@ -674,6 +675,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("lgg_beamcolormap", "floater_beamcolor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<lggBeamColorMapFloater>);
     LLFloaterReg::add("lgg_beamshape", "floater_beamshape.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<lggBeamMapFloater>);
     LLFloaterReg::add("id_keyword_colors", "floater_id_keyword_colors.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<IDFloaterKeywordColors>);
+    LLFloaterReg::add("id_worn_items", "floater_id_worn_items.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<IDFloaterWornItems>);
     LLFloaterReg::add("media_lists", "floater_media_lists.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterMediaLists>);
     LLFloaterReg::add("money_tracker", "floater_fs_money_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSMoneyTracker>);
     LLFloaterReg::add("omnifilter", "floater_omnifilter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<Omnifilter>);        // <FS:Zi> Omnifilter support

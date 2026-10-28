@@ -32,6 +32,7 @@
 #endif
 
 #include "llviewermenu.h"
+#include "idfloaterwornitems.h"  // <ID>
 
 // linden library includes
 #include "llavatarnamecache.h" // IDEVO (I Are Not Men!)
@@ -3633,6 +3634,27 @@ class IDAvatarReload : public view_listener_t
     {
         avatar_full_reload(find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()));
         return true;
+    }
+};
+
+class IDAvatarShowWornItems : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        if (LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()))
+        {
+            IDFloaterWornItems::show(avatar->getID());
+        }
+        return true;
+    }
+};
+
+class IDAvatarEnableShowWornItems : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+        return avatar && IDFloaterWornItems::canShow(avatar->getID());
     }
 };
 // </ID>
@@ -13632,6 +13654,8 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAvatarReportAbuse(), "Avatar.ReportAbuse");
     view_listener_t::addMenu(new LLAvatarTexRefresh(), "Avatar.TexRefresh"); // ## Zi: Texture Refresh
     view_listener_t::addMenu(new IDAvatarReload(), "Avatar.ReloadAvatar"); // <ID>
+    view_listener_t::addMenu(new IDAvatarShowWornItems(), "Avatar.ShowWornItems"); // <ID>
+    view_listener_t::addMenu(new IDAvatarEnableShowWornItems(), "Avatar.EnableShowWornItems"); // <ID>
     view_listener_t::addMenu(new IDRerezWorld(), "World.RerezWorld"); // <ID>
 
     view_listener_t::addMenu(new LLAvatarToggleMyProfile(), "Avatar.ToggleMyProfile");

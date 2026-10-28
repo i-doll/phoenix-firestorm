@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_close="true"
+ can_minimize="true"
+ can_resize="true"
+ save_rect="true"
+ height="360"
+ min_height="200"
+ width="460"
+ min_width="320"
+ name="floater_id_worn_items"
+ title="Worn Items">
+    <floater.string name="title_fmt">Worn by [NAME]</floater.string>
+    <floater.string name="loading">Loading...</floater.string>
+    <floater.string name="nothing_worn">Not wearing any attachments.</floater.string>
+    <floater.string name="not_in_range">This person is out of range.</floater.string>
+
+    <scroll_list
+     name="worn_list"
+     layout="topleft"
+     top="22"
+     left="5"
+     width="450"
+     height="300"
+     follows="all"
+     column_padding="0"
+     draw_heading="true"
+     multi_select="false">
+        <scroll_list.columns
+         name="name"
+         label="Name"
+         dynamic_width="true" />
+        <scroll_list.columns
+         name="point"
+         label="Worn On"
+         width="110" />
+        <scroll_list.columns
+         name="creator"
+         label="Creator"
+         width="150" />
+    </scroll_list>
+
+    <button
+     name="refresh_btn"
+     label="Refresh"
+     layout="topleft"
+     top_pad="6"
+     left="5"
+     height="22"
+     width="90"
+     follows="left|bottom" />
+    <button
+     name="creator_btn"
+     label="Creator Profile"
+     layout="topleft"
+     top_delta="0"
+     height="22"
+     width="120"
+     left_pad="5"
+     follows="left|bottom" />
+</floater>
