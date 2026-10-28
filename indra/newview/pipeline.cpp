@@ -10787,9 +10787,14 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 
     shader.uniform1i(LLShaderMgr::PROJECTOR_SHADOW_INDEX, s_idx);
 
+    // <ID> the debug view signals through shadow_fade; probe captures stay normal so it doesn't linger in reflections
+    static LLCachedControl<bool> shadow_debug(gSavedSettings, "IDRenderProjectorShadowDebug", false);
+    const bool show_shadow_debug = shadow_debug && !gCubeSnapshot;
+    // </ID>
+
     if (s_idx >= 0)
     {
-        shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f-mSpotLightFade[s_idx]);
+        shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, show_shadow_debug ? -100.f : 1.f-mSpotLightFade[s_idx]);
         shader.uniformMatrix4fv(LLShaderMgr::PROJECTOR_SHADOW_MATRIX, 1, false, glm::value_ptr(mSpotShadowMatrix[s_idx]));
 
         S32 shadow_channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW4);
@@ -10800,7 +10805,7 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     }
     else
     {
-        shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f);
+        shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, show_shadow_debug ? -100.f : 1.f);
     }
 
     // a light already holding a target slot must not take a second one
@@ -10817,23 +10822,29 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     {
         LLDrawable* potential = drawablep;
         //determine if this light is higher priority than one of the existing spot shadows
+        // worn lights rank below in-world ones, or a light rig near the camera takes every slot from the scene
         F32 m_pri = volume->getSpotLightPriority();
+        bool m_worn = volume->getRootEdit()->isAttachment();
 
         for (U32 i = 0; i < shadow_count; i++)
         {
             F32 pri = 0.f;
+            bool worn = true;
 
             if (mTargetShadowSpotLight[i].notNull())
             {
-                pri = mTargetShadowSpotLight[i]->getVOVolume()->getSpotLightPriority();
+                LLVOVolume* target = mTargetShadowSpotLight[i]->getVOVolume();
+                pri = target->getSpotLightPriority();
+                worn = target->getRootEdit()->isAttachment();
             }
 
-            if (m_pri > pri)
+            if ((!m_worn && worn) || (m_worn == worn && m_pri > pri))
             {
                 LLDrawable* temp = mTargetShadowSpotLight[i];
                 mTargetShadowSpotLight[i] = potential;
                 potential = temp;
                 m_pri = pri;
+                m_worn = worn;
             }
         }
     }

@@ -120,8 +120,18 @@ void main()
     if (proj_shadow_idx >= 0)
     {
         shadow = sampleSpotShadow(pos, n, tc);
+        if (shadow_fade < -50.0) // IDRenderProjectorShadowDebug: red = shadowed, green = lit
+        {
+            frag_color = vec4(0.3*(1.0-shadow), 0.3*shadow, 0.0, 0.0);
+            return;
+        }
         shadow += shadow_fade;
         shadow = clamp(shadow, 0.0, 1.0);
+    }
+    else if (shadow_fade < -50.0) // IDRenderProjectorShadowDebug: blue = no shadow map
+    {
+        frag_color = vec4(0.0, 0.0, 0.3, 0.0);
+        return;
     }
 
     float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
@@ -179,7 +189,7 @@ void main()
                 final_color += intensity * clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * 3.25; //magic number to balance with legacy ambiance
+            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * 3.25 * shadow; //magic number to balance with legacy ambiance
             pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, normalize(lv), nl, diffPunc, specPunc);
 
             final_color += amb_rgb * clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
@@ -209,11 +219,10 @@ void main()
 
                 final_color = dlit*lit*diffuse*shadow;
 
-                // unshadowed for consistency between forward and deferred?
-                amb_da += (nl*0.5+0.5) /* * (1.0-shadow) */ * proj_ambiance;
+                amb_da += (nl*0.5+0.5) * proj_ambiance;
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy );
+            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * shadow;
             final_color += diffuse.rgb * amb_rgb * max(dot(-normalize(lv), n), 0.0);
         }
 
