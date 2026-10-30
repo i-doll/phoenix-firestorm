@@ -28,6 +28,8 @@
 
 #include "idmcptools.h"
 #include "idmcpserver.h"
+#include "idheadless.h"
+#include "idmcptools_headless.h"
 #include "idmcp_meshupload.h"       // upload.mesh job
 
 #include "llagent.h"
@@ -427,10 +429,16 @@ namespace
 
         const std::vector<std::string> names = arg_str_array(args, "names");
         const bool   confirm = arg_bool(args, "confirm", false);
-        const LLUUID dest    = resolve_folder(arg_str(args, "dest"));
+        LLUUID dest          = resolve_folder(arg_str(args, "dest"));
         if (arg_has(args, "dest") && !arg_str(args, "dest").empty() && dest.isNull())
         {
             idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "unknown dest folder: " + arg_str(args, "dest"));
+            return;
+        }
+        std::string why;
+        if (!idmcp_headless::applyDest(!arg_str(args, "dest").empty(), dest, why))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
             return;
         }
 
@@ -592,6 +600,12 @@ namespace
         if (!dest.empty() && p.dest.isNull())
         {
             idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "unknown dest folder: " + dest);
+            return;
+        }
+        std::string why;
+        if (!idmcp_headless::applyDest(!dest.empty(), p.dest, why))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
             return;
         }
 

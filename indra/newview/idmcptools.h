@@ -31,5 +31,6 @@ void idmcp_register_object_tools(IDMCPToolRegistry& reg);
 void idmcp_register_faces_tools(IDMCPToolRegistry& reg);
 void idmcp_register_contents_tools(IDMCPToolRegistry& reg);
 void idmcp_register_rez_tools(IDMCPToolRegistry& reg);
+void idmcp_register_headless_tools(IDMCPToolRegistry& reg); // <ID> headless
 
 #endif // ID_IDMCPTOOLS_H

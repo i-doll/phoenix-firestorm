@@ -803,6 +803,7 @@ bool LLVOCachePartition::addEntry(LLViewerOctreeEntry* entry)
     }
 
     mOctree->insert(entry);
+    mHeadlessDirty = true; // <ID> headless
 
     return true;
 }
@@ -938,11 +939,11 @@ private:
 class LLVOCacheOctreeBackCull : public LLViewerOctreeCull
 {
 public:
-    LLVOCacheOctreeBackCull(LLCamera* camera, const LLVector3& shift, LLViewerRegion* regionp, F32 pixel_threshold, bool use_occlusion)
+    LLVOCacheOctreeBackCull(LLCamera* camera, const LLVector3& shift, LLViewerRegion* regionp, F32 pixel_threshold, bool use_occlusion, F32 sphere_radius = 0.f) // <ID> headless
         : LLViewerOctreeCull(camera), mRegionp(regionp), mPixelThreshold(pixel_threshold), mUseObjectCacheOcclusion(use_occlusion)
     {
         mLocalShift = shift;
-        mSphereRadius = LLVOCacheEntry::sRearFarRadius;
+        mSphereRadius = sphere_radius > 0.f ? sphere_radius : LLVOCacheEntry::sRearFarRadius; // <ID> headless
     }
 
     virtual bool earlyFail(LLViewerOctreeGroup* base_group)
@@ -1100,6 +1101,28 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
     }
     return 1;
 }
+
+void LLVOCachePartition::cullAroundCamera(LLCamera& camera) // <ID> headless
+{ // <ID> headless
+    if (!LLViewerRegion::sVOCacheCullingEnabled || mRegionp->isPaused()) // <ID> headless
+    { // <ID> headless
+        return; // <ID> headless
+    } // <ID> headless
+    const LLVector3 local_pos = camera.getOrigin() - mRegionp->getOriginAgent(); // <ID> headless
+    const F64 now = LLTimer::getTotalSeconds(); // <ID> headless
+    if (!mHeadlessDirty && !mCullHistory && dist_vec_squared(local_pos, mHeadlessCullPos) < 1.f && now - mHeadlessCullTime < 1.0) // <ID> headless
+    { // <ID> headless
+        return; // <ID> headless
+    } // <ID> headless
+    mHeadlessDirty = false; // <ID> headless
+    mHeadlessCullPos = local_pos; // <ID> headless
+    mHeadlessCullTime = now; // <ID> headless
+    ((LLViewerOctreeGroup*)mOctree->getListener(0))->rebound(); // <ID> headless
+    mFrontCull = true; // <ID> headless
+    LLVOCacheOctreeBackCull culler(&camera, mRegionp->getOriginAgent(), mRegionp, // <ID> headless
+        LLVOCacheEntry::getSquaredPixelThreshold(true), false, gAgentCamera.mDrawDistance); // <ID> headless
+    culler.traverse(mOctree); // <ID> headless
+} // <ID> headless
 #endif // LL_TEST
 
 void LLVOCachePartition::setCullHistory(bool has_new_object)

@@ -45,6 +45,8 @@
 
 #include "llevents.h"           // LLEventPumps, LLTempBoundListener
 #include "llpointer.h"
+#include "idheadless.h"        // <ID> headless
+#include "llviewerdisplay.h"   // <ID> headless: gWindowResized
 
 #include <algorithm>
 #include <cmath>
@@ -238,6 +240,7 @@ namespace
     std::vector<std::shared_ptr<VisionWait>> g_waits;
     bool                                     g_tick_on = false;
     LLTempBoundListener                      g_tick;
+    constexpr S32 HEADLESS_SNAPSHOT_PASSES = 4;   // <ID> headless
 
     void capture(const std::shared_ptr<VisionWait>& w)
     {
@@ -253,6 +256,15 @@ namespace
 
         LLPointer<LLImageRaw> raw = new LLImageRaw;
         bool ok = false;
+        // Headless never runs display(), so the first pass only consumes the
+        // pending window resize and later passes build geometry and textures.
+        const S32 passes = gIDHeadless ? HEADLESS_SNAPSHOT_PASSES : 1;   // <ID> headless
+        if (gIDHeadless)   // <ID> headless
+        {
+            LL_INFOS("Headless") << "snapshot: window_resized " << gWindowResized << ", shaders " << gPipeline.shadersLoaded()
+                                 << ", screen " << gPipeline.mRT->deferredScreen.getWidth() << "x"
+                                 << gPipeline.mRT->deferredScreen.getHeight() << ", passes " << passes << LL_ENDL;   // <ID> headless
+        }
         if (w->agent_cam)
         {
             if (!g_cam.set)
@@ -280,6 +292,7 @@ namespace
             camera->setViewNoBroadcast(effective_fov(g_cam));
             camera->setOriginAndLookAt(eye, fabsf(dir.mV[VZ]) > 0.999f ? LLVector3::x_axis : LLVector3::z_axis, target);
 
+            for (S32 pass = 0; pass < passes; ++pass)   // <ID> headless
             ok = gViewerWindow->rawSnapshot(
                 raw, width, height,
                 /*keep_window_aspect*/ true, /*is_texture*/ false,
@@ -295,6 +308,7 @@ namespace
         }
         else
         {
+            for (S32 pass = 0; pass < passes; ++pass)   // <ID> headless
             ok = gViewerWindow->rawSnapshot(
                 raw, width, height,
                 /*keep_window_aspect*/ true, /*is_texture*/ false,

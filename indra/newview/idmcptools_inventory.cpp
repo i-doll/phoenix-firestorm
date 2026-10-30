@@ -14,6 +14,8 @@
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
+#include "idheadless.h"
+#include "idmcptools_headless.h"
 
 #include "llinventorymodel.h"
 #include "llinventoryfunctions.h"
@@ -661,13 +663,21 @@ void idmcp_register_inventory_tools(IDMCPToolRegistry& reg)
         t.name = "inventory.createItem";
         t.description =
             "Create a new empty notecard or script. {\"parent\"} (folder UUID or "
-            "\"root\"), {\"name\"}, {\"type\"} \"notecard\" or \"script\". Returns "
+            "\"root\"; optional in headless: defaults to the run folder), {\"name\"}, {\"type\"} \"notecard\" or \"script\". Returns "
             "the new item id; add content with notecard.write / script.write.";
-        t.input_schema = boost::json::parse(
-            R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"},"type":{"type":"string","enum":["notecard","script"]}},"required":["parent","name","type"],"additionalProperties":false})");
+        t.input_schema = boost::json::parse(gIDHeadless
+            ? R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"},"type":{"type":"string","enum":["notecard","script"]}},"required":["name","type"],"additionalProperties":false})"
+            : R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"},"type":{"type":"string","enum":["notecard","script"]}},"required":["parent","name","type"],"additionalProperties":false})");
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
         {
-            const LLUUID parent = resolve_folder(arg_str(args, "parent"));
+            const std::string parent_arg = arg_str(args, "parent");
+            LLUUID parent = resolve_folder(parent_arg);
+            std::string why;
+            if (!idmcp_headless::applyDest(!parent_arg.empty(), parent, why))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
+                return;
+            }
             const std::string name = arg_str(args, "name");
             const std::string type = arg_str(args, "type");
             if (parent.isNull() || name.empty())

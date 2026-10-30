@@ -201,3 +201,5 @@ if [ $LL_RUN_ERR -ne 0 ]; then
 	# generic error running the binary
 	echo '*** Bad shutdown ($LL_RUN_ERR). ***'
 fi
+
+exit $LL_RUN_ERR

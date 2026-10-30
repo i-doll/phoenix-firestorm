@@ -23,6 +23,7 @@
 #include "llpermissions.h"
 #include "llpointer.h"
 #include "llquaternion.h"
+#include "llselectmgr.h"           // EDeRezDestination // <ID> headless
 #include "lluuid.h"
 #include "llviewerinventory.h"
 #include "llvoinventorylistener.h"
@@ -70,6 +71,10 @@ namespace idmcp_obj
     // Link N is element N-1. These numbers can differ from LSL's.
     std::vector<LLViewerObject*> linksOf(LLViewerObject* root);
     S32 linkNumberOf(LLViewerObject* prim);   // 1-based; 0 when not found
+    // DeRezObject for a single root (llviewermenu.cpp derez_objects).
+    void sendDerez(LLViewerObject* root, EDeRezDestination dest, const LLUUID& folder);   // <ID> headless
+    // The RLV checks object.take applies to a root.
+    IDMCPGateResult rlvTakeGate(LLViewerObject* root);   // <ID> headless
 
     struct Target
     {

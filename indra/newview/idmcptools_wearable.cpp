@@ -23,6 +23,8 @@
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
+#include "idheadless.h"
+#include "idmcptools_headless.h"
 
 #include "llagent.h"
 #include "llagentwearables.h"
@@ -314,15 +316,16 @@ void idmcp_register_wearable_tools(IDMCPToolRegistry& reg)
         t.name = "wearable.create";
         t.description =
             "Create a new wearable at its default settings. {\"parent\"} (folder "
-            "UUID), {\"name\"}, {\"type\"} one of shape, skin, hair, eyes, shirt, "
+            "UUID; optional in headless: defaults to the run folder), {\"name\"}, {\"type\"} one of shape, skin, hair, eyes, shirt, "
             "pants, shoes, socks, jacket, gloves, undershirt, underpants, skirt, "
             "alpha, tattoo, physics, universal. Optional {\"wear\"} (default true) — "
             "it must be worn before wearable.write can change it. Returns "
             "{accepted, item_id, wear_requested}; the wear completes "
             "asynchronously and is subject to the RLV wearable locks, so confirm "
             "with appearance.getWorn. Blocked by RLV @edit.";
-        t.input_schema = boost::json::parse(
-            R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"},"type":{"type":"string"},"wear":{"type":"boolean"}},"required":["parent","name","type"],"additionalProperties":false})");
+        t.input_schema = boost::json::parse(gIDHeadless
+            ? R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"},"type":{"type":"string"},"wear":{"type":"boolean"}},"required":["name","type"],"additionalProperties":false})"
+            : R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"},"type":{"type":"string"},"wear":{"type":"boolean"}},"required":["parent","name","type"],"additionalProperties":false})");
         t.gate = gate_edit;
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
         {
@@ -331,13 +334,21 @@ void idmcp_register_wearable_tools(IDMCPToolRegistry& reg)
             const std::string type_name   = arg_str(args, "type");
             const bool        wear        = arg_bool(args, "wear", true);
 
-            if (!looks_like_uuid(parent_spec) || name.empty())
+            const bool use_default = gIDHeadless && parent_spec.empty();
+            if ((!use_default && !looks_like_uuid(parent_spec)) || name.empty())
             {
                 idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
                                "parent must be a folder UUID and name must be non-empty");
                 return;
             }
-            const LLUUID parent(parent_spec);
+            LLUUID parent;
+            if (!use_default) parent = LLUUID(parent_spec);
+            std::string why;
+            if (!idmcp_headless::applyDest(!use_default, parent, why))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
+                return;
+            }
             if (!gInventory.getCategory(parent))
             {
                 idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "no such folder");

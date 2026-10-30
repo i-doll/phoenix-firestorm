@@ -69,6 +69,8 @@ const std::string gURLProtocolWhitelist[] = { "secondlife:", "http:", "https:", 
 //const std::string gURLProtocolWhitelistHandler[] = { "http", "http", "https" };
 
 
+bool gOSMessageBoxDisabled = false; // <ID> headless
+
 S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type)
 {
     // Properly hide the splash screen when displaying the message box
@@ -81,6 +83,7 @@ S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type)
 
     S32 result = 0;
     LL_WARNS() << "OSMessageBox: " << text << LL_ENDL;
+    if (gOSMessageBoxDisabled) return OSBTN_OK; // <ID> headless
 #if LL_MESA_HEADLESS // !!! *FIX: (?)
     return OSBTN_OK;
 #elif LL_WINDOWS

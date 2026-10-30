@@ -87,6 +87,8 @@ endif ()
 
 set(viewer_SOURCE_FILES
 # <Add FS includes below this line>
+    idheadless.cpp  # <ID> Headless test mode: bootstrap and status file
+    idmcptools_headless.cpp  # <ID> Headless test mode: MCP session tools
     idsenderhighlight.cpp  # <ID> Sender-based chat highlighting
     idkeywordhighlight.cpp  # <ID> Keyword-based chat highlighting
     idfloaterkeywordcolors.cpp  # <ID> Keyword color settings floater
@@ -991,6 +993,8 @@ set(viewer_HEADER_FILES
 # <Add FS includes below this line>
     idsenderhighlight.h  # <ID> Sender-based chat highlighting
     idkeywordhighlight.h  # <ID> Keyword-based chat highlighting
+    idheadless.h  # <ID> Headless test mode
+    idmcptools_headless.h  # <ID> Headless test mode
     idmcp.h  # <ID> Embedded MCP server: stable facade
     idmcpserver.h  # <ID> Embedded MCP server
     idmcpconnection.h  # <ID> Embedded MCP server: connection

@@ -222,6 +222,7 @@ public:
     bool addEntry(LLViewerOctreeEntry* entry);
     void removeEntry(LLViewerOctreeEntry* entry);
     /*virtual*/ S32 cull(LLCamera &camera, bool do_occlusion);
+    void cullAroundCamera(LLCamera& camera); // <ID> headless
     void addOccluders(LLViewerOctreeGroup* gp);
     void resetOccluders();
     void processOccluders(LLCamera* camera);
@@ -245,6 +246,10 @@ private:
 
     S32   mBackSlectionEnabled; //enable to select back objects if > 0.
     U32   mIdleHash;
+
+    bool      mHeadlessDirty = true; // <ID> headless
+    LLVector3 mHeadlessCullPos; // <ID> headless
+    F64       mHeadlessCullTime = 0.0; // <ID> headless
 };
 
 //

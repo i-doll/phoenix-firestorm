@@ -18,6 +18,8 @@
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
+#include "idmcptools_headless.h"    // <ID> headless
+#include "object_flags.h"
 
 #include "fscommon.h"               // FSCommon::getGroupForRezzing, sObjectAddMsg
 #include "llagent.h"
@@ -163,8 +165,10 @@ namespace
     class RezJob : public Job
     {
     public:
-        RezJob(const IDMCPCallPtr& call, U64 region_handle, const LLVector3& target, std::set<LLUUID> before)
-            : Job(call, REZ_LIMIT), mRegionHandle(region_handle), mTarget(target), mBefore(std::move(before)) {}
+        RezJob(const IDMCPCallPtr& call, U64 region_handle, const LLVector3& target, std::set<LLUUID> before,
+               bool keep, bool temporary)   // <ID> headless
+            : Job(call, REZ_LIMIT), mRegionHandle(region_handle), mTarget(target), mBefore(std::move(before)),
+              mKeep(keep), mTemporary(temporary) {}
 
         LLUUID       mItemId;
         std::string  mName;
@@ -194,6 +198,9 @@ namespace
             out["rotation"]  = eulerDegJson(o->getRotation());
             if (mConsumed) out["item_consumed"] = true;
             if (!mRotNote.empty()) out["rotation_skipped"] = mRotNote;
+            if (mTempSkipped) out["temporary_skipped"] = true;   // <ID> headless
+            if (mKeep) idmcp_headless::ledgerKeep(o);   // <ID> headless
+            else idmcp_headless::ledgerAdd(o, "object.rez");   // <ID> headless
             succeed(std::move(out));
         }
 
@@ -247,6 +254,18 @@ namespace
         void found(LLViewerObject* o)
         {
             mFound = o->getID();
+            if (mKeep) idmcp_headless::ledgerKeep(o);   // <ID> headless
+            if (mTemporary)   // <ID> headless
+            {
+                if (o->permModify() && rlvEdit(o).allowed)
+                {
+                    o->setFlags(FLAGS_TEMPORARY_ON_REZ, true);
+                }
+                else
+                {
+                    mTempSkipped = true;
+                }
+            }
             if (!mHasRot) return;
             if (!o->permModify())
             {
@@ -269,6 +288,9 @@ namespace
         std::set<LLUUID> mCandidates;   // new ones whose names we asked for
         LLUUID           mFound;
         std::string      mRotNote;      // why the rotation wasn't applied
+        bool             mKeep = false;          // <ID> headless
+        bool             mTemporary = false;     // <ID> headless
+        bool             mTempSkipped = false;   // <ID> headless
     };
 
     void run_rez(const boost::json::object& args, const IDMCPCallPtr& call)
@@ -309,7 +331,8 @@ namespace
         }
 
         auto job = std::make_shared<RezJob>(call, region->getHandle(), target,
-                                            own_roots_near(region->getHandle(), target));
+                                            own_roots_near(region->getHandle(), target),
+                                            argBool(args, "keep", false), argBool(args, "temporary", false));   // <ID> headless
         job->mItemId   = item->getUUID();
         job->mName     = item->getName();
         job->mHasRot   = has_rot;
@@ -412,9 +435,9 @@ namespace
     {
     public:
         CreateJob(const IDMCPCallPtr& call, U64 region_handle, const LLVector3& target, const LLVector3& size,
-                  std::set<LLUUID> before)
+                  std::set<LLUUID> before, bool keep, bool temporary)   // <ID> headless
             : Job(call, CREATE_LIMIT), mRegionHandle(region_handle), mTarget(target), mSize(size),
-              mBefore(std::move(before)) {}
+              mBefore(std::move(before)), mKeep(keep), mTemporary(temporary) {}   // <ID> headless
 
         std::string mShape;
 
@@ -440,6 +463,9 @@ namespace
             out["rotation"]  = eulerDegJson(o->getRotation());
             out["scale"]     = vecJson(o->getScale());
             if (!mPosNote.empty()) out["position_skipped"] = mPosNote;
+            if (mTempSkipped) out["temporary_skipped"] = true;   // <ID> headless
+            if (mKeep) idmcp_headless::ledgerKeep(o);   // <ID> headless
+            else idmcp_headless::ledgerAdd(o, "object.create");   // <ID> headless
             succeed(std::move(out));
         }
 
@@ -473,6 +499,18 @@ namespace
                 LLViewerObject* o = gObjectList.findObject(id);
                 if (!o || !scaleMatches(o->getScale(), mSize)) continue;
                 mFound = id;
+                if (mKeep) idmcp_headless::ledgerKeep(o);   // <ID> headless
+                if (mTemporary)   // <ID> headless
+                {
+                    if (o->permModify() && rlvEdit(o).allowed)
+                    {
+                        o->setFlags(FLAGS_TEMPORARY_ON_REZ, true);
+                    }
+                    else
+                    {
+                        mTempSkipped = true;
+                    }
+                }
                 if (posMatches(o->getPositionRegion(), mTarget)) return;
                 // The region may set it down off the target; moving it there is an edit.
                 const IDMCPGateResult g = rlvEdit(o);
@@ -494,6 +532,9 @@ namespace
         LLUUID           mFound;
         bool             mMoved = false;
         std::string      mPosNote;  // why the position wasn't corrected
+        bool             mKeep = false;   // <ID> headless
+        bool             mTemporary = false;     // <ID> headless
+        bool             mTempSkipped = false;   // <ID> headless
     };
 
     void run_create(const boost::json::object& args, const IDMCPCallPtr& call)
@@ -547,7 +588,8 @@ namespace
         }
 
         auto job = std::make_shared<CreateJob>(call, region->getHandle(), target, size,
-                                               own_roots_near(region->getHandle(), target));
+                                               own_roots_near(region->getHandle(), target),
+                                               argBool(args, "keep", false), argBool(args, "temporary", false));   // <ID> headless
         job->mShape = sh->name;
         // The request gate ran this frame, so it is the commit check for the create.
         send_add(region, *sh, target, size, rot);
@@ -718,28 +760,6 @@ namespace
         return id;
     }
 
-    // derez_objects (llviewermenu.cpp:6557-6644) for a single root.
-    void send_derez(LLViewerObject* root, EDeRezDestination dest, const LLUUID& folder)
-    {
-        LLUUID tid;
-        tid.generate();
-        LLMessageSystem* msg = gMessageSystem;
-        msg->newMessageFast(_PREHASH_DeRezObject);
-        msg->nextBlockFast(_PREHASH_AgentData);
-        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
-        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-        msg->nextBlockFast(_PREHASH_AgentBlock);
-        msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupID());
-        msg->addU8Fast(_PREHASH_Destination, (U8)dest);
-        msg->addUUIDFast(_PREHASH_DestinationID, folder);
-        msg->addUUIDFast(_PREHASH_TransactionID, tid);
-        msg->addU8Fast(_PREHASH_PacketCount, (U8)1);
-        msg->addU8Fast(_PREHASH_PacketNumber, (U8)0);
-        msg->nextBlockFast(_PREHASH_ObjectData);
-        msg->addU32Fast(_PREHASH_ObjectLocalID, root->getLocalID());
-        msg->sendReliable(root->getRegion()->getHost());
-    }
-
     class TakeJob : public Job
     {
     public:
@@ -774,6 +794,10 @@ namespace
                     out["name"]      = mName;
                     out["folder_id"] = mFolder.asString();
                     out["copy"]      = mCopy;
+                    if (!mCopy)   // <ID> headless
+                    {
+                        for (const LLUUID& id : mPrimIds) idmcp_headless::ledgerRemove(id);   // <ID> headless
+                    }
                     succeed(std::move(out));
                     return;
                 }
@@ -831,10 +855,12 @@ namespace
                     if (it.notNull()) mBefore.insert(it->getUUID());
                 }
             }
-            send_derez(root, mCopy ? DRD_ACQUIRE_TO_AGENT_INVENTORY : DRD_TAKE_INTO_AGENT_INVENTORY, mFolder);
+            for (LLViewerObject* prim : linksOf(root)) mPrimIds.push_back(prim->getID());   // <ID> headless
+            sendDerez(root, mCopy ? DRD_ACQUIRE_TO_AGENT_INVENTORY : DRD_TAKE_INTO_AGENT_INVENTORY, mFolder);
             mSent = true;
         }
 
+        std::vector<LLUUID> mPrimIds;   // <ID> headless
         LLUUID           mRootId;
         LLUUID           mFolder;
         bool             mCopy = false;
@@ -872,16 +898,27 @@ namespace
             return;
         }
         const std::string folder_arg = argStr(args, "folder");
-        const LLUUID folder = resolve_take_folder(folder_arg);
+        LLUUID folder = resolve_take_folder(folder_arg);
         if (folder.isNull())
         {
             idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "folder not found: " + folder_arg);
+            return;
+        }
+        std::string why;
+        if (!idmcp_headless::applyDest(!folder_arg.empty(), folder, why))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
             return;
         }
         auto job = std::make_shared<TakeJob>(call, root, folder, copy);
         Job::launch(job);
         job->begin();
     }
+}
+
+IDMCPGateResult idmcp_obj::rlvTakeGate(LLViewerObject* root)   // <ID> headless
+{
+    return rlv_take(root);
 }
 
 // ---------------------------------------------------------------------------
@@ -901,6 +938,8 @@ void idmcp_register_rez_tools(IDMCPToolRegistry& reg)
             "result has rotation_skipped with the reason. Blocked by RLV @rez and @interact.";
         t.input_schema = boost::json::parse(
             R"({"type":"object","properties":{"item_id":{"type":"string"},)"
+            R"("keep":{"type":"boolean","description":"Headless only: leave this object in-world when the session ends."},)"
+            R"("temporary":{"type":"boolean","description":"Mark the object temporary, so the region deletes it about a minute after rezzing."},)"
             R"("position":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
             R"("rotation":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},)"
             R"("required":["item_id"],"additionalProperties":false})");
@@ -929,6 +968,8 @@ void idmcp_register_rez_tools(IDMCPToolRegistry& reg)
             R"({"type":"object","properties":{"shape":{"type":"string","enum":["box","prism","pyramid",)"
             R"("tetrahedron","cylinder","half_cylinder","cone","half_cone","sphere","half_sphere","torus",)"
             R"("tube","ring"]},)"
+            R"("keep":{"type":"boolean","description":"Headless only: leave this object in-world when the session ends."},)"
+            R"("temporary":{"type":"boolean","description":"Mark the object temporary, so the region deletes it about a minute after rezzing."},)"
             R"("position":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
             R"("scale":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
             R"("rotation":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},)"

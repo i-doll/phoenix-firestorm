@@ -107,6 +107,7 @@ public:
     // the mainloop listener. Idempotent.
     void stop();
     bool isRunning() const { return mRunning; }
+    F64 lastToolCallTime() const { return mLastToolCall; } // <ID> headless
 
     IDMCPToolRegistry& registry() { return mRegistry; }
 
@@ -133,6 +134,7 @@ private:
     std::vector<std::shared_ptr<IDMCPConnection>>     mConnections;
     std::vector<std::weak_ptr<IDMCPCall>>             mDeferred;
     IDMCPToolRegistry                                 mRegistry;
+    F64                                               mLastToolCall = 0.0; // <ID> headless
     LLTempBoundListener                               mMainloopConn;
     boost::signals2::scoped_connection                mEnableSignal;
     bool                                              mRunning = false;
