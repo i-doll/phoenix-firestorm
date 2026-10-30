@@ -5612,7 +5612,10 @@ void LLPipeline::renderDebug()
             {
                 LLFloaterPathfindingCharacters *pathfindingCharacter = pathfindingCharacterHandle.get();
 
-                if ( pathfindingCharacter->getVisible() || gAgentCamera.cameraMouselook() )
+                // <FS:Trish> Mouselook hides floaters, keep rendering only if this one was visible before that
+                //if ( pathfindingCharacter->getVisible() || gAgentCamera.cameraMouselook() )
+                if ( pathfindingCharacter->getVisible() || (gAgentCamera.cameraMouselook() && pathfindingCharacter->getLastVisible()) )
+                // </FS:Trish>
                 {
                     gPathfindingProgram.bind();
                     gPathfindingProgram.uniform1f(sTint, 1.f);
@@ -5645,7 +5648,10 @@ void LLPipeline::renderDebug()
             {
                 LLFloaterPathfindingConsole *pathfindingConsole = pathfindingConsoleHandle.get();
 
-                if ( pathfindingConsole->getVisible() || gAgentCamera.cameraMouselook() )
+                // <FS:Trish> Mouselook hides floaters, keep rendering only if this one was visible before that
+                //if ( pathfindingConsole->getVisible() || gAgentCamera.cameraMouselook() )
+                if ( pathfindingConsole->getVisible() || (gAgentCamera.cameraMouselook() && pathfindingConsole->getLastVisible()) )
+                // </FS:Trish>
                 {
                     F32 ambiance = gSavedSettings.getF32("PathfindingAmbiance");
 
