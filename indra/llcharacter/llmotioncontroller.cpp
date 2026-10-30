@@ -37,6 +37,8 @@
 #include "llanimationstates.h"
 #include "llstl.h"
 
+#include <ranges> // <FS:Trish/> std::views::reverse
+
 // This is why LL_CHARACTER_MAX_ANIMATED_JOINTS needs to be a multiple of 4.
 const S32 NUM_JOINT_SIGNATURE_STRIDES = LL_CHARACTER_MAX_ANIMATED_JOINTS / 4;
 const U32 MAX_MOTION_INSTANCES = 32;
@@ -437,7 +439,11 @@ bool LLMotionController::startMotion(const LLUUID &id, F32 start_offset)
         return false;
     }
     //if the motion is already active and allows deprecation, then let it keep playing
-    else if (motion->canDeprecate() && isMotionActive(motion))
+    // <FS:Trish> A motion that is easing out and wasn't deprecated above (paused or LOD faded avatar)
+    // isn't playing anymore, reactivate it instead of letting it finish stopping
+    //else if (motion->canDeprecate() && isMotionActive(motion))
+    else if (motion->canDeprecate() && isMotionActive(motion) && !motion->isStopped())
+    // </FS:Trish>
     {
         return true;
     }
@@ -1083,7 +1089,14 @@ bool LLMotionController::activateMotionInstance(LLMotion *motion, F32 time)
     {
         mActiveMotions.remove(motion);
     }
-    mActiveMotions.push_front(motion);
+    // <FS:Trish> Order active motions by start request, newest first
+    // Equal priority animations are resolved by this order
+    // Without sorting, load order can cause the viewer to show a different pose than other viewers.
+    //mActiveMotions.push_front(motion);
+    motion_list_t::iterator insert_at = std::find_if(mActiveMotions.begin(), mActiveMotions.end(),
+        [motion](const LLMotion* other) { return other && other->mStartSequence < motion->mStartSequence; });
+    mActiveMotions.insert(insert_at, motion);
+    // </FS:Trish>
 
     motion->activate(time);
     motion->onUpdate(0.f, mJointSignature[1]);
@@ -1241,10 +1254,16 @@ void LLMotionController::flushAllMotions()
     mCharacter->removeAnimationData("Hand Pose");
 
     // restart motions
-    for (std::vector<std::pair<LLUUID,F32> >::value_type& motion_pair : active_motions)
+    // <FS:Trish> Restart oldest first so the active order is preserved
+    //for (std::vector<std::pair<LLUUID,F32> >::value_type& motion_pair : active_motions)
+    //{
+    //    startMotion(motion_pair.first, motion_pair.second);
+    //}
+    for (const auto& [id, start_offset] : active_motions | std::views::reverse)
     {
-        startMotion(motion_pair.first, motion_pair.second);
+        startMotion(id, start_offset);
     }
+    // </FS:Trish>
 }
 
 //-----------------------------------------------------------------------------

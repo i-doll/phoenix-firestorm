@@ -435,6 +435,7 @@ protected:
     F32                             mLastUpdateTime;
     F32                             mLastLoopedTime;
     AssetStatus                     mAssetStatus;
+    U32                             mFetchRetries = 0; // <FS:Trish/> Download retries after a failed fetch
 
 public:
     void setCharacter(LLCharacter* character) { mCharacter = character; }

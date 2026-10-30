@@ -63,6 +63,8 @@ static F32 MIN_ACCELERATION_SQUARED = 0.0005f * 0.0005f;
 
 static F32 MAX_CONSTRAINTS = 10;
 
+static constexpr U32 MAX_ANIM_FETCH_RETRIES = 5; // <FS:Trish/> Download retries after a failed fetch
+
 //-----------------------------------------------------------------------------
 // JointMotionList
 //-----------------------------------------------------------------------------
@@ -2487,6 +2489,17 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 
             delete[] buffer;
         }
+        // <FS:Trish> Retry a failed download a few times. A failed motion gets deleted and nothing
+        // requests it again while the sim keeps it in the avatar's animation list, so it never plays.
+        // onInitialize() requests it again on the next update.
+        else if (motionp->mFetchRetries < MAX_ANIM_FETCH_RETRIES)
+        {
+            ++motionp->mFetchRetries;
+            LL_WARNS() << "Failed to load asset for animation " << motionp->getName() << ":" << motionp->getID()
+                       << ", retrying (" << motionp->mFetchRetries << "/" << MAX_ANIM_FETCH_RETRIES << ")" << LL_ENDL;
+            motionp->mAssetStatus = ASSET_NEEDS_FETCH;
+        }
+        // </FS:Trish>
         else
         {
             LL_WARNS() << "Failed to load asset for animation " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
