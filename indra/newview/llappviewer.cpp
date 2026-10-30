@@ -28,6 +28,7 @@
 
 #include "llappviewer.h"
 #include "idmcp.h" // <ID> Embedded MCP server (stable facade)
+#include "idheadless.h" // <ID> headless
 
 // Viewer includes
 #include "llversioninfo.h"
@@ -1810,7 +1811,7 @@ bool LLAppViewer::doFrame()
 
             // Render scene.
             // *TODO: Should we run display() even during gHeadlessClient?  DK 2011-02-18
-            if (!LLApp::isExiting() && !gHeadlessClient && gViewerWindow)
+            if (!LLApp::isExiting() && !gHeadlessClient && !gIDHeadless && gViewerWindow) // <ID> headless
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df Display");
                 pingMainloopTimeout("Main:Display");
@@ -1866,9 +1867,14 @@ bool LLAppViewer::doFrame()
                 ms_sleep(non_interactive_ms_sleep_time);
             }
 
+            if (gIDHeadless) // <ID> headless
+            {
+                ms_sleep(50); // <ID> headless
+            }
+
             // yield cooperatively when not running as foreground window
             // and when not quiting (causes trouble at mac's cleanup stage)
-            if (!LLApp::isExiting()
+            if (!gIDHeadless && !LLApp::isExiting() // <ID> headless
                 && ((gViewerWindow && !gViewerWindow->getWindow()->getVisible())
                     || !gFocusMgr.getAppHasFocus()))
             {
@@ -1974,7 +1980,7 @@ bool LLAppViewer::doFrame()
     {
         pingMainloopTimeout("Main:qSnapshot");
         // Save snapshot for next time, if we made it through initialization
-        if (STATE_STARTED == LLStartUp::getStartupState())
+        if (!gIDHeadless && STATE_STARTED == LLStartUp::getStartupState()) // <ID> headless
         {
             saveFinalSnapshot();
         }
@@ -3538,6 +3544,16 @@ bool LLAppViewer::initConfiguration()
         LLError::setEnabledLogTypesMask(0);
         llassert_always(!gSavedSettings.getBOOL("SLURLPassToOtherInstance"));
     }
+
+#if LL_LINUX
+    idheadless::init(); // <ID> headless
+#else
+    if (gSavedSettings.getBOOL("IDHeadless")) // <ID> headless
+    {
+        LL_WARNS() << "--headless is only supported on Linux" << LL_ENDL;
+        return false;
+    }
+#endif
 
     // Handle slurl use. NOTE: Don't let SL-55321 reappear.
     // This initial-SLURL logic, up through the call to
@@ -5419,6 +5435,10 @@ static bool finish_early_exit(const LLSD& notification, const LLSD& response)
 
 void LLAppViewer::earlyExit(const std::string& name, const LLSD& substitutions)
 {
+    if (gIDHeadless) // <ID> headless
+    {
+        idheadless::fail(idheadless::EXIT_STARTUP, "early exit: " + name); // <ID> headless
+    }
     LL_WARNS() << "app_early_exit: " << name << LL_ENDL;
     gDoDisconnect = true;
     LLNotificationsUtil::add(name, substitutions, LLSD(), finish_early_exit);
@@ -5948,18 +5968,32 @@ bool finish_forced_disconnect(const LLSD& notification, const LLSD& response)
 
 void LLAppViewer::forceDisconnect(const std::string& mesg)
 {
-    if (gDoDisconnect)
-    {
-        // Already popped up one of these dialogs, don't
-        // do this again.
-        return;
-    }
-
     // *TODO: Translate the message if possible
     std::string big_reason = LLAgent::sTeleportErrorMessages[mesg];
     if ( big_reason.size() == 0 )
     {
         big_reason = mesg;
+    }
+
+    if (gIDHeadless) // <ID> headless
+    {
+        if (idheadless::isQuitting()) // <ID> headless
+        {
+            return; // <ID> headless
+        }
+        const bool started = LLStartUp::getStartupState() >= STATE_STARTED; // <ID> headless
+        if (started) // <ID> headless
+        {
+            sendSimpleLogoutRequest(); // <ID> headless
+        }
+        idheadless::fail(started ? idheadless::EXIT_DISCONNECTED : idheadless::EXIT_LOGIN, "disconnected: " + big_reason); // <ID> headless
+    }
+
+    if (gDoDisconnect)
+    {
+        // Already popped up one of these dialogs, don't
+        // do this again.
+        return;
     }
 
     LLSD args;

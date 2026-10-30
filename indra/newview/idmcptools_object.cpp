@@ -277,6 +277,27 @@ namespace idmcp_obj
         return out;
     }
 
+    void sendDerez(LLViewerObject* root, EDeRezDestination dest, const LLUUID& folder)   // <ID> headless
+    {
+        LLUUID tid;
+        tid.generate();
+        LLMessageSystem* msg = gMessageSystem;
+        msg->newMessageFast(_PREHASH_DeRezObject);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_AgentBlock);
+        msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupID());
+        msg->addU8Fast(_PREHASH_Destination, (U8)dest);
+        msg->addUUIDFast(_PREHASH_DestinationID, folder);
+        msg->addUUIDFast(_PREHASH_TransactionID, tid);
+        msg->addU8Fast(_PREHASH_PacketCount, (U8)1);
+        msg->addU8Fast(_PREHASH_PacketNumber, (U8)0);
+        msg->nextBlockFast(_PREHASH_ObjectData);
+        msg->addU32Fast(_PREHASH_ObjectLocalID, root->getLocalID());
+        msg->sendReliable(root->getRegion()->getHost());
+    }
+
     S32 linkNumberOf(LLViewerObject* prim)
     {
         if (!prim) return 0;

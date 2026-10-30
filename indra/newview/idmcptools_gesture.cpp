@@ -22,6 +22,8 @@
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
+#include "idheadless.h"
+#include "idmcptools_headless.h"
 
 #include "llagent.h"
 #include "llassetstorage.h"
@@ -680,23 +682,32 @@ void idmcp_register_gesture_tools(IDMCPToolRegistry& reg)
         IDMCPTool t;
         t.name = "gesture.create";
         t.description =
-            "Create a new empty gesture. {\"parent\"} (folder UUID) and {\"name\"}. "
+            "Create a new empty gesture. {\"parent\"} (folder UUID; optional in headless: defaults to the run folder) and {\"name\"}. "
             "Returns the new item id; add trigger and steps with gesture.write, then "
             "gesture.activate to make it live. Blocked by RLV @edit.";
-        t.input_schema = boost::json::parse(
-            R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"}},"required":["parent","name"],"additionalProperties":false})");
+        t.input_schema = boost::json::parse(gIDHeadless
+            ? R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"}},"required":["name"],"additionalProperties":false})"
+            : R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"}},"required":["parent","name"],"additionalProperties":false})");
         t.gate = gate_edit;
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
         {
             const std::string parent_spec = arg_str(args, "parent");
             const std::string name        = arg_str(args, "name");
-            if (!looks_like_uuid(parent_spec) || name.empty())
+            const bool use_default = gIDHeadless && parent_spec.empty();
+            if ((!use_default && !looks_like_uuid(parent_spec)) || name.empty())
             {
                 idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS,
                                "parent must be a folder UUID and name must be non-empty");
                 return;
             }
-            const LLUUID parent(parent_spec);
+            LLUUID parent;
+            if (!use_default) parent = LLUUID(parent_spec);
+            std::string why;
+            if (!idmcp_headless::applyDest(!use_default, parent, why))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
+                return;
+            }
             if (!gInventory.getCategory(parent))
             {
                 idmcp_tool_err(call, IDMCP_ERR_NOT_FOUND, "no such folder");

@@ -1727,9 +1727,9 @@ void process_enable_simulator(LLMessageSystem *msg, void **user_data)
 
 //<FS:Trish> Remove region if it wasnt a neighbor
     static LLCachedControl<bool> fSTrishNeighboringRegionLoadAdjacentsFix(gSavedSettings, "FSTrishNeighboringRegionLoadAdjacentsFix");
-    if (fSTrishNeighboringRegionLoadAdjacentsFix)
+    LLViewerRegion* current_region = gAgent.getRegion();
+    if (fSTrishNeighboringRegionLoadAdjacentsFix && current_region && current_region->getHandle() != handle) // <ID> never drop the agent's own region
     {
-        LLViewerRegion* current_region = gAgent.getRegion();
         std::vector<LLViewerRegion*> uniqueRegions;
         current_region->getNeighboringRegions(uniqueRegions);
 

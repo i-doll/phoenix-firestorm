@@ -154,6 +154,64 @@
       <string>IgnorePixelDepth</string>
     </map>
 
+    <key>headless</key>
+    <map>
+      <key>desc</key>
+      <string>run without a window for automated testing</string>
+      <key>map-to</key>
+      <string>IDHeadless</string>
+    </map>
+
+    <key>mcp-port</key>
+    <map>
+      <key>desc</key>
+      <string>MCP server port</string>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>IDMCPServerPort</string>
+    </map>
+
+    <key>login-name</key>
+    <map>
+      <key>desc</key>
+      <string>avatar to log in as in headless mode</string>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>IDHeadlessLoginName</string>
+    </map>
+
+    <key>run-name</key>
+    <map>
+      <key>desc</key>
+      <string>name of this headless test run</string>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>IDHeadlessRunName</string>
+    </map>
+
+    <key>idle-quit</key>
+    <map>
+      <key>desc</key>
+      <string>seconds idle before a headless viewer quits</string>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>IDHeadlessIdleQuit</string>
+    </map>
+
+    <key>status-file</key>
+    <map>
+      <key>desc</key>
+      <string>headless status file path</string>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>IDHeadlessStatusFile</string>
+    </map>
+
     <key>inbw</key>
     <map>
       <key>count</key>

@@ -33,6 +33,7 @@ void display_startup();
 void display_cleanup();
 
 void display(bool rebuild = true, F32 zoom_factor = 1.f, int subfield = 0, bool for_snapshot = false);
+void display_update_teleport_headless(); // <ID> headless
 
 extern bool gDisplaySwapBuffers;
 extern bool gDepthDirty;

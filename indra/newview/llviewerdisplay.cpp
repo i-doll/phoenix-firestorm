@@ -30,6 +30,7 @@
 
 #include "fsyspath.h"
 #include "hexdump.h"
+#include "idheadless.h" // <ID> headless
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
@@ -163,7 +164,8 @@ void display_startup()
         || !gViewerWindow->getActive()
         || !gViewerWindow->getWindow()->getVisible()
         || gViewerWindow->getWindow()->getMinimized()
-        || gNonInteractive)
+        || gNonInteractive
+        || gIDHeadless) // <ID> headless
     {
         return;
     }
@@ -480,6 +482,14 @@ static void update_tp_display(bool minimized)
     }
 }
 
+void display_update_teleport_headless() // <ID> headless
+{ // <ID> headless
+    if (gTeleportDisplay) // <ID> headless
+    { // <ID> headless
+        update_tp_display(true); // <ID> headless
+    } // <ID> headless
+} // <ID> headless
+
 // Paint the display!
 void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 {
@@ -529,10 +539,10 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     // Don't draw if the window is hidden or minimized.
     // In fact, must explicitly check the minimized state before drawing.
     // Attempting to draw into a minimized window causes a GL error. JC
-    if (   !gViewerWindow->getActive()
-        || !gViewerWindow->getWindow()->getVisible()
-        || gViewerWindow->getWindow()->getMinimized()
-        || gNonInteractive)
+    if (   !gViewerWindow->getWindow()->getVisible() // <ID> headless
+        || gNonInteractive // <ID> headless
+        || (!(gIDHeadless && gSnapshot) // <ID> headless
+            && (!gViewerWindow->getActive() || gViewerWindow->getWindow()->getMinimized()))) // <ID> headless
     {
         // Clean up memory the pools may have allocated
         if (rebuild)

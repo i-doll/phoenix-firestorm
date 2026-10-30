@@ -18,6 +18,7 @@
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
+#include "idmcptools_headless.h"
 
 #include "llagent.h"
 #include "llassetstorage.h"         // gAssetStorage
@@ -488,7 +489,8 @@ namespace
     IDMCPGateResult gate_copy_contents(const boost::json::object& args, IDMCPGatePhase phase)
     {
         IDMCPGateResult g = gate_add_contents(args, phase);
-        return g.allowed ? rlv_dest_folder(arg_dest(args)) : g;
+        if (!g.allowed) return g;
+        return rlv_dest_folder(args.contains("dest") ? arg_dest(args) : idmcp_headless::runFolder());
     }
 
     // ---- object.copyContents -----------------------------------------------------
@@ -723,6 +725,12 @@ namespace
                 idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "dest must be a folder in your inventory, or \"root\"");
                 return;
             }
+        }
+        std::string why;
+        if (!idmcp_headless::applyDest(args.contains("dest"), dest, why))
+        {
+            idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
+            return;
         }
         auto job = std::make_shared<CopyOutJob>(call, t, ids, dest);
         Job::launch(job);

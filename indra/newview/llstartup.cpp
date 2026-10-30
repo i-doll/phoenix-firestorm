@@ -95,6 +95,7 @@
 #include "llappviewer.h"
 #include "llstartup.h"
 #include "idmcp.h" // <ID> Embedded MCP server (stable facade)
+#include "idheadless.h" // <ID> headless
 
 #if LL_VELOPACK && LL_WINDOWS
 #include "llvelopack.h"
@@ -1242,6 +1243,7 @@ bool idle_startup()
         //
         // Log on to system
         //
+        if (gIDHeadless) idheadless::prepareLogin(); // <ID> headless
         if (gUserCredential.isNull())
         {
             gUserCredential = gLoginHandler.initializeLoginInfo();
@@ -1291,11 +1293,12 @@ bool idle_startup()
         }
 
 // [RLVa:KB] - Patch: RLVa-2.1.0
-        if (gSavedSettings.get<bool>(RlvSettingNames::Main))
+        if (gSavedSettings.get<bool>(RlvSettingNames::Main) && !gIDHeadless) // <ID> headless
         {
             show_connect_box = true;
         }
 // [/RVA:KB]
+        if (gIDHeadless) idheadless::beginLogin(gUserCredential, show_connect_box); // <ID> headless
 
         //setup map of datetime strings to codes and slt & local time offset from utc
         // *TODO: Does this need to be here?
@@ -1358,6 +1361,7 @@ bool idle_startup()
     {
         LL_DEBUGS("AppInit") << "Initializing Window, show_connect_box = "
                              << show_connect_box << LL_ENDL;
+        if (gIDHeadless && (show_connect_box || mLoginStatePastUI)) idheadless::fail(idheadless::EXIT_LOGIN, "entered STATE_LOGIN_SHOW (login panel)"); // <ID> headless
 
         // if we've gone backwards in the login state machine, to this state where we show the UI
         // AND the debug setting to exit in this case is true, then go ahead and bail quickly
@@ -1493,6 +1497,7 @@ bool idle_startup()
         // <FS:Ansariel> Check for test build expiration
         if (is_testbuild_expired())
         {
+            if (gIDHeadless) idheadless::fail(idheadless::EXIT_LOGIN, "this test build has expired"); // <ID> headless
             LL_INFOS() << "This test version has expired and cannot be used any further." << LL_ENDL;
             LLNotificationsUtil::add("TestversionExpired", LLSD(), LLSD(), login_alert_done);
             LLStartUp::setStartupState(STATE_LOGIN_CONFIRM_NOTIFICATON);
@@ -1505,6 +1510,7 @@ bool idle_startup()
         LLSD blocked = FSData::instance().allowedLogin();
         if (blocked.isMap()) //hack for testing for an empty LLSD
         {
+            if (gIDHeadless) idheadless::fail(idheadless::EXIT_LOGIN, "login blocked by FSData"); // <ID> headless
             LLNotificationsUtil::add("BlockLoginInfo", blocked, LLSD(), login_alert_done);
             LLStartUp::setStartupState(STATE_LOGIN_CONFIRM_NOTIFICATON);
             show_connect_box = true;
@@ -1522,6 +1528,7 @@ bool idle_startup()
             // already, so we just go back to the login screen. The user
             // could then change the preferences to fix the issue.
 
+            if (gIDHeadless) idheadless::fail(idheadless::EXIT_LOGIN, "proxy start-up failed"); // <ID> headless
             LLStartUp::setStartupState(STATE_LOGIN_SHOW);
             return false;
         }
@@ -1886,6 +1893,10 @@ bool idle_startup()
             std::string message_response = response["message"];
             std::string message_id = response["message_id"];
             std::string message; // actual string to show the user
+            if (gIDHeadless) // <ID> headless
+            {
+                idheadless::fail(idheadless::EXIT_LOGIN, "login failed: " + reason_response + (message_response.empty() ? "" : " " + message_response)); // <ID> headless
+            }
 
             bool localized_by_id = false;
             if(!message_id.empty())
@@ -2070,6 +2081,7 @@ bool idle_startup()
             }
             else
             {
+                if (gIDHeadless) idheadless::fail(idheadless::EXIT_LOGIN, "login response could not be processed"); // <ID> headless
                 LLSD args;
                 args["ERROR_MESSAGE"] = emsg.str();
                 LL_INFOS("LLStartUp") << "Notification: " << args << LL_ENDL;
@@ -2088,6 +2100,7 @@ bool idle_startup()
     // <FS:Ansariel> Wait for notification confirmation
     if (STATE_LOGIN_CONFIRM_NOTIFICATON == LLStartUp::getStartupState())
     {
+        if (gIDHeadless) idheadless::fail(idheadless::EXIT_LOGIN, "entered STATE_LOGIN_CONFIRM_NOTIFICATON (login dialog)"); // <ID> headless
         do_startup_frame();
         gViewerWindow->getProgressView()->setVisible(false);
         do_startup_frame();
@@ -5396,6 +5409,7 @@ bool process_login_success_response(U32 &first_sim_size_x, U32 &first_sim_size_y
 
 void transition_back_to_login_panel(const std::string& emsg)
 {
+    if (gIDHeadless) idheadless::fail(idheadless::EXIT_LOGIN, "returned to login panel"); // <ID> headless
     // Bounce back to the login screen.
     reset_login(); // calls LLStartUp::setStartupState( STATE_LOGIN_SHOW );
     gSavedSettings.setBOOL("AutoLogin", false);

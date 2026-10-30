@@ -303,6 +303,7 @@ protected:
 };
 
 // Platform-neutral for accessing the platform specific message box
+extern bool gOSMessageBoxDisabled; // <ID> headless
 S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type);
 constexpr U32 OSMB_OK = 0;
 constexpr U32 OSMB_OKCANCEL = 1;

@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llappviewerlinux.h"
+#include "idheadless.h" // <ID> headless
 
 #include "llcommandlineparser.h"
 
@@ -211,6 +212,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     gArgC = argc;
     gArgV = argv;
 
+    if (int headless_rc = idheadless::earlyInit(argc, argv)) std::_Exit(headless_rc); // <ID> headless
+
     gViewerAppPtr = new LLAppViewerLinux();
 
     // install unexpected exception handler
@@ -237,6 +240,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
         }
         // </FS:PP>
         LL_WARNS() << "Application init failed." << LL_ENDL;
+        if (gIDHeadless) idheadless::fail(idheadless::EXIT_STARTUP, "viewer init failed"); // <ID> headless
         return SDL_APP_FAILURE;
     }
 

@@ -56,6 +56,7 @@
 #include "llappviewer.h"
 #include "llsdserialize.h"
 #include "lltrans.h"
+#include "idheadless.h" // <ID> headless
 
 #include <boost/regex.hpp>
 #include <sstream>
@@ -364,6 +365,28 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
 
     std::string reason_response = response["reason"].asString();
     std::string message_response = response["message"].asString();
+    if (gIDHeadless && reason_response == "presence") // <ID> headless
+    {
+        idheadless::retryLoginLater(); // <ID> headless
+        return; // <ID> headless
+    }
+    if (gIDHeadless) // <ID> headless
+    {
+        std::string why = "login failed: " + reason_response;
+        if (reason_response == "tos")
+        {
+            why = "accept the Terms of Service in a normal viewer first";
+        }
+        else if (reason_response == "mfa_challenge")
+        {
+            why = "account needs an MFA token; not supported headless";
+        }
+        else if (!message_response.empty())
+        {
+            why += " " + message_response;
+        }
+        idheadless::fail(idheadless::EXIT_LOGIN, why);
+    }
     LL_DEBUGS("LLLogin") << "reason " << reason_response
                          << " message " << message_response
                          << LL_ENDL;

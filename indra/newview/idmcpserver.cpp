@@ -21,6 +21,10 @@
 #include "rlvactions.h"
 #include "idmcprlvgate.h"
 #include "idmcptools.h"
+#include "idheadless.h" // <ID> headless
+#include "idmcptools_headless.h" // <ID> headless
+#include "llagent.h" // <ID> headless
+#include "llviewerregion.h" // <ID> headless
 
 #include <sstream>
 
@@ -174,6 +178,7 @@ void IDMCPServer::initSingleton()
     idmcp_register_faces_tools(mRegistry);
     idmcp_register_contents_tools(mRegistry);
     idmcp_register_rez_tools(mRegistry);
+    idmcp_register_headless_tools(mRegistry); // <ID> headless
 
     // Watch the enable setting so toggling it mid-session starts/stops the
     // server live (e.g. from the Debug Settings floater).
@@ -205,6 +210,10 @@ void IDMCPServer::start()
     U16 port = (U16)gSavedSettings.getU32(SETTING_PORT);
     if (!bindListener(port))
     {
+        if (gIDHeadless) // <ID> headless
+        {
+            idheadless::fail(idheadless::EXIT_PORT_BUSY, "MCP server failed to bind 127.0.0.1:" + std::to_string(port)); // <ID> headless
+        }
         LL_WARNS("IDMCP") << "MCP server failed to bind 127.0.0.1:" << port
                           << " - disabling." << LL_ENDL;
         gSavedSettings.setBOOL(SETTING_ENABLED, false);
@@ -463,6 +472,12 @@ void IDMCPServer::handleRequest(const std::shared_ptr<IDMCPConnection>& conn,
             call->respondError(IDMCP_ERR_METHOD_MISSING, "unknown tool: " + name);
             return;
         }
+        if (gIDHeadless && idheadless::isQuitting()) // <ID> headless
+        {
+            call->respondError(IDMCP_ERR_BUSY, "headless session is quitting"); // <ID> headless
+            return;
+        }
+        mLastToolCall = LLTimer::getTotalSeconds(); // <ID> headless
 
         boost::json::object args;
         if (params && params->contains("arguments") && params->at("arguments").is_object())
@@ -517,6 +532,19 @@ void idmcp::startupInit()
     if (gSavedSettings.getBOOL("IDMCPServerEnabled"))
     {
         IDMCPServer::instance().start();
+    }
+    if (gIDHeadless && IDMCPServer::instance().isRunning()) // <ID> headless
+    {
+        idheadless::setState(idheadless::State::CleaningUp); // <ID> headless
+        idmcp_headless::begin([]() // <ID> headless
+        {
+            LLViewerRegion* region = gAgent.getRegion(); // <ID> headless
+            idheadless::setStatusField("region", region ? region->getName() : std::string()); // <ID> headless
+            if (idheadless::statusString("state") == "cleaning_up") // <ID> headless
+            {
+                idheadless::setState(idheadless::State::Ready); // <ID> headless
+            }
+        });
     }
 }
 

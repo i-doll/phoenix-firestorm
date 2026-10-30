@@ -28,6 +28,7 @@
 
 #include "llviewerprecompiledheaders.h"
 #include "llsecapi.h"
+#include "idheadless.h" // <ID> headless
 #include "llsechandler_basic.h"
 #include "llsdserialize.h"
 #include "llviewernetwork.h"
@@ -1280,10 +1281,18 @@ LLSecAPIBasicHandler::LLSecAPIBasicHandler()
 void LLSecAPIBasicHandler::init()
 {
     mProtectedDataMap = LLSD::emptyMap();
-    if (mProtectedDataFilename.length() == 0)
+    const bool default_store = mProtectedDataFilename.length() == 0;
+    if (gIDHeadless) // <ID> headless
     {
+        mProtectedDataFilename = idheadless::normalCredentialFile(); // <ID> headless
+    }
+    if (default_store)
+    {
+        if (!gIDHeadless) // <ID> headless
+        {
         mProtectedDataFilename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS,
                                                             "bin_conf.dat");
+        }
         mLegacyPasswordPath = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "password.dat");
 
         // <FS:Testy> Duplicate line
@@ -1413,6 +1422,7 @@ void LLSecAPIBasicHandler::_readProtectedData()
 
 void LLSecAPIBasicHandler::_writeProtectedData()
 {
+    if (gIDHeadless) return; // <ID> headless
     std::ostringstream formatted_data_ostream;
     U8 salt[STORE_SALT_SIZE];
     U8 buffer[BUFFER_READ_SIZE];

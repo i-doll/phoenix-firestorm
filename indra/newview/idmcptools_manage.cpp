@@ -15,6 +15,8 @@
 #include "idmcptools.h"
 #include "idmcpserver.h"
 #include "idmcprlvgate.h"
+#include "idheadless.h"
+#include "idmcptools_headless.h"
 #include "idmcptools_object.h"      // idmcp_obj::argNextOwner, maskJson
 
 #include "llinventorydefines.h"     // LLInventoryItemFlags
@@ -103,13 +105,21 @@ void idmcp_register_manage_tools(IDMCPToolRegistry& reg)
         IDMCPTool t;
         t.name = "inventory.createFolder";
         t.description =
-            "Create a new folder. {\"parent\"} (folder UUID or \"root\") and "
+            "Create a new folder. {\"parent\"} (folder UUID or \"root\"; optional in headless: defaults to the run folder) and "
             "{\"name\"}. Returns the new folder id.";
-        t.input_schema = boost::json::parse(
-            R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"}},"required":["parent","name"],"additionalProperties":false})");
+        t.input_schema = boost::json::parse(gIDHeadless
+            ? R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"}},"required":["name"],"additionalProperties":false})"
+            : R"({"type":"object","properties":{"parent":{"type":"string"},"name":{"type":"string"}},"required":["parent","name"],"additionalProperties":false})");
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
         {
-            const LLUUID parent = resolve_parent(arg_str(args, "parent"));
+            const std::string parent_arg = arg_str(args, "parent");
+            LLUUID parent = resolve_parent(parent_arg);
+            std::string why;
+            if (!idmcp_headless::applyDest(!parent_arg.empty(), parent, why))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
+                return;
+            }
             const std::string name = arg_str(args, "name");
             if (parent.isNull() || name.empty())
             {
@@ -331,7 +341,13 @@ void idmcp_register_manage_tools(IDMCPToolRegistry& reg)
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
         {
             const LLUUID id = arg_uuid(args, "id");
-            const LLUUID dest = arg_uuid(args, "dest");
+            LLUUID dest = arg_uuid(args, "dest");
+            std::string why;
+            if (!idmcp_headless::applyDest(true, dest, why))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
+                return;
+            }
             if (id.isNull() || dest.isNull())
             {
                 idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "id and dest (UUIDs) required");
@@ -384,7 +400,13 @@ void idmcp_register_manage_tools(IDMCPToolRegistry& reg)
         t.invoke = [](const boost::json::object& args, const IDMCPCallPtr& call)
         {
             const LLUUID id   = arg_uuid(args, "id");
-            const LLUUID dest = resolve_parent(arg_str(args, "dest"));
+            LLUUID dest = resolve_parent(arg_str(args, "dest"));
+            std::string why;
+            if (!idmcp_headless::applyDest(true, dest, why))
+            {
+                idmcp_tool_err(call, IDMCP_ERR_PERMISSION, why);
+                return;
+            }
             if (id.isNull() || dest.isNull())
             {
                 idmcp_tool_err(call, IDMCP_ERR_INVALID_PARAMS, "id (UUID) and dest (folder UUID or \"root\") required");
