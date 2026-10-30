@@ -969,7 +969,7 @@ bool LLTextureCache::isInLocal(const LLUUID& id)
 //static
 F32 LLTextureCache::sHeaderCacheVersion = 1.71f;
 U32 LLTextureCache::sCacheMaxEntries = 1024 * 1024; //~1 million textures.
-S64 LLTextureCache::sCacheMaxTexturesSize = 0; // no limit
+S64 LLTextureCache::sCacheMaxTexturesSize = 0; // whole texture cache budget, bodies plus header and fast cache records, see getUsedSize(). 0 = no limit
 std::string LLTextureCache::sHeaderCacheEncoderVersion = LLImageJ2C::getEngineInfo();
 
 #if defined(ADDRESS_SIZE)
@@ -1319,8 +1319,7 @@ void LLTextureCache::updateEntryTimeStamp(S32 idx, Entry& entry)
             mUpdatedEntryMap[idx] = entry ;
             setEntryTime(idx, entry.mTime);
 
-            // Write pending time stamps regularly, update() only does it when the cache is idle
-            // which may not happen for a long time under load, and a crash would lose them all.
+            // Write pending timestamps regularly, update() only does it when the cache is idle (which is rare)
             if (mUpdatedEntryMap.size() >= TEXTURE_CACHE_MAX_PENDING_TIME_STAMPS
                 || mUpdatedEntriesTimer.getElapsedTimeF32() > TEXTURE_CACHE_TIME_STAMPS_MAX_AGE)
             {
@@ -2423,7 +2422,8 @@ void LLTextureCache::openFastCache(bool first_time)
         }
         else
         {
-            mFastCachep = new LLAPRFile(mFastCacheFileName, APR_READ|APR_WRITE|APR_BINARY, mFastCachePoolp) ;
+            // Recreate the file if the cache was cleared since, existing contents are kept
+            mFastCachep = new LLAPRFile(mFastCacheFileName, APR_CREATE|APR_READ|APR_WRITE|APR_BINARY, mFastCachePoolp) ;
         }
 
         mFastCacheTimer.reset();

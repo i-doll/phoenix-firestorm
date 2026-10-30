@@ -260,7 +260,7 @@ private:
         U32 mTime = 0;
         S32 mImageSize = -1; // unknown, read the entry from the file
     };
-    std::vector<EntryInfo> mEntryInfos; // Entry::mTime and Entry::mImageSize by header index to avoid unecessary file reads
+    std::vector<EntryInfo> mEntryInfos; // Entry::mTime and Entry::mImageSize by header index to avoid unnecessary file reads
     LLTimer mUpdatedEntriesTimer; // time since mUpdatedEntryMap was last written
     typedef std::vector<std::pair<S32, Entry> > idx_entry_vector_t;
     idx_entry_vector_t mPurgeEntryList;
