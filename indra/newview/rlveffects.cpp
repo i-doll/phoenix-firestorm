@@ -309,7 +309,26 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
             break;
         case ESphereOrigin::Avatar:
         default:
-            posSphereOrigin.setVec((isAgentAvatarValid()) ? gAgentAvatarp->getRenderPosition() : gAgent.getPositionAgent(), 1.0f);
+            // <FS:Trish> FIRE-30896 Follow the hover height
+            if (isAgentAvatarValid())
+            {
+                LLVector3 hover_offset;
+                if (!gAgentAvatarp->isSitting())
+                {
+                    hover_offset = gAgentAvatarp->getHoverOffset();
+                }
+                else if (gAgentAvatarp->getParent() && gAgentAvatarp->mDrawable.notNull())
+                {
+                    // Sitting on an object, the offset follows the seat rotation
+                    hover_offset = gAgentAvatarp->getHoverOffset() * gAgentAvatarp->mDrawable->getRotation();
+                }
+                posSphereOrigin.setVec(gAgentAvatarp->getRenderPosition() + hover_offset, 1.0f);
+            }
+            else
+            {
+                posSphereOrigin.setVec(gAgent.getPositionAgent(), 1.0f);
+            }
+            // </FS:Trish>
             break;
     }
     glm::vec4 posSphereOriginGl(glm::make_vec4(posSphereOrigin.mV));
