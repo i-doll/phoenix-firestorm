@@ -192,6 +192,14 @@ static bool handleRenderAvatarMouselookChanged(const LLSD& newvalue)
     return true;
 }
 
+// <FS:Trish> FSExperimentalSyncAnimationClock
+static bool handleSyncAnimationClockChanged(const LLSD& newvalue)
+{
+    LLMotionController::sSyncAnimationClock = newvalue.asBoolean();
+    return true;
+}
+// </FS:Trish>
+
 static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
     if (LLStartUp::getStartupState() >= STATE_STARTED)
@@ -1430,6 +1438,7 @@ void settings_setup_listeners()
 {
     LL_PROFILE_ZONE_SCOPED;
     setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
+    setting_setup_signal_listener(gSavedSettings, "FSExperimentalSyncAnimationClock", handleSyncAnimationClockChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainScale", handleTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRScale", handlePBRTerrainScaleChanged);

@@ -47,6 +47,7 @@ const U32 MAX_MOTION_INSTANCES = 32;
 // Constants and statics
 //-----------------------------------------------------------------------------
 F32 LLMotionController::sCurrentTimeFactor = 1.f;
+bool LLMotionController::sSyncAnimationClock = false; // <FS:Trish/> FSExperimentalSyncAnimationClock
 LLMotionRegistry LLMotionController::sRegistry;
 
 //-----------------------------------------------------------------------------
@@ -449,6 +450,10 @@ bool LLMotionController::startMotion(const LLUUID &id, F32 start_offset)
     }
 
 //  LL_INFOS() << "Starting motion " << name << LL_ENDL;
+    // <FS:Trish> Remember when the start was requested
+    motion->mStartSequence = ++mStartSequence;
+    motion->mRequestedActivationTime = mAnimTime - start_offset;
+    // </FS:Trish>
     return activateMotionInstance(motion, mAnimTime - start_offset);
 }
 
@@ -807,7 +812,9 @@ void LLMotionController::updateLoadingMotions()
             // this motion should be playing
             if (!motionp->isStopped())
             {
-                activateMotionInstance(motionp, mAnimTime);
+                // <FS:Trish> FSExperimentalSyncAnimationClock
+                activateMotionInstance(motionp, sSyncAnimationClock ? llmin(motionp->mRequestedActivationTime, mAnimTime) : mAnimTime);
+                // </FS:Trish>
             }
         }
         else if (status == LLMotion::STATUS_FAILURE)
@@ -892,6 +899,12 @@ void LLMotionController::updateMotions(bool force_update)
             mAnimTime = update_time;
         }
     }
+    // <FS:Trish> FSExperimentalSyncAnimationClock
+    else if (sSyncAnimationClock)
+    {
+        mPausedTime += delta_time * mTimeFactor * mUpdateFactor;
+    }
+    // </FS:Trish>
 
     updateLoadingMotions();
 
@@ -942,6 +955,12 @@ void LLMotionController::updateMotionsMinimal()
     {
         mAnimTime += delta_time * mTimeFactor * mUpdateFactor;
     }
+    // <FS:Trish> FSExperimentalSyncAnimationClock
+    else if (sSyncAnimationClock)
+    {
+        mPausedTime += delta_time * mTimeFactor * mUpdateFactor;
+    }
+    // </FS:Trish>
 
     purgeExcessMotions();
     updateLoadingMotions();
@@ -1289,6 +1308,13 @@ void LLMotionController::unpauseAllMotions()
     {
         //LL_INFOS() << "Unpausing animations..." << LL_ENDL;
         mPaused = false;
+        // <FS:Trish> FSExperimentalSyncAnimationClock  sync animation state to the expected state now that we have the asset
+        if (sSyncAnimationClock)
+        {
+            mAnimTime += mPausedTime;
+        }
+        mPausedTime = 0.f;
+        // </FS:Trish>
     }
 }
 // End

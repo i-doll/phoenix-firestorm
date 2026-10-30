@@ -646,6 +646,7 @@ static void settings_to_globals()
     LLVOAvatar::sPhysicsLODFactor       = llclamp(gSavedSettings.getF32("RenderAvatarPhysicsLODFactor"), 0.f, MAX_AVATAR_LOD_FACTOR);
     LLVOAvatar::updateImpostorRendering(gSavedSettings.getU32("RenderAvatarMaxNonImpostors"));
     LLVOAvatar::sVisibleInFirstPerson   = gSavedSettings.getBOOL("FirstPersonAvatarVisible");
+    LLMotionController::sSyncAnimationClock = gSavedSettings.getBOOL("FSExperimentalSyncAnimationClock"); // <FS:Trish/>
     // clamp auto-open time to some minimum usable value
     LLFolderView::sAutoOpenTime         = llmax(0.25f, gSavedSettings.getF32("FolderAutoOpenDelay"));
     LLSelectMgr::sRectSelectInclusive   = gSavedSettings.getBOOL("RectangleSelectInclusive");
