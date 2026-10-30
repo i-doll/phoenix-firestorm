@@ -353,6 +353,9 @@ LLMeshRepository gMeshRepo;
 constexpr U32 CACHE_PREAMBLE_VERSION = 1;
 constexpr S32 CACHE_PREAMBLE_SIZE = sizeof(U32) * 3; //version, header_size, flags
 constexpr S32 MESH_HEADER_SIZE = 4096;                      // Important:  assumption is that headers fit in this space
+// <FS:Trish> Size of the first (header) request
+constexpr S32 MESH_FIRST_REQUEST_SIZE[LLModel::NUM_LODS] = { 8192, 8192, 32768, 262144 };
+// </FS:Trish>
 
 // <FS:Ansariel> [UDP Assets]
 const S32 REQUEST_HIGH_WATER_MIN = 32;                  // Limits for GetMesh regions
@@ -2080,11 +2083,32 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params)
         //within the first 4KB
         //NOTE -- this will break of headers ever exceed 4KB
 
-        LLMeshHandlerBase::ptr_t handler = std::make_shared<LLMeshHeaderHandler>(mesh_params, 0, MESH_HEADER_SIZE);
+        // <FS:Trish> 
+        S32 request_size = MESH_HEADER_SIZE;
+        {
+            LLMutexLock lock(mPendingMutex);
+            pending_lod_map::const_iterator pending = mPendingLOD.find(mesh_params.getSculptID());
+            if (pending != mPendingLOD.end())
+            {
+                for (S32 lod = LLModel::NUM_LODS - 1; lod >= 0; --lod)
+                {
+                    if (pending->second[lod] > 0)
+                    {
+                        request_size = MESH_FIRST_REQUEST_SIZE[lod];
+                        break;
+                    }
+                }
+            }
+        }
+
+        //LLMeshHandlerBase::ptr_t handler = std::make_shared<LLMeshHeaderHandler>(mesh_params, 0, MESH_HEADER_SIZE);
+        LLMeshHandlerBase::ptr_t handler = std::make_shared<LLMeshHeaderHandler>(mesh_params, 0, request_size);
         // <FS:Ansariel> [UDP Assets]
         //LLCore::HttpHandle handle = getByteRange(http_url, 0, MESH_HEADER_SIZE, handler);
-        LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, 0, MESH_HEADER_SIZE, handler);
+        //LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, 0, MESH_HEADER_SIZE, handler);
+        LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, 0, request_size, handler);
         // </FS:Ansariel> [UDP Assets]
+        // </FS:Trish>
         if (LLCORE_HTTP_HANDLE_INVALID == handle)
         {
             LL_WARNS(LOG_MESH) << "HTTP GET request failed for mesh header " << mID
