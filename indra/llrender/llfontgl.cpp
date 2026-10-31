@@ -325,6 +325,10 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             // otherwise the queued glyphs will be taken from wrong textures.
             if (glyph_count > 0)
             {
+                // <FS:Trish> Adding a glyph mid-render (kerning look-ahead, glyph lookup) uploads the
+                // atlas and leaves the white texture bound, rebind the page the queued glyphs belong to
+                gGL.getTexUnit(0)->bind(font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second));
+                // </FS:Trish>
                 gGL.begin(LLRender::TRIANGLES);
                 {
                     gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
@@ -375,6 +379,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
         if (glyph_count >= GLYPH_BATCH_SIZE)
         {
+            gGL.getTexUnit(0)->bind(font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)); // <FS:Trish/> Rebind after mid-render glyph uploads
             gGL.begin(LLRender::TRIANGLES);
             {
                 gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
@@ -413,6 +418,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         cur_render_y = cur_y;
     }
 
+    // <FS:Trish> Rebind after mid-render glyph uploads, bitmap_entry is still unset when nothing was queued
+    if (glyph_count > 0)
+    {
+        gGL.getTexUnit(0)->bind(font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second));
+    }
+    // </FS:Trish>
     gGL.begin(LLRender::TRIANGLES);
     {
         gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
