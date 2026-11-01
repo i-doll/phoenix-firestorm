@@ -257,7 +257,7 @@ bool LLEmojiDictionary::isEmoji(llwchar ch) const
 
 void LLEmojiDictionary::loadTranslations()
 {
-    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_CATEGORY_FILENAME, LLDir::CURRENT_SKIN);
+    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_CATEGORY_FILENAME, LLDir::ALL_SKINS);
     if (filenames.empty())
     {
         LL_WARNS() << "Emoji file categories not found" << LL_ENDL;
@@ -354,7 +354,7 @@ void LLEmojiDictionary::loadGroups()
 
 void LLEmojiDictionary::loadEmojis()
 {
-    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_EMOJI_FILENAME, LLDir::CURRENT_SKIN);
+    std::vector<std::string> filenames = gDirUtilp->findSkinnedFilenames(LLDir::XUI, SKINNED_EMOJI_FILENAME, LLDir::ALL_SKINS);
     if (filenames.empty())
     {
         LL_WARNS() << "Emoji file characters not found" << LL_ENDL;
