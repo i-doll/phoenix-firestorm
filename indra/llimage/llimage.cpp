@@ -694,6 +694,7 @@ void LLImageBase::sanityCheck()
 // virtual
 void LLImageBase::deleteData()
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     ll_aligned_free_16(mData);
     mDataSize = 0;
     mData = NULL;
@@ -702,6 +703,7 @@ void LLImageBase::deleteData()
 // virtual
 U8* LLImageBase::allocateData(S32 size)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     //make this function thread-safe.
     static const U32 MAX_BUFFER_SIZE = 4096 * 4096 * 16; //256 MB
     mBadBufferAllocation = false;
@@ -810,6 +812,7 @@ U8* LLImageBase::allocateData(S32 size)
 // virtual
 U8* LLImageBase::reallocateData(S32 size)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     U8 *new_datap = (U8*)ll_aligned_malloc_16(size);
     if (!new_datap)
     {
@@ -863,6 +866,7 @@ bool LLImageBase::isBufferInvalid() const
 
 void LLImageBase::setSize(S32 width, S32 height, S32 ncomponents)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     mWidth = width;
     mHeight = height;
     mComponents = ncomponents;
@@ -1013,6 +1017,7 @@ bool LLImageRaw::resize(U16 width, U16 height, S8 components)
 bool LLImageRaw::setSubImage(U32 x_pos, U32 y_pos, U32 width, U32 height,
                              const U8 *data, U32 stride, bool reverse_y)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageDataLock lock(this);
 
     if (!getData())
@@ -1041,6 +1046,7 @@ bool LLImageRaw::setSubImage(U32 x_pos, U32 y_pos, U32 width, U32 height,
 
 void LLImageRaw::clear(U8 r, U8 g, U8 b, U8 a)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     llassert( getComponents() <= 4 );
 
     LLImageDataLock lock(this);
@@ -1085,6 +1091,7 @@ void LLImageRaw::clear(U8 r, U8 g, U8 b, U8 a)
 // Reverses the order of the rows in the image
 void LLImageRaw::verticalFlip()
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageDataLock lock(this);
 
     S32 row_bytes = getWidth() * getComponents();
@@ -1126,6 +1133,7 @@ bool LLImageRaw::checkHasTransparentPixels()
 
 bool LLImageRaw::optimizeAwayAlpha()
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageDataLock lock(this);
 
     if (getComponents() == 4)
@@ -1165,6 +1173,7 @@ bool LLImageRaw::optimizeAwayAlpha()
 
 bool LLImageRaw::makeAlpha()
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     if (getComponents() == 3)
     {
         U8* data = getData();
@@ -1275,6 +1284,7 @@ inline U8 LLImageRaw::fastFractionalMult( U8 a, U8 b )
 
 void LLImageRaw::composite( const LLImageRaw* src )
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     LLImageDataSharedLock lockIn(src);
@@ -1411,6 +1421,7 @@ void LLImageRaw::compositeUnscaled4onto3( const LLImageRaw* src )
 
 void LLImageRaw::copyUnscaledAlphaMask( const LLImageRaw* src, const LLColor4U& fill)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     LLImageDataSharedLock lockIn(src);
@@ -1443,6 +1454,7 @@ void LLImageRaw::copyUnscaledAlphaMask( const LLImageRaw* src, const LLColor4U& 
 // Fill the buffer with a constant color
 void LLImageRaw::fill( const LLColor4U& color )
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageDataLock lock(this);
 
     if (isBufferInvalid())
@@ -1477,6 +1489,7 @@ void LLImageRaw::fill( const LLColor4U& color )
 
 void LLImageRaw::tint( const LLColor3& color )
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     llassert( (3 == getComponents()) || (4 == getComponents()) );
     if (isBufferInvalid())
     {
@@ -1516,6 +1529,7 @@ LLPointer<LLImageRaw> LLImageRaw::duplicate()
 // Src and dst can be any size.  Src and dst can each have 3 or 4 components.
 void LLImageRaw::copy(const LLImageRaw* src)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     LLImageDataSharedLock lockIn(src);
@@ -1568,6 +1582,7 @@ void LLImageRaw::copy(const LLImageRaw* src)
 // Src and dst are same size.  Src and dst have same number of components.
 void LLImageRaw::copyUnscaled(const LLImageRaw* src)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     LLImageDataLock lock(this);
@@ -1607,6 +1622,7 @@ void LLImageRaw::copyScaled4onto3(const LLImageRaw* src)
 // Src and dst are same size.  Src has 4 components.  Dst has 3 components.
 void LLImageRaw::copyUnscaled4onto3( const LLImageRaw* src )
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     LLImageDataLock lock(this);
@@ -1631,6 +1647,7 @@ void LLImageRaw::copyUnscaled4onto3( const LLImageRaw* src )
 // Src and dst are same size.  Src has 3 components.  Dst has 4 components.
 void LLImageRaw::copyUnscaled3onto4( const LLImageRaw* src )
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     LLImageDataLock lock(this);
@@ -1657,6 +1674,7 @@ void LLImageRaw::copyUnscaled3onto4( const LLImageRaw* src )
 // Src and dst can be any size.  Src and dst have same number of components.
 void LLImageRaw::copyScaled( const LLImageRaw* src )
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     LLImageDataSharedLock lockIn(src);
@@ -1703,6 +1721,7 @@ void LLImageRaw::copyScaled( const LLImageRaw* src )
 
 bool LLImageRaw::scale( S32 new_width, S32 new_height, bool scale_image_data )
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageDataLock lock(this);
 
     S32 components = getComponents();
@@ -2051,6 +2070,7 @@ void LLImageRaw::compositeRowScaled4onto3( const U8* in, U8* out, S32 in_pixel_l
 
 void LLImageRaw::addEmissive(LLImageRaw* src)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     if (!validateSrcAndDst(__FUNCTION__, src, dst))
@@ -2076,6 +2096,7 @@ void LLImageRaw::addEmissive(LLImageRaw* src)
 
 void LLImageRaw::addEmissiveUnscaled(LLImageRaw* src)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     llassert((3 == src->getComponents()) || (4 == src->getComponents()));
@@ -2103,6 +2124,7 @@ void LLImageRaw::addEmissiveUnscaled(LLImageRaw* src)
 
 void LLImageRaw::addEmissiveScaled(LLImageRaw* src)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     LLImageRaw* dst = this;  // Just for clarity.
 
     llassert( (4 == src->getComponents()) && (3 == dst->getComponents()) );
@@ -2690,6 +2712,7 @@ static void avg4_colors2(const U8* a, const U8* b, const U8* c, const U8* d, U8*
 
 void LLImageBase::setDataAndSize(U8 *data, S32 size)
 {
+    invalidateAlphaInfo(); // <FS:Trish/>
     ll_assert_aligned(data, 16);
     mData = data;
     mDataSize = size;
@@ -2729,6 +2752,158 @@ void LLImageBase::generateMip(const U8* indata, U8* mipdata, S32 width, S32 heig
         indata += nchannels*in_width; // skip odd lines
     }
 }
+
+// <FS:Trish> Moved from LLImageGL::analyzeAlphaData unchanged so decode threads can run it
+//static
+bool LLImageBase::analyzeAlphaMask(const U8* data_in, U32 w, U32 h, S8 alpha_offset, S8 alpha_stride)
+{
+    if (!data_in)
+    {
+        return false;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+
+    U32 length = w * h;
+    U32 alphatotal = 0;
+
+    U32 sample[16];
+    memset(sample, 0, sizeof(U32) * 16);
+
+    // generate histogram of quantized alpha.
+    // also add-in the histogram of a 2x2 box-sampled version.  The idea is
+    // this will mid-skew the data (and thus increase the chances of not
+    // being used as a mask) from high-frequency alpha maps which
+    // suffer the worst from aliasing when used as alpha masks.
+    if (w >= 2 && h >= 2)
+    {
+        llassert(w % 2 == 0);
+        llassert(h % 2 == 0);
+        const U8* rowstart = data_in + alpha_offset;
+        for (U32 y = 0; y < h; y += 2)
+        {
+            const U8* current = rowstart;
+            for (U32 x = 0; x < w; x += 2)
+            {
+                const U32 s1 = current[0];
+                alphatotal += s1;
+                const U32 s2 = current[w * alpha_stride];
+                alphatotal += s2;
+                current += alpha_stride;
+                const U32 s3 = current[0];
+                alphatotal += s3;
+                const U32 s4 = current[w * alpha_stride];
+                alphatotal += s4;
+                current += alpha_stride;
+
+                ++sample[s1 / 16];
+                ++sample[s2 / 16];
+                ++sample[s3 / 16];
+                ++sample[s4 / 16];
+
+                const U32 asum = (s1 + s2 + s3 + s4);
+                alphatotal += asum;
+                sample[asum / (16 * 4)] += 4;
+            }
+
+            rowstart += 2 * w * alpha_stride;
+        }
+        length *= 2; // we sampled everything twice, essentially
+    }
+    else
+    {
+        const U8* current = data_in + alpha_offset;
+        for (U32 i = 0; i < length; i++)
+        {
+            const U32 s1 = *current;
+            alphatotal += s1;
+            ++sample[s1 / 16];
+            current += alpha_stride;
+        }
+    }
+
+    // if more than 1/16th of alpha samples are mid-range, this
+    // shouldn't be treated as a 1-bit mask
+
+    // also, if all of the alpha samples are clumped on one half
+    // of the range (but not at an absolute extreme), then consider
+    // this to be an intentional effect and don't treat as a mask.
+
+    U32 midrangetotal = 0;
+    for (U32 i = 2; i < 13; i++)
+    {
+        midrangetotal += sample[i];
+    }
+    U32 lowerhalftotal = 0;
+    for (U32 i = 0; i < 8; i++)
+    {
+        lowerhalftotal += sample[i];
+    }
+    U32 upperhalftotal = 0;
+    for (U32 i = 8; i < 16; i++)
+    {
+        upperhalftotal += sample[i];
+    }
+
+    if (midrangetotal > length / 48 ||
+        (lowerhalftotal == length && alphatotal != 0) ||
+        (upperhalftotal == length && alphatotal != 255 * length))
+    {
+        return false; // not suitable for masking
+    }
+    else
+    {
+        return true; // is a mask
+    }
+}
+
+void LLImageRaw::computeAlphaInfo()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    invalidateAlphaInfo();
+
+    const S8 components = getComponents();
+    const S32 width = getWidth();
+    const S32 height = getHeight();
+    const U8* data = static_cast<const LLImageRaw*>(this)->getData(); // const accessor, reading only
+    if ((components != 2 && components != 4) || !data || width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    if (!mAlphaInfo)
+    {
+        mAlphaInfo = std::make_unique<AlphaInfo>();
+    }
+    AlphaInfo& info = *mAlphaInfo;
+    info.mData = data;
+    info.mWidth = width;
+    info.mHeight = height;
+    info.mComponents = components;
+    info.mIsMask = analyzeAlphaMask(data, width, height, components - 1, components);
+
+    info.mPickMask.clear();
+    if (components == 4)
+    {
+        // Same layout as LLImageGL::updatePickMask
+        info.mPickMask.assign(pickMaskBytes(width, height), 0);
+        U32 pick_bit = 0;
+        for (S32 y = 0; y < height; y += 2)
+        {
+            for (S32 x = 0; x < width; x += 2)
+            {
+                if (data[(y * width + x) * 4 + 3] > 32)
+                {
+                    info.mPickMask[pick_bit / 8] |= 1 << (pick_bit % 8);
+                }
+                ++pick_bit;
+            }
+        }
+    }
+
+    mAlphaInfoValid = true;
+}
+// </FS:Trish>
 
 
 //============================================================================

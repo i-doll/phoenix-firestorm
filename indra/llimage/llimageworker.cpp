@@ -206,6 +206,13 @@ bool ImageRequest::processRequest()
         // some decoders are removing data when task is complete and there were errors
         mDecodedRaw = done && mDecodedImageRaw->getData();
 
+        // <FS:Trish> Alpha mask analysis and pick mask here rather than on the main thread at GL upload
+        if (mDecodedRaw)
+        {
+            mDecodedImageRaw->computeAlphaInfo();
+        }
+        // </FS:Trish>
+
         // Pick up errors from decoding
         mErrorString = LLImage::getLastThreadError();
     }

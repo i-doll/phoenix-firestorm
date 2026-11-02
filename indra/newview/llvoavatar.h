@@ -609,6 +609,7 @@ private:
     F32         mLastSkinTime; //value of gFrameTimeSeconds at last skin update
 
     S32         mUpdatePeriod;
+    S32         mHiddenUpdatePeriod = 1; // <FS:Trish/> character update period while out of view, separate because mUpdatePeriod > 1 means impostor
     S32         mNumInitFaces; //number of faces generated when creating the avatar drawable, does not inculde splitted faces due to long vertex buffer.
 
     // profile handle

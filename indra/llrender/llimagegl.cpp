@@ -1653,8 +1653,28 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
 
     setCategory(category);
     const U8* rawdata = imageraw->getData();
-    return createGLTexture(discard_level, rawdata, false, usename, defer_copy, tex_name);
+    // <FS:Trish> Let setImage() use the decoder's alpha analysis and pick mask if they match this data
+    //return createGLTexture(discard_level, rawdata, false, usename, defer_copy, tex_name);
+    mUploadAlphaInfo = imageraw->getAlphaInfo();
+    bool res = createGLTexture(discard_level, rawdata, false, usename, defer_copy, tex_name);
+    mUploadAlphaInfo = nullptr;
+    return res;
+    // </FS:Trish>
 }
+
+// <FS:Trish>
+const LLImageBase::AlphaInfo* LLImageGL::getUploadAlphaInfo(const void* data_in, S32 w, S32 h) const
+{
+    const LLImageBase::AlphaInfo* info = mUploadAlphaInfo;
+    if (info && info->mData == data_in && info->mWidth == w && info->mHeight == h &&
+        mFormatType == GL_UNSIGNED_BYTE &&
+        mAlphaStride == info->mComponents && mAlphaOffset == info->mComponents - 1)
+    {
+        return info;
+    }
+    return nullptr;
+}
+// </FS:Trish>
 
 bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_hasmips, S32 usename, bool defer_copy, LLGLuint* tex_name)
 // Call with void data, vmem is allocated but unitialized
@@ -2227,99 +2247,19 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         return ;
     }
 
+    // <FS:Trish> Already analyzed by the decoder
+    if (const LLImageBase::AlphaInfo* info = getUploadAlphaInfo(data_in, w, h))
+    {
+        mIsMask = info->mIsMask;
+        return;
+    }
+    // </FS:Trish>
+
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-    U32 length = w * h;
-    U32 alphatotal = 0;
-
-    U32 sample[16];
-    memset(sample, 0, sizeof(U32)*16);
-
-    // generate histogram of quantized alpha.
-    // also add-in the histogram of a 2x2 box-sampled version.  The idea is
-    // this will mid-skew the data (and thus increase the chances of not
-    // being used as a mask) from high-frequency alpha maps which
-    // suffer the worst from aliasing when used as alpha masks.
-    if (w >= 2 && h >= 2)
-    {
-        llassert(w % 2 == 0);
-        llassert(h % 2 == 0);
-        const GLubyte* rowstart = ((const GLubyte*) data_in) + mAlphaOffset;
-        for (U32 y = 0; y < h; y += 2)
-        {
-            const GLubyte* current = rowstart;
-            for (U32 x = 0; x < w; x += 2)
-            {
-                const U32 s1 = current[0];
-                alphatotal += s1;
-                const U32 s2 = current[w * mAlphaStride];
-                alphatotal += s2;
-                current += mAlphaStride;
-                const U32 s3 = current[0];
-                alphatotal += s3;
-                const U32 s4 = current[w * mAlphaStride];
-                alphatotal += s4;
-                current += mAlphaStride;
-
-                ++sample[s1/16];
-                ++sample[s2/16];
-                ++sample[s3/16];
-                ++sample[s4/16];
-
-                const U32 asum = (s1+s2+s3+s4);
-                alphatotal += asum;
-                sample[asum/(16*4)] += 4;
-            }
-
-            rowstart += 2 * w * mAlphaStride;
-        }
-        length *= 2; // we sampled everything twice, essentially
-    }
-    else
-    {
-        const GLubyte* current = ((const GLubyte*) data_in) + mAlphaOffset;
-        for (U32 i = 0; i < length; i++)
-        {
-            const U32 s1 = *current;
-            alphatotal += s1;
-            ++sample[s1/16];
-            current += mAlphaStride;
-        }
-    }
-
-    // if more than 1/16th of alpha samples are mid-range, this
-    // shouldn't be treated as a 1-bit mask
-
-    // also, if all of the alpha samples are clumped on one half
-    // of the range (but not at an absolute extreme), then consider
-    // this to be an intentional effect and don't treat as a mask.
-
-    U32 midrangetotal = 0;
-    for (U32 i = 2; i < 13; i++)
-    {
-        midrangetotal += sample[i];
-    }
-    U32 lowerhalftotal = 0;
-    for (U32 i = 0; i < 8; i++)
-    {
-        lowerhalftotal += sample[i];
-    }
-    U32 upperhalftotal = 0;
-    for (U32 i = 8; i < 16; i++)
-    {
-        upperhalftotal += sample[i];
-    }
-
-    if (midrangetotal > length/48 || // lots of midrange, or
-        (lowerhalftotal == length && alphatotal != 0) || // all close to transparent but not all totally transparent, or
-        (upperhalftotal == length && alphatotal != 255*length)) // all close to opaque but not all totally opaque
-    {
-        mIsMask = false; // not suitable for masking
-    }
-    else
-    {
-        mIsMask = true;
-    }
+    // <FS:Trish> Moved to LLImageBase::analyzeAlphaMask so decode threads can run it
+    mIsMask = LLImageBase::analyzeAlphaMask(static_cast<const U8*>(data_in), w, h, mAlphaOffset, mAlphaStride);
+    // </FS:Trish>
 }
 
 //----------------------------------------------------------------------------
@@ -2389,6 +2329,18 @@ void LLImageGL::updatePickMask(S32 width, S32 height, const U8* data_in)
         freePickMask();
         return;
     }
+
+    // <FS:Trish> Built by the decoder with the same layout
+    if (const LLImageBase::AlphaInfo* info = getUploadAlphaInfo(data_in, width, height))
+    {
+        if (info->mComponents == 4 && info->mPickMask.size() == LLImageBase::pickMaskBytes(width, height))
+        {
+            const U32 size = createPickMask(width, height);
+            memcpy(mPickMask, info->mPickMask.data(), size);
+            return;
+        }
+    }
+    // </FS:Trish>
 
 
 #ifdef SHOW_ASSERT

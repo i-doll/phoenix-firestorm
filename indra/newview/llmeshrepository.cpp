@@ -3537,20 +3537,8 @@ void LLMeshRepoThread::notifyLoadedMeshes()
             update_metrics = true;
 
             // Process the elements free of the lock
-            // <FS:Trish> Time sliced, arriving in a mesh heavy area could process hundreds of LODs in one frame
-            //for (const auto& mesh : loaded_queue)
-            //{
-            constexpr F32 MAX_NOTIFY_SECONDS = 0.004f;
-            LLTimer notify_timer;
-            auto mesh_it = loaded_queue.begin();
-            for (; mesh_it != loaded_queue.end(); ++mesh_it)
+            for (const auto& mesh : loaded_queue)
             {
-                if (mesh_it != loaded_queue.begin() && notify_timer.getElapsedTimeF32() > MAX_NOTIFY_SECONDS)
-                {
-                    break;
-                }
-                const LoadedMesh& mesh = *mesh_it;
-            // </FS:Trish>
                 if (mesh.mVolume->getNumVolumeFaces() > 0)
                 {
                     gMeshRepo.notifyMeshLoaded(mesh.mMeshParams, mesh.mVolume, mesh.mLOD);
@@ -3560,15 +3548,6 @@ void LLMeshRepoThread::notifyLoadedMeshes()
                     gMeshRepo.notifyMeshUnavailable(mesh.mMeshParams, mesh.mLOD, LLVolumeLODGroup::getVolumeDetailFromScale(mesh.mVolume->getDetail()));
                 }
             }
-
-            // <FS:Trish> Put the rest back in front of anything that arrived meanwhile
-            if (mesh_it != loaded_queue.end())
-            {
-                LLMutexLock lock(mLoadedMutex);
-                mLoadedQ.insert(mLoadedQ.begin(), mesh_it, loaded_queue.end());
-                loaded_queue.erase(mesh_it, loaded_queue.end());
-            }
-            // </FS:Trish>
         }
         else
         {

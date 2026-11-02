@@ -245,6 +245,11 @@ private:
 
     bool mIsMask;
     bool mNeedsAlphaAndPickMask;
+    // <FS:Trish> Alpha analysis/pick mask precomputed by the decoder for the image being uploaded,
+    // only set for the duration of createGLTexture(LLImageRaw*)
+    const LLImageBase::AlphaInfo* mUploadAlphaInfo = nullptr;
+    const LLImageBase::AlphaInfo* getUploadAlphaInfo(const void* data_in, S32 w, S32 h) const;
+    // </FS:Trish>
     S8   mAlphaStride ;
     S8   mAlphaOffset ;
 

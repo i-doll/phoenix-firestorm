@@ -34,6 +34,8 @@
 #include "lluuid.h"
 
 #include <atomic> // <FS:Beq/> [FIRE-36494] Small memory allocation fail bugsplat reporting improvement
+#include <memory> // <FS:Trish/>
+#include <vector> // <FS:Trish/>
 
 constexpr S32 MIN_IMAGE_MIP =  2; // 4x4, only used for expand/contract power of 2
 constexpr S32 MAX_IMAGE_MIP = 12; // 4096x4096
@@ -168,6 +170,29 @@ protected:
 public:
     static void generateMip(const U8 *indata, U8* mipdata, int width, int height, S32 nchannels);
 
+    // <FS:Trish> Alpha mask analysis and pick mask computed where the image is decoded, so the GL upload
+    // doesn't have to scan or copy the pixels on the main thread. Valid only while the pixels are unchanged.
+    struct AlphaInfo
+    {
+        const U8* mData = nullptr; // buffer the info was computed from
+        S32 mWidth = 0;
+        S32 mHeight = 0;
+        S8 mComponents = 0;
+        bool mIsMask = false;
+        std::vector<U8> mPickMask; // LLImageGL::updatePickMask layout, only for 4 components
+    };
+    // Shared with LLImageGL::analyzeAlphaData
+    static bool analyzeAlphaMask(const U8* data_in, U32 w, U32 h, S8 alpha_offset, S8 alpha_stride);
+    // Bytes of a pick mask for an image of this size, as LLImageGL::createPickMask allocates
+    static U32 pickMaskBytes(S32 width, S32 height) { return ((U32)(width / 2 + 1) * (U32)(height / 2 + 1) + 7) / 8; }
+    const AlphaInfo* getAlphaInfo() const { return mAlphaInfoValid ? mAlphaInfo.get() : nullptr; }
+protected:
+    void invalidateAlphaInfo() { mAlphaInfoValid = false; }
+    std::unique_ptr<AlphaInfo> mAlphaInfo; // only replaced before the image is shared (decode thread)
+    std::atomic<bool> mAlphaInfoValid{ false };
+public:
+    // </FS:Trish>
+
     // <FS:Beq> [FIRE-36494] Image allocation failure telemetry
     using allocation_failure_callback_t = void (*)(const LLImageAllocationFailureInfo&);
     static void setAllocationFailureCallback(allocation_failure_callback_t callback);
@@ -281,6 +306,11 @@ public:
 
     // Fill the buffer with a constant color
     void fill( const LLColor4U& color );
+
+    // <FS:Trish> Analyze alpha and build the pick mask for 2 and 4 component images (see LLImageBase::AlphaInfo).
+    // Call before the image is handed to other threads, typically right after decoding.
+    void computeAlphaInfo();
+    // </FS:Trish>
 
     // Multiply this raw image by the given color
     void tint( const LLColor3& color );

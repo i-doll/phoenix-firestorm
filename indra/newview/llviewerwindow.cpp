@@ -2157,6 +2157,17 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     // LLViewerWindow needs are requested, as well as before LLViewerMedia starts updating images.
     bool threaded_texture_uploads = gSavedSettings.getBOOL("RenderGLMultiThreadedTextures");
     bool threaded_media_uploads = gSavedSettings.getBOOL("RenderGLMultiThreadedMedia");
+    // <FS:Trish> Texture creation (upload + mip generation) on the GL thread by default on NVIDIA, it keeps
+    // the main thread out of glTexImage2D/glGenerateMipmap while scenes load. NVIDIA syncs uploads with a
+    // client side fence (see LLImageGL::syncToMainThread). RenderGLMultiThreadedTexturesNVIDIA off restores
+    // RenderGLMultiThreadedTextures alone.
+#if !LL_DARWIN
+    if (gGLManager.mIsNVIDIA && gSavedSettings.getBOOL("RenderGLMultiThreadedTexturesNVIDIA"))
+    {
+        threaded_texture_uploads = true;
+    }
+#endif
+    // </FS:Trish>
     // Force these settings off on Windows, they're buggy.
 #if LL_WINDOWS
     if (gGLManager.mIsAMD && gSavedSettings.getBOOL("RenderAMDDisableTextureThreading"))

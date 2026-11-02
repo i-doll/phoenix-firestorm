@@ -427,7 +427,17 @@ void LLReflectionMapManager::update()
     if (mUpdatingProbe != nullptr)
     {
         did_update = true;
-        doProbeUpdate();
+        // <FS:Trish> With many probes the scheduler never runs out of "old" ones, so a face was rendered
+        // every frame forever. Refreshing a probe that already has a good map can go slower; new and
+        // incomplete probes, the default probe and dynamic ones keep one face per frame.
+        //doProbeUpdate();
+        static LLCachedControl<U32> refresh_interval(gSavedSettings, "RenderReflectionProbeRefreshFrameInterval", 3);
+        const bool refreshing = mUpdatingProbe->mComplete && mUpdatingProbe != mDefaultProbe && !mUpdatingProbe->getIsDynamic();
+        if (!refreshing || refresh_interval <= 1 || (LLFrameTimer::getFrameCount() % refresh_interval) == 0)
+        {
+            doProbeUpdate();
+        }
+        // </FS:Trish>
     }
 
     // Occlusion state only means anything for as long as the queries that produce it keep
@@ -465,11 +475,27 @@ void LLReflectionMapManager::update()
 
         std::vector<LLReflectionMap*> manual_probes;
 
+        // <FS:Trish> Every automatic probe against every manual one each frame showed up in idle profiles.
+        // Probes move slowly and the hysteresis absorbs a short delay, so classify a few times a second,
+        // or right away when probes come or go. Following the viewer objects stays per frame.
+        constexpr F32 ECLIPSE_CHECK_INTERVAL = 0.25f;
+        static F32 last_eclipse_check = -1.f;
+        static size_t last_probe_count = 0;
+        const bool check_eclipses = mProbes.size() != last_probe_count ||
+            gFrameTimeSeconds - last_eclipse_check >= ECLIPSE_CHECK_INTERVAL || gFrameTimeSeconds < last_eclipse_check;
+        if (check_eclipses)
+        {
+            last_eclipse_check = gFrameTimeSeconds;
+            last_probe_count = mProbes.size();
+        }
+        // </FS:Trish>
+
         for (auto& probe : mProbes)
         {
             probe->syncToViewerObject();
 
-            if (probe != mDefaultProbe && probe->mViewerObject && probe->mComplete &&
+            if (check_eclipses && // <FS:Trish/>
+                probe != mDefaultProbe && probe->mViewerObject && probe->mComplete &&
                 probe->mCubeIndex != -1 && probe->mFadeIn >= 1.f && probe->isRelevant())
             {
                 manual_probes.push_back(probe);
@@ -478,6 +504,12 @@ void LLReflectionMapManager::update()
 
         for (auto& probe : mProbes)
         {
+            // <FS:Trish>
+            if (!check_eclipses)
+            {
+                break;
+            }
+            // </FS:Trish>
             if (probe == mDefaultProbe || probe->mViewerObject)
             { // only automatic probes are ever displaced
                 continue;

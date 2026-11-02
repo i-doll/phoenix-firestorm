@@ -351,6 +351,25 @@ public:
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
     void generateSunShadow(LLCamera& camera);
+    // <FS:Trish> Reflection probe faces share two sun cascades fitted around the probe instead of
+    // culling and rendering their own pair for each of the 12 faces. Returns false to use the normal path.
+    bool generateProbeSunShadow(LLCamera& camera, const LLVector3& light_dir, const LLPlane& shadow_near_clip,
+                                const glm::mat4& inv_view, glm::mat4* view, glm::mat4* proj);
+    struct ProbeShadowCache
+    {
+        bool mValid = false;
+        LLVector3 mEye;
+        LLVector3 mLightDir;
+        U32 mShadowTex[2] = { 0, 0 };
+        U32 mShadowWidth = 0;
+        U32 mCasterTypes = 0; // caster render types enabled (dynamic probes add avatars, the default probe has no objects)
+        F32 mTime = 0.f;
+        LLVector4 mClipPlanes;
+        glm::mat4 mView[2];
+        glm::mat4 mProj[2];
+    };
+    ProbeShadowCache mProbeShadowCache;
+    // </FS:Trish>
     LLRenderTarget* getSunShadowTarget(U32 i);
     LLRenderTarget* getSpotShadowTarget(U32 i);
     U32 getProjectorShadowCount() const;

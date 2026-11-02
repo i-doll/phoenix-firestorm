@@ -58,6 +58,7 @@
 #include "llvoavatarself.h" // <ID:i.doll> [Full-res own avatar textures]
 #include "pipeline.h"
 #include "llappviewer.h"
+#include "llviewercamera.h" // <FS:Trish/>
 #include "llxuiparser.h"
 #include "lltracerecording.h"
 #include "llviewerdisplay.h"
@@ -1431,13 +1432,37 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
         }
     }
 
+    // <FS:Trish> Both extra lanes below only matter while something can change: the camera moved
+    // recently or textures are being fetched. Idle, they walked up to 4096 map entries every frame
+    // and recomputed priorities the regular sweep keeps current anyway.
+    static LLVector3 last_cam_origin;
+    static LLVector3 last_cam_at;
+    static F32 last_cam_view = 0.f;
+    static F32 last_cam_move_time = 0.f;
+    {
+        LLViewerCamera* cam = LLViewerCamera::getInstance();
+        if (dist_vec_squared(cam->getOrigin(), last_cam_origin) > 0.01f ||
+            cam->getAtAxis() * last_cam_at < 0.9995f ||
+            fabsf(cam->getView() - last_cam_view) > 0.001f)
+        {
+            last_cam_origin = cam->getOrigin();
+            last_cam_at = cam->getAtAxis();
+            last_cam_view = cam->getView();
+            last_cam_move_time = gFrameTimeSeconds;
+        }
+    }
+    const bool fetching = LLAppViewer::getTextureFetch()->getNumRequests() > 0;
+    const bool run_urgent_lane = fetching || gFrameTimeSeconds - last_cam_move_time < 2.f || gFrameTimeSeconds < last_cam_move_time;
+    // </FS:Trish>
+
     // Give visible textures a small extra pass while reserving most of the
     // budget for the complete sweep (including offscreen cleanup). This scan
     // is cheap and bounded; it does not recalculate pixel areas for candidates.
     std::unordered_set<LLViewerFetchedTexture*> urgent_updates;
    const U32 scan_count = llmin((U32)mUUIDMap.size(), 2048U);
     auto urgent_iter = mUUIDMap.upper_bound(mLastUrgentUpdateKey);
-    for (U32 scanned = 0; scanned < scan_count && urgent_updates.size() < 32 && !mUUIDMap.empty(); ++scanned)
+    //for (U32 scanned = 0; scanned < scan_count && urgent_updates.size() < 32 && !mUUIDMap.empty(); ++scanned)
+    for (U32 scanned = 0; run_urgent_lane && scanned < scan_count && urgent_updates.size() < 32 && !mUUIDMap.empty(); ++scanned) // <FS:Trish/>
     {
         if (timer.getElapsedTimeF32() >= max_time * 0.25f)
         {
@@ -1498,7 +1523,8 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
         const F32 refresh_deadline = timer.getElapsedTimeF32() + max_time * 0.15f;
         const U32 refresh_scan_count = llmin((U32)mUUIDMap.size(), FETCH_REFRESH_SCAN_COUNT);
         auto refresh_iter = mUUIDMap.upper_bound(mLastFetchRefreshKey);
-        for (U32 scanned = 0; scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned)
+        //for (U32 scanned = 0; scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned)
+        for (U32 scanned = 0; fetching && scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned) // <FS:Trish/> only fetching textures qualify
         {
             if (timer.getElapsedTimeF32() >= refresh_deadline)
             {
