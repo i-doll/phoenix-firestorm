@@ -1833,7 +1833,10 @@ void RlvForceWear::done()
     //          |======================================================|
     // Add    : | LLAppearanceMgr | <custom>         | LLAppearanceMgr |
     // Remove : | LLAppearanceMgr | LLAppearanceMgr  | LLGestureMgr    |
-    LLPointer<LLInventoryCallback> cb = new LLUpdateAppearanceOnDestroy(false, false, boost::bind(RlvForceWear::updatePendingAttachments));
+    // <FS:Trish> FIRE-37073 RLVa wearing layers should respect layer order
+    //LLPointer<LLInventoryCallback> cb = new LLUpdateAppearanceOnDestroy(false, false, boost::bind(RlvForceWear::updatePendingAttachments));
+    LLPointer<LLInventoryCallback> cb = new LLUpdateAppearanceOnDestroy(false, true, boost::bind(RlvForceWear::updatePendingAttachments));
+    // </FS:Trish>
 
     if (!remItems.empty())
     {
