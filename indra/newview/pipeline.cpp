@@ -78,6 +78,7 @@
 #include "lltool.h"
 #include "lltoolmgr.h"
 #include "llviewercamera.h"
+#include "llfetchedgltfmaterial.h"
 #include "llviewermediafocus.h"
 #include "llviewertexturelist.h"
 #include "llviewerobject.h"
@@ -2016,6 +2017,39 @@ LLDrawPool* LLPipeline::getPoolFromTE(const LLTextureEntry* te, LLViewerTexture*
 }
 
 //static
+static bool gltf_blend_has_transparency(const LLGLTFMaterial* mat)
+{
+    if (!mat || (mat->mAlphaMode != LLGLTFMaterial::ALPHA_MODE_BLEND &&
+        mat->mAlphaMode != LLGLTFMaterial::ALPHA_MODE_MASK))
+    {
+        return false;
+    }
+
+    if (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_BLEND)
+    {
+        if (mat->mBaseColor.mV[3] < 0.999f)
+        {
+            return true;
+        }
+    }
+    else if (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK)
+    {
+        if (mat->mBaseColor.mV[3] + 0.0001f < mat->mAlphaCutoff)
+        {
+            return true;
+        }
+    }
+
+    const LLFetchedGLTFMaterial* fetched = dynamic_cast<const LLFetchedGLTFMaterial*>(mat);
+    if (fetched && fetched->mBaseColorTexture.notNull())
+    {
+        const S32 comps = fetched->mBaseColorTexture->getComponents();
+        return (comps == 4 || comps == 2);
+    }
+
+    return mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].notNull();
+}
+
 U32 LLPipeline::getPoolTypeFromTE(const LLTextureEntry* te, LLViewerTexture* imagep)
 {
     if (!te || !imagep)
@@ -2050,7 +2084,7 @@ U32 LLPipeline::getPoolTypeFromTE(const LLTextureEntry* te, LLViewerTexture* ima
         }
     }
 
-    if (alpha || (gltf_mat && gltf_mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_BLEND))
+    if (alpha || gltf_blend_has_transparency(gltf_mat))
     {
         return LLDrawPool::POOL_ALPHA;
     }
