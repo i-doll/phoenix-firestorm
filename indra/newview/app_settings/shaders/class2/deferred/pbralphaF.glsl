@@ -243,7 +243,13 @@ void main()
     vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
 
 #ifdef HAS_SUN_SHADOW
-    scol = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    // <FS:Trish> pbrBaseLight multiplies scol by N.L (clamped to 0), so it doesn't matter facing away from the light
+    //scol = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    if (dot(norm.xyz, light_dir) > 0.0)
+    {
+        scol = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    }
+    // </FS:Trish>
 #endif
 
     // PBR IBL

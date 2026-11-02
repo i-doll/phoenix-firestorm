@@ -179,7 +179,13 @@ void main()
     // After the alpha tests rather than ahead of them, so a fragment they reject does not pay
     // for the PCF taps. The shadow maps carry no mips, so nothing here depends on derivatives.
 #ifdef HAS_SUN_SHADOW
-    shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    // <FS:Trish> shadow only enters as min(clamp(N.L), shadow), which is 0 facing away from the light
+    //shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    if (dot(norm.xyz, light_dir.xyz) > 0.0)
+    {
+        shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    }
+    // </FS:Trish>
 #endif
 
     vec3 sunlit;

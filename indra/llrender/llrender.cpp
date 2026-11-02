@@ -186,7 +186,13 @@ void LLTexUnit::bindFast(LLTexture* texture)
 {
     LLImageGL* gl_tex = texture->getGLTexture();
     texture->setActive();
-    glActiveTexture(GL_TEXTURE0 + mIndex);
+    // <FS:Trish> Same active unit tracking activate() relies on, pushBatch binds up to 16 units per draw
+    //glActiveTexture(GL_TEXTURE0 + mIndex);
+    if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
+    {
+        glActiveTexture(GL_TEXTURE0 + mIndex);
+    }
+    // </FS:Trish>
     gGL.mCurrTextureUnitIndex = mIndex;
     mCurrTexture = gl_tex->getTexName();
     mCurrTexType = gl_tex->getTarget();

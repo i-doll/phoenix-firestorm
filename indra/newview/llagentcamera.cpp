@@ -1856,8 +1856,15 @@ LLVector3d LLAgentCamera::calcFocusPositionTargetGlobal()
                     // Updating only a moving linkset root leaves its children on the normal
                     // update pass, which makes them appear dislocated from the root every few frames when the root was updated first.
                     // This is particularly noticeable on moving children or avatars (and avatar attachments).
-                    if (mFocusObject->isRoot())
+                    // <FS:Trish> calcFocusPositionTargetGlobal() runs several times per frame, the root only
+                    // moves once, so only redo the children and seated avatars once per frame
+                    //if (mFocusObject->isRoot())
+                    static U32 last_child_update_frame = 0;
+                    const U32 frame = LLFrameTimer::getFrameCount();
+                    if (mFocusObject->isRoot() && last_child_update_frame != frame)
+                    // </FS:Trish>
                     {
+                        last_child_update_frame = frame; // <FS:Trish/>
                         for (LLViewerObject* childp : mFocusObject->getChildren())
                         {
                             LLDrawable* child_drawablep = childp ? childp->mDrawable.get() : nullptr;

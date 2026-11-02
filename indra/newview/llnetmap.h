@@ -200,6 +200,11 @@ private:
     typedef std::map<LLUUID, LLColor4> avatar_marks_map_t;
     static avatar_marks_map_t sAvatarMarksMap;
 
+    // <FS:Trish> getAvatarColor() results, the contact set chain ran for every dot every frame
+    std::unordered_map<LLUUID, LLColor4> mAvatarColorCache;
+    LLFrameTimer    mAvatarColorCacheTimer;
+    // </FS:Trish>
+
 public:
     void            setSelected(uuid_vec_t uuids) { gmSelected=uuids; };
 // <FS:CR> Minimap improvements

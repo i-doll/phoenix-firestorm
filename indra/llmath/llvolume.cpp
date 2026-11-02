@@ -2776,6 +2776,14 @@ void LLVolume::copyVolumeFaces(const LLVolume* volume)
     mSculptLevel = 0;
 }
 
+// <FS:Trish>
+void LLVolume::swapVolumeFaces(LLVolume* volume)
+{
+    mVolumeFaces.swap(volume->mVolumeFaces);
+    mSculptLevel = 0;
+}
+// </FS:Trish>
+
 bool LLVolume::cacheOptimize(bool gen_tangents)
 {
     for (S32 i = 0; i < mVolumeFaces.size(); ++i)

@@ -776,6 +776,7 @@ void LLHUDNameTag::updateAll()
 
     for (S32 i = 0; i < NUM_OVERLAP_ITERATIONS; i++)
     {
+        bool moved = false; // <FS:Trish/> a pass without overlaps changes nothing, so neither would the rest
         for (src_it = sVisibleTextObjects.begin(); src_it != sVisibleTextObjects.end(); ++src_it)
         {
             LLHUDNameTag* src_textp = (*src_it);
@@ -826,9 +827,16 @@ void LLHUDNameTag::updateAll()
                     dst_textp->mTargetPositionOffset += dst_force;
                     src_textp->mTargetPositionOffset = src_textp->updateScreenPos(src_textp->mTargetPositionOffset);
                     dst_textp->mTargetPositionOffset = dst_textp->updateScreenPos(dst_textp->mTargetPositionOffset);
+                    moved = true; // <FS:Trish/>
                 }
             }
         }
+        // <FS:Trish>
+        if (!moved)
+        {
+            break;
+        }
+        // </FS:Trish>
     }
 
     VisibleTextObjectIterator this_object_it;

@@ -12285,6 +12285,28 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>Backup</key>
     <integer>0</integer>
   </map>
+  <key>RenderHiddenAvatarUpdatePeriod</key>
+  <map>
+    <key>Comment</key>
+    <string>Frames between full character updates for avatars outside the camera view (capped at 2 with sun shadows on). 1 updates them every frame.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>4</integer>
+  </map>
+  <key>RenderSpotShadowMaxResolution</key>
+  <map>
+    <key>Comment</key>
+    <string>Maximum width and height of the two projector shadow maps, which otherwise follow the screen width. 0 for no limit.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>2048</integer>
+  </map>
   <key>RenderSpotShadowOffset</key>
   <map>
     <key>Comment</key>
@@ -13369,6 +13391,17 @@ Change of this parameter will affect the layout of buttons in notification toast
     <string>F32</string>
     <key>Value</key>
     <real>2.0</real>
+  </map>
+  <key>RenderReflectionProbeMinRefresh</key>
+  <map>
+    <key>Comment</key>
+    <string>Minimum time in seconds before a complete, non dynamic reflection probe is re-rendered. Sky changes still refresh probes immediately. 0 re-renders the oldest probe continuously.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>10.0</real>
   </map>
   <key>RenderReflectionProbeLevel</key>
   <map>

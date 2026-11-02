@@ -1066,6 +1066,17 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         mRT->deferredLight.release();
     }
 
+    // <FS:Trish> Separate 8 bit light map, only written when the sun/SSAO pass runs
+    if (shadow_detail > 0 || ssao)
+    {
+        if (!mRT->lightMap.allocate(resX, resY, GL_RGBA)) return false;
+    }
+    else
+    {
+        mRT->lightMap.release();
+    }
+    // </FS:Trish>
+
     allocateShadowBuffer(resX, resY);
 
     if (!gCubeSnapshot) // hack to not re-allocate various targets for cube snapshots
@@ -1093,6 +1104,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
             {
                 mSMAABlendBuffer.release();
             }
+            // </FS:Trish>
         }
         else
         {
@@ -1168,6 +1180,13 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         mBakeMap.allocate(LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH, LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT, GL_RGBA);
         }// <FS:Beq/> create an independent preview screen target
     }
+    // <FS:Trish> Reflection probe pack gets water scratch targets at its own size
+    else if (mRT == &mAuxillaryRT)
+    {
+        if (!mRT->waterDis.allocate(resX, resY, screenFormat, true)) return false;
+        if (!mRT->waterExclusion.allocate(resX, resY, GL_R8, true)) return false;
+    }
+    // </FS:Trish>
     //HACK make screenbuffer allocations start failing after 30 seconds
     if (gSavedSettings.getBOOL("SimulateFBOFailure"))
     {
@@ -1214,6 +1233,13 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     if (!gCubeSnapshot) // hack to not allocate spot shadow maps during ReflectionMapManager init
     {
         U32 width = (U32)(resX * scale);
+        // <FS:Trish> Spot shadow maps are square at screen width, 3840x3840 each at 4K. Cap them.
+        static LLCachedControl<U32> spot_max_res(gSavedSettings, "RenderSpotShadowMaxResolution", 2048);
+        if (spot_max_res > 0)
+        {
+            width = llmin(width, (U32)spot_max_res);
+        }
+        // </FS:Trish>
         U32 height = width;
 
         if (shadow_detail > 1)
@@ -1517,15 +1543,20 @@ void LLPipeline::releaseScreenBuffers()
     mRT->screen.release();
     mRT->deferredScreen.release();
     mRT->deferredLight.release();
+    mRT->lightMap.release(); // <FS:Trish/>
     mRlvSphereDepth.release();
 
     mAuxillaryRT.screen.release();
     mAuxillaryRT.deferredScreen.release();
     mAuxillaryRT.deferredLight.release();
+    mAuxillaryRT.lightMap.release(); // <FS:Trish/>
+    mAuxillaryRT.waterDis.release(); // <FS:Trish/>
+    mAuxillaryRT.waterExclusion.release(); // <FS:Trish/>
 
     mHeroProbeRT.screen.release();
     mHeroProbeRT.deferredScreen.release();
     mHeroProbeRT.deferredLight.release();
+    mHeroProbeRT.lightMap.release(); // <FS:Trish/>
 
     mPreviewScreen.release(); // <FS:Beq/> dedicated preview target
     mOITBuffer.release();
@@ -1739,6 +1770,11 @@ void LLPipeline::createLUTBuffers()
     mExposureMap.flush();
 
     mLuminanceMap.allocate(256, 256, GL_R16F, false, LLTexUnit::TT_TEXTURE, LLTexUnit::TMG_AUTO);
+    // <FS:Trish> Defined contents, the luminance pass is skipped while the exposure range is fixed
+    mLuminanceMap.bindTarget();
+    mLuminanceMap.clear();
+    mLuminanceMap.flush();
+    // </FS:Trish>
 
     mLastExposure.allocate(1, 1, GL_R16F);
 }
@@ -2319,18 +2355,20 @@ void LLPipeline::updateMovedList(LLDrawable::drawable_vector_t& moved_list, F32 
 
     LLTimer update_timer;
     S32 update_count = 0;
-    for (LLDrawable::drawable_vector_t::iterator iter = moved_list.begin();
-         iter != moved_list.end() &&
-         (max_dtime < 0.f || update_count == 0 || update_timer.getElapsedTimeF32() < max_dtime); )
+    // <FS:Trish> Compact in one pass, erasing each finished entry shifted the whole tail and
+    // every avatar attachment goes through this list every frame
+    size_t write_idx = 0;
+    size_t read_idx = 0;
+    for (; read_idx < moved_list.size() &&
+           (max_dtime < 0.f || update_count == 0 || update_timer.getElapsedTimeF32() < max_dtime); ++read_idx)
     {
-        LLDrawable::drawable_vector_t::iterator curiter = iter++;
-        LLDrawable *drawablep = *curiter;
+        LLDrawable *drawablep = moved_list[read_idx];
         ++update_count;
         if (!drawablep)
         {
-            iter = moved_list.erase(curiter);
             continue;
         }
+    // </FS:Trish>
         bool done = true;
         if (!drawablep->isDead() && (!drawablep->isState(LLDrawable::EARLY_MOVE)))
         {
@@ -2354,9 +2392,27 @@ void LLPipeline::updateMovedList(LLDrawable::drawable_vector_t& moved_list, F32 
                     drawablep->getVObj()->dirtySpatialGroup();
                 }
             }
-            iter = moved_list.erase(curiter);
+            // <FS:Trish>
+            //iter = moved_list.erase(curiter);
+            continue;
         }
+        if (write_idx != read_idx)
+        {
+            moved_list[write_idx] = moved_list[read_idx];
+        }
+        ++write_idx;
     }
+    // Entries the time budget didn't reach stay queued
+    for (; read_idx < moved_list.size(); ++read_idx)
+    {
+        if (write_idx != read_idx)
+        {
+            moved_list[write_idx] = moved_list[read_idx];
+        }
+        ++write_idx;
+    }
+    moved_list.resize(write_idx);
+    // </FS:Trish>
 
     LLTrace::add(sMovedDrawables, update_count);
 }
@@ -3032,7 +3088,8 @@ void LLPipeline::clearRebuildGroups()
 void LLPipeline::clearRebuildDrawables()
 {
     // Clear all drawables on the priority build queue,
-    for (LLDrawable::drawable_list_t::iterator iter = mBuildQ1.begin();
+    //for (LLDrawable::drawable_list_t::iterator iter = mBuildQ1.begin();
+    for (LLDrawable::drawable_vector_t::iterator iter = mBuildQ1.begin(); // <FS:Trish/>
          iter != mBuildQ1.end(); ++iter)
     {
         LLDrawable* drawablep = *iter;
@@ -3101,8 +3158,18 @@ void LLPipeline::rebuildPriorityGroups()
         ++rebuild_count;
     }
 
-    mGroupSaveQ1.assign(mGroupQ1.begin(), iter);
-    mGroupQ1.erase(mGroupQ1.begin(), iter);
+    if (iter == mGroupQ1.end())
+    {
+        // <FS:Trish> Swap instead of copying the pointers, the old saved groups are released by the clear just the same
+        mGroupSaveQ1.swap(mGroupQ1);
+        mGroupQ1.clear();
+        // </FS:Trish>
+    }
+    else
+    {
+        mGroupSaveQ1.assign(mGroupQ1.begin(), iter);
+        mGroupQ1.erase(mGroupQ1.begin(), iter);
+    }
     mGroupQ1Locked = false;
 
     LLTrace::add(sPriorityGeomRebuilds, rebuild_count);
@@ -3128,12 +3195,15 @@ void LLPipeline::updateGeom(F32 max_dtime)
     LLVOVolume::preUpdateGeom();
 
     // Iterate through all drawables on the priority build queue,
-    for (LLDrawable::drawable_list_t::iterator iter = mBuildQ1.begin();
-         iter != mBuildQ1.end() &&
-         (rebuild_count == 0 || update_timer.getElapsedTimeF32() < max_dtime);)
+    // <FS:Trish> Compacted in place, indexed because updateDrawableGeom() can append to the queue
+    size_t write_idx = 0;
+    size_t read_idx = 0;
+    for (; read_idx < mBuildQ1.size() &&
+           (rebuild_count == 0 || update_timer.getElapsedTimeF32() < max_dtime); ++read_idx)
     {
-        LLDrawable::drawable_list_t::iterator curiter = iter++;
-        LLDrawable* drawablep = *curiter;
+        LLPointer<LLDrawable> drawablep = mBuildQ1[read_idx];
+        bool keep = false;
+    // </FS:Trish>
         if (drawablep && !drawablep->isDead())
         {
             if (drawablep->isUnload())
@@ -3145,15 +3215,41 @@ void LLPipeline::updateGeom(F32 max_dtime)
             if (updateDrawableGeom(drawablep))
             {
                 drawablep->clearState(LLDrawable::IN_REBUILD_Q);
-                mBuildQ1.erase(curiter);
+                //mBuildQ1.erase(curiter); // <FS:Trish/>
             }
+            // <FS:Trish>
+            else
+            {
+                keep = true;
+            }
+            // </FS:Trish>
             ++rebuild_count;
         }
-        else
+        // <FS:Trish>
+        //else
+        //{
+        //    mBuildQ1.erase(curiter);
+        //}
+        if (keep)
         {
-            mBuildQ1.erase(curiter);
+            if (write_idx != read_idx)
+            {
+                mBuildQ1[write_idx] = drawablep;
+            }
+            ++write_idx;
         }
+        // </FS:Trish>
     }
+    // Entries the time budget didn't reach stay queued
+    for (; read_idx < mBuildQ1.size(); ++read_idx)
+    {
+        if (write_idx != read_idx)
+        {
+            mBuildQ1[write_idx] = mBuildQ1[read_idx];
+        }
+        ++write_idx;
+    }
+    mBuildQ1.resize(write_idx); // <FS:Trish/>
 
     LLTrace::add(sDrawableGeomRebuilds, rebuild_count);
     LLTrace::sample(sDrawableGeomBacklog, (S32)mBuildQ1.size());
@@ -3604,7 +3700,11 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
         return;
     }
 
-    if (LLSelectMgr::getInstance()->mHideSelectedObjects)
+    // <FS:Trish> getInstance() takes the singleton mutex, this runs per drawable in every pass
+    //if (LLSelectMgr::getInstance()->mHideSelectedObjects)
+    static LLSelectMgr* select_mgr = LLSelectMgr::getInstance();
+    if (select_mgr->mHideSelectedObjects)
+    // </FS:Trish>
     {
 //      if (drawablep->getVObj().notNull() &&
 //          drawablep->getVObj()->isSelected())
@@ -6674,7 +6774,8 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
             }
             cur_nearby_lights.insert(Light(drawable, dist, fade));
         }
-        mNearbyLights = cur_nearby_lights;
+        //mNearbyLights = cur_nearby_lights;
+        mNearbyLights.swap(cur_nearby_lights); // <FS:Trish/> no deep copy of the set every frame
 
         // FIND NEW LIGHTS THAT ARE IN RANGE
         light_set_t new_nearby_lights;
@@ -8211,46 +8312,20 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         static LLStaticHashedString dynamic_exposure_params2("dynamic_exposure_params2");
         static LLStaticHashedString dynamic_exposure_e("dynamic_exposure_enabled");
         static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
-        static LLCachedControl<bool> dynamic_exposure_enabled(gSavedSettings, "RenderDynamicExposureEnabled", true);
+        // <FS:Trish> Range moved to getExposureRange(), renderFinalize needs it to skip the luminance pass
+        //static LLCachedControl<bool> dynamic_exposure_enabled(gSavedSettings, "RenderDynamicExposureEnabled", true);
+        // </FS:Trish>
         static LLCachedControl<F32> dynamic_exposure_coefficient(gSavedSettings, "RenderDynamicExposureCoefficient", 0.175f);
         static LLCachedControl<F32> dynamic_exposure_speed_error(gSavedSettings, "RenderDynamicExposureSpeedError", 0.1f);
         static LLCachedControl<F32> dynamic_exposure_speed_target(gSavedSettings, "RenderDynamicExposureSpeedTarget", 2.f);
 
         LLSettingsSky::ptr_t sky = LLEnvironment::instance().getCurrentSky();
 
-        F32 probe_ambiance = LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust());
-
+        // <FS:Trish>
         F32 exp_min = 1.f;
         F32 exp_max = 1.f;
-
-        static LLCachedControl<bool> use_exposure_sky_settings(gSavedSettings, "RenderUseExposureSkySettings", false);
-
-        if (use_exposure_sky_settings)
-        {
-            if (dynamic_exposure_enabled)
-            {
-                exp_min = sky->getHDROffset(should_auto_adjust()) - sky->getHDRMin(should_auto_adjust());
-                exp_max = sky->getHDROffset(should_auto_adjust()) + sky->getHDRMax(should_auto_adjust());
-            }
-            else
-            {
-                exp_min = sky->getHDROffset(should_auto_adjust());
-                exp_max = sky->getHDROffset(should_auto_adjust());
-            }
-        }
-        else if (dynamic_exposure_enabled)
-        {
-            if (probe_ambiance > 0.f)
-            {
-                F32 hdr_scale = sqrtf(LLEnvironment::instance().getCurrentSky()->getGamma()) * 2.f;
-
-                if (hdr_scale > 1.f)
-                {
-                    exp_min = 1.f / hdr_scale;
-                    exp_max = hdr_scale;
-                }
-            }
-        }
+        getExposureRange(exp_min, exp_max);
+        // </FS:Trish>
 
         shader->uniform1f(dt, gFrameIntervalSeconds);
         shader->uniform2f(noiseVec, ll_frand() * 2.0f - 1.0f, ll_frand() * 2.0f - 1.0f);
@@ -8268,6 +8343,49 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         dst->flush();
     }
 }
+
+// <FS:Trish> Moved out of generateExposure() unchanged
+void LLPipeline::getExposureRange(F32& exp_min, F32& exp_max)
+{
+    static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
+    static LLCachedControl<bool> dynamic_exposure_enabled(gSavedSettings, "RenderDynamicExposureEnabled", true);
+    static LLCachedControl<bool> use_exposure_sky_settings(gSavedSettings, "RenderUseExposureSkySettings", false);
+
+    LLSettingsSky::ptr_t sky = LLEnvironment::instance().getCurrentSky();
+
+    F32 probe_ambiance = sky->getReflectionProbeAmbiance(should_auto_adjust());
+
+    exp_min = 1.f;
+    exp_max = 1.f;
+
+    if (use_exposure_sky_settings)
+    {
+        if (dynamic_exposure_enabled)
+        {
+            exp_min = sky->getHDROffset(should_auto_adjust()) - sky->getHDRMin(should_auto_adjust());
+            exp_max = sky->getHDROffset(should_auto_adjust()) + sky->getHDRMax(should_auto_adjust());
+        }
+        else
+        {
+            exp_min = sky->getHDROffset(should_auto_adjust());
+            exp_max = sky->getHDROffset(should_auto_adjust());
+        }
+    }
+    else if (dynamic_exposure_enabled)
+    {
+        if (probe_ambiance > 0.f)
+        {
+            F32 hdr_scale = sqrtf(sky->getGamma()) * 2.f;
+
+            if (hdr_scale > 1.f)
+            {
+                exp_min = 1.f / hdr_scale;
+                exp_max = hdr_scale;
+            }
+        }
+    }
+}
+// </FS:Trish>
 
 extern LLPointer<LLImageGL> gEXRImage;
 
@@ -8738,7 +8856,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 
             // bake out texture2D with RGBL for FXAA shader
             mFXAAMap.bindTarget();
-            mFXAAMap.clear(GL_COLOR_BUFFER_BIT);
+            //mFXAAMap.clear(GL_COLOR_BUFFER_BIT); // <FS:Trish/> the bake writes every pixel, blend is off in renderFinalize
 
             LLGLSLShader* shader = &gGlowCombineFXAAProgram;
             shader->bind();
@@ -9541,7 +9659,14 @@ void LLPipeline::renderFinalize()
         renderBloom();
         // </FS:Trish>
 
-        generateLuminance(&mRT->screen, &mLuminanceMap);
+        // <FS:Trish> With a fixed exposure range the exposure shader's target doesn't depend on luminance
+        F32 exp_min, exp_max;
+        getExposureRange(exp_min, exp_max);
+        if (exp_min != exp_max)
+        {
+            generateLuminance(&mRT->screen, &mLuminanceMap);
+        }
+        // </FS:Trish>
 
         generateExposure(&mLuminanceMap, &mExposureMap);
 
@@ -9568,8 +9693,15 @@ void LLPipeline::renderFinalize()
     LLRenderTarget* sourceBuffer = &mPostPingMap;
     LLRenderTarget* targetBuffer = &mPostPongMap;
 
-    combineGlow(sourceBuffer, targetBuffer);
-    std::swap(sourceBuffer, targetBuffer);
+    // <FS:Trish> With glow off this was a full screen copy adding a cleared buffer
+    //combineGlow(sourceBuffer, targetBuffer);
+    //std::swap(sourceBuffer, targetBuffer);
+    if (sRenderGlow)
+    {
+        combineGlow(sourceBuffer, targetBuffer);
+        std::swap(sourceBuffer, targetBuffer);
+    }
+    // </FS:Trish>
 
     gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
     gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
@@ -9788,7 +9920,10 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LLRenderTarget* deferred_target       = &mRT->deferredScreen;
-    LLRenderTarget* deferred_light_target = &mRT->deferredLight;
+    // <FS:Trish> Light map has its own 8 bit target
+    //LLRenderTarget* deferred_light_target = &mRT->deferredLight;
+    LLRenderTarget* deferred_light_target = &mRT->lightMap;
+    // </FS:Trish>
 
     shader.bind();
     S32 channel = 0;
@@ -10054,7 +10189,10 @@ void LLPipeline::renderDeferredLighting()
     }
 
     LLRenderTarget *screen_target         = &mRT->screen;
-    LLRenderTarget* deferred_light_target = &mRT->deferredLight;
+    // <FS:Trish> Light map has its own 8 bit target
+    //LLRenderTarget* deferred_light_target = &mRT->deferredLight;
+    LLRenderTarget* deferred_light_target = &mRT->lightMap;
+    // </FS:Trish>
 
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("deferred");
@@ -10107,9 +10245,11 @@ void LLPipeline::renderDeferredLighting()
                 }
                 // </ID:PCSS>
                 mScreenTriangleVB->setBuffer();
-                glClearColor(1, 1, 1, 1);
-                deferred_light_target->clear(GL_COLOR_BUFFER_BIT);
-                glClearColor(0, 0, 0, 0);
+                // <FS:Trish> The sun shaders write every pixel of the full screen triangle (blend off, depth always)
+                //glClearColor(1, 1, 1, 1);
+                //deferred_light_target->clear(GL_COLOR_BUFFER_BIT);
+                //glClearColor(0, 0, 0, 0);
+                // </FS:Trish>
 
                 sun_shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                               (GLfloat)deferred_light_target->getWidth(),
@@ -10133,9 +10273,11 @@ void LLPipeline::renderDeferredLighting()
             LL_PROFILE_GPU_ZONE("soften shadow");
             // blur lightmap
             screen_target->bindTarget();
-            glClearColor(1, 1, 1, 1);
-            screen_target->clear(GL_COLOR_BUFFER_BIT);
-            glClearColor(0, 0, 0, 0);
+            // <FS:Trish> The blur writes every pixel of the full screen triangle
+            //glClearColor(1, 1, 1, 1);
+            //screen_target->clear(GL_COLOR_BUFFER_BIT);
+            //glClearColor(0, 0, 0, 0);
+            // </FS:Trish>
 
             bindDeferredShader(gDeferredBlurLightProgram);
 
@@ -10191,7 +10333,13 @@ void LLPipeline::renderDeferredLighting()
         screen_target->bindTarget();
         // clear color buffer here - zeroing alpha (glow) is important or it will accumulate against sky
         glClearColor(0, 0, 0, 0);
-        screen_target->clear(GL_COLOR_BUFFER_BIT);
+        // <FS:Trish> softenLight writes every pixel including alpha = 0, only clear when it doesn't run
+        //screen_target->clear(GL_COLOR_BUFFER_BIT);
+        if (!RenderDeferredAtmospheric)
+        {
+            screen_target->clear(GL_COLOR_BUFFER_BIT);
+        }
+        // </FS:Trish>
 
         if (RenderDeferredAtmospheric)
         {  // apply sunlight contribution
@@ -10596,7 +10744,8 @@ void LLPipeline::doAtmospherics()
             LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
             LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& dst = gPipeline.mWaterDis;
+            //LLRenderTarget& dst = gPipeline.mWaterDis;
+            LLRenderTarget& dst = gPipeline.getWaterDisTarget(); // <FS:Trish/>
 
             src.flush();
             dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
@@ -10612,7 +10761,8 @@ void LLPipeline::doAtmospherics()
         LLGLSLShader& haze_shader = gHazeProgram;
 
         LL_PROFILE_GPU_ZONE("haze");
-        bindDeferredShader(haze_shader, nullptr, &mWaterDis);
+        //bindDeferredShader(haze_shader, nullptr, &mWaterDis);
+        bindDeferredShader(haze_shader, nullptr, &getWaterDisTarget()); // <FS:Trish/>
 
         LLEnvironment& environment = LLEnvironment::instance();
         haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
@@ -10649,7 +10799,8 @@ void LLPipeline::doWaterHaze()
             LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
             LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& dst = gPipeline.mWaterDis;
+            //LLRenderTarget& dst = gPipeline.mWaterDis;
+            LLRenderTarget& dst = gPipeline.getWaterDisTarget(); // <FS:Trish/>
 
             src.flush();
             dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
@@ -10666,14 +10817,16 @@ void LLPipeline::doWaterHaze()
         LLGLSLShader& haze_shader = gHazeWaterProgram;
 
         LL_PROFILE_GPU_ZONE("haze");
-        bindDeferredShader(haze_shader, nullptr, &mWaterDis);
+        //bindDeferredShader(haze_shader, nullptr, &mWaterDis);
+        bindDeferredShader(haze_shader, nullptr, &getWaterDisTarget()); // <FS:Trish/>
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
         static LLStaticHashedString above_water_str("above_water");
         haze_shader.uniform1i(above_water_str, sUnderWaterRender ? -1 : 1);
 
-        haze_shader.bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &mWaterExclusionMask);
+        //haze_shader.bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &mWaterExclusionMask);
+        haze_shader.bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &getWaterExclusionTarget()); // <FS:Trish/>
 
         if (LLPipeline::sUnderWaterRender)
         {
@@ -10707,12 +10860,21 @@ void LLPipeline::doWaterHaze()
 
 void LLPipeline::doWaterExclusionMask()
 {
-    mWaterExclusionMask.bindTarget();
+    // <FS:Trish> Sized to the pack being rendered
+    //mWaterExclusionMask.bindTarget();
+    //glClearColor(1, 1, 1, 1);
+    //mWaterExclusionMask.clear();
+    //mWaterExclusionPool->render();
+    //
+    //mWaterExclusionMask.flush();
+    LLRenderTarget& exclusion_mask = getWaterExclusionTarget();
+    exclusion_mask.bindTarget();
     glClearColor(1, 1, 1, 1);
-    mWaterExclusionMask.clear();
+    exclusion_mask.clear();
     mWaterExclusionPool->render();
 
-    mWaterExclusionMask.flush();
+    exclusion_mask.flush();
+    // </FS:Trish>
     glClearColor(0, 0, 0, 0);
 }
 
@@ -10895,7 +11057,10 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 {
     LLRenderTarget* deferred_target       = &mRT->deferredScreen;
-    LLRenderTarget* deferred_light_target = &mRT->deferredLight;
+    // <FS:Trish> Light map has its own 8 bit target
+    //LLRenderTarget* deferred_light_target = &mRT->deferredLight;
+    LLRenderTarget* deferred_light_target = &mRT->lightMap;
+    // </FS:Trish>
 
     stop_glerror();
     shader.disableTexture(LLShaderMgr::NORMAL_MAP, deferred_target->getUsage());

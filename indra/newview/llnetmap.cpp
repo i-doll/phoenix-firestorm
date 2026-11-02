@@ -721,6 +721,15 @@ void LLNetMap::draw()
         LLAvatarTracker& avatar_tracker = LLAvatarTracker::instance();
         LGGContactSets& contact_sets = LGGContactSets::instance();
 
+        // <FS:Trish> Colors are re-evaluated twice a second
+        constexpr F32 AVATAR_COLOR_CACHE_SECONDS = 0.5f;
+        if (mAvatarColorCacheTimer.getElapsedTimeF32() > AVATAR_COLOR_CACHE_SECONDS)
+        {
+            mAvatarColorCache.clear();
+            mAvatarColorCacheTimer.reset();
+        }
+        // </FS:Trish>
+
         // Gather avatar draw data and pick info first.
         for (U32 i = 0; i < avatar_ids.size(); i++)
         {
@@ -732,7 +741,15 @@ void LLNetMap::draw()
 
             // <FS:CR>
             //LLColor4 color = LLAvatarActions::isFriend(uuid) ? map_avatar_friend_color : map_avatar_color;
-            LLColor4 color = getAvatarColor(uuid);
+            // <FS:Trish>
+            //LLColor4 color = getAvatarColor(uuid);
+            auto [color_it, color_inserted] = mAvatarColorCache.try_emplace(uuid);
+            if (color_inserted)
+            {
+                color_it->second = getAvatarColor(uuid);
+            }
+            LLColor4 color = color_it->second;
+            // </FS:Trish>
             // </FS:CR>
 
             // <FS:Ansariel> Check for unknown Z-offset => AVATAR_UNKNOWN_Z_OFFSET

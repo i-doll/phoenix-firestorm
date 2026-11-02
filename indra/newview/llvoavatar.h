@@ -1266,6 +1266,7 @@ protected:
     static void     getAnimNames(std::vector<std::string>* names);
 private:
     bool            mNameIsSet;
+    LLFrameTimer    mNameTagStateTimer; // <FS:Trish/> Throttles name tag state/color evaluation
     LLSD            mClientTagData;
     bool            mHasClientTagColor;
     std::string     mTitle;

@@ -920,7 +920,10 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
     else
     {
         // perform a separate pick that detects transparent objects since they respond to 1-click actions
-        LLPickInfo click_action_pick = gViewerWindow->pickImmediate(x, y, false, pick_rigged);
+        // <FS:Trish> Same arguments as mHoverPick above, reuse it instead of raycasting the world twice per frame
+        //LLPickInfo click_action_pick = gViewerWindow->pickImmediate(x, y, false, pick_rigged);
+        const LLPickInfo& click_action_pick = mHoverPick;
+        // </FS:Trish>
 
         LLViewerObject* click_action_object = click_action_pick.getObject();
 

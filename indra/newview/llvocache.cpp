@@ -1611,7 +1611,10 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
 		LL_PROFILE_ZONE_NAMED_CATEGORY_NETWORK("VOCache:loadRegionObjectCache");        
         LLUUID cache_id;
         getObjectCacheFilename(handle, filename);
-        LLAPRFile apr_file(filename, APR_READ|APR_BINARY, mLocalAPRFilePoolp);
+        // <FS:Trish> Buffered, every entry is two small reads and this runs on the main thread for each region connected
+        //LLAPRFile apr_file(filename, APR_READ|APR_BINARY, mLocalAPRFilePoolp);
+        LLAPRFile apr_file(filename, APR_READ|APR_BINARY|APR_BUFFERED, mLocalAPRFilePoolp);
+        // </FS:Trish>
 
         success = check_read(&apr_file, cache_id.mData, UUID_BYTES);
 

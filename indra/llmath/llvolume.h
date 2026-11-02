@@ -1107,6 +1107,9 @@ public:
     // NaCl End
 
     void copyVolumeFaces(const LLVolume* volume);
+    // <FS:Trish> Takes volume's faces without copying, volume gets ours
+    void swapVolumeFaces(LLVolume* volume);
+    // </FS:Trish>
     void copyFacesTo(std::vector<LLVolumeFace> &faces) const;
     void copyFacesFrom(const std::vector<LLVolumeFace> &faces);
 

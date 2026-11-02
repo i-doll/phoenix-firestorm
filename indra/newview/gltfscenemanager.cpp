@@ -771,7 +771,10 @@ void GLTFSceneManager::bindTexture(Asset& asset, TextureType texture_type, Textu
 
     if (channel > -1)
     {
-        glActiveTexture(GL_TEXTURE0 + channel);
+        // <FS:Trish> Go through LLTexUnit so LLRender's active unit tracking stays in sync (bindFast relies on it)
+        //glActiveTexture(GL_TEXTURE0 + channel);
+        gGL.getTexUnit(channel)->activate();
+        // </FS:Trish>
 
         if (info.mIndex != INVALID_INDEX)
         {

@@ -159,6 +159,7 @@ public:
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
+    void getExposureRange(F32& exp_min, F32& exp_max); // <FS:Trish/>
     void tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_correct);
     void gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst);
     void generateGlow(LLRenderTarget* src);
@@ -730,6 +731,14 @@ public:
         LLRenderTarget          screen;
         LLRenderTarget          deferredScreen;
         LLRenderTarget          deferredLight;
+        // <FS:Trish> Shadow/SSAO light map, four [0,1] terms so 8 bit is plenty. deferredLight stays
+        // HDR for the tonemap -> CAS intermediate and DoF.
+        LLRenderTarget          lightMap;
+        // Water scratch targets sized to the pack, only allocated for mAuxillaryRT (reflection probes),
+        // probe faces were stretch blitted into the full screen mWaterDis three times per face
+        LLRenderTarget          waterDis;
+        LLRenderTarget          waterExclusion;
+        // </FS:Trish>
 
         //sun shadow map
         LLRenderTarget          shadow[4];
@@ -873,6 +882,10 @@ public:
 
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;
+    // <FS:Trish> Water scratch targets for the pack being rendered (see RenderTargetPack::waterDis)
+    LLRenderTarget& getWaterDisTarget() { return mRT == &mAuxillaryRT ? mRT->waterDis : mWaterDis; }
+    LLRenderTarget& getWaterExclusionTarget() { return mRT == &mAuxillaryRT ? mRT->waterExclusion : mWaterExclusionMask; }
+    // </FS:Trish>
     // Optional pre-alpha depth snapshot for RLVa sphere post effect.
     LLRenderTarget              mRlvSphereDepth;
 
@@ -961,7 +974,10 @@ protected:
     //
     // Different queues of drawables being processed.
     //
-    LLDrawable::drawable_list_t     mBuildQ1; // priority
+    // <FS:Trish> Vector, every markRebuild allocated a list node
+    //LLDrawable::drawable_list_t     mBuildQ1; // priority
+    LLDrawable::drawable_vector_t   mBuildQ1; // priority
+    // </FS:Trish>
     LLSpatialGroup::sg_vector_t     mGroupQ1; //priority
 
     LLSpatialGroup::sg_vector_t     mGroupSaveQ1; // a place to save mGroupQ1 until it is safe to unref

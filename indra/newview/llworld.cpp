@@ -2089,6 +2089,15 @@ void LLWorld::getAvatars(uuid_vec_t* avatar_ids, std::vector<LLVector3d>* positi
         }
     }
 
+    // <FS:Trish> Hash the ids for the duplicate check below, it was a linear search per coarse location avatar
+    std::unordered_set<LLUUID> known_ids;
+    if (avatar_ids != NULL)
+    {
+        known_ids.reserve(avatar_ids->size() * 2);
+        known_ids.insert(avatar_ids->begin(), avatar_ids->end());
+    }
+    // </FS:Trish>
+
     // region avatars added for situations where radius is greater than RenderFarClip
     for (const LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
     {
@@ -2105,7 +2114,10 @@ void LLWorld::getAvatars(uuid_vec_t* avatar_ids, std::vector<LLVector3d>* positi
             {
                 LLUUID uuid = regionp->mMapAvatarIDs.at(i);
                 // if this avatar doesn't already exist in the list, add it
-                if(uuid.notNull() && avatar_ids != NULL && std::find(avatar_ids->begin(), avatar_ids->end(), uuid) == avatar_ids->end())
+                // <FS:Trish>
+                //if(uuid.notNull() && avatar_ids != NULL && std::find(avatar_ids->begin(), avatar_ids->end(), uuid) == avatar_ids->end())
+                if(uuid.notNull() && avatar_ids != NULL && known_ids.insert(uuid).second)
+                // </FS:Trish>
                 {
                     if (positions != NULL)
                     {

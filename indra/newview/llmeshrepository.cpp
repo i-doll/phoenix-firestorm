@@ -3537,8 +3537,20 @@ void LLMeshRepoThread::notifyLoadedMeshes()
             update_metrics = true;
 
             // Process the elements free of the lock
-            for (const auto& mesh : loaded_queue)
+            // <FS:Trish> Time sliced, arriving in a mesh heavy area could process hundreds of LODs in one frame
+            //for (const auto& mesh : loaded_queue)
+            //{
+            constexpr F32 MAX_NOTIFY_SECONDS = 0.004f;
+            LLTimer notify_timer;
+            auto mesh_it = loaded_queue.begin();
+            for (; mesh_it != loaded_queue.end(); ++mesh_it)
             {
+                if (mesh_it != loaded_queue.begin() && notify_timer.getElapsedTimeF32() > MAX_NOTIFY_SECONDS)
+                {
+                    break;
+                }
+                const LoadedMesh& mesh = *mesh_it;
+            // </FS:Trish>
                 if (mesh.mVolume->getNumVolumeFaces() > 0)
                 {
                     gMeshRepo.notifyMeshLoaded(mesh.mMeshParams, mesh.mVolume, mesh.mLOD);
@@ -3548,6 +3560,15 @@ void LLMeshRepoThread::notifyLoadedMeshes()
                     gMeshRepo.notifyMeshUnavailable(mesh.mMeshParams, mesh.mLOD, LLVolumeLODGroup::getVolumeDetailFromScale(mesh.mVolume->getDetail()));
                 }
             }
+
+            // <FS:Trish> Put the rest back in front of anything that arrived meanwhile
+            if (mesh_it != loaded_queue.end())
+            {
+                LLMutexLock lock(mLoadedMutex);
+                mLoadedQ.insert(mLoadedQ.begin(), mesh_it, loaded_queue.end());
+                loaded_queue.erase(mesh_it, loaded_queue.end());
+            }
+            // </FS:Trish>
         }
         else
         {
@@ -4961,6 +4982,24 @@ void LLMeshRepository::notifyLoadedMeshes()
         {
             S32 push_count = LLMeshRepoThread::sRequestHighWater - active_count;
 
+            // <FS:Trish> Drop requests whose last waiting volume unregistered before scoring, so the
+            // partial sort covers everything that gets sent. Skipping them while consuming went past
+            // the sorted range and erased from the front one entry at a time.
+            mPendingRequests.erase(std::remove_if(mPendingRequests.begin(), mPendingRequests.end(),
+                [](const std::shared_ptr<PendingRequestBase>& req_p)
+                {
+                    if (req_p && req_p->hasTrackedData())
+                    {
+                        return false;
+                    }
+                    if (req_p && req_p->getRequestType() == MESH_REQUEST_LOD)
+                    {
+                        LLMeshRepository::sLODPending--;
+                    }
+                    return true;
+                }), mPendingRequests.end());
+            // </FS:Trish>
+
             if (mPendingRequests.size() > push_count)
             {
                 LL_PROFILE_ZONE_NAMED("Mesh score update");
@@ -4993,13 +5032,14 @@ void LLMeshRepository::notifyLoadedMeshes()
                                       PendingRequestBase::CompareScoreGreater());
                 }
             }
-            S32 scheduled_count = 0;
-            while (!mPendingRequests.empty() && push_count > 0 &&
-                   (scheduled_count == 0 || request_timer.getElapsedTimeF32() < max_dtime))
+            // <FS:Trish> Consume the sorted front by index and erase it in one go
+            const size_t max_send_count = llmin((size_t)llmax(push_count, 0), mPendingRequests.size());
+            size_t send_count = 0;
+            while (send_count < max_send_count &&
+                   (send_count == 0 || request_timer.getElapsedTimeF32() < max_dtime))
             {
-                std::shared_ptr<PendingRequestBase>& req_p = mPendingRequests.front();
-                // todo: check hasTrackedData here and erase request if none
-                // since this is supposed to mean that request was removed
+                std::shared_ptr<PendingRequestBase>& req_p = mPendingRequests[send_count];
+            // </FS:Trish>
                 switch (req_p->getRequestType())
                 {
                 case MESH_REQUEST_LOD:
@@ -5020,10 +5060,9 @@ void LLMeshRepository::notifyLoadedMeshes()
                     LL_ERRS() << "Unknown request type in LLMeshRepository::notifyLoadedMeshes" << LL_ENDL;
                     break;
                 }
-                mPendingRequests.erase(mPendingRequests.begin());
-                push_count--;
-                ++scheduled_count;
+                ++send_count; // <FS:Trish/>
             }
+            mPendingRequests.erase(mPendingRequests.begin(), mPendingRequests.begin() + send_count); // <FS:Trish/>
         }
 
         //send decomposition requests
@@ -5137,7 +5176,10 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
             LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, detail);
             if (sys_volume)
             {
-                sys_volume->copyVolumeFaces(volume);
+                // <FS:Trish> volume is the repo thread's temporary and is dropped after this, don't deep copy every LOD
+                //sys_volume->copyVolumeFaces(volume);
+                sys_volume->swapVolumeFaces(volume);
+                // </FS:Trish>
                 sys_volume->setMeshAssetLoaded(true);
                 LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
             }
