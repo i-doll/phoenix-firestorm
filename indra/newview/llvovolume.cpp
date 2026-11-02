@@ -34,6 +34,7 @@
 #include <unordered_map>
 
 #include "llviewercontrol.h"
+#include "llcallbacklist.h"
 #include "lldir.h"
 #include "llflexibleobject.h"
 #include "llfloatertools.h"
@@ -116,7 +117,9 @@ extern bool gCubeSnapshot;
 namespace
 {
 constexpr size_t LARGE_LINKSET_RESYNC_THRESHOLD = 128;
-constexpr F64 LARGE_LINKSET_RESYNC_INTERVAL_SEC = 0.5;
+constexpr F64 LARGE_LINKSET_RESYNC_INTERVAL_SEC = 10.;
+constexpr F64 LARGE_LINKSET_RESYNC_QUIET_SEC = 1.;
+constexpr F64 LARGE_LINKSET_RESYNC_MAX_WAIT_SEC = 10.;
 constexpr F64 TE_RESYNC_INTERVAL_SEC = 1.0;
 
 // A malformed or incomplete terse TextureEntry update can otherwise leave a
@@ -150,42 +153,52 @@ void requestTEFullResync(LLViewerObject* objectp)
 }
 
 // Terse updates are unreliable; for very large linksets, alpha/TE bursts can
-// leave random child links visually stale. Throttle a full linkset resync.
-void requestLargeLinksetResync(LLVOVolume* objectp)
+// leave random child links visually stale. Resync the whole linkset once a
+// burst has gone quiet (or has run for too long), at most once per interval.
+// The queued misses are sent by the per-frame LLWorld::requestCacheMisses().
+struct LinksetResyncState
 {
-    if (!objectp)
+    F64 last_te_update = 0.;
+    F64 pending_since = 0.;
+    F64 last_resync = -LARGE_LINKSET_RESYNC_INTERVAL_SEC;
+    bool pending = false;
+};
+std::unordered_map<LLUUID, LinksetResyncState> sLinksetResync;
+
+void flushLargeLinksetResync(const LLUUID& root_id)
+{
+    auto it = sLinksetResync.find(root_id);
+    if (it == sLinksetResync.end())
     {
         return;
     }
 
-    LLViewerRegion* regionp = objectp->getRegion();
-    LLViewerObject* rootp = objectp->getRootEdit();
-    if (!regionp || !rootp)
-    {
-        return;
-    }
-
-    const LLViewerObject::const_child_list_t& children = rootp->getChildren();
-    if ((children.size() + 1) < LARGE_LINKSET_RESYNC_THRESHOLD)
-    {
-        return;
-    }
-
-    static std::unordered_map<LLUUID, F64> sLastLinksetResyncRequest;
+    LinksetResyncState& state = it->second;
     const F64 now = LLFrameTimer::getTotalSeconds();
-    F64& last_request = sLastLinksetResyncRequest[rootp->getID()];
-    if (now - last_request < LARGE_LINKSET_RESYNC_INTERVAL_SEC)
+    if (now - state.last_te_update < LARGE_LINKSET_RESYNC_QUIET_SEC &&
+        now - state.pending_since < LARGE_LINKSET_RESYNC_MAX_WAIT_SEC)
     {
+        doAfterInterval([root_id]() { flushLargeLinksetResync(root_id); }, (F32)LARGE_LINKSET_RESYNC_QUIET_SEC);
         return;
     }
-    last_request = now;
+
+    state.pending = false;
+    state.last_resync = now;
+
+    LLViewerObject* rootp = gObjectList.findObject(root_id);
+    LLViewerRegion* regionp = rootp ? rootp->getRegion() : nullptr;
+    if (!rootp || rootp->isDead() || !regionp)
+    {
+        sLinksetResync.erase(it);
+        return;
+    }
 
     if (U32 root_local_id = rootp->getLocalID())
     {
         regionp->addCacheMissFull(root_local_id);
     }
 
-    for (const auto& child_ptr : children)
+    for (const auto& child_ptr : rootp->getChildren())
     {
         LLViewerObject* childp = child_ptr.get();
         if (childp && childp->getLocalID())
@@ -193,8 +206,51 @@ void requestLargeLinksetResync(LLVOVolume* objectp)
             regionp->addCacheMissFull(childp->getLocalID());
         }
     }
+}
 
-    regionp->requestCacheMisses();
+void requestLargeLinksetResync(LLVOVolume* objectp)
+{
+    if (!objectp)
+    {
+        return;
+    }
+
+    LLViewerObject* rootp = objectp->getRootEdit();
+    if (!rootp || !objectp->getRegion())
+    {
+        return;
+    }
+
+    if ((rootp->getChildren().size() + 1) < LARGE_LINKSET_RESYNC_THRESHOLD)
+    {
+        return;
+    }
+
+    const F64 now = LLFrameTimer::getTotalSeconds();
+
+    static F64 next_prune = 0.;
+    if (now >= next_prune)
+    {
+        next_prune = now + 60.;
+        for (auto it = sLinksetResync.begin(); it != sLinksetResync.end();)
+        {
+            if (!it->second.pending && now - it->second.last_te_update > 60.) it = sLinksetResync.erase(it);
+            else ++it;
+        }
+    }
+
+    const LLUUID root_id = rootp->getID();
+    LinksetResyncState& state = sLinksetResync[root_id];
+    state.last_te_update = now;
+    if (state.pending)
+    {
+        return;
+    }
+
+    state.pending = true;
+    state.pending_since = now;
+    const F64 delay = llmax(LARGE_LINKSET_RESYNC_QUIET_SEC, state.last_resync + LARGE_LINKSET_RESYNC_INTERVAL_SEC - now);
+    doAfterInterval([root_id]() { flushLargeLinksetResync(root_id); }, (F32)delay);
 }
 } // namespace
 

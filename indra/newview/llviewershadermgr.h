@@ -37,6 +37,7 @@ class LLViewerShaderMgr: public LLShaderMgr
 public:
     static bool sInitialized;
     static bool sSkipReload;
+    static bool sRiggedLocalOrigin; // <FS:Trish/> RIGGED_LOCAL_ORIGIN is in the compiled global defines
 
     LLViewerShaderMgr();
     /* virtual */ ~LLViewerShaderMgr();

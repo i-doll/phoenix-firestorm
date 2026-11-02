@@ -11433,7 +11433,10 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
     MatrixPaletteCache& entry = mMatrixPaletteCache[hash];
     // Follow the compiled shader permutation, not a live setting that may have
     // changed without a shader reload.
-    const bool use_local_origin = LLGLSLShader::sGlobalDefines.count("RIGGED_LOCAL_ORIGIN") != 0;
+    // <FS:Trish> Cached at shader load, a string keyed map lookup here runs for every rigged mesh in every pass
+    //const bool use_local_origin = LLGLSLShader::sGlobalDefines.count("RIGGED_LOCAL_ORIGIN") != 0;
+    const bool use_local_origin = LLViewerShaderMgr::sRiggedLocalOrigin;
+    // </FS:Trish>
 
     if (entry.mFrame != gFrameCount || entry.mUsesLocalOrigin != use_local_origin)
     {

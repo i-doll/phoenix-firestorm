@@ -152,6 +152,7 @@ public:
     bool mCountedPendingRead = false;
     bool mWriteStarted = false;
     bool mDeferringWrite = false;
+    std::atomic<bool> mWritePrioritized{ false }; // a fetch worker is waiting on this write, don't defer it
     LLTimer mWriteQueuedTimer;
     // </FS:Trish>
     void ioComplete(S32 bytes)
@@ -748,7 +749,8 @@ bool LLTextureCacheWorker::doWork(S32 param)
         // <FS:Trish> Reads before writes
         if (!mWriteStarted)
         {
-            if (mCache->getPendingReads() > 0 &&
+            if (!mWritePrioritized &&
+                mCache->getPendingReads() > 0 &&
                 mWriteQueuedTimer.getElapsedTimeF32() < MAX_WRITE_DEFER_SECONDS)
             {
                 mDeferringWrite = true;
@@ -1841,29 +1843,35 @@ void LLTextureCache::purgeTexturesLazy(F32 time_limit_sec)
     if (mPurgeEntryList.empty())
     {
         // Form the list of textures to purge from the in-memory entries, header-only ones included
-        idx_entry_vector_t candidates;
+        // Only copy the ids under mHeaderIDMapMutex, the main thread's cache lookups wait on it.
+        // The removal pass below re-validates every entry against the map before removing it.
+        std::vector<std::pair<LLUUID, S32>> ids;
         {
             LLMutexLock lock(&mHeaderIDMapMutex);
-            candidates.reserve(mHeaderIDMap.size());
-            for (id_map_t::iterator iter = mHeaderIDMap.begin(); iter != mHeaderIDMap.end(); ++iter)
-            {
-                S32 idx = iter->second;
-                size_map_t::iterator size_iter = mTexturesSizeMap.find(iter->first);
-                S32 body_size = size_iter != mTexturesSizeMap.end() ? size_iter->second : 0;
-                candidates.push_back(std::make_pair(idx, Entry(iter->first, 0, body_size, getEntryTime(idx))));
-            }
+            ids.assign(mHeaderIDMap.begin(), mHeaderIDMap.end());
         }
-        if (candidates.empty())
+        if (ids.empty())
         {
             return; // nothing to purge
         }
 
-        // Oldest first
-        std::sort(candidates.begin(), candidates.end(),
-                  [](const idx_entry_vector_t::value_type& a, const idx_entry_vector_t::value_type& b)
-                  {
-                      return a.second.mTime != b.second.mTime ? a.second.mTime < b.second.mTime : a.first < b.first;
-                  });
+        idx_entry_vector_t candidates;
+        candidates.reserve(ids.size());
+        for (const auto& [id, idx] : ids)
+        {
+            size_map_t::iterator size_iter = mTexturesSizeMap.find(id);
+            S32 body_size = size_iter != mTexturesSizeMap.end() ? size_iter->second : 0;
+            candidates.push_back(std::make_pair(idx, Entry(id, 0, body_size, getEntryTime(idx))));
+        }
+        ids.clear();
+        ids.shrink_to_fit();
+
+        // Oldest on top of the heap, usually only a small slice is purged so don't sort everything
+        auto newer = [](const idx_entry_vector_t::value_type& a, const idx_entry_vector_t::value_type& b)
+                     {
+                         return a.second.mTime != b.second.mTime ? a.second.mTime > b.second.mTime : a.first > b.first;
+                     };
+        std::make_heap(candidates.begin(), candidates.end(), newer);
 
         // Only shrink what is over its limit, each entry frees its body and its header and fast cache records
         size_t num_live = candidates.size();
@@ -1878,18 +1886,14 @@ void LLTextureCache::purgeTexturesLazy(F32 time_limit_sec)
         {
             purged_num_live = (size_t)(sCacheMaxEntries * (TEXTURE_CACHE_ENTRIES_PURGE_THRESHOLD - TEXTURE_CACHE_PURGE_AMOUNT));
         }
-        for (const idx_entry_vector_t::value_type& candidate : candidates)
+        auto heap_end = candidates.end();
+        while (heap_end != candidates.begin() && (cache_size > purged_cache_size || num_live > purged_num_live))
         {
-            if (cache_size > purged_cache_size || num_live > purged_num_live)
-            {
-                cache_size -= candidate.second.mBodySize + TEXTURE_CACHE_ENTRY_COST;
-                num_live--;
-                mPurgeEntryList.push_back(candidate);
-            }
-            else
-            {
-                break;
-            }
+            std::pop_heap(candidates.begin(), heap_end, newer);
+            --heap_end;
+            cache_size -= heap_end->second.mBodySize + TEXTURE_CACHE_ENTRY_COST;
+            num_live--;
+            mPurgeEntryList.push_back(*heap_end);
         }
         // Entries are removed from the back, keep the oldest there
         std::reverse(mPurgeEntryList.begin(), mPurgeEntryList.end());
@@ -2472,10 +2476,20 @@ bool LLTextureCache::writeComplete(handle_t handle, bool abort)
 
 void LLTextureCache::prioritizeWrite(handle_t handle)
 {
-    // Don't prioritize yet, we might be working on this now
-    //   which could create a deadlock
-    LLMutexLock lock(&mListMutex);
-    mPrioritizeWriteList.push_back(handle);
+    // <FS:Trish> The list was never consumed. Stop deferring the write behind pending reads instead,
+    // the fetch worker can't request a better discard until this write is done
+    //// Don't prioritize yet, we might be working on this now
+    ////   which could create a deadlock
+    //LLMutexLock lock(&mListMutex);
+    //mPrioritizeWriteList.push_back(handle);
+    lockWorkers();
+    handle_map_t::iterator iter = mWriters.find(handle);
+    if (iter != mWriters.end())
+    {
+        iter->second->mWritePrioritized = true;
+    }
+    unlockWorkers();
+    // </FS:Trish>
 }
 
 void LLTextureCache::addCompleted(Responder* responder, bool success)

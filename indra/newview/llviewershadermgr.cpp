@@ -69,6 +69,7 @@ using std::string;
 
 bool                LLViewerShaderMgr::sInitialized = false;
 bool                LLViewerShaderMgr::sSkipReload = false;
+bool                LLViewerShaderMgr::sRiggedLocalOrigin = false; // <FS:Trish/>
 
 LLVector4           gShinyOrigin;
 
@@ -1001,6 +1002,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     }
 
     LLGLSLShader::sGlobalDefines = attribs;
+    sRiggedLocalOrigin = attribs.count("RIGGED_LOCAL_ORIGIN") != 0; // <FS:Trish/>
 
     // We no longer have to bind the shaders to global glhandles, they are automatically added to a map now.
     for (U32 i = 0; i < shaders.size(); i++)
