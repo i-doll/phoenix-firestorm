@@ -10,6 +10,7 @@
 #include "idfloatervolumetricclouds.h"
 
 #include "idvolumetricclouds.h"
+#include "fsdecodedtexturecache.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
@@ -34,14 +35,14 @@ static LLDefaultChildRegistry::Register<IDCloudAltitudeColumn> r_id_cloud_altitu
 static LLDefaultChildRegistry::Register<IDCloudCompassDial> r_id_cloud_compass_dial("id_cloud_compass_dial");
 
 // The Experimental preferences panel, so its cloud toggles grey out when the clouds cannot be changed.
-class IDPanelPreferenceExperimental : public LLPanelPreference
+class IDPanelPreferenceExperimental : public FSPanelPreferenceExperimental
 {
 public:
     bool postBuild() override
     {
         mCloudControls = { findChild<LLUICtrl>("volumetric_clouds_enabled"),
                            findChild<LLUICtrl>("volumetric_clouds_full_quality") };
-        return LLPanelPreference::postBuild();
+        return FSPanelPreferenceExperimental::postBuild();
     }
 
     void draw() override
@@ -54,7 +55,7 @@ public:
                 ctrl->setEnabled(can_edit);
             }
         }
-        LLPanelPreference::draw();
+        FSPanelPreferenceExperimental::draw();
     }
 
 private:

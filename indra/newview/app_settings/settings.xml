@@ -13414,6 +13414,83 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>Value</key>
     <real>10.0</real>
   </map>
+  <key>FSDecodedTextureCache</key>
+  <map>
+    <key>Comment</key>
+    <string>Keep decoded texture pixels on disk so textures seen before load without JPEG2000 decoding. Uses more disk space than the texture cache.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>FSDecodedTextureCacheSizeMB</key>
+  <map>
+    <key>Comment</key>
+    <string>Maximum disk space for the decoded texture cache in MB. Least recently used textures are removed beyond it.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>20480</integer>
+  </map>
+  <key>FSDecodedTextureCacheMode</key>
+  <map>
+    <key>Comment</key>
+    <string>Which decoded textures to keep. 0: everything. 1: only places visited before (data already in the texture cache). 2: only the current region, other regions' textures are dropped on arriving somewhere else. 3: only the regions in FSDecodedTextureCacheRegions. Listed regions are always kept.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>3</integer>
+  </map>
+  <key>FSDecodedTextureCacheUncompressed</key>
+  <map>
+    <key>Comment</key>
+    <string>Store decoded textures uncompressed. Texture pixels only compress to about 65%, and decompressing is most of a cache load's cost, so this loads faster for about 1.5x the disk space. Existing entries keep their format.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
+  <key>FSDecodedTextureCacheRegions</key>
+  <map>
+    <key>Comment</key>
+    <string>Comma separated region names whose decoded textures are always kept: stored on any visit, not dropped when leaving, evicted last.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>String</string>
+    <key>Value</key>
+    <string></string>
+  </map>
+  <key>FSDecodedTextureCacheMinSize</key>
+  <map>
+    <key>Comment</key>
+    <string>Smallest texture size (larger side, in pixels) kept in and loaded from the decoded texture cache. Smaller textures decode quickly enough as JPEG2000.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>256</integer>
+  </map>
+  <key>FSPrioritizeTextureDecodes</key>
+  <map>
+    <key>Comment</key>
+    <string>Decode the most important textures first instead of in request order, and skip decodes nothing waits for anymore.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
   <key>RenderReflectionProbeRefreshFrameInterval</key>
   <map>
     <key>Comment</key>

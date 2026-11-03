@@ -9,6 +9,9 @@
  width="540"
  label="Experimental"
  name="experimental">
+    <string name="decoded_cache_stats">[ENTRIES] textures, [USED] of [MAX] GB. This session: [LOADS] loaded, [STORES] stored, [REMOVED] removed.</string>
+    <string name="decoded_cache_stats_off">Decoded texture cache is off.</string>
+    <string name="decoded_cache_stats_indexing">Reading the decoded texture cache...</string>
     <text
      follows="left|top|right"
      height="18"
@@ -50,7 +53,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="586"
+                 height="826"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -309,6 +312,154 @@
                      tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
                      top_delta="-2"
                      width="100" />
+                    <check_box
+                     control_name="FSDecodedTextureCache"
+                     follows="left|top"
+                     height="20"
+                     label="Keep decoded textures on disk (faster loading on return visits)"
+                     layout="topleft"
+                     left="15"
+                     name="decoded_texture_cache"
+                     tool_tip="Stores the pixels of decoded textures so places you return to load them without JPEG2000 decoding. Uses several times more disk space than the regular texture cache. Cleared together with the texture cache."
+                     top_pad="6"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="decoded_texture_cache_mode_label"
+                     top_pad="6"
+                     width="285">
+                        Keep decoded textures from
+                    </text>
+                    <combo_box
+                     control_name="FSDecodedTextureCacheMode"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="330"
+                     name="decoded_texture_cache_mode"
+                     tool_tip="A region can take several GB of decoded textures. Listed regions only keeps just the regions named below. Current region only keeps what you see where you are, so relogging or moving around the same region reuses it, and drops it once you are somewhere else. Places visited before only keeps textures that were already in the texture cache, so a first visit writes nothing."
+                     top_delta="-2"
+                     width="160">
+                        <combo_box.item
+                         name="decoded_texture_cache_mode_listed"
+                         label="Listed regions only"
+                         value="3" />
+                        <combo_box.item
+                         name="decoded_texture_cache_mode_current"
+                         label="Current region only"
+                         value="2" />
+                        <combo_box.item
+                         name="decoded_texture_cache_mode_revisited"
+                         label="Places visited before"
+                         value="1" />
+                        <combo_box.item
+                         name="decoded_texture_cache_mode_all"
+                         label="Everywhere"
+                         value="0" />
+                    </combo_box>
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="decoded_texture_cache_regions_label"
+                     top_pad="6"
+                     width="455">
+                        Regions to keep (comma separated):
+                    </text>
+                    <line_editor
+                     control_name="FSDecodedTextureCacheRegions"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="35"
+                     name="decoded_texture_cache_regions"
+                     tool_tip="Region names, separated by commas. Their decoded textures are kept on any visit, not dropped when you leave, and removed last when the cache is full."
+                     top_pad="2"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="decoded_texture_cache_size_label"
+                     top_pad="8"
+                     width="285">
+                        Decoded texture cache size (MB)
+                    </text>
+                    <spinner
+                     control_name="FSDecodedTextureCacheSizeMB"
+                     decimal_digits="0"
+                     increment="1024"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="330"
+                     max_val="131072"
+                     min_val="1024"
+                     name="decoded_texture_cache_size"
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="decoded_texture_cache_min_size_label"
+                     tool_tip="Textures smaller than this (larger side, in pixels) decode quickly enough and are not kept."
+                     top_pad="6"
+                     width="285">
+                        Smallest texture kept (pixels)
+                    </text>
+                    <spinner
+                     control_name="FSDecodedTextureCacheMinSize"
+                     decimal_digits="0"
+                     increment="64"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="330"
+                     max_val="2048"
+                     min_val="64"
+                     name="decoded_texture_cache_min_size"
+                     top_delta="-2"
+                     width="100" />
+                    <check_box
+                     control_name="FSDecodedTextureCacheUncompressed"
+                     follows="left|top"
+                     height="20"
+                     label="Store uncompressed (faster loading, about 1.5x the disk space)"
+                     layout="topleft"
+                     left="35"
+                     name="decoded_texture_cache_uncompressed"
+                     tool_tip="Decompressing is most of the cost of loading from the decoded cache, and texture pixels only compress to about 65%. Applies to newly stored textures."
+                     top_pad="6"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="32"
+                     layout="topleft"
+                     left="35"
+                     name="decoded_texture_cache_stats"
+                     top_pad="6"
+                     width="455"
+                     wrap="true">
+                        Reading the decoded texture cache...
+                    </text>
+                    <check_box
+                     control_name="FSPrioritizeTextureDecodes"
+                     follows="left|top"
+                     height="20"
+                     label="Decode the most important textures first"
+                     layout="topleft"
+                     left="15"
+                     name="prioritize_texture_decodes"
+                     tool_tip="Decodes textures in order of importance instead of request order, so what is in front of you sharpens first after a teleport or while moving. Decodes for textures nothing waits for anymore are skipped."
+                     top_pad="6"
+                     width="475" />
                     <check_box
                      control_name="FSLowPriorityTextureThreads"
                      follows="left|top"

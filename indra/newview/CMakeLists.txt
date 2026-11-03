@@ -145,6 +145,7 @@ set(viewer_SOURCE_FILES
     fsconsoleutils.cpp
     fscontactsfriendsmenu.cpp
     fsdata.cpp
+    fsdecodedtexturecache.cpp
     fsdroptarget.cpp
     fsexportperms.cpp
     fsfloateraddtocontactset.cpp
@@ -1041,6 +1042,7 @@ set(viewer_HEADER_FILES
     fsconsoleutils.h
     fscontactsfriendsmenu.h
     fsdata.h
+    fsdecodedtexturecache.h
     fsdroptarget.h
     fsexportperms.h
     fsfloateraddtocontactset.h

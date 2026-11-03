@@ -29,12 +29,9 @@
 #include "llimageworker.h"
 #include "llimagedxt.h"
 #include "threadpool.h"
-// <FS:Trish>
-#include "llthread.h"
-#include <algorithm>
-#include <atomic>
-#include <mutex>
-// </FS:Trish>
+#include "llthread.h" // <FS:Trish/>
+
+#include <algorithm> // <FS:Trish/>
 
 /*--------------------------------------------------------------------------*/
 class ImageRequest
@@ -63,45 +60,32 @@ private:
     LLPointer<LLImageRaw> mDecodedImageAux;
     bool mDecodedRaw;
     bool mDecodedAux;
+    bool mObsolete = false; // <FS:Trish/> skipped, nobody waits for the result
     LLPointer<LLImageDecodeThread::Responder> mResponder;
     std::string mErrorString;};
+
+std::atomic<bool> LLImageDecodeThread::sPrioritize{ true }; // <FS:Trish/>
 
 
 //----------------------------------------------------------------------------
 
-// <FS:Trish> Decode ordering and decode thread priority
+// <FS:Trish> Decode thread scheduling priority
 namespace
 {
     std::atomic<bool> sDecodeInBackground{ false };
     // What the current pool thread last applied, so the priority call only happens on a change
     thread_local bool tAppliedBackground = false;
-}
 
-// The pool's own queue is first come first served. Instead each submitted request waits
-// here, and every job posted to the pool just takes the most urgent request at the time a
-// thread becomes free. One job is posted per request, so the counts always match.
-struct LLImageDecodeThread::PendingDecodes
-{
-    struct Entry
+    void applyDecodeThreadPriority()
     {
-        F32 mPriority;
-        U32 mSequence;
-        std::unique_ptr<ImageRequest> mRequest;
-    };
-
-    // Heap order: the entry that should run last sorts lowest
-    static bool lessUrgent(const Entry& lhs, const Entry& rhs)
-    {
-        if (lhs.mPriority != rhs.mPriority)
+        const bool background = sDecodeInBackground;
+        if (background != tAppliedBackground)
         {
-            return lhs.mPriority < rhs.mPriority;
+            LLThread::setCurrentThreadBackground(background);
+            tAppliedBackground = background;
         }
-        return lhs.mSequence > rhs.mSequence;
     }
-
-    std::mutex mMutex;
-    std::vector<Entry> mHeap;
-};
+}
 
 //static
 void LLImageDecodeThread::setBackgroundPriority(bool background)
@@ -112,11 +96,7 @@ void LLImageDecodeThread::setBackgroundPriority(bool background)
 
 // MAIN THREAD
 LLImageDecodeThread::LLImageDecodeThread(bool /*threaded*/)
-    // <FS:Trish>
-    //: mDecodeCount(0)
-    : mPending(std::make_unique<PendingDecodes>()),
-      mDecodeCount(0)
-    // </FS:Trish>
+    : mDecodeCount(0)
 {
     mThreadPool = std::make_unique<LL::ThreadPool>("ImageDecode", 8);
     mThreadPool->start();
@@ -136,11 +116,7 @@ size_t LLImageDecodeThread::update(F32 max_time_ms)
 
 size_t LLImageDecodeThread::getPending()
 {
-    // <FS:Trish> Requests not started yet
-    //return mThreadPool->getQueue().size();
-    std::lock_guard<std::mutex> lock(mPending->mMutex);
-    return mPending->mHeap.size();
-    // </FS:Trish>
+    return mThreadPool->getQueue().size();
 }
 
 LLImageDecodeThread::handle_t LLImageDecodeThread::decodeImage(
@@ -159,30 +135,20 @@ LLImageDecodeThread::handle_t LLImageDecodeThread::decodeImage(
     if (decode_id == 0)
         decode_id = ++mDecodeCount;
 
-    // <FS:Trish> Queue by priority, see PendingDecodes
-    //// Instantiate the ImageRequest right in the lambda, why not?
+    // Instantiate the ImageRequest right in the lambda, why not?
+    // <FS:Trish> Through the priority queue
     //bool posted = mThreadPool->getQueue().post(
-    //    [req = ImageRequest(image, discard, needs_aux, responder, decode_id)]
-    //    () mutable
-    //    {
-    //        auto done = req.processRequest();
-    //        req.finishRequest(done);
-    //    });
-    {
-        std::lock_guard<std::mutex> lock(mPending->mMutex);
-        mPending->mHeap.push_back({ priority, decode_id,
-                                    std::make_unique<ImageRequest>(image, discard, needs_aux, responder, decode_id) });
-        std::push_heap(mPending->mHeap.begin(), mPending->mHeap.end(), PendingDecodes::lessUrgent);
-    }
-    bool posted = mThreadPool->getQueue().post([this]() { runNextDecode(); });
+    bool posted = enqueue(
     // </FS:Trish>
+        [req = ImageRequest(image, discard, needs_aux, responder, decode_id)]
+        () mutable
+        {
+            auto done = req.processRequest();
+            req.finishRequest(done);
+        }, priority); // <FS:Trish/>
     if (! posted)
     {
         LL_DEBUGS() << "Tried to start decoding on shutdown" << LL_ENDL;
-        // <FS:Trish> Nothing will run what is left
-        std::lock_guard<std::mutex> lock(mPending->mMutex);
-        mPending->mHeap.clear();
-        // </FS:Trish>
         return 0;
     }
 
@@ -190,30 +156,57 @@ LLImageDecodeThread::handle_t LLImageDecodeThread::decodeImage(
 }
 
 // <FS:Trish>
-// DECODE THREAD
-void LLImageDecodeThread::runNextDecode()
+bool LLImageDecodeThread::postTask(std::function<void()> task, F32 priority)
 {
-    const bool background = sDecodeInBackground;
-    if (background != tAppliedBackground)
+    return enqueue(std::move(task), priority);
+}
+
+// Decodes ran strictly in submission order, so after a teleport or a fast move the textures in
+// front of the camera waited behind everything requested on the way there. Pending work now sits
+// in a heap and every item posted to the pool takes the most important one at the time it runs.
+bool LLImageDecodeThread::enqueue(std::function<void()> task, F32 priority)
+{
+    if (!sPrioritize)
     {
-        LLThread::setCurrentThreadBackground(background);
-        tAppliedBackground = background;
+        return mThreadPool->getQueue().post([task = std::move(task)]()
+            {
+                applyDecodeThreadPriority();
+                task();
+            });
     }
 
-    std::unique_ptr<ImageRequest> request;
+    auto less_important = [](const PendingTask& a, const PendingTask& b)
     {
-        std::lock_guard<std::mutex> lock(mPending->mMutex);
-        if (mPending->mHeap.empty())
+        return a.mPriority != b.mPriority ? a.mPriority < b.mPriority : a.mSeq > b.mSeq;
+    };
+    {
+        std::lock_guard<std::mutex> lock(mPendingMutex);
+        mPending.push_back({ priority, mPendingSeq++, std::move(task) });
+        std::push_heap(mPending.begin(), mPending.end(), less_important);
+    }
+    return mThreadPool->getQueue().post([this]() { runNext(); });
+}
+
+void LLImageDecodeThread::runNext()
+{
+    applyDecodeThreadPriority();
+
+    auto less_important = [](const PendingTask& a, const PendingTask& b)
+    {
+        return a.mPriority != b.mPriority ? a.mPriority < b.mPriority : a.mSeq > b.mSeq;
+    };
+    std::function<void()> task;
+    {
+        std::lock_guard<std::mutex> lock(mPendingMutex);
+        if (mPending.empty())
         {
             return;
         }
-        std::pop_heap(mPending->mHeap.begin(), mPending->mHeap.end(), PendingDecodes::lessUrgent);
-        request = std::move(mPending->mHeap.back().mRequest);
-        mPending->mHeap.pop_back();
+        std::pop_heap(mPending.begin(), mPending.end(), less_important);
+        task = std::move(mPending.back().mTask);
+        mPending.pop_back();
     }
-
-    bool done = request->processRequest();
-    request->finishRequest(done);
+    task();
 }
 // </FS:Trish>
 
@@ -260,6 +253,16 @@ bool ImageRequest::processRequest()
 
     if (mFormattedImage.isNull())
         return true;
+
+    // <FS:Trish> The texture moved on (new request, aborted, gone): don't spend a decode on it.
+    // finishRequest() still reports, as a failure, which the requester ignores for a stale id.
+    if (mResponder.notNull() && mResponder->isObsolete(mRequestId))
+    {
+        mObsolete = true;
+        mErrorString = "obsolete";
+        return true;
+    }
+    // </FS:Trish>
 
     const F32 decode_time_slice = 0.f; //disable time slicing
     bool done = true;

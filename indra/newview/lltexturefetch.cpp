@@ -33,6 +33,7 @@
 
 #include "lltexturefetch.h"
 
+#include "fsdecodedtexturecache.h" // <FS:Trish/>
 #include "lldir.h"
 #include "llhttpconstants.h"
 #include "llimage.h"
@@ -374,6 +375,21 @@ private:
                 worker->callbackDecoded(success, error_message, raw, aux, request_id);
             }
         }
+
+        // <FS:Trish> Threads: Tid. callbackDecoded() ignores results for a worker that is gone,
+        // started another decode, or left the decode state, and none of those come back for this
+        // id, so the decode itself can be skipped.
+        virtual bool isObsolete(U32 request_id)
+        {
+            LLTextureFetchWorker* worker = mFetcher->getWorker(mID);
+            if (!worker)
+            {
+                return true;
+            }
+            LLMutexLock lock(&worker->mWorkMutex);                      // +Mw
+            return worker->mDecodeHandle != request_id || worker->mState != DECODE_IMAGE_UPDATE;
+        }                                                               // -Mw
+        // </FS:Trish>
     private:
         LLTextureFetch* mFetcher;
         LLUUID mID;
@@ -417,6 +433,13 @@ public:
 
     // Threads:  Tid
     void callbackDecoded(bool success, const std::string& error_message, LLImageRaw* raw, LLImageRaw* aux, S32 decode_id);
+
+    // <FS:Trish> Decoded texture cache
+    // Threads:  Ttf, Locks: Mw
+    bool tryDecodedCache();
+    // Threads:  Tid
+    void callbackDecodedCache(U32 handle, LLImageRaw* raw, S32 discard);
+    // </FS:Trish>
 
     // Threads:  T*
     void setGetStatus(LLCore::HttpStatus status, const std::string& reason)
@@ -624,6 +647,11 @@ private:
                                 mCachedSize;
     e_request_state mSentRequest;
     handle_t mDecodeHandle;
+    // <FS:Trish> Decoded texture cache
+    U32 mDecodedCacheHandle = 0;
+    bool mDecodedFromCache = false; // current DECODE_IMAGE_UPDATE waits on a decoded cache load
+    bool mDecodedCacheTried = false; // once per pass from INIT
+    // </FS:Trish>
     bool mLoaded;
     bool mDecoded;
     bool mWritten;
@@ -1396,6 +1424,11 @@ bool LLTextureFetchWorker::doWork(S32 param)
         mSentRequest = UNSENT;
         mDecoded  = false;
         mWritten  = false;
+        // <FS:Trish>
+        mDecodedCacheTried = false;
+        mDecodedFromCache = false;
+        mDecodedCacheHandle = 0;
+        // </FS:Trish>
         if (mHttpBufferArray)
         {
             mHttpBufferArray->release();
@@ -1419,6 +1452,12 @@ bool LLTextureFetchWorker::doWork(S32 param)
     if (mState == LOAD_FROM_TEXTURE_CACHE)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("tfwdw - LOAD_FROM_TEXTURE_CACHE"); //<FS:Beq/> fix incorrect category
+        // <FS:Trish> Pixels decoded on an earlier visit skip reading and decoding the JPEG2000 data
+        if (mCacheReadHandle == LLTextureCache::nullHandle() && tryDecodedCache())
+        {
+            return false; // now in DECODE_IMAGE_UPDATE, waiting for the load
+        }
+        // </FS:Trish>
         if (mCacheReadHandle == LLTextureCache::nullHandle())
         {
             S32 offset = mFormattedImage.notNull() ? mFormattedImage->getDataSize() : 0;
@@ -2248,7 +2287,7 @@ bool LLTextureFetchWorker::doWork(S32 param)
         // In case worked manages to request decode, be shut down,
         // then init and request decode again with first decode
         // still in progress, assign a sufficiently unique id
-        // <FS:Trish> Decode in the same order as fetching, most needed first
+        // <FS:Trish> With the fetch priority, so visible textures decode first
         //mDecodeHandle = LLAppViewer::getImageDecodeThread()->decodeImage(mFormattedImage,
         //                                                               discard,
         //                                                               mNeedsAux,
@@ -2276,6 +2315,28 @@ bool LLTextureFetchWorker::doWork(S32 param)
         if (mDecoded)
         {
             mDecodeTime = mDecodeTimer.getElapsedTimeF32();
+
+            // <FS:Trish> A decoded cache load that failed dropped its entry: take the normal path
+            const bool from_decoded_cache = mDecodedFromCache;
+            mDecodedFromCache = false;
+            if (from_decoded_cache && mDecodedDiscard < 0)
+            {
+                LL_DEBUGS(LOG_TXT) << mID << ": decoded cache load failed, reading JPEG2000 data" << LL_ENDL;
+                mDecoded = false;
+                setState(LOAD_FROM_TEXTURE_CACHE);
+                return doWork(param);
+            }
+            // Keep fresh JPEG2000 decodes for next time, as the cache's mode allows (a region is
+            // several GB of pixels, so it is selective: current region, revisited places, listed
+            // regions). mInCache: the JPEG2000 data came from the texture cache, i.e. seen before.
+            if (!from_decoded_cache && mDecodedDiscard >= 0 && mRawImage.notNull() && !mNeedsAux &&
+                FSDecodedTextureCache::instance().wantsStore(mInCache) &&
+                mFTType != FTT_SERVER_BAKE && mUrl.compare(0, 7, "file://") != 0 &&
+                mFormattedImage.notNull() && mFormattedImage->getCodec() == IMG_CODEC_J2C)
+            {
+                FSDecodedTextureCache::instance().store(mID, mRawImage, mDecodedDiscard);
+            }
+            // </FS:Trish>
 
             if (mDecodedDiscard < 0)
             {
@@ -2944,6 +3005,85 @@ void LLTextureFetchWorker::callbackDecoded(bool success, const std::string &erro
 }                                                                       // -Mw
 
 //////////////////////////////////////////////////////////////////////////////
+
+// <FS:Trish>
+// Threads:  Ttf, Locks: Mw
+// Serve this pass from the decoded texture cache when it holds the desired resolution or better.
+// Small results are left to JPEG2000, decoding those at reduced resolution is cheap.
+bool LLTextureFetchWorker::tryDecodedCache()
+{
+    if (mDecodedCacheTried)
+    {
+        return false;
+    }
+    mDecodedCacheTried = true;
+
+    FSDecodedTextureCache& cache = FSDecodedTextureCache::instance();
+    if (mNeedsAux || mDesiredDiscard < 0 || mFTType == FTT_SERVER_BAKE ||
+        mUrl.compare(0, 7, "file://") == 0 || !cache.canLoad(mID, mDesiredDiscard))
+    {
+        return false;
+    }
+
+    static std::atomic<U32> sHandleCounter{ 0 };
+    U32 handle = ++sHandleCounter;
+    if (handle == 0)
+    {
+        handle = ++sHandleCounter;
+    }
+    const S32 discard = mDesiredDiscard;
+    mDecodedCacheHandle = handle;
+    mDecodedFromCache = true;
+    mDecoded = false;
+    mRawImage = NULL;
+    mAuxImage = NULL;
+    mWriteToCacheState = NOT_WRITE;
+    mDecodeTimer.reset();
+    setState(DECODE_IMAGE_UPDATE);
+
+    LLTextureFetch* fetcher = mFetcher;
+    const LLUUID id = mID;
+    const bool posted = LLAppViewer::getImageDecodeThread()->postTask([fetcher, id, handle, discard]()
+        {
+            LLPointer<LLImageRaw> raw = FSDecodedTextureCache::instance().load(id, discard);
+            if (LLTextureFetchWorker* worker = fetcher->getWorker(id))
+            {
+                worker->callbackDecodedCache(handle, raw, discard);
+            }
+        }, mImagePriority);
+    if (!posted)
+    {
+        mDecodedFromCache = false;
+        mDecodedCacheHandle = 0;
+        setState(LOAD_FROM_TEXTURE_CACHE);
+        return false;
+    }
+    LL_DEBUGS(LOG_TXT) << mID << ": loading discard " << discard << " from the decoded cache" << LL_ENDL;
+    return true;
+}
+
+// Threads:  Tid
+void LLTextureFetchWorker::callbackDecodedCache(U32 handle, LLImageRaw* raw, S32 discard)
+{
+    LLMutexLock lock(&mWorkMutex);                                      // +Mw
+    if (handle != mDecodedCacheHandle || !mDecodedFromCache || mState != DECODE_IMAGE_UPDATE)
+    {
+        return; // superseded
+    }
+    mDecodedCacheHandle = 0;
+    if (raw)
+    {
+        mRawImage = raw;
+        mAuxImage = NULL;
+        mDecodedDiscard = discard;
+    }
+    else
+    {
+        mDecodedDiscard = -1;
+    }
+    mDecoded = true;
+}                                                                       // -Mw
+// </FS:Trish>
 
 // Threads:  Ttf
 bool LLTextureFetchWorker::writeToCacheComplete()
