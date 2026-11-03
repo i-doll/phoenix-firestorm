@@ -2643,6 +2643,24 @@ bool LLAppViewer::initThreads()
                                                     enable_threads && true,
                                                     app_metrics_qa_mode);
 
+    // <FS:Trish> Optionally keep texture decode and cache threads from competing with the
+    // main and render threads for CPU, applied live when the setting changes
+    auto apply_texture_thread_priority = [](bool background)
+    {
+        LLImageDecodeThread::setBackgroundPriority(background);
+        if (LLAppViewer::sTextureCache)
+        {
+            LLAppViewer::sTextureCache->setBackgroundPriority(background);
+        }
+    };
+    apply_texture_thread_priority(gSavedSettings.getBOOL("FSLowPriorityTextureThreads"));
+    gSavedSettings.getControl("FSLowPriorityTextureThreads")->getSignal()->connect(
+        [apply_texture_thread_priority](LLControlVariable*, const LLSD& new_val, const LLSD&)
+        {
+            apply_texture_thread_priority(new_val.asBoolean());
+        });
+    // </FS:Trish>
+
     // general task background thread (LLPerfStats, etc)
     LLAppViewer::instance()->initGeneralThread();
 

@@ -30,6 +30,7 @@
 
 #include "_refcounted.h"
 #include "_mutex.h"
+#include <functional> // <FS:Trish/>
 
 namespace LLCore
 {
@@ -95,10 +96,21 @@ public:
     /// Threading:  callable by any thread.
     void fetchAll(OpContainer & ops);
 
+    // <FS:Trish> Optional callback run after each addOp, so a consumer can sleep until a reply
+    // is waiting instead of polling. It runs on the thread delivering the reply and must be cheap.
+    // Clearing it waits for a call in progress to finish.
+    typedef std::function<void()> notifier_t;
+    void setNotifier(notifier_t notifier);
+    // </FS:Trish>
+
 protected:
 
     OpContainer                         mQueue;
     LLCoreInt::HttpMutex                mQueueMutex;
+    // <FS:Trish>
+    notifier_t                          mNotifier;
+    LLCoreInt::HttpMutex                mNotifierMutex;
+    // </FS:Trish>
 
 }; // end class HttpReplyQueue
 

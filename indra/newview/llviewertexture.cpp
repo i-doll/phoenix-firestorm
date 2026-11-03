@@ -607,8 +607,15 @@ void LLViewerTexture::updateClass()
 
     static bool was_low = false;
 
+    // <FS:Trish> Bias the viewer last ran out of memory at, 0 when none. Lowering the bias again
+    // stops a little above it while headroom is modest, otherwise the textures it lets back in
+    // fill memory, the bias rises, and the scene keeps cycling between blurry and sharp.
+    static F32 overflow_bias = 0.f;
+    // </FS:Trish>
+
     if (is_low && !was_low)
     {
+        overflow_bias = sDesiredDiscardBias; // <FS:Trish/>
         if (is_sys_low)
         {
             // Not having system memory is more serious, so discard harder
@@ -690,7 +697,20 @@ void LLViewerTexture::updateClass()
             static LLCachedControl<F32> high_mem_discard_decrement(gSavedSettings, "RenderHighMemMinDiscardDecrement", .1f);
 
             F32 decrement = high_mem_discard_decrement - llmin(over_pct - FREE_PERCENTAGE_TRESHOLD, 0.f);
+            // <FS:Trish> Hold above the bias that last overflowed unless there is plenty of room,
+            // as after moving somewhere lighter. Once room shrinks back the hold applies from
+            // wherever the bias got to.
+            //sDesiredDiscardBias -= decrement * gFrameIntervalSeconds;
+            static LLCachedControl<F32> recovery_margin(gSavedSettings, "FSTextureBiasRecoveryMargin", 0.25f);
+            static LLCachedControl<F32> recovery_headroom(gSavedSettings, "FSTextureBiasRecoveryHeadroom", 0.3f);
+            const F32 previous_bias = sDesiredDiscardBias;
             sDesiredDiscardBias -= decrement * gFrameIntervalSeconds;
+            if (recovery_margin() > 0.f && overflow_bias > 0.f && over_pct > -recovery_headroom())
+            {
+                const F32 hold = overflow_bias + recovery_margin();
+                sDesiredDiscardBias = llmax(sDesiredDiscardBias, llmin(previous_bias, hold));
+            }
+            // </FS:Trish>
         }
     }
 

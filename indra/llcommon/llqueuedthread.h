@@ -27,6 +27,7 @@
 #ifndef LL_LLQUEUEDTHREAD_H
 #define LL_LLQUEUEDTHREAD_H
 
+#include <atomic> // <FS:Trish/>
 #include <queue>
 #include <string>
 #include <map>
@@ -151,6 +152,12 @@ public:
     void waitOnPending();
     void printQueueStats();
 
+    // <FS:Trish> Asks this thread to change its own scheduling priority the next time it runs
+    // work. Nothing is queued, so it can be called at any time from any thread, including
+    // before code that expects the request queue to be empty.
+    void setBackgroundPriority(bool background);
+    // </FS:Trish>
+
     virtual size_t getPending();
     bool getThreaded() { return mThreaded; }
 
@@ -175,6 +182,12 @@ protected:
     //request_queue_t mRequestQueue;
     LL::WorkSchedule mRequestQueue;
     LL::WorkQueue::weak_t mMainQueue;
+
+    // <FS:Trish> Priority asked for by setBackgroundPriority(), -1 when there is nothing to apply.
+    // Only the thread itself applies it.
+    std::atomic<S32> mWantedBackgroundPriority{ -1 };
+    void applyWantedBackgroundPriority();
+    // </FS:Trish>
 
     enum { REQUEST_HASH_SIZE = 512 }; // must be power of 2
     typedef LLSimpleHash<handle_t, REQUEST_HASH_SIZE> request_hash_t;

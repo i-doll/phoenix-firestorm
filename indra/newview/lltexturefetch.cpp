@@ -2248,10 +2248,17 @@ bool LLTextureFetchWorker::doWork(S32 param)
         // In case worked manages to request decode, be shut down,
         // then init and request decode again with first decode
         // still in progress, assign a sufficiently unique id
+        // <FS:Trish> Decode in the same order as fetching, most needed first
+        //mDecodeHandle = LLAppViewer::getImageDecodeThread()->decodeImage(mFormattedImage,
+        //                                                               discard,
+        //                                                               mNeedsAux,
+        //                                                               new DecodeResponder(mFetcher, mID, this));
         mDecodeHandle = LLAppViewer::getImageDecodeThread()->decodeImage(mFormattedImage,
                                                                        discard,
                                                                        mNeedsAux,
-                                                                       new DecodeResponder(mFetcher, mID, this));
+                                                                       new DecodeResponder(mFetcher, mID, this),
+                                                                       mImagePriority);
+        // </FS:Trish>
         if (mDecodeHandle == 0)
         {
             // Abort, failed to put into queue.

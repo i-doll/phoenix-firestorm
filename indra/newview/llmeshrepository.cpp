@@ -971,6 +971,7 @@ LLMeshRepoThread::LLMeshRepoThread()
     mSkinMapMutex = new LLMutex();
     mSignal = new LLCondition();
     mHttpRequest = new LLCore::HttpRequest;
+    mHttpRequest->setReplyNotifier([this]() { wake(); }); // <FS:Trish/>
     mHttpOptions = std::make_shared<LLCore::HttpOptions>();
     mHttpOptions->setTransferTimeout(SMALL_MESH_XFER_TIMEOUT);
     mHttpOptions->setUseRetryAfter(gSavedSettings.getBOOL("MeshUseHttpRetryAfter"));
@@ -1018,6 +1019,9 @@ LLMeshRepoThread::~LLMeshRepoThread()
         mPhysicsQ.pop_front();
     }
 
+    // <FS:Trish> Replies still in flight would otherwise call wake() on a deleted thread
+    mHttpRequest->setReplyNotifier(nullptr);
+    // </FS:Trish>
     delete mHttpRequest;
     mHttpRequest = nullptr;
     delete mMutex;
@@ -1059,10 +1063,17 @@ void LLMeshRepoThread::run()
         // Will likely need a correctly-implemented condition variable to do this.
         // On the other hand, this may actually be an effective and efficient scheme...
 
-        mSignal->wait();
+        // <FS:Trish> A plain wait lost any signal sent while the loop was busy, so the
+        // thread only ever ran once per frame
+        //mSignal->wait();
+        waitForWork();
+        // </FS:Trish>
         LL_PROFILE_ZONE_NAMED("mesh_thread_loop")
 
-        if (LLApp::isExiting())
+        // <FS:Trish> Also leave on cleanup(), its wake can't be missed anymore
+        //if (LLApp::isExiting())
+        if (LLApp::isExiting() || mShuttingDown)
+        // </FS:Trish>
         {
             break;
         }
@@ -1328,9 +1339,30 @@ void LLMeshRepoThread::run()
 void LLMeshRepoThread::cleanup()
 {
     mShuttingDown = true;
-    mSignal->broadcast();
+    // <FS:Trish>
+    //mSignal->broadcast();
+    wake();
+    // </FS:Trish>
     mMeshThreadPool->close();
 }
+
+// <FS:Trish>
+void LLMeshRepoThread::wake()
+{
+    {
+        std::lock_guard<std::mutex> lock(mWakeMutex);
+        mWakePending = true;
+    }
+    mWakeCond.notify_one();
+}
+
+void LLMeshRepoThread::waitForWork()
+{
+    std::unique_lock<std::mutex> lock(mWakeMutex);
+    mWakeCond.wait(lock, [this]() { return mWakePending; });
+    mWakePending = false;
+}
+// </FS:Trish>
 
 // Mutex:  LLMeshRepoThread::mMutex must be held on entry
 void LLMeshRepoThread::loadMeshSkinInfo(const LLUUID& mesh_id)
@@ -5140,7 +5172,10 @@ void LLMeshRepository::notifyLoadedMeshes()
         mThread->notifyLoadedMeshes();
     }
 
-    mThread->mSignal->signal();
+    // <FS:Trish>
+    //mThread->mSignal->signal();
+    mThread->wake();
+    // </FS:Trish>
 }
 
 void LLMeshRepository::notifySkinInfoReceived(LLMeshSkinInfo* info)

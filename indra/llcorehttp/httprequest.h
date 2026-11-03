@@ -33,6 +33,7 @@
 
 #include "httpheaders.h"
 #include "httpoptions.h"
+#include <functional> // <FS:Trish/>
 
 namespace LLCore
 {
@@ -289,6 +290,12 @@ public:
     ///                 the returned value may not be reliable.
     ///
     HttpStatus getStatus() const;
+
+    // <FS:Trish> Run a callback whenever a reply for this request object is queued, from the
+    // thread delivering it, so the owner can sleep until update() has something to do.
+    // Pass an empty function to clear it, which waits for a call in progress.
+    void setReplyNotifier(std::function<void()> notifier);
+    // </FS:Trish>
 
     /// Queue a full HTTP GET request to be issued for entire entity.
     /// The request is queued and serviced by the working thread and

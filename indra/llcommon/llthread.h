@@ -63,6 +63,10 @@ public:
     // <FS:Beq> Try to encourage the inlining
     static LL_FORCE_INLINE id_t currentID(){return std::this_thread::get_id();}; // Return ID of current thread
     static void yield(); // Static because it can be called by the main thread, which doesn't have an LLThread data structure.
+    // <FS:Trish> Drop the calling thread below normal scheduling priority, or put it back.
+    // Background work then only takes cores the main and render threads leave idle.
+    static void setCurrentThreadBackground(bool background);
+    // </FS:Trish>
 
 public:
     // PAUSE / RESUME functionality. See source code for important usage notes.

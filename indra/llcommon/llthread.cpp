@@ -40,6 +40,11 @@
 
 #if LL_LINUX
 #include <sched.h>
+// <FS:Trish> setCurrentThreadBackground
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+// </FS:Trish>
 #endif
 
 
@@ -479,6 +484,28 @@ void LLThread::yield()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     std::this_thread::yield();
 }
+
+// <FS:Trish>
+//static
+void LLThread::setCurrentThreadBackground(bool background)
+{
+#if LL_WINDOWS
+    if (!SetThreadPriority(GetCurrentThread(), background ? THREAD_PRIORITY_BELOW_NORMAL : THREAD_PRIORITY_NORMAL))
+    {
+        LL_WARNS_ONCE("THREAD") << "SetThreadPriority failed: " << GetLastError() << LL_ENDL;
+    }
+#elif LL_DARWIN
+    pthread_set_qos_class_self_np(background ? QOS_CLASS_UTILITY : QOS_CLASS_DEFAULT, 0);
+#elif LL_LINUX
+    // Per thread nice value. Going back down to 0 needs privileges, so turning
+    // this off may only apply after a restart.
+    if (setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), background ? 10 : 0) != 0)
+    {
+        LL_WARNS_ONCE("THREAD") << "setpriority failed: " << errno << LL_ENDL;
+    }
+#endif
+}
+// </FS:Trish>
 
 void LLThread::wake()
 {

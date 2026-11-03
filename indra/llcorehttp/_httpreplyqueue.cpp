@@ -56,7 +56,23 @@ void HttpReplyQueue::addOp(const HttpReplyQueue::opPtr_t &op)
 
         mQueue.push_back(op);
     }
+
+    // <FS:Trish> Tell the consumer outside the queue lock, so it can fetch right away
+    HttpScopedLock lock(mNotifierMutex);
+    if (mNotifier)
+    {
+        mNotifier();
+    }
+    // </FS:Trish>
 }
+
+// <FS:Trish>
+void HttpReplyQueue::setNotifier(notifier_t notifier)
+{
+    HttpScopedLock lock(mNotifierMutex);
+    mNotifier = std::move(notifier);
+}
+// </FS:Trish>
 
 
 HttpReplyQueue::opPtr_t HttpReplyQueue::fetchOp()

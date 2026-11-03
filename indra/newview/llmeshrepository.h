@@ -587,6 +587,12 @@ public:
     void cleanup();
     bool isShuttingDown() { return mShuttingDown; }
 
+    // <FS:Trish> Wake the repo thread. The main thread calls it once per frame and the HTTP layer
+    // whenever a reply lands, so replies get handled and free request slots refilled without
+    // waiting for the next frame. Safe from any thread, a wake is never lost.
+    void wake();
+    // </FS:Trish>
+
     void lockAndLoadMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
     void loadMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
 
@@ -669,6 +675,13 @@ private:
     S32 mDiskCacheBufferSize = 0;
     U8* mDiskCacheBuffer = nullptr;
     bool mShuttingDown = false;
+
+    // <FS:Trish> Sleeps until wake() was called since the last time it returned
+    void waitForWork();
+    std::mutex mWakeMutex;
+    std::condition_variable mWakeCond;
+    bool mWakePending = false;
+    // </FS:Trish>
 };
 
 

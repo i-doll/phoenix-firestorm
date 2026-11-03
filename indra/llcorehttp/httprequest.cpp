@@ -180,6 +180,16 @@ HttpStatus HttpRequest::getStatus() const
     return mLastReqStatus;
 }
 
+// <FS:Trish>
+void HttpRequest::setReplyNotifier(std::function<void()> notifier)
+{
+    if (mReplyQueue)
+    {
+        mReplyQueue->setNotifier(std::move(notifier));
+    }
+}
+// </FS:Trish>
+
 
 HttpHandle HttpRequest::requestGet(policy_t policy_id,
                                    const std::string & url,

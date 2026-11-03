@@ -48,15 +48,32 @@ public:
 
     // meant to resemble LLQueuedThread::handle_t
     typedef U32 handle_t;
+    // <FS:Trish> Higher priority decodes start first, equal ones in submission order
+    //handle_t decodeImage(const LLPointer<LLImageFormatted>& image,
+    //                     S32 discard, bool needs_aux,
+    //                     const LLPointer<Responder>& responder);
     handle_t decodeImage(const LLPointer<LLImageFormatted>& image,
                          S32 discard, bool needs_aux,
-                         const LLPointer<Responder>& responder);
+                         const LLPointer<Responder>& responder,
+                         F32 priority = 0.f);
+    // </FS:Trish>
     size_t getPending();
     size_t update(F32 max_time_ms);
     S32 getTotalDecodeCount() { return mDecodeCount; }
     void shutdown();
 
+    // <FS:Trish> Run decode threads below normal priority, applied by each thread before its next decode
+    static void setBackgroundPriority(bool background);
+    // </FS:Trish>
+
 private:
+    // <FS:Trish> Decodes waiting for a thread. Declared before the pool so it outlives the
+    // pool threads using it.
+    struct PendingDecodes;
+    std::unique_ptr<PendingDecodes> mPending;
+    void runNextDecode();
+    // </FS:Trish>
+
     // As of SL-17483, LLImageDecodeThread is no longer itself an
     // LLQueuedThread - instead this is the API by which we submit work to the
     // "ImageDecode" ThreadPool.

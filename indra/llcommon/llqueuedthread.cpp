@@ -164,6 +164,7 @@ size_t LLQueuedThread::updateQueue(F32 max_time_ms)
             mRequestQueue.post([=, this]()
                 {
                     LL_PROFILE_ZONE_NAMED_CATEGORY_THREAD("qt - update");
+                    applyWantedBackgroundPriority(); // <FS:Trish/>
                     mIdleThread = false;
                     threadedUpdate();
                     mIdleThread = true;
@@ -202,6 +203,28 @@ size_t LLQueuedThread::getPending()
 {
     return mRequestQueue.size();
 }
+
+// <FS:Trish>
+void LLQueuedThread::setBackgroundPriority(bool background)
+{
+    // Posting a job here would make getPending() non zero, which LLTextureCache::initCache()
+    // asserts against when this is called during startup. Let the thread pick it up instead.
+    if (mThreaded)
+    {
+        mWantedBackgroundPriority = background ? 1 : 0;
+    }
+}
+
+// Runs on its OWN thread
+void LLQueuedThread::applyWantedBackgroundPriority()
+{
+    S32 wanted = mWantedBackgroundPriority.exchange(-1);
+    if (wanted >= 0)
+    {
+        LLThread::setCurrentThreadBackground(wanted != 0);
+    }
+}
+// </FS:Trish>
 
 // MAIN thread
 void LLQueuedThread::waitOnPending()
@@ -406,6 +429,8 @@ bool LLQueuedThread::check()
 void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+
+    applyWantedBackgroundPriority(); // <FS:Trish/>
 
     mIdleThread = false;
     //threadedUpdate();

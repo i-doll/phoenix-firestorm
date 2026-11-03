@@ -50,7 +50,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="560"
+                 height="586"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -309,6 +309,17 @@
                      tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
                      top_delta="-2"
                      width="100" />
+                    <check_box
+                     control_name="FSLowPriorityTextureThreads"
+                     follows="left|top"
+                     height="20"
+                     label="Run texture decode and cache threads at low priority"
+                     layout="topleft"
+                     left="15"
+                     name="low_priority_texture_threads"
+                     tool_tip="EXPERIMENTAL. Texture decoding and caching only use CPU time the main and render threads leave free. Smoother frames while a scene loads, but loading can take longer on CPUs with few cores."
+                     top_pad="6"
+                     width="475" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
