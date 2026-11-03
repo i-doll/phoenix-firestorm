@@ -77,4 +77,23 @@
     <menu_item_call.on_enable
      function="EnableMuteParticle" />
   </menu_item_call>
+  <menu_item_separator
+     layout="topleft" />
+  <menu_item_call
+     label="Derender Parcel"
+     name="Derender Parcel">
+    <menu_item_call.on_click
+     function="Land.Derender" />
+    <menu_item_call.on_enable
+     function="Land.EnableDerender" />
+  </menu_item_call>
+  <menu_item_call
+     label="Derender Parcel + Blacklist"
+     name="Derender Parcel Permanent">
+    <menu_item_call.on_click
+     function="Land.Derender"
+     parameter="permanent" />
+    <menu_item_call.on_enable
+     function="Land.EnableDerender" />
+  </menu_item_call>
 </context_menu>

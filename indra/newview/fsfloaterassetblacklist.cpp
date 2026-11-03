@@ -112,6 +112,8 @@ std::string FSFloaterAssetBlacklist::getTypeString(S32 type) const
             return getString("asset_resident");
         case LLAssetType::AT_SOUND:
             return getString("asset_sound");
+        case FS_AT_PARCEL:
+            return getString("asset_parcel");
         default:
             return getString("asset_unknown");
     }

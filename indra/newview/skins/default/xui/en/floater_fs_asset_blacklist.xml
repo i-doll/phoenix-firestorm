@@ -27,6 +27,9 @@
 	<floater.string name="asset_resident">
 		Resident
 	</floater.string>
+	<floater.string name="asset_parcel">
+		Parcel
+	</floater.string>
     <floater.string name="blacklist_flag_none">
     </floater.string>
     <floater.string name="blacklist_flag_mute_avatar_worn_objects_sounds">

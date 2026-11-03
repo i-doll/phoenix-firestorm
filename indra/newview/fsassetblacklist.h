@@ -35,6 +35,9 @@
 #include "llsingleton.h"
 #include "llassettype.h"
 
+// Not an asset type, marks a derendered parcel, see FSParcelDerender. Outside LL's range, below AT_UNKNOWN.
+constexpr LLAssetType::EType FS_AT_PARCEL = static_cast<LLAssetType::EType>(254);
+
 struct FSAssetBlacklistData
 {
     std::string name;
@@ -43,6 +46,7 @@ struct FSAssetBlacklistData
     S32 flags{ 0 };
     LLDate date;
     bool permanent{ false };
+    LLSD extra; // type specific, such as a parcel's shape
 
     LLSD toLLSD() const;
     static FSAssetBlacklistData fromLLSD(const LLSD& data);

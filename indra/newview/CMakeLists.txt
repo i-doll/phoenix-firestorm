@@ -213,6 +213,7 @@ set(viewer_SOURCE_FILES
     fspanelpreferenceuisounds.cpp
     fspanelprefs.cpp
     fspanelradar.cpp
+    fsparcelderender.cpp
     fsparticipantlist.cpp
     fspose.cpp
     fsposeranimator.cpp
@@ -1113,6 +1114,7 @@ set(viewer_HEADER_FILES
     fspanelpreferenceuisounds.h
     fspanelprefs.h
     fspanelradar.h
+    fsparcelderender.h
     fsparticipantlist.h
     fspose.h
     fsposeranimator.h

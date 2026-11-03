@@ -29,15 +29,40 @@
         <pie_slice.on_click
             function="Land.Sit" />
     </pie_slice>
-    <pie_slice
-        enabled="false"
-        label="Mute Part. Own."
-        name="Mute Particle">
-        <pie_slice.on_click
-            function="Particle.Mute" />
-        <pie_slice.on_enable
-            function="EnableMuteParticle" />
-    </pie_slice>
+    <pie_menu
+        name="More"
+        label="More &gt;">
+        <pie_slice
+            enabled="false"
+            label="Mute Part. Own."
+            name="Mute Particle">
+            <pie_slice.on_click
+                function="Particle.Mute" />
+            <pie_slice.on_enable
+                function="EnableMuteParticle" />
+        </pie_slice>
+        <pie_menu
+            name="Derender Parcel"
+            label="Derender &gt;">
+            <pie_slice
+                label="Blacklist"
+                name="Derender Parcel Permanent">
+                <pie_slice.on_click
+                    function="Land.Derender"
+                    parameter="permanent" />
+                <pie_slice.on_enable
+                    function="Land.EnableDerender" />
+            </pie_slice>
+            <pie_slice
+                label="Temporary"
+                name="Derender Parcel">
+                <pie_slice.on_click
+                    function="Land.Derender" />
+                <pie_slice.on_enable
+                    function="Land.EnableDerender" />
+            </pie_slice>
+        </pie_menu>
+    </pie_menu>
     <pie_slice
         enabled="false"
         label="Buy Pass"

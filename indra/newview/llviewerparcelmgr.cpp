@@ -73,6 +73,8 @@
 
 #include "llenvironment.h"
 
+#include "fsparcelderender.h" // <FS:Trish/> Parcel derender
+
 const F32 PARCEL_BAN_LINES_DRAW_SECS_ON_COLLISION = 10.f;
 const F32 PARCEL_COLLISION_DRAW_SECS_ON_PROXIMITY = 1.f;
 
@@ -1939,6 +1941,8 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 
                 parcel_mgr.resetSegments(parcel_mgr.mHighlightSegments);
                 parcel_mgr.writeSegmentsFromBitmap( bitmap, parcel_mgr.mHighlightSegments );
+
+                FSParcelDerender::instance().onSelectedParcelProperties(region, parcel, bitmap, bitmap_size); // <FS:Trish/> Parcel derender
 
                 delete[] bitmap;
                 bitmap = NULL;

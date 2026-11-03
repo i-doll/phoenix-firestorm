@@ -29,6 +29,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "fsassetblacklist.h"
+#include "fsparcelderender.h"
 
 #include "llaudioengine.h"
 #include "llsdserialize.h"
@@ -58,6 +59,9 @@ static LLAssetType::EType S32toAssetType(S32 assetindex)
         case 45:
             type = LLAssetType::AT_PERSON;
             break;
+        case FS_AT_PARCEL:
+            type = FS_AT_PARCEL;
+            break;
         default:
             type = LLAssetType::AT_NONE;
     }
@@ -77,6 +81,10 @@ LLSD FSAssetBlacklistData::toLLSD() const
     data["asset_blacklist_flag"] = flags;
     data["asset_date"] = input_date;
     data["asset_permanent"] = permanent;
+    if (extra.isDefined())
+    {
+        data["asset_extra"] = extra;
+    }
 
     return data;
 }
@@ -94,6 +102,7 @@ FSAssetBlacklistData FSAssetBlacklistData::fromLLSD(const LLSD& data)
     blacklistdata.flags = data.has("asset_blacklist_flag") ? data["asset_blacklist_flag"].asInteger() : 0;
     blacklistdata.date = LLDate(asset_date);
     blacklistdata.permanent = data["asset_permanent"].asBoolean();
+    blacklistdata.extra = data["asset_extra"];
 
     return blacklistdata;
 }
@@ -102,6 +111,7 @@ void FSAssetBlacklist::init()
 {
     mBlacklistFileName = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "asset_blacklist.xml");
     loadBlacklist();
+    FSParcelDerender::instance().init();
 }
 
 bool FSAssetBlacklist::isBlacklisted(const LLUUID& id, LLAssetType::EType type, eBlacklistFlag flag) const
