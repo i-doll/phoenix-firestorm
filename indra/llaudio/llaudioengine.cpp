@@ -1973,8 +1973,19 @@ bool LLAudioData::load()
         return false;
     }
 
-    mBufferp = gAudiop->getFreeBuffer();
-    if (!mBufferp)
+    // <FS:Trish> A load started earlier: see whether it finished
+    if (mLoadingBufferp)
+    {
+        return checkLoadingBuffer();
+    }
+    // </FS:Trish>
+
+    // <FS:Trish> Not handed out until the load finishes
+    //mBufferp = gAudiop->getFreeBuffer();
+    //if (!mBufferp)
+    LLAudioBuffer* bufferp = gAudiop->getFreeBuffer();
+    if (!bufferp)
+    // </FS:Trish>
     {
         // No free buffers, abort.
         LL_INFOS() << "Not able to allocate a new audio buffer, aborting." << LL_ENDL;
@@ -1991,34 +2002,77 @@ bool LLAudioData::load()
     wav_path= gDirUtilp->getExpandedFilename(LL_PATH_FS_SOUND_CACHE,uuid_str) + ".dsf";
     // </FS:Ansariel>
 
-    mHasWAVLoadFailed = !mBufferp->loadWAV(wav_path);
+    // <FS:Trish> The engine may load in the background. Until it is done the sound behaves as
+    // decoded but not loaded yet, which callers already handle by calling load() again.
+    //mHasWAVLoadFailed = !mBufferp->loadWAV(wav_path);
+    //if (mHasWAVLoadFailed)
+    //{
+    //    // Hrm.  Right now, let's unset the buffer, since it's empty.
+    //    gAudiop->cleanupBuffer(mBufferp);
+    //    mBufferp = nullptr;
+    //    ... (moved to onWAVLoadFailed)
+    //    return false;
+    //}
+    //mBufferp->mAudioDatap = this;
+    //if (mPinned)
+    //{
+    //    mBufferp->setPinned(true);
+    //}
+    //return true;
+    mHasWAVLoadFailed = !bufferp->loadWAV(wav_path);
     if (mHasWAVLoadFailed)
     {
         // Hrm.  Right now, let's unset the buffer, since it's empty.
-        gAudiop->cleanupBuffer(mBufferp);
-        mBufferp = nullptr;
-
-        // <FS:Ansariel> FIRE-480: Opening multiple instances causes sound failures
-        if (!gDirUtilp->fileExists(wav_path))
-        {
-            mHasLocalData = false;
-            mHasDecodedData = false;
-            mHasCompletedDecode = false;
-            mHasDecodeFailed = false;
-            mHasWAVLoadFailed = false;
-            gAudiop->preloadSound(mID, mPinned);
-        }
-        // </FS:Ansariel>
-
+        gAudiop->cleanupBuffer(bufferp);
+        onWAVLoadFailed(wav_path);
         return false;
     }
-    mBufferp->mAudioDatap = this;
-    if (mPinned)
-    {
-        mBufferp->setPinned(true);
-    }
-    return true;
+    bufferp->mAudioDatap = this;
+    bufferp->setPinned(true);
+    mLoadingBufferp = bufferp;
+    mLoadingPath = wav_path;
+    return checkLoadingBuffer();
+    // </FS:Trish>
 }
+
+// <FS:Trish>
+bool LLAudioData::checkLoadingBuffer()
+{
+    switch (mLoadingBufferp->getLoadState())
+    {
+    case LLAudioBuffer::LOAD_PENDING:
+        return true;
+    case LLAudioBuffer::LOAD_READY:
+        mBufferp = mLoadingBufferp;
+        mLoadingBufferp = nullptr;
+        mBufferp->setPinned(mPinned);
+        mHasWAVLoadFailed = false;
+        return true;
+    case LLAudioBuffer::LOAD_FAILED:
+    default:
+        gAudiop->cleanupBuffer(mLoadingBufferp);
+        mLoadingBufferp = nullptr;
+        mHasWAVLoadFailed = true;
+        onWAVLoadFailed(mLoadingPath);
+        return false;
+    }
+}
+
+void LLAudioData::onWAVLoadFailed(const std::string& wav_path)
+{
+    // <FS:Ansariel> FIRE-480: Opening multiple instances causes sound failures
+    if (!gDirUtilp->fileExists(wav_path))
+    {
+        mHasLocalData = false;
+        mHasDecodedData = false;
+        mHasCompletedDecode = false;
+        mHasDecodeFailed = false;
+        mHasWAVLoadFailed = false;
+        gAudiop->preloadSound(mID, mPinned);
+    }
+    // </FS:Ansariel>
+}
+// </FS:Trish>
 
 // <FS:ND> Protect against corrupted sounds
 
@@ -2108,6 +2162,13 @@ void LLAudioEngine::removeAudioData(const LLUUID& audio_uuid)
                 }
                 delete buf;
             }
+            // <FS:Trish> Or one still loading
+            if (data->mLoadingBufferp)
+            {
+                cleanupBuffer(data->mLoadingBufferp);
+                data->mLoadingBufferp = nullptr;
+            }
+            // </FS:Trish>
             delete data;
         }
 

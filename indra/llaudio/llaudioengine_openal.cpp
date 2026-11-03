@@ -36,6 +36,25 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <cstring>
 
+// <FS:Trish>
+#include "workqueue.h"
+#include <mutex>
+
+// Result of reading a WAV file on a worker thread. Shared with the job so a buffer destroyed
+// while its file is still being read doesn't leave the job writing into freed memory.
+struct LLAudioBufferOpenAL::LoadJob
+{
+    std::mutex mMutex;
+    bool mDone = false;
+    bool mAbandoned = false;
+    ALvoid* mData = nullptr; // from alutLoadMemoryFromFile, released with free()
+    ALenum mFormat = AL_NONE;
+    ALsizei mSize = 0;
+    ALfloat mFrequency = 0.f;
+    ALenum mError = ALUT_ERROR_NO_ERROR;
+};
+// </FS:Trish>
+
 const float LLAudioEngine_OpenAL::WIND_BUFFER_SIZE_SEC = 0.05f;
 
 namespace
@@ -451,6 +470,20 @@ LLAudioBufferOpenAL::~LLAudioBufferOpenAL()
 
 void LLAudioBufferOpenAL::cleanup()
 {
+    // <FS:Trish> Let a running read clean up after itself
+    if (mLoadJob)
+    {
+        std::lock_guard<std::mutex> lock(mLoadJob->mMutex);
+        if (mLoadJob->mDone)
+        {
+            free(mLoadJob->mData);
+            mLoadJob->mData = nullptr;
+        }
+        mLoadJob->mAbandoned = true;
+    }
+    mLoadJob.reset();
+    // </FS:Trish>
+
     if(mALBuffer != AL_NONE)
     {
         alGetError(); // <ND/>
@@ -469,6 +502,44 @@ void LLAudioBufferOpenAL::cleanup()
 bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
 {
     cleanup();
+
+    // <FS:Trish> Reading and parsing the whole file on the main thread hitched every time a sound
+    // played for the first time, like a friend logging on. Do that on a worker, getLoadState()
+    // then only copies the samples into the OpenAL buffer.
+    if (auto queue = LL::WorkQueue::getInstance("General"))
+    {
+        auto job = std::make_shared<LoadJob>();
+        const bool posted = queue->post([job, filename]()
+            {
+                ALenum format = AL_NONE;
+                ALsizei size = 0;
+                ALfloat frequency = 0.f;
+                ALvoid* data = alutLoadMemoryFromFile(filename.c_str(), &format, &size, &frequency);
+                const ALenum error = data ? ALUT_ERROR_NO_ERROR : alutGetError();
+
+                std::lock_guard<std::mutex> lock(job->mMutex);
+                if (job->mAbandoned)
+                {
+                    free(data);
+                    return;
+                }
+                job->mData = data;
+                job->mFormat = format;
+                job->mSize = size;
+                job->mFrequency = frequency;
+                job->mError = error;
+                job->mDone = true;
+            });
+        if (posted)
+        {
+            mLoadJob = job;
+            mLoadingFilename = filename;
+            return true;
+        }
+    }
+    // Shutting down: load in place
+    // </FS:Trish>
+
     mALBuffer = alutCreateBufferFromFile(filename.c_str());
     if(mALBuffer == AL_NONE)
     {
@@ -493,6 +564,73 @@ bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
 
     return true;
 }
+
+// <FS:Trish>
+LLAudioBuffer::ELoadState LLAudioBufferOpenAL::getLoadState()
+{
+    if (!mLoadJob)
+    {
+        return mALBuffer != AL_NONE ? LOAD_READY : LOAD_FAILED;
+    }
+
+    ALvoid* data = nullptr;
+    ALenum format = AL_NONE;
+    ALsizei size = 0;
+    ALfloat frequency = 0.f;
+    ALenum load_error = ALUT_ERROR_NO_ERROR;
+    {
+        std::lock_guard<std::mutex> lock(mLoadJob->mMutex);
+        if (!mLoadJob->mDone)
+        {
+            return LOAD_PENDING;
+        }
+        data = mLoadJob->mData;
+        mLoadJob->mData = nullptr;
+        format = mLoadJob->mFormat;
+        size = mLoadJob->mSize;
+        frequency = mLoadJob->mFrequency;
+        load_error = mLoadJob->mError;
+    }
+    mLoadJob.reset();
+
+    if (!data)
+    {
+        if (gDirUtilp->fileExists(mLoadingFilename))
+        {
+            LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Error loading " << mLoadingFilename
+                       << " " << alutGetErrorString(load_error) << LL_ENDL;
+        }
+        else
+        {
+            // It's common for the file to not actually exist.
+            LL_DEBUGS() << "LLAudioBufferOpenAL::loadWAV() Error loading " << mLoadingFilename
+                        << " " << alutGetErrorString(load_error) << LL_ENDL;
+        }
+        return LOAD_FAILED;
+    }
+
+    alGetError();
+    alGenBuffers(1, &mALBuffer);
+    if (alGetError() == AL_NO_ERROR)
+    {
+        alBufferData(mALBuffer, format, data, size, (ALsizei)frequency);
+    }
+    free(data);
+
+    ALenum error = alGetError();
+    if (error != AL_NO_ERROR)
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::getLoadState() OpenAL error " << error << " for " << mLoadingFilename << LL_ENDL;
+        if (mALBuffer != AL_NONE)
+        {
+            alDeleteBuffers(1, &mALBuffer);
+            mALBuffer = AL_NONE;
+        }
+        return LOAD_FAILED;
+    }
+    return LOAD_READY;
+}
+// </FS:Trish>
 
 U32 LLAudioBufferOpenAL::getLength()
 {

@@ -448,6 +448,13 @@ class LLAudioData
     friend class LLAudioEngine;  // Severe laziness, bad.
 
   protected:
+    // <FS:Trish> Asynchronous WAV loading
+    bool checkLoadingBuffer();
+    void onWAVLoadFailed(const std::string& wav_path);
+    LLAudioBuffer *mLoadingBufferp{ nullptr }; // loadWAV() started, not ready to play yet. Pinned so it isn't recycled meanwhile.
+    std::string    mLoadingPath;
+    // </FS:Trish>
+
     LLUUID         mID;
     LLAudioBuffer *mBufferp;             // If this data is being used by the audio system, a pointer to the buffer will be set here.
     bool           mHasLocalData;        // Set true if the encoded sound asset file is available locally
@@ -514,6 +521,17 @@ public:
     virtual ~LLAudioBuffer() {};
     virtual bool loadWAV(const std::string& filename) = 0;
     virtual U32 getLength() = 0;
+
+    // <FS:Trish> loadWAV() may only start loading. LLAudioData hands the buffer out once
+    // this reports it ready, so nothing plays a half loaded sound.
+    enum ELoadState
+    {
+        LOAD_READY,
+        LOAD_PENDING,
+        LOAD_FAILED
+    };
+    virtual ELoadState getLoadState() { return LOAD_READY; }
+    // </FS:Trish>
 
     void setPinned(bool pinned) { mPinned = pinned; }
     bool isPinned() const { return mPinned; }

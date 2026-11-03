@@ -34,6 +34,8 @@
 #include "lllistener_openal.h"
 #include "llwindgen.h"
 #include "llatomic.h"
+#include "llframetimer.h" // <FS:Trish/> Output device recovery fallback
+#include <memory> // <FS:Trish/>
 
 class LLAudioEngine_OpenAL : public LLAudioEngine
 {
@@ -118,6 +120,7 @@ class LLAudioBufferOpenAL : public LLAudioBuffer{
 
         bool loadWAV(const std::string& filename);
         U32 getLength();
+        ELoadState getLoadState() override; // <FS:Trish/>
 
         friend class LLAudioChannelOpenAL;
     protected:
@@ -125,6 +128,13 @@ class LLAudioBufferOpenAL : public LLAudioBuffer{
         ALuint getBuffer() {return mALBuffer;}
 
         ALuint mALBuffer;
+
+        // <FS:Trish> The file is read and parsed on a worker thread, only the copy into the
+        // OpenAL buffer happens on the main thread
+        struct LoadJob;
+        std::shared_ptr<LoadJob> mLoadJob;
+        std::string mLoadingFilename;
+        // </FS:Trish>
 };
 
 #endif
