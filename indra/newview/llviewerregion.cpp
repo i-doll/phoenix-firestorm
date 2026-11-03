@@ -1609,10 +1609,22 @@ void LLViewerRegion::createVisibleObjects(F32 max_time)
         {
             addNewObject(vo_entry);
             has_new_obj = true;
-            if(throttle > 0 && !(--throttle) && update_timer.getElapsedTimeF32() > max_time)
+            // <FS:Trish> The time was only checked once, when the count ran out, so being under
+            // budget at that moment created everything left in the same frame. Keep checking after
+            // the count, and when the throttle is disabled the loosened budget still applies.
+            //if(throttle > 0 && !(--throttle) && update_timer.getElapsedTimeF32() > max_time)
+            //{
+            //    break;
+            //}
+            if (throttle > 0)
+            {
+                --throttle;
+            }
+            if (throttle <= 0 && update_timer.getElapsedTimeF32() > max_time)
             {
                 break;
             }
+            // </FS:Trish>
         }
     }
 

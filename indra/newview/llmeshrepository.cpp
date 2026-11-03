@@ -4022,13 +4022,32 @@ void LLMeshLODHandler::processLod(U8* data, S32 data_size)
                     // todo: handle else because we shouldn't have requested twice?
                 }
             }
-            if (flags > 0)
+            // <FS:Trish> Write the block before marking it cached, so a crash or failed write
+            // can't leave the preamble claiming data that isn't there
+            //if (flags > 0)
+            //{
+            //    write_preamble(file, header_bytes, flags);
+            //}
+
+            //file.seek(offset, 0);
+            //file.write(data, size);
+            file.seek(offset, 0);
+            const bool written = file.write(data, size);
+            if (written && flags > 0)
             {
+                file.seek(0, 0);
                 write_preamble(file, header_bytes, flags);
             }
-
-            file.seek(offset, 0);
-            file.write(data, size);
+            else if (!written && flags > 0)
+            {
+                LLMutexLock lock(gMeshRepo.mThread->mHeaderMutex);
+                LLMeshRepoThread::mesh_header_map::iterator header_it = gMeshRepo.mThread->mMeshHeader.find(mMeshParams.getSculptID());
+                if (header_it != gMeshRepo.mThread->mMeshHeader.end())
+                {
+                    header_it->second.mLodInCache[mLOD] = false;
+                }
+            }
+            // </FS:Trish>
             LLMeshRepository::sCacheBytesWritten += size;
             ++LLMeshRepository::sCacheWrites;
         }
@@ -4145,13 +4164,31 @@ void LLMeshSkinInfoHandler::processSkin(U8* data, S32 data_size)
                     // todo: handle else because we shouldn't have requested twice?
                 }
             }
-            if (flags > 0)
+            // <FS:Trish> Write the block before marking it cached
+            //if (flags > 0)
+            //{
+            //    write_preamble(file, header_bytes, flags);
+            //}
+
+            //file.seek(offset, 0);
+            //file.write(data, size);
+            file.seek(offset, 0);
+            const bool written = file.write(data, size);
+            if (written && flags > 0)
             {
+                file.seek(0, 0);
                 write_preamble(file, header_bytes, flags);
             }
-
-            file.seek(offset, 0);
-            file.write(data, size);
+            else if (!written && flags > 0)
+            {
+                LLMutexLock lock(gMeshRepo.mThread->mHeaderMutex);
+                LLMeshRepoThread::mesh_header_map::iterator header_it = gMeshRepo.mThread->mMeshHeader.find(mMeshID);
+                if (header_it != gMeshRepo.mThread->mMeshHeader.end())
+                {
+                    header_it->second.mSkinInCache = false;
+                }
+            }
+            // </FS:Trish>
         }
     }
     else
@@ -4264,13 +4301,31 @@ void LLMeshDecompositionHandler::processData(LLCore::BufferArray * /* body */, S
                     // todo: handle else because we shouldn't have requested twice?
                 }
             }
-            if (flags > 0)
+            // <FS:Trish> Write the block before marking it cached
+            //if (flags > 0)
+            //{
+            //    write_preamble(file, header_bytes, flags);
+            //}
+
+            //file.seek(offset, 0);
+            //file.write(data, size);
+            file.seek(offset, 0);
+            const bool written = file.write(data, size);
+            if (written && flags > 0)
             {
+                file.seek(0, 0);
                 write_preamble(file, header_bytes, flags);
             }
-
-            file.seek(offset, 0);
-            file.write(data, size);
+            else if (!written && flags > 0)
+            {
+                LLMutexLock lock(gMeshRepo.mThread->mHeaderMutex);
+                LLMeshRepoThread::mesh_header_map::iterator header_it = gMeshRepo.mThread->mMeshHeader.find(mMeshID);
+                if (header_it != gMeshRepo.mThread->mMeshHeader.end())
+                {
+                    header_it->second.mPhysicsConvexInCache = false;
+                }
+            }
+            // </FS:Trish>
         }
     }
     else
@@ -4337,13 +4392,31 @@ void LLMeshPhysicsShapeHandler::processData(LLCore::BufferArray * /* body */, S3
                     // todo: handle else because we shouldn't have requested twice?
                 }
             }
-            if (flags > 0)
+            // <FS:Trish> Write the block before marking it cached
+            //if (flags > 0)
+            //{
+            //    write_preamble(file, header_bytes, flags);
+            //}
+
+            //file.seek(offset, 0);
+            //file.write(data, size);
+            file.seek(offset, 0);
+            const bool written = file.write(data, size);
+            if (written && flags > 0)
             {
+                file.seek(0, 0);
                 write_preamble(file, header_bytes, flags);
             }
-
-            file.seek(offset, 0);
-            file.write(data, size);
+            else if (!written && flags > 0)
+            {
+                LLMutexLock lock(gMeshRepo.mThread->mHeaderMutex);
+                LLMeshRepoThread::mesh_header_map::iterator header_it = gMeshRepo.mThread->mMeshHeader.find(mMeshID);
+                if (header_it != gMeshRepo.mThread->mMeshHeader.end())
+                {
+                    header_it->second.mPhysicsMeshInCache = false;
+                }
+            }
+            // </FS:Trish>
         }
     }
     else

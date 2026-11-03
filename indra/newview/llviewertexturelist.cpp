@@ -892,11 +892,17 @@ void LLViewerTextureList::updateImages(F32 max_time)
         iter != mCallbackList.end(); )
     {
         //trigger loaded callbacks on local textures immediately
-        LLViewerFetchedTexture* image = *iter++;
+        // <FS:Trish> Hold a reference, doLoadedCallbacks can remove the texture from the list it is iterating
+        //LLViewerFetchedTexture* image = *iter++;
+        LLPointer<LLViewerFetchedTexture> image = *iter++;
+        // </FS:Trish>
         if (!image->getUrl().empty())
         {
             // Do stuff to handle callbacks, update priorities, etc.
-            didone = image->doLoadedCallbacks();
+            // <FS:Trish> Don't let a URL texture reset the one-per-frame limit for the others
+            //didone = image->doLoadedCallbacks();
+            didone = image->doLoadedCallbacks() || didone;
+            // </FS:Trish>
         }
         else if (!didone)
         {

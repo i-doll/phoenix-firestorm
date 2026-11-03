@@ -2338,6 +2338,12 @@ bool LLViewerFetchedTexture::updateFetch()
     S32 current_discard = getCurrentDiscardLevelForFetching();
     S32 desired_discard = getDesiredDiscardLevel();
     F32 decode_priority = desired_discard <= getMaxDiscardLevel() ? mMaxVirtualSize : 0.f;
+    // <FS:Trish> Textures with nothing on screen yet go ahead of sharpening ones that already show something
+    if (decode_priority > 0.f && getDiscardLevel() < 0)
+    {
+        decode_priority += sMaxVirtualSize;
+    }
+    // </FS:Trish>
 
     if (mIsFetching)
     {
