@@ -3253,6 +3253,7 @@ if (LL_TESTS)
     )
 
 # LL_ADD_INTEGRATION_TEST(llhttpretrypolicy "llhttpretrypolicy.cpp" "${test_libs}")
+# LL_ADD_INTEGRATION_TEST(lltexturematrix "" "${test_libs}") # </FS:Beq> Texture-animation matrix lifetime regression coverage.
 
   #ADD_VIEWER_BUILD_TEST(llmemoryview viewer)
   #ADD_VIEWER_BUILD_TEST(llagentaccess viewer)

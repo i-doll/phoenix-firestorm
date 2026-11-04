@@ -172,7 +172,10 @@ void LLFace::init(LLDrawable* drawablep, LLViewerObject* objp)
 
     mReferenceIndex = -1;
 
-    mTextureMatrix = NULL;
+    // <FS:Beq> Release shared texture-matrix ownership.
+    // mTextureMatrix = NULL;
+    mTextureMatrix.reset();
+    // </FS:Beq>
     mDrawInfo = NULL;
 
     mFaceColor = LLColor4(1,0,0,1);
@@ -219,7 +222,9 @@ void LLFace::destroy()
 
     if (mTextureMatrix)
     {
+        // <FS:Beq> Outstanding draw batches retain the matrix until rebuilt.
         clearTextureMatrix();
+        // </FS:Beq>
 
         if (mDrawablep)
         {
@@ -720,19 +725,14 @@ void LLFace::clearTextureMatrix()
         return;
     }
 
-    // Draw info stores raw matrix pointers for batching.  It may still be
-    // submitted during the frame in which this face loses its texture matrix.
+    // <FS:Beq> The draw batch keeps its own reference to the texture matrix,
+    // but its model matrix is still a raw pointer.
     if (mDrawInfo)
     {
-        if (mDrawInfo->mTextureMatrix == mTextureMatrix)
-        {
-            mDrawInfo->mTextureMatrix = nullptr;
-        }
         mDrawInfo->mModelMatrix = nullptr;
     }
-
-    delete mTextureMatrix;
-    mTextureMatrix = nullptr;
+    mTextureMatrix.reset();
+    // </FS:Beq>
 }
 
 void LLFace::printDebugInfo() const
