@@ -68,11 +68,27 @@ static U64 sTextureBytes = 0;
 
 // track a texture alloc on the currently bound texture.
 // asserts that no currently tracked alloc exists
-void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count)
+// <FS:Trish>
+//void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count)
+void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, bool add_level)
+// </FS:Trish>
 {
     U32 texUnit = gGL.getCurrentTexUnitIndex();
     llassert(texUnit == 0); // allocations should always be done on tex unit 0
     U32 texName = gGL.getTexUnit(texUnit)->getCurrTexture();
+    // <FS:Trish> Drivers keep 24-bit color with a padding byte, so it takes as much as 32-bit
+    switch (intformat)
+    {
+    case GL_RGB:
+    case GL_RGB8:
+    case GL_SRGB:
+    case GL_SRGB8:
+        intformat = GL_RGBA8;
+        break;
+    default:
+        break;
+    }
+    // </FS:Trish>
     U64 size = LLImageGL::dataFormatBytes(intformat, width, height);
     size *= count;
 
@@ -80,14 +96,43 @@ void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 
 
     sTexMemMutex.lock();
 
+    // <FS:Trish> A further mip level adds to the allocation tracked for its texture
+    auto iter = sTextureAllocs.find(texName);
+    if (add_level && iter != sTextureAllocs.end())
+    {
+        iter->second += size;
+        sTextureBytes += size;
+        sTexMemMutex.unlock();
+        return;
+    }
+    // </FS:Trish>
+
     // it is a precondition that no existing allocation exists for this texture
-    llassert(sTextureAllocs.find(texName) == sTextureAllocs.end());
+    //llassert(sTextureAllocs.find(texName) == sTextureAllocs.end());
+    llassert(iter == sTextureAllocs.end()); // <FS:Trish/>
 
     sTextureAllocs[texName] = size;
     sTextureBytes += size;
 
     sTexMemMutex.unlock();
 }
+
+// <FS:Trish>
+void LLImageGLMemory::alloc_tex_mips()
+{
+    U32 texName = gGL.getTexUnit(gGL.getCurrentTexUnitIndex())->getCurrTexture();
+
+    LLMutexLock lock(&sTexMemMutex);
+    auto iter = sTextureAllocs.find(texName);
+    if (iter != sTextureAllocs.end())
+    {
+        // Each level is a quarter of the one above it, so the whole chain below the base adds a third
+        U64 mips = iter->second / 3;
+        iter->second += mips;
+        sTextureBytes += mips;
+    }
+}
+// </FS:Trish>
 
 // track texture free on given texName
 void LLImageGLMemory::free_tex_image(U32 texName)
@@ -870,6 +915,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                     {
                         LL_PROFILE_GPU_ZONE("generate mip map");
                         glGenerateMipmap(mTarget);
+                        alloc_tex_mips(); // <FS:Trish/>
                     }
                     stop_glerror();
                 }
@@ -1494,7 +1540,13 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         LL_PROFILE_ZONE_NUM(width);
         LL_PROFILE_ZONE_NUM(height);
 
-        free_cur_tex_image();
+        // <FS:Trish> Only a new base level replaces the texture; further levels add to it
+        //free_cur_tex_image();
+        if (miplevel == 0)
+        {
+            free_cur_tex_image();
+        }
+        // </FS:Trish>
         const bool use_sub_image = should_stagger_image_set(compress);
         if (!use_sub_image)
         {
@@ -1516,7 +1568,8 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
                 sub_image_lines(target, 0, miplevel, 0, 0, width, height, pixformat, pixtype, src, width);
             }
         }
-        alloc_tex_image(width, height, intformat, 1);
+        //alloc_tex_image(width, height, intformat, 1);
+        alloc_tex_image(width, height, intformat, 1, miplevel > 0); // <FS:Trish/>
     }
     stop_glerror();
 }
@@ -2495,6 +2548,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
                 LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("scaleDown - glGenerateMipmap");
                 gGL.getTexUnit(0)->bind(this);
                 glGenerateMipmap(mTarget);
+                alloc_tex_mips(); // <FS:Trish/>
                 gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
             }
         }
@@ -2540,6 +2594,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("scaleDown - glGenerateMipmap");
             glGenerateMipmap(mTarget);
+            alloc_tex_mips(); // <FS:Trish/>
         }
 
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);

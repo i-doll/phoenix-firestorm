@@ -183,7 +183,10 @@ void LLStatsListener::getPerfData(LLSD const & evt)
 
     // texture memory usage
     LLSD memory;
-    memory["texture_bytes_alloc_mb"] = (F64)LLImageGL::getTextureBytesAllocated() / 1024.0 / 512.0;
+    // <FS:Trish> The tracked figure includes mipmaps and padding now, so it no longer needs doubling
+    //memory["texture_bytes_alloc_mb"] = (F64)LLImageGL::getTextureBytesAllocated() / 1024.0 / 512.0;
+    memory["texture_bytes_alloc_mb"] = (F64)LLImageGL::getTextureBytesAllocated() / 1024.0 / 1024.0;
+    // </FS:Trish>
     stats["memory"] = memory;
 
     LLSD inventory;

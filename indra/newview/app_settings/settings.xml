@@ -11747,7 +11747,7 @@ Change of this parameter will affect the layout of buttons in notification toast
   <key>RenderTextureMemoryUsageBias</key>
   <map>
     <key>Comment</key>
-    <string>Multiplier applied to tracked texture+vertex MB when deciding low-memory discard behavior (0.25-4.0).</string>
+    <string>Multiplier applied to tracked texture+vertex MB when deciding low-memory discard behavior (0.25-4.0). Texture memory is tracked at what the driver allocates, mipmaps included, so 1.0 is the real figure.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>

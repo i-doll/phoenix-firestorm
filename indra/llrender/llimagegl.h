@@ -50,7 +50,12 @@ class LLWindow;
 
 namespace LLImageGLMemory
 {
-    void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count);
+    // <FS:Trish> add_level: the allocation is a further mip level of the bound texture, add it to what is tracked
+    //void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count);
+    void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, bool add_level = false);
+    // Count the levels glGenerateMipmap just added to the bound texture
+    void alloc_tex_mips();
+    // </FS:Trish>
     void free_tex_image(U32 texName);
     void free_tex_images(U32 count, const U32* texNames);
     void free_cur_tex_image();
@@ -66,9 +71,12 @@ public:
     static void updateClass();
 
     // Get an estimate of how many bytes have been allocated in vram for textures.
-    // Does not include mipmaps.
-    // NOTE: multiplying this number by two gives a good estimate for total
-    // video memory usage based on testing in lagland against an NVIDIA GPU.
+    // <FS:Trish> Mipmaps and the padding byte of 24-bit formats are counted now
+    //// Does not include mipmaps.
+    //// NOTE: multiplying this number by two gives a good estimate for total
+    //// video memory usage based on testing in lagland against an NVIDIA GPU.
+    // Includes mipmaps, and counts 24-bit color at the 4 bytes per texel drivers store it at.
+    // </FS:Trish>
     static U64 getTextureBytesAllocated();
 
     // These 2 functions replace glGenTextures() and glDeleteTextures()
