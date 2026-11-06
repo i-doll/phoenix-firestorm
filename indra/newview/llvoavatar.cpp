@@ -9757,12 +9757,25 @@ void LLVOAvatar::updateRuthTimer(bool loading)
     if (mPreviousFullyLoaded)
     {
         mRuthTimer.reset();
+        mCloudRetryCount = 0; // <FS:Trish/>
         debugAvatarRezTime("AvatarRezCloudNotification","became cloud");
     }
 
     const F32 LOADING_TIMEOUT__SECONDS = 120.f;
-    if (mRuthTimer.getElapsedTimeF32() > LOADING_TIMEOUT__SECONDS)
+    // <FS:Trish> Re-request sooner while the shape or a body bake is still missing, backing off
+    // to the usual timeout. Waiting on textures or attachments keeps the usual timeout.
+    //if (mRuthTimer.getElapsedTimeF32() > LOADING_TIMEOUT__SECONDS)
+    static LLCachedControl<bool> cloud_fast_retry(gSavedSettings, "FSAvatarCloudFastRetry");
+    static const F32 FAST_RETRY_SECONDS[] = { 15.f, 30.f, 60.f };
+    F32 timeout = LOADING_TIMEOUT__SECONDS;
+    if (cloud_fast_retry && mCloudRetryCount < LL_ARRAY_SIZE(FAST_RETRY_SECONDS) && getHasMissingParts())
     {
+        timeout = FAST_RETRY_SECONDS[mCloudRetryCount];
+    }
+    if (mRuthTimer.getElapsedTimeF32() > timeout)
+    // </FS:Trish>
+    {
+        mCloudRetryCount++; // <FS:Trish/>
         LL_DEBUGS("Avatar") << avString()
                 << "Ruth Timer timeout: Missing texture data for '" << getFullname() << "' "
                 << "( Params loaded : " << !visualParamWeightsAreDefault() << " ) "
@@ -11048,6 +11061,7 @@ void LLVOAvatar::processAvatarAppearance( LLMessageSystem* mesgsys )
         return;
     }
 
+    const F32 seconds_since_last_appearance = mLastAppearanceMessageTimer.getElapsedTimeF32(); // <FS:Trish/>
     mLastAppearanceMessageTimer.reset();
 
     LLPointer<LLAppearanceMessageContents> contents(new LLAppearanceMessageContents);
@@ -11109,11 +11123,31 @@ void LLVOAvatar::processAvatarAppearance( LLMessageSystem* mesgsys )
         }
 
     }
+    // <FS:Trish> Appearance messages are unreliable UDP and can arrive out of order during an
+    // outfit change. Drop one that is older than the last applied, but only when they arrive
+    // close together, so a COF that really went backwards (recreated) can't lock out updates.
+    // Equal versions are resends, e.g. replies to a re-request, and still apply.
+    else
+    {
+        static LLCachedControl<bool> drop_stale_appearance(gSavedSettings, "FSAvatarDropStaleAppearance");
+        const F32 STALE_APPEARANCE_WINDOW_SECONDS = 10.f;
+        if (drop_stale_appearance && appearance_version > 0
+            && thisAppearanceVersion > 0 && mLastUpdateReceivedCOFVersion > 0
+            && thisAppearanceVersion < mLastUpdateReceivedCOFVersion
+            && seconds_since_last_appearance < STALE_APPEARANCE_WINDOW_SECONDS)
+        {
+            LL_INFOS("Avatar") << "Dropping out of order appearance for " << getID() << ", version " << thisAppearanceVersion
+                << " is older than " << mLastUpdateReceivedCOFVersion << LL_ENDL;
+            return;
+        }
+    }
+    // </FS:Trish>
 
     // SUNSHINE CLEANUP - is this case OK now?
     auto num_params = contents->mParamWeights.size();
     if (num_params <= 1)
     {
+        static LLCachedControl<bool> retry_empty_appearance(gSavedSettings, "FSAvatarRetryEmptyAppearance"); // <FS:Trish/>
         // In this case, we have no reliable basis for knowing
         // appearance version, which may cause us to look for baked
         // textures in the wrong place and flag them as missing
@@ -11125,6 +11159,16 @@ void LLVOAvatar::processAvatarAppearance( LLMessageSystem* mesgsys )
             LLNotificationsUtil::add("AvatarRezSelfBakeForceUpdateNotification");
             LLAppearanceMgr::instance().syncCofVersionAndRefresh();
         }
+        // <FS:Trish> Without a shape the avatar stays a cloud, so ask again instead of waiting
+        // for the cloud timeout. Throttled, a region with no shape to give would answer the same.
+        else if (!isSelf() && retry_empty_appearance && visualParamWeightsAreDefault()
+                 && LLFrameTimer::getTotalSeconds() - mLastEmptyAppearanceRetry > 10.0)
+        {
+            LL_INFOS("Avatar") << "Empty appearance for " << getID() << ", re-requesting" << LL_ENDL;
+            LLAvatarPropertiesProcessor::getInstance()->sendAvatarTexturesRequest(getID());
+            mLastEmptyAppearanceRetry = LLFrameTimer::getTotalSeconds();
+        }
+        // </FS:Trish>
         else
         // </FS:Beq>
         LL_DEBUGS("Avatar") << "ignoring appearance message due to lack of params" << LL_ENDL;

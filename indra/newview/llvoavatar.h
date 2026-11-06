@@ -471,6 +471,10 @@ private:
     LLColor4        mMutedAVColor;
     LLFrameTimer    mFullyLoadedTimer;
     LLFrameTimer    mRuthTimer;
+    // <FS:Trish> Cloud recovery, see FSAvatarCloudFastRetry and FSAvatarRetryEmptyAppearance
+    U32             mCloudRetryCount{ 0 };
+    F64             mLastEmptyAppearanceRetry{ -1000.0 };
+    // </FS:Trish>
 
     // variables to hold "slowness" status
     bool            mTooSlow{false};

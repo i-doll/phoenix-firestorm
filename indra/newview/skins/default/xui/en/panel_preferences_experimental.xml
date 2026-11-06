@@ -20,7 +20,7 @@
      width="538">
         <panel
          follows="left|top"
-         height="690"
+         height="790"
          layout="topleft"
          left="0"
          name="experimental_settings"
@@ -265,6 +265,50 @@
              tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
              top_delta="-2"
              width="100" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="18"
+             layout="topleft"
+             left="15"
+             name="avatar_loading_heading"
+             top_pad="10"
+             width="475">
+                Avatar loading
+            </text>
+            <check_box
+             control_name="FSAvatarCloudFastRetry"
+             follows="left|top"
+             height="20"
+             label="Retry sooner for avatars stuck as a cloud"
+             layout="topleft"
+             left="15"
+             name="avatar_cloud_fast_retry"
+             tool_tip="EXPERIMENTAL. When another avatar is missing its shape or body textures, ask the region for its appearance again after 15, 30 and 60 seconds, instead of only every 2 minutes."
+             top_pad="4"
+             width="475" />
+            <check_box
+             control_name="FSAvatarRetryEmptyAppearance"
+             follows="left|top"
+             height="20"
+             label="Ask again when an avatar's appearance arrives without a shape"
+             layout="topleft"
+             left="15"
+             name="avatar_retry_empty_appearance"
+             tool_tip="EXPERIMENTAL. When the region sends another avatar's appearance without a shape, ask for it again right away (at most every 10 seconds) instead of waiting for the cloud timeout."
+             top_pad="2"
+             width="475" />
+            <check_box
+             control_name="FSAvatarDropStaleAppearance"
+             follows="left|top"
+             height="20"
+             label="Ignore out of order appearance updates"
+             layout="topleft"
+             left="15"
+             name="avatar_drop_stale_appearance"
+             tool_tip="EXPERIMENTAL. During an outfit change, appearance updates for another avatar can arrive out of order. Ignore one that is older than the last applied, if it arrives within 10 seconds of it. Logged under Avatar."
+             top_pad="2"
+             width="475" />
         </panel>
     </scroll_container>
 </panel>
