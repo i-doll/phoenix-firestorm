@@ -12284,6 +12284,11 @@ void LLPipeline::renderSunRays()
     static LLCachedControl<S32> steps(gSavedSettings, "FSRenderSunRaysSteps", 24);
     static LLCachedControl<F32> max_distance(gSavedSettings, "FSRenderSunRaysDistance", 256.f);
     static LLCachedControl<F32> resolution(gSavedSettings, "FSRenderSunRaysResolution", 0.5f);
+    static LLCachedControl<bool> sky_color(gSavedSettings, "FSRenderSunRaysSkyColor", true);
+    static LLCachedControl<LLColor4> tint(gSavedSettings, "FSRenderSunRaysTint", LLColor4::white);
+    static LLCachedControl<bool> sky_haze(gSavedSettings, "FSRenderSunRaysSkyHaze", true);
+    static LLCachedControl<F32> height_falloff(gSavedSettings, "FSRenderSunRaysHeightFalloff", 0.005f);
+    static LLCachedControl<bool> moon_rays(gSavedSettings, "FSRenderSunRaysMoon", true);
 
     if (!enabled || strength <= 0.f || density <= 0.f || RenderShadowDetail <= 0 ||
         gSnapshotNoPost || sUnderWaterRender ||
@@ -12292,19 +12297,63 @@ void LLPipeline::renderSunRays()
         return;
     }
 
+    // The shadow maps follow the sun while it is up, else the moon
     LLEnvironment& environment = LLEnvironment::instance();
+    LLSettingsSky::ptr_t psky = environment.getCurrentSky();
     const bool sun_up = environment.getIsSunUp();
-    if (!sun_up && !environment.getIsMoonUp())
+    if (!psky || (!sun_up && (!moon_rays || !environment.getIsMoonUp())))
     {
         return;
     }
+
+    // Fade in over the first few degrees above the horizon, so the rays don't pop on or off
+    // as the light rises, sets or hands over between sun and moon
+    const F32 elevation = (sun_up ? environment.getSunDirection() : environment.getMoonDirection()).mV[VZ];
+    const F32 fade_t = llclamp(elevation / 0.08f, 0.f, 1.f);
+    const F32 fade = fade_t * fade_t * (3.f - 2.f * fade_t);
+    if (fade <= 0.f)
+    {
+        return;
+    }
+
+    LLColor3 light(1.f, 1.f, 1.f);
+    if (sky_color)
+    {
+        // The sky's light colour, then reddened and dimmed by the extra air it crosses when
+        // low, relative to overhead, the way the sky's own lighting does it
+        light = linearColor3(sun_up ? LLColor3(mSunDiffuse.mV) : LLColor3(mMoonDiffuse.mV));
+        const LLColor3 atten = psky->getLightAttenuation(psky->getMaxY());
+        const F32 extra_air = 1.f / llmax(elevation, 0.02f) - 1.f;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            light.mV[i] *= expf(-atten.mV[i] * extra_air);
+        }
+    }
+    const LLColor4 tint_color = tint; // alpha unused
+    const LLColor3 tint_linear = linearColor3(tint_color);
+    light.mV[VRED] *= tint_linear.mV[VRED];
+    light.mV[VGREEN] *= tint_linear.mV[VGREEN];
+    light.mV[VBLUE] *= tint_linear.mV[VBLUE];
+    // Moonlight shares the sun's colour in the sky settings, scale it down to moonlight
+    light *= (F32)strength * fade * (sun_up ? 1.f : llclamp(psky->getMoonBrightness(), 0.f, 1.f) * 0.25f);
+
+    // Hazier skies scatter more, gently: half to twice the set density
+    F32 ray_density = (F32)density;
+    if (sky_haze)
+    {
+        ray_density *= llclamp(sqrtf(llmax(psky->getHazeDensity(), 0.f) / 0.7f), 0.5f, 2.f);
+    }
+
+    // World up in view space, for the density falling off with height
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+    const LLVector3 up_view(-camera->getLeftAxis().mV[VZ], camera->getUpAxis().mV[VZ], -camera->getAtAxis().mV[VZ]);
 
     LL_PROFILE_GPU_ZONE("sun rays");
 
     const F32 scale = llclamp((F32)resolution, 0.25f, 1.f);
     const U32 width = llmax((U32)(mRT->screen.getWidth() * scale), 1u);
     const U32 height = llmax((U32)(mRT->screen.getHeight() * scale), 1u);
-    if (!fs_ensure_target(mSunRayMap, width, height, GL_R16F))
+    if (!fs_ensure_target(mSunRayMap, width, height, GL_RG16F)) // scattering, distance marched to
     {
         return;
     }
@@ -12316,7 +12365,8 @@ void LLPipeline::renderSunRays()
     static LLStaticHashedString s_ray_max_dist("ray_max_dist");
     static LLStaticHashedString s_ray_density("ray_density");
     static LLStaticHashedString s_ray_anisotropy("ray_anisotropy");
-    static LLStaticHashedString s_ray_texel("ray_texel");
+    static LLStaticHashedString s_ray_height_falloff("ray_height_falloff");
+    static LLStaticHashedString s_ray_up("ray_up");
     static LLStaticHashedString s_ray_color("ray_color");
 
     // March
@@ -12327,8 +12377,10 @@ void LLPipeline::renderSunRays()
         gFSSunRaysProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up ? 1 : 0);
         gFSSunRaysProgram.uniform1i(s_ray_steps, llclamp((S32)steps, 4, 128));
         gFSSunRaysProgram.uniform1f(s_ray_max_dist, llclamp((F32)max_distance, 8.f, 1024.f));
-        gFSSunRaysProgram.uniform1f(s_ray_density, (F32)density);
+        gFSSunRaysProgram.uniform1f(s_ray_density, ray_density);
         gFSSunRaysProgram.uniform1f(s_ray_anisotropy, llclamp((F32)anisotropy, 0.f, 0.95f));
+        gFSSunRaysProgram.uniform1f(s_ray_height_falloff, llclamp((F32)height_falloff, 0.f, 0.1f));
+        gFSSunRaysProgram.uniform3fv(s_ray_up, 1, up_view.mV);
         fs_draw_screen_triangle(mScreenTriangleVB);
         unbindDeferredShader(gFSSunRaysProgram);
         mSunRayMap.flush();
@@ -12336,19 +12388,15 @@ void LLPipeline::renderSunRays()
 
     // Composite onto the HDR scene
     {
-        LLColor3 light = sun_up ? LLColor3(mSunDiffuse.mV) : LLColor3(mMoonDiffuse.mV);
-        light = linearColor3(light) * (F32)strength;
-
         mRT->screen.bindTarget();
         gGL.setColorMask(true, false); // the screen's alpha is glow
         LLGLEnable blend(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ADD);
 
         gFSSunRaysCompositeProgram.bind();
-        gFSSunRaysCompositeProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mSunRayMap, false, LLTexUnit::TFO_BILINEAR);
+        gFSSunRaysCompositeProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mSunRayMap, false, LLTexUnit::TFO_POINT);
         gFSSunRaysCompositeProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
         gFSSunRaysCompositeProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
-        gFSSunRaysCompositeProgram.uniform2f(s_ray_texel, 1.f / (F32)width, 1.f / (F32)height);
         gFSSunRaysCompositeProgram.uniform3fv(s_ray_color, 1, light.mV);
         fs_draw_screen_triangle(mScreenTriangleVB);
         gFSSunRaysCompositeProgram.unbind();

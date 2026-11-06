@@ -27059,6 +27059,66 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.5</real>
     </map>
+    <key>FSRenderSunRaysSkyColor</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: take their colour from the current sky's sun or moon light, warmer and dimmer near the horizon. Off uses only FSRenderSunRaysTint.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSRenderSunRaysTint</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: colour multiplied into the rays (alpha is ignored). White leaves the sky colour unchanged.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Color4</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>1.0</real>
+      </array>
+    </map>
+    <key>FSRenderSunRaysSkyHaze</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: scale the density by the current sky's haze density (between half and twice), so hazier skies give thicker rays.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSRenderSunRaysHeightFalloff</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: how fast the air thins with height above the camera, per meter (0 to 0.1). 0 is even air; 0.005 halves it about 140 m up. Below the camera it thickens, up to 4 times.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.005</real>
+    </map>
+    <key>FSRenderSunRaysMoon</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: also draw much fainter rays from the moon while the sun is down.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>FSRenderBloom</key>
     <map>
       <key>Comment</key>
