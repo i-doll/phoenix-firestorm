@@ -1155,6 +1155,18 @@ public:
     {
         return AABBInFrustumObjectBounds(group);
     }
+
+    // <FS:Trish> Skip groups too small to show up in the shadow map being culled. Only this
+    // group is skipped, its children are still visited.
+    virtual void processGroup(LLViewerOctreeGroup* base_group)
+    {
+        if (LLPipeline::isShadowCasterTooSmall((LLSpatialGroup*)base_group, LLPipeline::sShadowMinCasterSize))
+        {
+            return;
+        }
+        LLOctreeCull::processGroup(base_group);
+    }
+    // </FS:Trish>
 };
 
 class LLOctreeCullVisExtents: public LLOctreeCullShadow

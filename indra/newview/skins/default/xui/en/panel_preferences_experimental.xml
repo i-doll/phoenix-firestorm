@@ -53,7 +53,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="826"
+                 height="936"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -471,6 +471,83 @@
                      tool_tip="EXPERIMENTAL. Texture decoding and caching only use CPU time the main and render threads leave free. Smoother frames while a scene loads, but loading can take longer on CPUs with few cores."
                      top_pad="6"
                      width="475" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="shadows_heading"
+                     top_pad="12"
+                     width="475">
+                        Shadows
+                    </text>
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_cull_mode_label"
+                     tool_tip="EXPERIMENTAL. How the objects drawn into the 4 sun shadow maps are found. Once for all maps saves CPU time, each map is then filtered down to what reaches it."
+                     top_pad="6"
+                     width="285">
+                        Find sun shadow casters
+                    </text>
+                    <combo_box
+                     control_name="RenderShadowCullMode"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="330"
+                     name="shadow_cull_mode"
+                     tool_tip="EXPERIMENTAL. How the objects drawn into the 4 sun shadow maps are found. Once for all maps saves CPU time, each map is then filtered down to what reaches it."
+                     top_delta="-2"
+                     width="160">
+                        <combo_box.item
+                         name="shadow_cull_mode_per_map"
+                         label="Separately per map"
+                         value="0" />
+                        <combo_box.item
+                         name="shadow_cull_mode_shared"
+                         label="Once for all maps"
+                         value="1" />
+                    </combo_box>
+                    <check_box
+                     control_name="RenderShadowCullBridgesPerCascade"
+                     follows="left|top"
+                     height="20"
+                     label="Only draw avatars and attachments into shadow maps they reach"
+                     layout="topleft"
+                     left="15"
+                     name="shadow_cull_bridges_per_cascade"
+                     tool_tip="EXPERIMENTAL. When casters are found once for all maps, test avatars, attachments and animesh against each sun shadow map by their position in the world, instead of drawing them into maps they don't reach."
+                     top_pad="6"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_min_caster_texels_label"
+                     tool_tip="EXPERIMENTAL. Objects smaller than this many shadow map pixels are not drawn into that sun shadow map. Measured against the map's most detailed pixels, so their shadow could not show anyway. Avatars, attachments, trees and terrain always cast. 0 draws everything."
+                     top_pad="6"
+                     width="285">
+                        Skip shadow casters smaller than (pixels)
+                    </text>
+                    <spinner
+                     control_name="RenderShadowMinCasterTexels"
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="4"
+                     min_val="0"
+                     name="shadow_min_caster_texels"
+                     tool_tip="EXPERIMENTAL. Objects smaller than this many shadow map pixels are not drawn into that sun shadow map. Measured against the map's most detailed pixels, so their shadow could not show anyway. Avatars, attachments, trees and terrain always cast. 0 draws everything."
+                     top_delta="-2"
+                     width="100" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"

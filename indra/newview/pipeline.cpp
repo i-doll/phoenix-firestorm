@@ -373,6 +373,7 @@ bool    LLPipeline::sBakeSunlight = false;
 bool    LLPipeline::sNoAlpha = false;
 bool    LLPipeline::sUseFarClip = true;
 bool    LLPipeline::sShadowRender = false;
+F32     LLPipeline::sShadowMinCasterSize = 0.f; // <FS:Trish/>
 bool    LLPipeline::sRenderGlow = false;
 bool    LLPipeline::sReflectionRender = false;
 bool    LLPipeline::sDistortionRender = false;
@@ -12264,6 +12265,13 @@ bool LLPipeline::renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst)
     static LLCachedControl<F32> grain_size(gSavedSettings, "FSRenderFilmGrainSize", 1.5f);
 
     if (gSnapshotNoPost || !gFSLensEffectsProgram.isComplete())
+
+// <FS:Trish> Only plain prims are skipped: terrain, trees, avatars and anything inside an
+// attachment or animesh always cast. Object bounds are center and half size.
+//static
+bool LLPipeline::isShadowCasterTooSmall(LLSpatialGroup* group, F32 min_size)
+{
+    if (min_size <= 0.f)
     {
         return false;
     }
@@ -12311,6 +12319,9 @@ bool LLPipeline::renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst)
     }
 
     if (ca <= 0.f && flare <= 0.f && grain <= 0.f)
+
+    LLSpatialPartition* part = group->getSpatialPartition();
+    if (!part || part->mPartitionType != LLViewerRegion::PARTITION_VOLUME || part->isBridge())
     {
         return false;
     }
@@ -12360,21 +12371,57 @@ bool LLPipeline::renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst)
 // </FS:Trish>
 
 
+
+    const LLVector4a& half_size = group->getObjectBounds()[1];
+    F32 largest = llmax(half_size[0], llmax(half_size[1], half_size[2])) * 2.f;
+    return largest < min_size;
+}
+
+// Groups inside a spatial bridge (avatars, attachments, animesh) have object bounds local to
+// the bridge, so testing them against an agent space cascade frustum is meaningless. Test the
+// bridge's own agent space extents instead, as LLSpatialBridge::setVisible does in
+// RenderShadowCullMode 0, so these expensive casters only render into cascades they reach.
+static bool shadowGroupInCascade(LLSpatialGroup* group, LLCamera& cam)
+{
+    static LLCachedControl<bool> cull_bridges(gSavedSettings, "RenderShadowCullBridgesPerCascade", true);
+    LLSpatialPartition* part = group->getSpatialPartition();
+    if (cull_bridges && part && part->isBridge())
+    {
+        const LLVector4a* exts = part->asBridge()->getSpatialExtents();
+        LLVector4a center;
+        center.setAdd(exts[0], exts[1]);
+        center.mul(0.5f);
+        LLVector4a size;
+        size.setSub(exts[1], exts[0]);
+        size.mul(0.5f);
+        return cam.AABBInFrustum(center, size) > 0;
+    }
+
+    return cam.AABBInFrustum(group->getObjectBounds()[0], group->getObjectBounds()[1]) > 0;
+}
+// </FS:Trish>
+
 // Re-bucket a shared sun-shadow cull (produced by a single union octree walk) down to one
 // cascade: copy the union's visible/drawable groups whose object bounds intersect this
 // cascade's frustum into `dst` (the same AABBInFrustumObjectBounds test the per-cascade
 // cull uses, so the geometry matches mode 0 exactly), then pass the small individual-
 // drawable and bridge lists through unfiltered. stateSort then builds the cascade's render
 // map from `dst`. Lets RenderShadowCullMode 1 share one octree walk across all cascades.
-static void bucketShadowCull(LLCullResult& src, LLCamera& cam, LLCullResult& dst)
+//static void bucketShadowCull(LLCullResult& src, LLCamera& cam, LLCullResult& dst)
+static void bucketShadowCull(LLCullResult& src, LLCamera& cam, LLCullResult& dst, F32 min_caster_size) // <FS:Trish/>
 {
     dst.clear();
 
     for (LLCullResult::sg_iterator i = src.beginVisibleGroups(), end = src.endVisibleGroups(); i != end; ++i)
     {
         LLSpatialGroup* group = *i;
+        // <FS:Trish>
+        //if (!group->isDead() &&
+        //    cam.AABBInFrustum(group->getObjectBounds()[0], group->getObjectBounds()[1]) > 0)
         if (!group->isDead() &&
-            cam.AABBInFrustum(group->getObjectBounds()[0], group->getObjectBounds()[1]) > 0)
+            !LLPipeline::isShadowCasterTooSmall(group, min_caster_size) &&
+            shadowGroupInCascade(group, cam))
+        // </FS:Trish>
         {
             dst.pushVisibleGroup(group);
         }
@@ -12383,8 +12430,13 @@ static void bucketShadowCull(LLCullResult& src, LLCamera& cam, LLCullResult& dst
     for (LLCullResult::sg_iterator i = src.beginDrawableGroups(), end = src.endDrawableGroups(); i != end; ++i)
     {
         LLSpatialGroup* group = *i;
+        // <FS:Trish>
+        //if (!group->isDead() &&
+        //    cam.AABBInFrustum(group->getObjectBounds()[0], group->getObjectBounds()[1]) > 0)
         if (!group->isDead() &&
-            cam.AABBInFrustum(group->getObjectBounds()[0], group->getObjectBounds()[1]) > 0)
+            !LLPipeline::isShadowCasterTooSmall(group, min_caster_size) &&
+            shadowGroupInCascade(group, cam))
+        // </FS:Trish>
         {
             dst.pushDrawableGroup(group);
         }
@@ -12898,6 +12950,12 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             //find a good origin for shadow projection
             LLVector3 origin;
 
+            // <FS:Trish> World size of the smallest texel in this cascade, set with the projection below
+            F32 min_texel_size = 0.f;
+            const F32 shadow_map_width = (F32)llmax(mRT->shadow[j].getWidth(), 1U);
+            const F32 shadow_map_height = (F32)llmax(mRT->shadow[j].getHeight(), 1U);
+            // </FS:Trish>
+
             //get a temporary view projection
             view[j] = look(camera.getOrigin(), lightDir, -up);
 
@@ -13010,6 +13068,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     proj[j] = glm::ortho(min.mV[0], max.mV[0],
                                         min.mV[1], max.mV[1],
                                         -max.mV[2], -min.mV[2]);
+                    // <FS:Trish/> Ortho texels are the same size everywhere
+                    min_texel_size = llmin((max.mV[0] - min.mV[0]) / shadow_map_width, (max.mV[1] - min.mV[1]) / shadow_map_height);
                 }
                 else
                 {
@@ -13101,6 +13161,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                         proj[j] = glm::ortho(min.mV[0], max.mV[0],
                                 min.mV[1], max.mV[1],
                                 -max.mV[2], -min.mV[2]);
+                        // <FS:Trish/> Ortho texels are the same size everywhere
+                        min_texel_size = llmin((max.mV[0] - min.mV[0]) / shadow_map_width, (max.mV[1] - min.mV[1]) / shadow_map_height);
                     }
                     else
                     {
@@ -13129,6 +13191,11 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                             0, (yfar + ynear) / (ynear - yfar), 0, -1.0f,
                             0, 0, -fz, 0,
                             0, (2.f * yfar * ynear) / (ynear - yfar), 0, 0);
+
+                        // <FS:Trish> Perspective texels grow with distance from the origin, so
+                        // the smallest ones are at the near plane: 2 * ynear * tan(fov) / resolution
+                        min_texel_size = 2.f * ynear * llmin(tanf(fovx) / shadow_map_width, tanf(fovz) / shadow_map_height);
+                        // </FS:Trish>
                     }
                 }
             }
@@ -13169,12 +13236,21 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             mRT->shadow[j].clear();
 
             {
+                // <FS:Trish> Casters smaller than this many of the cascade's smallest texels can't
+                // show up in it. Not applied to probe shadows, which use their own path.
+                static LLCachedControl<F32> min_caster_texels(gSavedSettings, "RenderShadowMinCasterTexels", 1.f);
+                const F32 min_caster_size = (!gCubeSnapshot && min_caster_texels > 0.f && llfinite(min_texel_size))
+                    ? llmax(min_texel_size, 0.f) * min_caster_texels : 0.f;
+                // </FS:Trish>
                 static LLCullResult result[4];
                 if (have_union_cull)
                 {   // re-bucket the shared union cull down to this cascade's frustum
-                    bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
+                    //bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
+                    bucketShadowCull(sUnionShadowResult, shadow_cam, result[j], min_caster_size); // <FS:Trish/>
                 }
+                sShadowMinCasterSize = have_union_cull ? 0.f : min_caster_size; // <FS:Trish/> used by LLOctreeCullShadow
                 renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull);
+                sShadowMinCasterSize = 0.f; // <FS:Trish/>
             }
 
             mRT->shadow[j].flush();

@@ -710,6 +710,11 @@ public:
     static bool             sNoAlpha;
     static bool             sUseFarClip;
     static bool             sShadowRender;
+    // <FS:Trish> Smallest caster size, in meters, worth drawing into the shadow map being
+    // culled (0 = no limit), see RenderShadowMinCasterTexels
+    static F32              sShadowMinCasterSize;
+    static bool             isShadowCasterTooSmall(LLSpatialGroup* group, F32 min_size);
+    // </FS:Trish>
     static bool             sDynamicLOD;
     static bool             sPickAvatar;
     static bool             sReflectionRender;
