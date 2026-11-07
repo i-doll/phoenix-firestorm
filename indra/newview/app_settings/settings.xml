@@ -27609,6 +27609,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSRenderUpscaler</key>
+    <map>
+      <key>Comment</key>
+      <string>Filter used when the 3D scene is rendered smaller than the window and enlarged for display (dynamic resolution, RenderResolutionMultiplier below 1, RenderResolutionDivisor). 0 = stock filter (sharpened Catmull-Rom for dynamic resolution, bilinear otherwise), 1 = NVIDIA Image Scaling (6-tap directional scaler with edge-adaptive sharpening, works on any GPU). Its sharpening uses FSRenderDynamicResolutionSharpness and replaces CAS (RenderCASSharpness) on frames it enlarges. Changing it reloads the shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

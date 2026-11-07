@@ -1415,6 +1415,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "FSRenderSkinSSS", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "FSPerfBatchedLocalLights", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "FSPerfSkinOncePerFrame", handleSetShaderChanged); // <FS:Trish/>
+    setting_setup_signal_listener(gSavedSettings, "FSRenderUpscaler", handleSetShaderChanged); // <FS:Trish/> builds the NIS program
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatConsoleFontSize", handleChatFontSizeChanged);

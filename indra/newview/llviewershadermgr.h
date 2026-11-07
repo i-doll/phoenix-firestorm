@@ -277,6 +277,7 @@ extern LLGLSLShader         gFSBloomUpProgram;
 extern LLGLSLShader         gFSLensDirtProgram;
 extern LLGLSLShader         gFSLensEffectsProgram;
 extern LLGLSLShader         gFSDynResUpscaleProgram; // <FS:Trish/> Dynamic resolution
+extern LLGLSLShader         gFSNISUpscaleProgram; // <FS:Trish/> NVIDIA Image Scaling
 // </FS:Trish>
 
 // <ID:VolumetricClouds>

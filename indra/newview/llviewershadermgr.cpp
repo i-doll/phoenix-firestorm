@@ -228,6 +228,7 @@ LLGLSLShader            gIDCloudsFroxelProgram;
 LLGLSLShader            gIDCloudsFroxelAccumProgram;
 // </ID:VolumetricClouds>
 LLGLSLShader            gFSDynResUpscaleProgram; // <FS:Trish/> Dynamic resolution
+LLGLSLShader            gFSNISUpscaleProgram; // <FS:Trish/> NVIDIA Image Scaling
 // </FS:Trish>
 LLGLSLShader            gFSLocalTonemapLumProgram; // <FS:Trish/> Local tone mapping
 LLGLSLShader            gFSSkinSSSProgram; // <FS:Trish/>
@@ -1557,6 +1558,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSLensDirtProgram.unload();
         gFSLensEffectsProgram.unload();
         gFSDynResUpscaleProgram.unload(); // <FS:Trish/> Dynamic resolution
+        gFSNISUpscaleProgram.unload(); // <FS:Trish/> NVIDIA Image Scaling
         gFSLocalTonemapLumProgram.unload(); // <FS:Trish/> Local tone mapping
         gFSSkinSSSProgram.unload(); // <FS:Trish/>
         gFSGTAOHalfProgram.unload(); // <FS:Trish/> Half-resolution GTAO
@@ -3184,6 +3186,28 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 LL_WARNS("ShaderLoading") << post.mName << " failed to build, that effect stays off" << LL_ENDL;
                 post.mShader->unload();
             }
+        }
+    }
+    // </FS:Trish>
+
+    // <FS:Trish> NVIDIA Image Scaling upscaler, built only while FSRenderUpscaler selects it.
+    // Optional: without it the present falls back to the stock upscale.
+    gFSNISUpscaleProgram.unload();
+    static LLCachedControl<S32> fs_upscaler(gSavedSettings, "FSRenderUpscaler", 0);
+    if (success && fs_upscaler == 1)
+    {
+        gFSNISUpscaleProgram.mName = "FS NIS Upscale";
+        gFSNISUpscaleProgram.mFeatures.isDeferred = false;
+        gFSNISUpscaleProgram.mShaderFiles.clear();
+        gFSNISUpscaleProgram.clearPermutations();
+        gFSNISUpscaleProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gFSNISUpscaleProgram.mShaderFiles.push_back(make_pair("deferred/fsNISUpscaleF.glsl", GL_FRAGMENT_SHADER));
+        gFSNISUpscaleProgram.mShaderFiles.push_back(make_pair("deferred/fsDebandF.glsl", GL_FRAGMENT_SHADER)); // Debanding dither
+        gFSNISUpscaleProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        if (!gFSNISUpscaleProgram.createShader())
+        {
+            LL_WARNS("ShaderLoading") << "FS NIS Upscale failed to build, the stock upscale is used" << LL_ENDL;
+            gFSNISUpscaleProgram.unload();
         }
     }
     // </FS:Trish>

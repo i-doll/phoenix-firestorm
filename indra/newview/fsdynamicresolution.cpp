@@ -75,6 +75,7 @@
 #include "llviewercontrol.h"
 #include "llviewerdisplay.h"
 #include "llviewershadermgr.h"
+#include "llviewerwindow.h"
 #include "pipeline.h"
 
 extern bool gCubeSnapshot;
@@ -325,6 +326,51 @@ namespace
             apply_scale(next, headroom ? "GPU headroom" : "CPU bound");
         }
     }
+
+    // NVIDIA Image Scaling constants: NVScalerUpdateConfig() from NIS_Config.h (NIS SDK v1.0.3,
+    // MIT license, Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES) in SDR mode, the input
+    // being tone mapped and gamma corrected. The scale and texel size terms are not needed:
+    // the shader derives the source position from the present's texture coordinate.
+    void setup_nis(LLGLSLShader& shader, F32 sharpness)
+    {
+        // adjust params based on value from sharpness slider
+        sharpness = llclamp(sharpness, 0.f, 1.f);
+        const F32 sharpen_slider = sharpness - 0.5f; // Map 0 to 1 to -0.5 to +0.5
+
+        // Different range for 0 to 50% vs 50% to 100%. Sharpness 0 maps to no sharpening,
+        // while 1 doesn't oversharpen.
+        const F32 MaxScale = (sharpen_slider >= 0.0f) ? 1.25f : 1.75f;
+        const F32 MinScale = (sharpen_slider >= 0.0f) ? 1.25f : 1.0f;
+        const F32 LimitScale = (sharpen_slider >= 0.0f) ? 1.25f : 1.0f;
+
+        const F32 kDetectRatio = 2.f * 1127.f / 1024.f;
+
+        // Params for SDR
+        const F32 kDetectThres = 64.0f / 1024.0f;
+        const F32 kMinContrastRatio = 2.0f;
+        const F32 kMaxContrastRatio = 10.0f;
+
+        const F32 kSharpStartY = 0.45f;
+        const F32 kSharpEndY = 0.9f;
+        const F32 kSharpStrengthMin = llmax(0.0f, 0.4f + sharpen_slider * MinScale * 1.2f);
+        const F32 kSharpStrengthMax = 1.6f + sharpen_slider * MaxScale * 1.8f;
+        const F32 kSharpLimitMin = llmax(0.1f, 0.14f + sharpen_slider * LimitScale * 0.32f);
+        const F32 kSharpLimitMax = 0.5f + sharpen_slider * LimitScale * 0.6f;
+
+        const F32 kRatioNorm = 1.0f / (kMaxContrastRatio - kMinContrastRatio);
+        const F32 kSharpScaleY = 1.0f / (kSharpEndY - kSharpStartY);
+        const F32 kSharpStrengthScale = kSharpStrengthMax - kSharpStrengthMin;
+        const F32 kSharpLimitScale = kSharpLimitMax - kSharpLimitMin;
+        const F32 kContrastBoost = 1.0f;
+        const F32 kEps = 1.0f / 255.0f;
+
+        static LLStaticHashedString s_detect("nis_detect");
+        static LLStaticHashedString s_sharp_y("nis_sharp_y");
+        static LLStaticHashedString s_sharp("nis_sharp");
+        shader.uniform4f(s_detect, kDetectRatio, kDetectThres, kMinContrastRatio, kRatioNorm);
+        shader.uniform4f(s_sharp_y, kContrastBoost, kEps, kSharpStartY, kSharpScaleY);
+        shader.uniform4f(s_sharp, kSharpStrengthMin, kSharpStrengthScale, kSharpLimitMin, kSharpLimitScale);
+    }
 }
 
 // static
@@ -430,8 +476,31 @@ void FSDynamicResolution::shadowBaseSize(U32& res_x, U32& res_y)
 }
 
 // static
+bool FSDynamicResolution::nisPresents(const LLRenderTarget* src, S32 out_width, S32 out_height)
+{
+    static LLCachedControl<S32> upscaler(gSavedSettings, "FSRenderUpscaler", 0);
+    return upscaler == 1 && src && gFSNISUpscaleProgram.isComplete() &&
+           ((S32)src->getWidth() < out_width || (S32)src->getHeight() < out_height);
+}
+
+// static
+bool FSDynamicResolution::upscalerReplacesCAS(const LLRenderTarget* src)
+{
+    // renderFinalize() asks before the present viewport is set, so compare with the world view
+    // rectangle that viewport is made from
+    const LLRect& rect = gViewerWindow->getWorldViewRectRaw();
+    return nisPresents(src, rect.getWidth(), rect.getHeight());
+}
+
+// static
 LLGLSLShader& FSDynamicResolution::presentShader(LLGLSLShader& fallback, const LLRenderTarget* src)
 {
+    // NIS takes every upscaled present: dynamic resolution, RenderResolutionMultiplier below 1
+    // and RenderResolutionDivisor
+    if (nisPresents(src, gGLViewport[2], gGLViewport[3]))
+    {
+        return gFSNISUpscaleProgram;
+    }
     if (sAppliedScale < 1.f && src && gFSDynResUpscaleProgram.isComplete() &&
         ((S32)src->getWidth() < gGLViewport[2] || (S32)src->getHeight() < gGLViewport[3]))
     {
@@ -443,11 +512,16 @@ LLGLSLShader& FSDynamicResolution::presentShader(LLGLSLShader& fallback, const L
 // static
 void FSDynamicResolution::setupPresent(LLGLSLShader& shader)
 {
+    static LLCachedControl<F32> sharpness(gSavedSettings, "FSRenderDynamicResolutionSharpness", 0.5f);
+    if (&shader == &gFSNISUpscaleProgram)
+    {
+        setup_nis(shader, sharpness);
+        return;
+    }
     if (&shader != &gFSDynResUpscaleProgram)
     {
         return;
     }
-    static LLCachedControl<F32> sharpness(gSavedSettings, "FSRenderDynamicResolutionSharpness", 0.5f);
     static LLStaticHashedString s_sharpness("fs_dynres_sharpness");
     shader.uniform1f(s_sharpness, llclamp((F32)sharpness, 0.f, 1.f));
 }

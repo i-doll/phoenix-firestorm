@@ -60,8 +60,16 @@ public:
 
     // renderFinalize() present: the upscale program when the image is below the window size,
     // else the given fallback. setupPresent() sets its uniforms once it is bound.
+    // With FSRenderUpscaler 1 every present that upscales (dynamic resolution, and a manual
+    // RenderResolutionMultiplier below 1 or RenderResolutionDivisor) uses NVIDIA Image Scaling
+    // instead, which also sharpens with FSRenderDynamicResolutionSharpness.
     static LLGLSLShader& presentShader(LLGLSLShader& fallback, const LLRenderTarget* src);
     static void setupPresent(LLGLSLShader& shader);
+
+    // renderFinalize(): true when the present of src will be NIS. Its sharpening replaces CAS,
+    // which would otherwise sharpen the same image a second time before NIS enlarges and
+    // sharpens it again (NVIDIA's guidance: NVScaler already includes the sharpening pass).
+    static bool upscalerReplacesCAS(const LLRenderTarget* src);
 
     static F32 getScale();
 
@@ -74,6 +82,9 @@ public:
         SnapshotGuard(const SnapshotGuard&) = delete;
         SnapshotGuard& operator=(const SnapshotGuard&) = delete;
     };
+
+private:
+    static bool nisPresents(const LLRenderTarget* src, S32 out_width, S32 out_height);
 };
 
 #endif // FS_DYNAMICRESOLUTION_H

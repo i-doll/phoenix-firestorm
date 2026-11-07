@@ -10341,6 +10341,7 @@ void LLPipeline::renderFinalize()
 
         static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
         bool apply_cas = cas_sharpness != 0.0f && gCASProgram.isComplete() && gCASLegacyGammaProgram.isComplete();
+        apply_cas = apply_cas && !FSDynamicResolution::upscalerReplacesCAS(&mRT->screen); // <FS:Trish/> NIS present sharpens instead
 
         tonemap(&mRT->screen, apply_cas ? &mRT->deferredLight : &mPostPingMap, !apply_cas);
 
