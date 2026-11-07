@@ -207,6 +207,7 @@ set(viewer_SOURCE_FILES
     fsnewitemctrl.cpp
     fspanelblocklist.cpp
     fspanelcontactsets.cpp
+    fspanelbuildinfo.cpp
     fspanelface.cpp
     fspanelimcontrolpanel.cpp
     fspanellogin.cpp
@@ -1108,6 +1109,7 @@ set(viewer_HEADER_FILES
     fsnewitemctrl.h
     fspanelblocklist.h
     fspanelcontactsets.h
+    fspanelbuildinfo.h
     fspanelface.h
     fspanelimcontrolpanel.h
     fspanellogin.h

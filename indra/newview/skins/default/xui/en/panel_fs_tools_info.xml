@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ border="false"
+ follows="all"
+ height="420"
+ label="Info"
+ layout="topleft"
+ left="0"
+ mouse_opaque="false"
+ name="Info"
+ top="0"
+ width="295">
+    <panel.string name="sel_counts_text">Objects: [OBJECTS]   Prims: [PRIMS]   Faces: [FACES]   Triangles drawn: [TRIS]</panel.string>
+    <panel.string name="sel_cost_text">Land impact: [LI]   Physics: [PHYSICS]   Download: [DOWNLOAD]</panel.string>
+    <panel.string name="sel_render_text">Render complexity: [COMPLEXITY]</panel.string>
+    <panel.string name="sel_textures_text">Textures: [COUNT] unique, [LOADED] loaded, [FULL] at full resolution</panel.string>
+    <panel.string name="sel_materials_text">Faces with PBR materials: [PBR]   with legacy normal/specular maps: [LEGACY]</panel.string>
+    <panel.string name="sel_lod_text">Showing detail level: High [HIGH], Medium [MEDIUM], Low [LOW], Lowest [LOWEST]</panel.string>
+    <panel.string name="obj_link_text">Link [LINK] of [COUNT]</panel.string>
+    <panel.string name="obj_ids_text">Local ID: [LOCALID]&#10;UUID: [UUID]</panel.string>
+    <panel.string name="obj_created_text">Created: [DATE]</panel.string>
+    <panel.string name="obj_region_text">Region: [REGION]</panel.string>
+    <panel.string name="bounds_size_text">Size along the root's axes: [X] x [Y] x [Z] m</panel.string>
+    <panel.string name="bounds_region_size_text">Size along the region's axes: [X] x [Y] x [Z] m</panel.string>
+    <panel.string name="bounds_center_text">Centre (region): [X], [Y], [Z]</panel.string>
+    <panel.string name="none_selected">Nothing selected</panel.string>
+    <panel.string name="unknown">unknown</panel.string>
+
+    <text
+     follows="left|top"
+     font="SansSerifSmallBold"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="sel_heading"
+     top="8"
+     width="275">
+        Selection
+    </text>
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="28"
+     layout="topleft"
+     left="10"
+     name="sel_counts"
+     tool_tip="Root objects and prims selected, their faces, and the triangles currently drawn for them (at the detail level each is showing)."
+     top_pad="4"
+     width="275"
+     wrap="true" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="sel_cost"
+     tool_tip="Land impact of the selected linksets, their physics weight and download (streaming) weight. These come from the region and update once it answers."
+     top_pad="2"
+     width="275" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="sel_render"
+     tool_tip="The selection's rendering complexity, counted like avatar complexity."
+     top_pad="2"
+     width="275" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="28"
+     layout="topleft"
+     left="10"
+     name="sel_textures"
+     tool_tip="Unique textures used by the selection (diffuse, normal, specular and PBR maps), the video memory they use at the resolution loaded now, and what they would use fully loaded."
+     top_pad="2"
+     width="275"
+     wrap="true" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="28"
+     layout="topleft"
+     left="10"
+     name="sel_materials"
+     top_pad="2"
+     width="275"
+     wrap="true" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="28"
+     layout="topleft"
+     left="10"
+     name="sel_lod"
+     tool_tip="How many of the selected prims are showing each detail level right now, from your camera."
+     top_pad="2"
+     width="275"
+     wrap="true" />
+
+    <text
+     follows="left|top"
+     font="SansSerifSmallBold"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="obj_heading"
+     top_pad="8"
+     width="275">
+        Object
+    </text>
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="obj_link"
+     top_pad="4"
+     width="275" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="28"
+     layout="topleft"
+     left="10"
+     name="obj_ids"
+     top_pad="2"
+     width="205" />
+    <button
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="20"
+     label="Copy UUID"
+     layout="topleft"
+     left="215"
+     name="copy_uuid_btn"
+     tool_tip="Copy this prim's UUID"
+     top_delta="4"
+     width="70" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="obj_created"
+     top_pad="6"
+     width="275" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="obj_region"
+     top_pad="2"
+     width="275" />
+
+    <text
+     follows="left|top"
+     font="SansSerifSmallBold"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="bounds_heading"
+     tool_tip="Bounding box of every prim in the selected linksets, even when only one part is selected with Edit linked."
+     top_pad="8"
+     width="275">
+        Linkset bounds
+    </text>
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="28"
+     layout="topleft"
+     left="10"
+     name="bounds_size"
+     top_pad="4"
+     width="205"
+     wrap="true" />
+    <button
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="20"
+     label="Copy"
+     layout="topleft"
+     left="215"
+     name="copy_size_btn"
+     tool_tip="Copy the size along the root's axes as an LSL vector"
+     top_delta="4"
+     width="70" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="28"
+     layout="topleft"
+     left="10"
+     name="bounds_region_size"
+     top_pad="6"
+     width="275"
+     wrap="true" />
+    <text
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="14"
+     layout="topleft"
+     left="10"
+     name="bounds_center"
+     top_pad="2"
+     width="205" />
+    <button
+     follows="left|top"
+     font="DejaVu"
+     font.size="LSmall"
+     height="20"
+     label="Copy"
+     layout="topleft"
+     left="215"
+     name="copy_center_btn"
+     tool_tip="Copy the centre in region coordinates as an LSL vector"
+     top_delta="-3"
+     width="70" />
+</panel>

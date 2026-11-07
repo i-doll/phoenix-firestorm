@@ -3392,6 +3392,18 @@ Low ↔ Lwst
              top="70"
              width="275" />
 		</panel>
+        <!-- <FS:Trish> Selection cost, memory, detail level, identity and bounds -->
+        <panel
+         class="fs_panel_build_info"
+         filename="panel_fs_tools_info.xml"
+         help_topic="toolbox_info_tab"
+         label="Info"
+         layout="topleft"
+         left_delta="0"
+         name="Info"
+         top_delta="0"
+         width="295" />
+        <!-- </FS:Trish> -->
         </tab_container>
 	<panel
 	 follows="left|top"

@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llfloatertools.h"
+#include "fspanelbuildinfo.h" // <FS:Trish/> link number helper
 
 #include "llfontgl.h"
 #include "llcoord.h"
@@ -654,27 +655,18 @@ void LLFloaterTools::refresh()
     {
         desc_string = getString("link_number");
         LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
-        if (objectp && objectp->getRootEdit())
+        // <FS:Trish> Shared with the face display above, and shows the link count
+        S32 link_num = 0;
+        S32 link_count = 0;
+        if (FSPanelBuildInfo::getLinkNumber(objectp, link_num, link_count))
         {
-            LLViewerObject::child_list_t children = objectp->getRootEdit()->getChildren();
-            if (children.empty())
-                num_string = "0"; //a childless prim is always link zero, and unhappy
-            else if (objectp->getRootEdit()->isSelected())
-                num_string = "1"; //root prim is always link one
-            else
+            LLResMgr::getInstance()->getIntegerString(num_string, link_num);
+            if (link_count > 1)
             {
-                S32 index = 1;
-                for (LLViewerObject::child_list_t::iterator iter = children.begin(); iter != children.end(); ++iter)
-                {
-                    index++;
-                    if ((*iter)->isSelected())
-                    {
-                        LLResMgr::getInstance()->getIntegerString(num_string, index);
-                        break;
-                    }
-                }
+                num_string += llformat("/%d", link_count);
             }
         }
+        // </FS:Trish>
     }
     else
     {
