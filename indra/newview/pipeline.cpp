@@ -10913,7 +10913,7 @@ static void fs_bind_water_caustics(LLGLSLShader& shader)
 }
 // </FS:Trish>
 
-// <FS:Trish> Per frame uniforms of the extra sun shadow terms (fsShadowExtrasF.glsl, shadowUtil.glsl).
+// <FS:Trish> Per frame uniforms of the extra sun shadow terms (fsShadowExtrasF.glsl, fsShadowFadeF.glsl).
 // Programs built without a feature have no such uniforms, and setting them is then a no-op.
 static void fs_bind_sun_shadow_extras(LLGLSLShader& shader, const glm::mat4& modelview)
 {
@@ -10923,6 +10923,16 @@ static void fs_bind_sun_shadow_extras(LLGLSLShader& shader, const glm::mat4& mod
     static LLCachedControl<bool> contact_shadows(gSavedSettings, "FSRenderContactShadows", false);
     static LLCachedControl<F32> contact_length(gSavedSettings, "FSRenderContactShadowLength", 0.5f);
     static LLCachedControl<F32> contact_strength(gSavedSettings, "FSRenderContactShadowStrength", 0.8f);
+    static LLCachedControl<bool> smooth_fade(gSavedSettings, "FSRenderShadowSmoothFade", false);
+
+    // Smooth fade: dither the cascade transitions only where the shadow blur runs after this pass
+    // (the same test as renderDeferredLighting's) to turn the dither into a smooth change; set on
+    // every bind, as the probe program also draws probe captures
+    {
+        static const LLStaticHashedString sCascadeDither("fs_shadow_cascade_dither");
+        const bool blur = LLPipeline::RenderDeferredSSAO && LLPipeline::RenderShadowBlurSize != 0.f;
+        shader.uniform1i(sCascadeDither, (smooth_fade && blur && !gCubeSnapshot) ? 1 : 0);
+    }
 
     if (gCubeSnapshot)
     {
@@ -11286,7 +11296,7 @@ void LLPipeline::renderDeferredLighting()
                 }
                 // </ID:PCSS>
 
-                fs_bind_sun_shadow_extras(sun_shader, mat); // <FS:Trish/> cloud and contact shadows
+                fs_bind_sun_shadow_extras(sun_shader, mat); // <FS:Trish/> cloud, contact shadows, smooth fade
                 // <FS:Trish> GTAO search radius (metres) and visibility exponent; only a sun
                 // program built with FS_GTAO has these uniforms
                 static LLCachedControl<bool> fs_gtao(gSavedSettings, "FSRenderGTAO", false);

@@ -1178,6 +1178,16 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
         // </FS:Trish>
 
+        // <FS:Trish> Smooth sun shadow fade at the far end of the range and dithered cascade
+        // transitions (fsShadowFadeF.glsl); the value is the fade's share of the range
+        static LLCachedControl<bool> smooth_fade(gSavedSettings, "FSRenderShadowSmoothFade", false);
+        static LLCachedControl<F32> fade_length(gSavedSettings, "FSRenderShadowFadeLength", 0.2f);
+        if (smooth_fade)
+        {
+            attribs["FS_SHADOW_EDGE_FADE"] = llformat("%.3f", llclamp((F32)fade_length, 0.02f, 0.5f));
+        }
+        // </FS:Trish>
+
         if (shadow_detail >= 2)
         {
             attribs["SPOT_SHADOW"] = "1";
@@ -1277,6 +1287,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/globalF.glsl",                          1));
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/idCloudUtil.glsl",                     1) ); // <ID:VolumetricClouds/>
+    // <FS:Trish> Smooth sun shadow fade, attached next to shadowUtil.glsl (LLShaderMgr::attachShaderFeatures)
+    if (attribs.count("FS_SHADOW_EDGE_FADE"))
+    {
+        index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/fsShadowFadeF.glsl",               1) );
+    }
+    // </FS:Trish>
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/pbrterrainUtilF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/tonemapUtilF.glsl",                    1) );

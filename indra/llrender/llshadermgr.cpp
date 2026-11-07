@@ -256,6 +256,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         {
             return false;
         }
+
+        // <FS:Trish> Smooth sun shadow fade: its helpers, compiled with the basic shaders while the
+        // global define is set (LLViewerShaderMgr::loadBasicShaders)
+        if (LLGLSLShader::sGlobalDefines.count("FS_SHADOW_EDGE_FADE") && !shader->attachFragmentObject("deferred/fsShadowFadeF.glsl"))
+        {
+            return false;
+        }
+        // </FS:Trish>
     }
 
     if (features->hasReflectionProbes)

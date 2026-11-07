@@ -250,6 +250,19 @@ float pcfSpotShadow(sampler2DShadow shadowMap, vec4 stc, float bias_scale, vec2 
 #endif
 }
 
+// Smooth fade (fsShadowFadeF.glsl): a fade at the far end of the range and dithered cascade
+// transitions. Without it the blend fractions pass through unchanged.
+#if defined(FS_SHADOW_EDGE_FADE)
+float fsCascadeFadeOut(float t);
+float fsCascadeFadeIn(float f);
+float fsShadowEdgeFade(float shadow, float z);
+#define FS_CASCADE_FADE_OUT(t) fsCascadeFadeOut(t)
+#define FS_CASCADE_FADE_IN(f) fsCascadeFadeIn(f)
+#else
+#define FS_CASCADE_FADE_OUT(t) (t)
+#define FS_CASCADE_FADE_IN(f) (f)
+#endif
+
 float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 {
 #if defined(SUN_SHADOW)
@@ -280,7 +293,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             lpos = shadow_matrix[3]*spos;
 
             float w = 1.0;
-            w -= max(spos.z-far_split.z, 0.0)/transition_domain.z;
+            w -= FS_CASCADE_FADE_IN(max(spos.z-far_split.z, 0.0)/transition_domain.z);
             //w = clamp(w, 0.0, 1.0);
             float contrib = pcfShadow(shadowMap3, norm, lpos, 1.0, pos_screen, light_dir, 3, spos.xyz)*w;
             //if (contrib > 0)
@@ -288,7 +301,9 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
                 shadow += contrib;
                 weight += w;
             }
+#if !defined(FS_SHADOW_EDGE_FADE)
             shadow += max((pos.z+shadow_clip.z)/(shadow_clip.z-shadow_clip.w)*2.0-1.0, 0.0);
+#endif
         }
 
         if (spos.z < near_split.y && spos.z > far_split.z)
@@ -296,8 +311,8 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             lpos = shadow_matrix[2]*spos;
 
             float w = 1.0;
-            w -= max(spos.z-far_split.y, 0.0)/transition_domain.y;
-            w -= max(near_split.z-spos.z, 0.0)/transition_domain.z;
+            w -= FS_CASCADE_FADE_IN(max(spos.z-far_split.y, 0.0)/transition_domain.y);
+            w -= FS_CASCADE_FADE_OUT(max(near_split.z-spos.z, 0.0)/transition_domain.z);
             //w = clamp(w, 0.0, 1.0);
             float contrib = pcfShadow(shadowMap2, norm, lpos, 1.0, pos_screen, light_dir, 2, spos.xyz)*w;
             //if (contrib > 0)
@@ -312,8 +327,8 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             lpos = shadow_matrix[1]*spos;
 
             float w = 1.0;
-            w -= max(spos.z-far_split.x, 0.0)/transition_domain.x;
-            w -= max(near_split.y-spos.z, 0.0)/transition_domain.y;
+            w -= FS_CASCADE_FADE_IN(max(spos.z-far_split.x, 0.0)/transition_domain.x);
+            w -= FS_CASCADE_FADE_OUT(max(near_split.y-spos.z, 0.0)/transition_domain.y);
             //w = clamp(w, 0.0, 1.0);
             float contrib = pcfShadow(shadowMap1, norm, lpos, 1.0, pos_screen, light_dir, 1, spos.xyz)*w;
             //if (contrib > 0)
@@ -328,7 +343,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             lpos = shadow_matrix[0]*spos;
 
             float w = 1.0;
-            w -= max(near_split.x-spos.z, 0.0)/transition_domain.x;
+            w -= FS_CASCADE_FADE_OUT(max(near_split.x-spos.z, 0.0)/transition_domain.x);
             //w = clamp(w, 0.0, 1.0);
             float contrib = pcfShadow(shadowMap0, norm, lpos, 1.0, pos_screen, light_dir, 0, spos.xyz)*w;
             //if (contrib > 0)
@@ -339,6 +354,9 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
         }
 
         shadow /= weight;
+#if defined(FS_SHADOW_EDGE_FADE)
+        shadow = fsShadowEdgeFade(shadow, spos.z); // replaces the linear ramp over the far half of cascade 3
+#endif
     }
     else
     {
