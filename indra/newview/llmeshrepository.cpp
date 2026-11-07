@@ -4949,6 +4949,7 @@ void LLMeshRepository::notifyLoadedMeshes()
 
         //// Clean up dead skin info
         //U64Bytes skinbytes(0);
+        std::vector<LLUUID> erased_ids; // <FS:Trish/> Batch the background thread erase
         for (auto iter = mSkinMap.begin(), ender = mSkinMap.end(); iter != ender;)
         {
             auto copy_iter = iter++;
@@ -4963,15 +4964,32 @@ void LLMeshRepository::notifyLoadedMeshes()
             if (copy_iter->second->getNumRefs() == 1)
             {
                 mSkinMap.erase(copy_iter);
+                erased_ids.push_back(id); // <FS:Trish/> Batch the background thread erase
             }
 
-            // erase from background thread
-            mThread->mWorkQueue.post([=, this]()
+            // <FS:Trish> Erase only the skins dropped here from the background thread copy, in one work item
+            //// erase from background thread
+            //mThread->mWorkQueue.post([=, this]()
+            //    {
+            //        LLMutexLock skin_lock(mThread->mSkinMapMutex);
+            //        mThread->mSkinMap.erase(id);
+            //    });
+            // </FS:Trish>
+        }
+
+        // <FS:Trish> Erase only the skins dropped here from the background thread copy, in one work item
+        if (!erased_ids.empty())
+        {
+            mThread->mWorkQueue.post([ids = std::move(erased_ids), this]()
                 {
-                    LLMutexLock(mThread->mSkinMapMutex);
-                    mThread->mSkinMap.erase(id);
+                    LLMutexLock skin_lock(mThread->mSkinMapMutex);
+                    for (const LLUUID& id : ids)
+                    {
+                        mThread->mSkinMap.erase(id);
+                    }
                 });
         }
+        // </FS:Trish>
         //LL_INFOS() << "Skin info cache elements:" << mSkinMap.size() << " Memory: " << U64Kilobytes(skinbytes) << LL_ENDL;
     }
 
