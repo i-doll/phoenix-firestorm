@@ -267,6 +267,12 @@ public:
     bool visibleObjectsInFrustum(LLCamera& camera);
     bool getVisibleExtents(LLCamera& camera, LLVector3 &min, LLVector3& max);
     bool getVisiblePointCloud(LLCamera& camera, LLVector3 &min, LLVector3& max, std::vector<LLVector3>& fp, LLVector3 light_dir = LLVector3(0,0,0));
+    // <FS:Trish> FSPerfShadowPointCloudFromCull: shadow receiver bounds taken once per sun shadow update from the camera cull
+    void gatherShadowReceiverBounds();
+    bool getCulledVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& max);
+    std::vector<LLVector4a> mShadowReceiverBounds;  // per group: object bounds center, size, extents min, max
+    bool mUseShadowReceiverBounds = false;
+    // </FS:Trish>
 
     // Populate given LLCullResult with results of a frustum cull of the entire scene against the given LLCamera
     void updateCull(LLCamera& camera, LLCullResult& result, bool hud_attachments = false);

@@ -11743,12 +11743,81 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
     LLPipeline::sShadowRender = false;
 }
 
+// <FS:Trish> FSPerfShadowPointCloudFromCull
+// The camera cull that runs just before generateSunShadow already holds every non-empty group in view.
+// getVisibleExtents only wants the visible receivers (casters out of view are handled by the shadow
+// near plane, not by the point cloud), so keep the agent space object bounds of those groups once and
+// test them against each cascade frustum the same way LLOctreeCullVisExtents does.
+// Bridge-internal groups are skipped: their bounds are bridge local, and the bridge drawable itself is
+// in the region's bridge partition with agent space bounds.
+void LLPipeline::gatherShadowReceiverBounds()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    mShadowReceiverBounds.clear();
+
+    auto add_groups = [this](LLCullResult::sg_iterator begin, LLCullResult::sg_iterator end)
+    {
+        for (LLCullResult::sg_iterator i = begin; i != end; ++i)
+        {
+            LLSpatialGroup* group = *i;
+            if (!group || group->isDead() || group->isEmpty())
+            {
+                continue;
+            }
+            LLSpatialPartition* part = group->getSpatialPartition();
+            if (!part || part->isBridge() || !hasRenderType(part->mDrawableType))
+            {
+                continue;
+            }
+            const LLVector4a* bounds = group->getObjectBounds();
+            const LLVector4a* exts = group->getObjectExtents();
+            mShadowReceiverBounds.push_back(bounds[0]);
+            mShadowReceiverBounds.push_back(bounds[1]);
+            mShadowReceiverBounds.push_back(exts[0]);
+            mShadowReceiverBounds.push_back(exts[1]);
+        }
+    };
+
+    add_groups(sCull->beginVisibleGroups(), sCull->endVisibleGroups());
+    add_groups(sCull->beginDrawableGroups(), sCull->endDrawableGroups());
+}
+
+// Same contract as getVisibleExtents: returns true when nothing is in the frustum
+bool LLPipeline::getCulledVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& max)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    const F32 X = 65536.f;
+    LLVector4a mina;
+    LLVector4a maxa;
+    mina.splat(X);
+    maxa.splat(-X);
+
+    bool empty = true;
+    for (size_t i = 0; i + 3 < mShadowReceiverBounds.size(); i += 4)
+    {
+        if (camera.AABBInFrustum(mShadowReceiverBounds[i], mShadowReceiverBounds[i + 1]) > 0)
+        {
+            empty = false;
+            update_min_max(mina, maxa, mShadowReceiverBounds[i + 2]);
+            update_min_max(mina, maxa, mShadowReceiverBounds[i + 3]);
+        }
+    }
+
+    min.set(mina.getF32ptr());
+    max.set(maxa.getF32ptr());
+    return empty;
+}
+// </FS:Trish>
+
 bool LLPipeline::getVisiblePointCloud(LLCamera& camera, LLVector3& min, LLVector3& max, std::vector<LLVector3>& fp, LLVector3 light_dir)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     //get point cloud of intersection of frust and min, max
 
-    if (getVisibleExtents(camera, min, max))
+    // <FS:Trish> Use the receiver bounds gathered from the camera cull instead of walking every octree again
+    //if (getVisibleExtents(camera, min, max))
+    if (mUseShadowReceiverBounds ? getCulledVisibleExtents(camera, min, max) : getVisibleExtents(camera, min, max))
+    // </FS:Trish>
     {
         return false;
     }
@@ -12907,6 +12976,23 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     up.normVec();
     at.normVec();
 
+
+    // <FS:Trish> Take the shadow receiver bounds from the camera cull once, instead of walking every
+    // octree for the main frustum and again for each cascade. sCull still holds the cull of this camera
+    // here (both callers run updateCull right before generateSunShadow). The render type mask is already
+    // narrowed above, as getVisibleExtents expects.
+    static LLCachedControl<bool> point_cloud_from_cull(gSavedSettings, "FSPerfShadowPointCloudFromCull", false);
+    struct ReceiverBoundsReset
+    {
+        LLPipeline* pipeline;
+        ~ReceiverBoundsReset() { pipeline->mUseShadowReceiverBounds = false; pipeline->mShadowReceiverBounds.clear(); }
+    } receiver_bounds_reset{ this };
+    mUseShadowReceiverBounds = point_cloud_from_cull && sCull;
+    if (mUseShadowReceiverBounds)
+    {
+        gatherShadowReceiverBounds();
+    }
+    // </FS:Trish>
 
     LLCamera main_camera = camera;
 
