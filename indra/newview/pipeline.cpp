@@ -13381,8 +13381,11 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 // <FS:Trish> Casters smaller than this many of the cascade's smallest texels can't
                 // show up in it. Not applied to probe shadows, which use their own path.
                 static LLCachedControl<F32> min_caster_texels(gSavedSettings, "RenderShadowMinCasterTexels", 1.f);
+                // ...and more of them in the far cascades, where small objects barely show
+                static LLCachedControl<F32> far_caster_scale(gSavedSettings, "FSRenderShadowFarCascadeMinCasterScale", 1.f);
+                const F32 cascade_caster_scale = j >= 2 ? llclamp((F32)far_caster_scale, 1.f, 16.f) : 1.f;
                 const F32 min_caster_size = (!gCubeSnapshot && min_caster_texels > 0.f && llfinite(min_texel_size))
-                    ? llmax(min_texel_size, 0.f) * min_caster_texels : 0.f;
+                    ? llmax(min_texel_size, 0.f) * min_caster_texels * cascade_caster_scale : 0.f;
                 // </FS:Trish>
                 static LLCullResult result[4];
                 if (have_union_cull)
