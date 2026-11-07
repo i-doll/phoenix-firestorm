@@ -1472,6 +1472,12 @@ static bool id_gl_extension_supported(const char* name)
 // these are used to turn software blending on. They appear in the Debug/Avatar menu
 // presence of vertex skinning/blending or vertex programs will set these to false by default.
 
+// <FS:Trish> GL_NV_shading_rate_image (FSRenderVRS)
+PFNGLBINDSHADINGRATEIMAGENVPROC fs_glBindShadingRateImageNV = nullptr;
+PFNGLSHADINGRATEIMAGEPALETTENVPROC fs_glShadingRateImagePaletteNV = nullptr;
+PFNGLSHADINGRATEIMAGEBARRIERNVPROC fs_glShadingRateImageBarrierNV = nullptr;
+// </FS:Trish>
+
 void LLGLManager::initExtensions()
 {
 // <FS:Zi> Linux support
@@ -1521,6 +1527,22 @@ void LLGLManager::initExtensions()
     // NVIDIA Turing and newer. State only, no entry points.
     mHasNVRepresentativeFragmentTest = id_gl_extension_supported("GL_NV_representative_fragment_test");
     LL_INFOS("RenderInit") << "NV representative fragment test available: " << mHasNVRepresentativeFragmentTest << LL_ENDL;
+    // </FS:Trish>
+
+    // <FS:Trish> Variable rate shading (FSRenderVRS): NVIDIA Turing and newer
+    fs_glBindShadingRateImageNV = nullptr;
+    fs_glShadingRateImagePaletteNV = nullptr;
+    fs_glShadingRateImageBarrierNV = nullptr;
+#if LL_WINDOWS || LL_SDL
+    if (id_gl_extension_supported("GL_NV_shading_rate_image"))
+    {
+        fs_glBindShadingRateImageNV = (PFNGLBINDSHADINGRATEIMAGENVPROC)GLH_EXT_GET_PROC_ADDRESS("glBindShadingRateImageNV");
+        fs_glShadingRateImagePaletteNV = (PFNGLSHADINGRATEIMAGEPALETTENVPROC)GLH_EXT_GET_PROC_ADDRESS("glShadingRateImagePaletteNV");
+        fs_glShadingRateImageBarrierNV = (PFNGLSHADINGRATEIMAGEBARRIERNVPROC)GLH_EXT_GET_PROC_ADDRESS("glShadingRateImageBarrierNV");
+    }
+#endif
+    mHasNVShadingRateImage = fs_glBindShadingRateImageNV && fs_glShadingRateImagePaletteNV && fs_glShadingRateImageBarrierNV;
+    LL_INFOS("RenderInit") << "NV shading rate image available: " << mHasNVShadingRateImage << LL_ENDL;
     // </FS:Trish>
 
     mInited = true;

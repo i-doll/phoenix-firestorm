@@ -100,6 +100,7 @@ public:
     bool mHasAnisotropic = false;
     bool mHasDSA = false;
     bool mHasNVRepresentativeFragmentTest = false; // <FS:Trish/> GL_NV_representative_fragment_test (FSPerfRepresentativeFragmentTest)
+    bool mHasNVShadingRateImage = false; // <FS:Trish/> GL_NV_shading_rate_image (FSRenderVRS)
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
@@ -489,5 +490,12 @@ extern bool gGLActive;
 #ifndef GL_DEPTH24_STENCIL8
 #define GL_DEPTH24_STENCIL8 GL_DEPTH24_STENCIL8_EXT
 #endif
+
+// <FS:Trish> GL_NV_shading_rate_image entry points (FSRenderVRS), loaded by initExtensions().
+// Only valid while gGLManager.mHasNVShadingRateImage is true.
+extern PFNGLBINDSHADINGRATEIMAGENVPROC fs_glBindShadingRateImageNV;
+extern PFNGLSHADINGRATEIMAGEPALETTENVPROC fs_glShadingRateImagePaletteNV;
+extern PFNGLSHADINGRATEIMAGEBARRIERNVPROC fs_glShadingRateImageBarrierNV;
+// </FS:Trish>
 
 #endif // LL_LLGL_H
