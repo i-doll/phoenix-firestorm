@@ -6942,6 +6942,13 @@ void LLPipeline::setupHWLights()
         return;
     }
 
+    // <FS:Trish> setupHWLights runs several times a frame (deferred, post deferred, lighting, probe passes);
+    // the light fades must only move forward on the first call of each frame
+    static U32 last_fade_frame = 0;
+    const bool advance_fade = (last_fade_frame != LLFrameTimer::getFrameCount());
+    last_fade_frame = LLFrameTimer::getFrameCount();
+    // </FS:Trish>
+
     F32 light_scale = 1.f;
 
     if (gCubeSnapshot)
@@ -7061,12 +7068,24 @@ void LLPipeline::setupHWLights()
                 if (fade >= 0.f)
                 {
                     fade = fade / LIGHT_FADE_TIME;
-                    ((Light*) (&(*iter)))->fade += gFrameIntervalSeconds.value();
+                    // <FS:Trish> Advance the fade once per frame, not once per call
+                    //((Light*) (&(*iter)))->fade += gFrameIntervalSeconds.value();
+                    if (advance_fade)
+                    {
+                        ((Light*) (&(*iter)))->fade += gFrameIntervalSeconds.value();
+                    }
+                    // </FS:Trish>
                 }
                 else
                 {
                     fade = 1.f + fade / LIGHT_FADE_TIME;
-                    ((Light*) (&(*iter)))->fade -= gFrameIntervalSeconds.value();
+                    // <FS:Trish> Advance the fade once per frame, not once per call
+                    //((Light*) (&(*iter)))->fade -= gFrameIntervalSeconds.value();
+                    if (advance_fade)
+                    {
+                        ((Light*) (&(*iter)))->fade -= gFrameIntervalSeconds.value();
+                    }
+                    // </FS:Trish>
                 }
                 fade = llclamp(fade,0.f,1.f);
                 light_color *= fade;
