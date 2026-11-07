@@ -242,20 +242,6 @@ bool LLAppViewerLinux::init()
 
     bool success = LLAppViewer::init();
 
-#if LL_SEND_CRASH_REPORTS
-    S32 nCrashSubmitBehavior = gCrashSettings.getS32("CrashSubmitBehavior");
-
-    // For the first version we just consider always send and create a nice dialog for CRASH_BEHAVIOR_ASK later.
-    if (success && nCrashSubmitBehavior != CRASH_BEHAVIOR_NEVER_SEND )
-    {
-        if( nCrashSubmitBehavior == CRASH_BEHAVIOR_ASK )
-            gCrashBehavior = "ask";
-        else
-            gCrashBehavior = "send";
-        setupBreakpad();
-    }
-#endif
-
     return success;
 }
 
