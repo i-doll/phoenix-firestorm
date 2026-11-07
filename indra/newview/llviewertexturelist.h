@@ -242,7 +242,17 @@ private:
     uuid_map_t mUUIDMap;
     LLTextureKey mLastUpdateKey;
     LLTextureKey mLastUrgentUpdateKey;
-    LLTextureKey mLastFetchRefreshKey; // <FS:Trish/> round-robin position of the fetch priority refresh
+    // <FS:Trish> The fetch priority refresh lane walks the fetching set instead of the whole map,
+    // and the urgent-lane set is reused instead of allocated every frame
+    //LLTextureKey mLastFetchRefreshKey; // <FS:Trish/> round-robin position of the fetch priority refresh
+    std::set<LLViewerFetchedTexture*> mFetchingTextures;
+    LLViewerFetchedTexture* mLastFetchRefreshTex = nullptr; // round-robin position of the fetch priority refresh (compared, never dereferenced)
+    std::unordered_set<LLViewerFetchedTexture*> mUrgentUpdates;
+    static bool sTrackFetching; // false after shutdown(), when textures may outlive the list
+public:
+    void onTextureFetchingChanged(LLViewerFetchedTexture* imagep, bool fetching);
+private:
+    // </FS:Trish>
     // Ready requests left over from the last frame: carried for time, or seen before the fetcher
     // had published the result (the notification can land just ahead of it).
     std::vector<LLUUID> mReadyRequestBacklog;

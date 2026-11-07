@@ -72,6 +72,7 @@
 void (*LLViewerTextureList::sUUIDCallback)(void **, const LLUUID&) = NULL;
 
 S32 LLViewerTextureList::sNumImages = 0;
+bool LLViewerTextureList::sTrackFetching = true; // <FS:Trish/>
 
 // <FS:Ansariel> Fast cache stats
 U32 LLViewerTextureList::sNumFastCacheReads = 0;
@@ -296,10 +297,33 @@ LLViewerTextureList::~LLViewerTextureList()
 {
 }
 
+// <FS:Trish> Set of textures with an active fetch request, for the fetch priority refresh lane
+void LLViewerTextureList::onTextureFetchingChanged(LLViewerFetchedTexture* imagep, bool fetching)
+{
+    if (!sTrackFetching)
+    {
+        return;
+    }
+    if (fetching)
+    {
+        mFetchingTextures.insert(imagep);
+    }
+    else
+    {
+        mFetchingTextures.erase(imagep);
+    }
+}
+// </FS:Trish>
+
 void LLViewerTextureList::shutdown()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LL_WARNS() << "Shutdown called" << LL_ENDL;
+    // <FS:Trish> Textures can outlive the list from here on
+    sTrackFetching = false;
+    mFetchingTextures.clear();
+    mUrgentUpdates.clear();
+    // </FS:Trish>
     // clear out preloads
     mImagePreloads.clear();
 
@@ -1469,7 +1493,11 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
     // Give visible textures a small extra pass while reserving most of the
     // budget for the complete sweep (including offscreen cleanup). This scan
     // is cheap and bounded; it does not recalculate pixel areas for candidates.
-    std::unordered_set<LLViewerFetchedTexture*> urgent_updates;
+    // <FS:Trish> Reuse the set instead of allocating it every frame
+    //std::unordered_set<LLViewerFetchedTexture*> urgent_updates;
+    std::unordered_set<LLViewerFetchedTexture*>& urgent_updates = mUrgentUpdates;
+    urgent_updates.clear();
+    // </FS:Trish>
    const U32 scan_count = llmin((U32)mUUIDMap.size(), 2048U);
     auto urgent_iter = mUUIDMap.upper_bound(mLastUrgentUpdateKey);
     //for (U32 scanned = 0; scanned < scan_count && urgent_updates.size() < 32 && !mUUIDMap.empty(); ++scanned)
@@ -1530,31 +1558,60 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
     // own round-robin refreshes every live request within a fraction of a second.
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - fetch priorities");
-        static constexpr U32 FETCH_REFRESH_SCAN_COUNT = 2048;
+        //static constexpr U32 FETCH_REFRESH_SCAN_COUNT = 2048;
         const F32 refresh_deadline = timer.getElapsedTimeF32() + max_time * 0.15f;
-        const U32 refresh_scan_count = llmin((U32)mUUIDMap.size(), FETCH_REFRESH_SCAN_COUNT);
-        auto refresh_iter = mUUIDMap.upper_bound(mLastFetchRefreshKey);
-        //for (U32 scanned = 0; scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned)
-        for (U32 scanned = 0; fetching && scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned) // <FS:Trish/> only fetching textures qualify
+        // <FS:Trish> Walk the set of fetching textures instead of scanning the map for them
+        //const U32 refresh_scan_count = llmin((U32)mUUIDMap.size(), FETCH_REFRESH_SCAN_COUNT);
+        //auto refresh_iter = mUUIDMap.upper_bound(mLastFetchRefreshKey);
+        ////for (U32 scanned = 0; scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned)
+        //for (U32 scanned = 0; fetching && scanned < refresh_scan_count && !mUUIDMap.empty(); ++scanned) // <FS:Trish/> only fetching textures qualify
+        const U32 refresh_scan_count = (U32)mFetchingTextures.size();
+        auto refresh_iter = mFetchingTextures.upper_bound(mLastFetchRefreshTex);
+        for (U32 scanned = 0; fetching && scanned < refresh_scan_count && !mFetchingTextures.empty(); ++scanned)
+        // </FS:Trish>
         {
             if (timer.getElapsedTimeF32() >= refresh_deadline)
             {
                 break;
             }
-            if (refresh_iter == mUUIDMap.end())
+            // <FS:Trish> Walk the set of fetching textures instead of scanning the map for them
+            //if (refresh_iter == mUUIDMap.end())
+            //{
+            //    refresh_iter = mUUIDMap.begin();
+            //}
+            //mLastFetchRefreshKey = refresh_iter->first;
+            //
+            //LLViewerFetchedTexture* candidate = refresh_iter->second.get();
+            //if (!candidate->isFetching() || urgent_updates.count(candidate))
+            //{
+            //    ++refresh_iter;
+            //    continue;
+            //}
+            //
+            //LLPointer<LLViewerFetchedTexture> imagep = refresh_iter->second;
+            if (refresh_iter == mFetchingTextures.end())
             {
-                refresh_iter = mUUIDMap.begin();
+                refresh_iter = mFetchingTextures.begin();
             }
-            mLastFetchRefreshKey = refresh_iter->first;
+            mLastFetchRefreshTex = *refresh_iter;
 
-            LLViewerFetchedTexture* candidate = refresh_iter->second.get();
+            LLViewerFetchedTexture* candidate = *refresh_iter;
             if (!candidate->isFetching() || urgent_updates.count(candidate))
             {
                 ++refresh_iter;
                 continue;
             }
 
-            LLPointer<LLViewerFetchedTexture> imagep = refresh_iter->second;
+            // Only textures in the map qualify, as with the map scan
+            auto map_iter = mUUIDMap.find(LLTextureKey(candidate->getID(), (ETexListType)candidate->getTextureListType()));
+            if (map_iter == mUUIDMap.end() || map_iter->second.get() != candidate)
+            {
+                ++refresh_iter;
+                continue;
+            }
+
+            LLPointer<LLViewerFetchedTexture> imagep = map_iter->second;
+            // </FS:Trish>
             updateImageDecodePriority(imagep);
             if (imagep->isInImageList())
             {
@@ -1562,7 +1619,10 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
                 urgent_updates.insert(imagep.get());
             }
             // Updating can erase map entries. Reacquire the iterator by key.
-            refresh_iter = mUUIDMap.upper_bound(mLastFetchRefreshKey);
+            // <FS:Trish> Updating can also change the fetching set
+            //refresh_iter = mUUIDMap.upper_bound(mLastFetchRefreshKey);
+            refresh_iter = mFetchingTextures.upper_bound(mLastFetchRefreshTex);
+            // </FS:Trish>
         }
     }
     // </FS:Trish>

@@ -1442,6 +1442,12 @@ void LLViewerFetchedTexture::init(bool firstinit)
 LLViewerFetchedTexture::~LLViewerFetchedTexture()
 {
     assert_main_thread();
+    // <FS:Trish> Leave the texture list's fetching set
+    if (mIsFetching)
+    {
+        gTextureList.onTextureFetchingChanged(this, false);
+    }
+    // </FS:Trish>
     //*NOTE getTextureFetch can return NULL when Viewer is shutting down.
     // This is due to LLWearableList is singleton and is destroyed after
     // LLAppViewer::cleanup() was called. (see ticket EXT-177)
@@ -2190,7 +2196,10 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
                 LL_WARNS() << "oversize, setting as missing" << LL_ENDL;
                 setIsMissingAsset();
                 mRawDiscardLevel = INVALID_DISCARD_LEVEL;
-                mIsFetching = false;
+                // <FS:Trish> Keep the texture list's fetching set current
+                //mIsFetching = false;
+                setIsFetching(false);
+                // </FS:Trish>
                 mLastPacketTimer.reset();
                 return false;
             }
@@ -2395,7 +2404,10 @@ bool LLViewerFetchedTexture::updateFetch()
         }
         if (finished)
         {
-            mIsFetching = false;
+            // <FS:Trish> Keep the texture list's fetching set current
+            //mIsFetching = false;
+            setIsFetching(false);
+            // </FS:Trish>
             mLastFetchState = -1;
             mLastPacketTimer.reset();
         }
@@ -2498,7 +2510,10 @@ bool LLViewerFetchedTexture::updateFetch()
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - request created");
             mHasFetcher = true;
-            mIsFetching = true;
+            // <FS:Trish> Keep the texture list's fetching set current
+            //mIsFetching = true;
+            setIsFetching(true);
+            // </FS:Trish>
             mLastWorkerDiscardLevel = worker_discard;
             // in some cases createRequest can modify discard, as an example
             // bake textures are always at discard 0
@@ -2583,12 +2598,26 @@ void LLViewerFetchedTexture::clearFetchedResults()
     }
 }
 
+// <FS:Trish> Keep the texture list's fetching set current
+void LLViewerFetchedTexture::setIsFetching(bool fetching)
+{
+    if (mIsFetching != fetching)
+    {
+        mIsFetching = fetching;
+        gTextureList.onTextureFetchingChanged(this, fetching);
+    }
+}
+// </FS:Trish>
+
 void LLViewerFetchedTexture::forceToDeleteRequest()
 {
     if (mHasFetcher)
     {
         mHasFetcher = false;
-        mIsFetching = false;
+        // <FS:Trish> Keep the texture list's fetching set current
+        //mIsFetching = false;
+        setIsFetching(false);
+        // </FS:Trish>
     }
 
     resetTextureStats();
@@ -2622,7 +2651,10 @@ void LLViewerFetchedTexture::setIsMissingAsset(bool is_missing)
         {
             LLAppViewer::getTextureFetch()->deleteRequest(getID(), true);
             mHasFetcher = false;
-            mIsFetching = false;
+            // <FS:Trish> Keep the texture list's fetching set current
+            //mIsFetching = false;
+            setIsFetching(false);
+            // </FS:Trish>
             mLastPacketTimer.reset();
             mFetchState = 0;
             mFetchPriority = 0;
