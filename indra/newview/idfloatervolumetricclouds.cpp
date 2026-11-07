@@ -161,7 +161,7 @@ S32 IDCloudAltitudeColumn::hitTest(S32 y, Drag& mode) const
         }
         return i;
     }
-    mode = Drag::None;
+    mode = Drag::Idle;
     return -1;
 }
 
@@ -223,7 +223,7 @@ bool IDCloudAltitudeColumn::handleMouseDown(S32 x, S32 y, MASK mask)
         return false;
     }
 
-    Drag mode = Drag::None;
+    Drag mode = Drag::Idle;
     const S32 hit = hitTest(y, mode);
     if (hit < 0)
     {
@@ -247,7 +247,7 @@ bool IDCloudAltitudeColumn::handleHover(S32 x, S32 y, MASK mask)
     }
 
     Drag mode = mDrag;
-    if (hasMouseCapture() && mDrag != Drag::None && mSelected >= 0 && mSelected < static_cast<S32>(mLayers.size()))
+    if (hasMouseCapture() && mDrag != Drag::Idle && mSelected >= 0 && mSelected < static_cast<S32>(mLayers.size()))
     {
         const F32 delta = std::round((y - mDragStartY) * metersPerPixel() / SNAP_M) * SNAP_M;
         IDCloudLayer& l = mLayers[mSelected];
@@ -293,14 +293,14 @@ bool IDCloudAltitudeColumn::handleMouseUp(S32 x, S32 y, MASK mask)
         return false;
     }
     gFocusMgr.setMouseCapture(nullptr);
-    mDrag = Drag::None;
+    mDrag = Drag::Idle;
     onCommit();
     return true;
 }
 
 void IDCloudAltitudeColumn::onMouseCaptureLost()
 {
-    mDrag = Drag::None;
+    mDrag = Drag::Idle;
 }
 
 // ---------------------------------------------------------------------------
@@ -528,7 +528,7 @@ void IDFloaterVolumetricClouds::draw()
 
 void IDFloaterVolumetricClouds::updateAvailability()
 {
-    const Blocked blocked = IDVolumetricClouds::canEdit() ? Blocked::None
+    const Blocked blocked = IDVolumetricClouds::canEdit() ? Blocked::Available
                           : !IDVolumetricClouds::isSupported() ? Blocked::Unsupported
                           : Blocked::Rlv;
     if (blocked == mBlocked)
@@ -545,13 +545,13 @@ void IDFloaterVolumetricClouds::updateAvailability()
     {
         mReasonText->setText(getString("reason_rlv"));
     }
-    mReasonText->setVisible(blocked != Blocked::None);
+    mReasonText->setVisible(blocked != Blocked::Available);
     updateEnabled();
 }
 
 void IDFloaterVolumetricClouds::updateEnabled()
 {
-    const bool ok = mBlocked == Blocked::None;
+    const bool ok = mBlocked == Blocked::Available;
     const S32 count = static_cast<S32>(IDCloudState::instance().current().mLayers.size());
     const S32 sel = mColumn->getSelected();
     const bool has_layer = ok && sel >= 0 && sel < count;

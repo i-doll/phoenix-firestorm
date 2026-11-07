@@ -46,7 +46,7 @@ protected:
     IDCloudAltitudeColumn(const Params& p);
 
 private:
-    enum class Drag { None, Move, Base, Top };
+    enum class Drag { Idle, Move, Base, Top };
 
     S32 altToY(F32 alt_m) const;
     F32 metersPerPixel() const;
@@ -54,7 +54,7 @@ private:
 
     std::vector<IDCloudLayer> mLayers;
     S32  mSelected = -1;
-    Drag mDrag = Drag::None;
+    Drag mDrag = Drag::Idle;
     S32  mDragStartY = 0;
     F32  mStartBaseM = 0.f;
     F32  mStartTopM = 0.f;
@@ -94,7 +94,7 @@ public:
 private:
     ~IDFloaterVolumetricClouds() override = default;
 
-    enum class Blocked { Unknown, None, Unsupported, Rlv };
+    enum class Blocked { Unknown, Available, Unsupported, Rlv };
 
     void refreshFromState();
     void refreshPresets();
