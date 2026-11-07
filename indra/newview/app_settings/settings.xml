@@ -26762,6 +26762,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSRenderShadowTexelSnap</key>
+    <map>
+      <key>Comment</key>
+      <string>Snap each sun shadow cascade to whole shadow map texels so shadow edges do not crawl or shimmer while the camera moves or turns.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

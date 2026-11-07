@@ -12981,6 +12981,16 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         up = camera.getUpAxis();
     }
 
+    // <FS:Trish> FSRenderShadowTexelSnap: a light space basis that doesn't turn with the camera, so the
+    // shadow map texel grid stays fixed in the world. Reflection probe shadows keep the usual fit.
+    static LLCachedControl<bool> shadow_texel_snap(gSavedSettings, "FSRenderShadowTexelSnap", false);
+    const bool texel_snap = shadow_texel_snap && !gCubeSnapshot;
+    if (texel_snap)
+    {
+        up = fabsf(lightDir.mV[VY]) < 0.9f ? LLVector3::y_axis : LLVector3::x_axis;
+    }
+    // </FS:Trish>
+
     up.normVec();
     at.normVec();
 
@@ -13078,6 +13088,12 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         da = powf(da, split_exp.mV[2]);
 
         F32 sxp = split_exp.mV[1] + (split_exp.mV[0]-split_exp.mV[1])*da;
+        // <FS:Trish> Snapped cascades are all orthographic: use the ortho exponent, which doesn't depend on camera rotation
+        if (texel_snap)
+        {
+            sxp = split_exp.mV[1];
+        }
+        // </FS:Trish>
 
         for (U32 i = 0; i < 4; ++i)
         {
@@ -13444,6 +13460,72 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 bfb = (sx*sxy-sy*sx2)/(sx*sx-bfm*sx2);
             }
 
+            // <FS:Trish> FSRenderShadowTexelSnap: an orthographic cascade around the bounding sphere of this
+            // split's frustum slice, whose size doesn't change as the camera turns, placed on whole shadow map
+            // texels of a grid fixed in the world, so texels don't move as the camera moves. The perspective
+            // warp isn't used here: its texels change size across the map, so it can't be snapped.
+            if (texel_snap)
+            {
+                // smallest sphere around the slice: its centre is on the view axis between the near and far rectangles
+                LLVector3 snap_near = (frust[0] + frust[1] + frust[2] + frust[3]) * 0.25f;
+                LLVector3 snap_far = (frust[4] + frust[5] + frust[6] + frust[7]) * 0.25f;
+                LLVector3 snap_axis = snap_far - snap_near;
+                const F32 snap_len = snap_axis.normVec();
+                F32 near_r2 = 0.f;
+                F32 far_r2 = 0.f;
+                for (U32 i = 0; i < 4; ++i)
+                {
+                    near_r2 = llmax(near_r2, (frust[i] - snap_near).magVecSquared());
+                    far_r2 = llmax(far_r2, (frust[i+4] - snap_far).magVecSquared());
+                }
+                const F32 t = snap_len > 0.f ? llclamp((snap_len * snap_len + far_r2 - near_r2) / (2.f * snap_len), 0.f, snap_len) : 0.f;
+                const LLVector3 sphere_center = snap_near + snap_axis * t;
+                F32 radius = 0.01f;
+                for (U32 i = 0; i < 8; ++i)
+                {
+                    radius = llmax(radius, dist_vec(frust[i], sphere_center));
+                }
+
+                // The split distances still follow the visible receivers. Keep each cascade's size while
+                // they drift, and only step it when the slice outgrows it or shrinks well inside it.
+                static F32 snap_radius[4] = { 0.f, 0.f, 0.f, 0.f };
+                if (radius > snap_radius[j] || radius < snap_radius[j] * 0.7f)
+                {
+                    const F32 step = powf(2.f, floorf(log2f(radius)) - 4.f);
+                    snap_radius[j] = ceilf(radius * 1.15f / step) * step;
+                }
+                radius = snap_radius[j];
+
+                // One texel more than the diameter, so flooring the corner onto the grid never uncovers the far edge
+                const F32 texel_x = 2.f * radius / llmax(shadow_map_width - 1.f, 1.f);
+                const F32 texel_y = 2.f * radius / llmax(shadow_map_height - 1.f, 1.f);
+
+                // light space position of the agent frame origin, the fixed point of the texel grid
+                const glm::vec3 grid_origin = mul_mat4_vec3(view[j], glm::vec3(0.f, 0.f, 0.f));
+                const glm::vec3 snap_center = mul_mat4_vec3(view[j], glm::vec3(sphere_center));
+                const F32 left = floorf((snap_center.x - radius - grid_origin.x) / texel_x) * texel_x + grid_origin.x;
+                const F32 bottom = floorf((snap_center.y - radius - grid_origin.y) / texel_y) * texel_y + grid_origin.y;
+
+                // depth range from the receivers as before, so the shadow bias means the same; casters
+                // outside it are depth clamped
+                F32 znear = -max.mV[2];
+                F32 zfar = -min.mV[2];
+                if (zfar - znear < 1.f)
+                {
+                    const F32 zmid = (znear + zfar) * 0.5f;
+                    znear = zmid - 0.5f;
+                    zfar = zmid + 0.5f;
+                }
+
+                proj[j] = glm::ortho(left, left + texel_x * shadow_map_width,
+                                     bottom, bottom + texel_y * shadow_map_height,
+                                     znear, zfar);
+                min_texel_size = llmin(texel_x, texel_y);
+                mShadowError.mV[j] = 0.f;
+                mShadowFOV.mV[j] = -1.f;
+            }
+            else
+            // </FS:Trish>
             {
                 // best fit line is y=bfm*x+bfb
 
