@@ -97,7 +97,6 @@ namespace
     constexpr S32 FROXEL_H = 90;
     constexpr S32 FROXEL_D = 64;
     constexpr F32 FROXEL_FAR_M = 1500.f;
-    constexpr S32 FROXEL_LIGHT_STEPS = 2;
 
     const char* CACHE_DIR   = "volumetric_clouds";
     const char* BASE_FILE   = "noise_base_v1_128.raw";
@@ -1149,7 +1148,7 @@ void IDVolumetricClouds::renderFroxels(LLRenderTarget* depth_src)
 
         const glm::mat4 eye_to_world(glm::mat3(glm::inverse(get_current_modelview())));
         shader.uniformMatrix4fv(s_eye_to_world, 1, GL_FALSE, glm::value_ptr(eye_to_world));
-        shader.uniform1i(s_light_steps, FROXEL_LIGHT_STEPS);
+        shader.uniform1i(s_light_steps, FULL_LIGHT_STEPS);
         shader.uniform1i(s_detail_noise, 1);
         shader.uniform1f(s_far, FROXEL_FAR_M);
         shader.uniform2f(s_grid, (F32)FROXEL_W, (F32)FROXEL_H);

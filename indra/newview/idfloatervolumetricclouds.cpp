@@ -847,7 +847,11 @@ void IDFloaterVolumetricClouds::onTypePicked(IDCloudType type)
     {
         IDCloudLayer d = idCloudTypeDefaults(type);
         d.mWindDirDeg = l.mWindDirDeg;
-        d.mWindSpeedMS = l.mWindSpeedMS;
+        // Fog drifts far slower than cloud, so its wind speed is not carried across.
+        if (type != IDCloudType::Fog && l.mType != IDCloudType::Fog)
+        {
+            d.mWindSpeedMS = l.mWindSpeedMS;
+        }
         l = d;
     });
 }
