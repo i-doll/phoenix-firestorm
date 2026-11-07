@@ -37,6 +37,18 @@ uniform int uOITPass;
 uniform int uPremultAlpha;
 uniform int uOITUseMRT;
 
+#ifdef FS_HAIR
+// Two-pass rigged alpha (FSRenderHairTwoPass, see LLDrawPoolAlpha::renderRiggedAlphaTwoPass).
+// Same block in class2 alphaF, class1 fullbrightF, class3 materialF and class2 pbralphaF.
+// fs_hair_pass: 0 stock, 1 solid core only (coverage >= fs_hair_cut, writes depth),
+// 2 soft fringe only (coverage < fs_hair_cut, depth tested only), 3 depth only.
+uniform int fs_hair_pass;
+uniform float fs_hair_cut;
+#define OIT_DEPTH_MASK_CUT fs_hair_cut // <ID/> Improved Transparency's depth mask takes the hair threshold
+#else
+#define OIT_DEPTH_MASK_CUT OIT_DEPTH_MASK_ALPHA_MIN
+#endif
+
 uniform mat3 env_mat;
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
@@ -176,6 +188,18 @@ void main()
     diffuse_linear.rgb = srgb_to_linear(diffuse_srgb.rgb);
 #endif // USE_VERTEX_COLOR
 
+#ifdef FS_HAIR
+    if ((fs_hair_pass == 1 && final_alpha < fs_hair_cut) || (fs_hair_pass == 2 && final_alpha >= fs_hair_cut))
+    {
+        discard;
+    }
+    if (fs_hair_pass == 3)
+    { // depth only: the colour mask is off, skip the lighting
+        frag_color = vec4(0.0);
+        return;
+    }
+#endif
+
     // After the alpha tests rather than ahead of them, so a fragment they reject does not pay
     // for the PCF taps. The shadow maps carry no mips, so nothing here depends on derivatives.
 #ifdef HAS_SUN_SHADOW
@@ -292,7 +316,7 @@ void main()
         // Depth-only pre-pass: fragments that are effectively opaque write
         // depth so weighted accumulation cannot blend surfaces behind them
         // through them. Color writes are masked off by the caller.
-        if (out_color.a < OIT_DEPTH_MASK_ALPHA_MIN)
+        if (out_color.a < OIT_DEPTH_MASK_CUT)
         {
             discard;
         }

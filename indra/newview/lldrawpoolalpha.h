@@ -94,6 +94,19 @@ private:
                                   const std::vector<LLDrawInfo*>& pbr_emissives,
                                   const std::vector<LLDrawInfo*>& pbr_rigged_emissives);
 
+    // <FS:Trish> Two-pass rigged alpha (FSRenderHairTwoPass). The values are the shaders' fs_hair_pass.
+    enum EHairPass
+    {
+        HAIR_OFF = 0,   // stock: one sorted, blended, depth writing pass
+        HAIR_CORE,      // coverage at or above the threshold only, blended, writes depth
+        HAIR_FRINGE,    // coverage below the threshold only, blended over the core, no depth writes
+        HAIR_DEPTH,     // depth only, every fragment the stock pass would have written
+    };
+    bool renderRiggedAlphaTwoPass();
+    void setHairUniforms(F32 threshold, bool reset);
+    EHairPass mHairPass = HAIR_OFF;
+    // </FS:Trish>
+
     // our 'normal' alpha blend function for this pass
     LLRender::eBlendFactor mColorSFactor;
     LLRender::eBlendFactor mColorDFactor;

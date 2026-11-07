@@ -249,8 +249,15 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
 
     if (render_rigged_pass)
     {
+        // <FS:Trish> Two-pass rigged alpha (hair), when FSRenderHairTwoPass is on
+        //// first pass, render rigged objects only and render to depth buffer
+        //forwardRender(true);
+        if (!renderRiggedAlphaTwoPass())
+        {
         // first pass, render rigged objects only and render to depth buffer
         forwardRender(true);
+        }
+        // </FS:Trish>
     }
 
     // second pass, regular forward alpha rendering
@@ -304,6 +311,18 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
         write_depth = oit_depth_mask_pass;
     }
 
+    // <FS:Trish> Two-pass rigged alpha: the soft fringe tests against the solid core's depth
+    // without writing its own; the depth only pass then lays down what the stock pass writes
+    if (mHairPass == HAIR_FRINGE)
+    {
+        write_depth = false;
+    }
+    else if (mHairPass == HAIR_DEPTH)
+    {
+        gGL.setColorMask(false, false);
+    }
+    // </FS:Trish>
+
     LLGLDepthTest depth(GL_TRUE, write_depth ? GL_TRUE : GL_FALSE);
 
     const bool pref_premult_blend = LLPipeline::RenderUsePremultAlpha && !LLPipeline::sRenderingHUDs && !LLPipeline::sImpostorRender;
@@ -342,7 +361,10 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
     ensure_mrt_oit_blend_state();
 
-    if (rigged && mType == LLDrawPool::POOL_ALPHA_POST_WATER)
+    // <FS:Trish> Two-pass rigged alpha: once, before the first pass
+    //if (rigged && mType == LLDrawPool::POOL_ALPHA_POST_WATER)
+    if (rigged && mType == LLDrawPool::POOL_ALPHA_POST_WATER && mHairPass <= HAIR_CORE)
+    // </FS:Trish>
     { // draw GLTF scene to depth buffer before rigged alpha
         LL::GLTFSceneManager::instance().render(false, false);
         LL::GLTFSceneManager::instance().render(false, true);
@@ -352,7 +374,8 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     // If the face is more than 90% transparent, then don't update the Depth buffer for Dof
     // We don't want the nearly invisible objects to cause of DoF effects
-    renderAlpha(getVertexDataMask() | LLVertexBuffer::MAP_TEXTURE_INDEX | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2, false, rigged);
+    renderAlpha(getVertexDataMask() | LLVertexBuffer::MAP_TEXTURE_INDEX | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2,
+        mHairPass == HAIR_DEPTH, rigged); // <FS:Trish/> two-pass rigged alpha: the depth only pass adds no glow
 
     gGL.setColorMask(true, false);
 
@@ -364,6 +387,87 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
         renderDebugAlpha();
     }
 }
+
+// <FS:Trish> Two-pass rigged alpha (FSRenderHairTwoPass). Layered alpha blended rigged mesh (hair,
+// clothing layers) can't be sorted within one mesh, and the stock pass writes depth for every
+// fragment it blends, so whichever layer happens to draw first hides the layers behind it, soft
+// edges included. Here the solid core of every layer (coverage at or above the threshold) is drawn
+// first and writes depth, so the cores are depth sorted per pixel. The soft fringe follows, blended
+// and depth tested against the cores but not writing depth, so the wisps can't cut holes into the
+// layers behind them. A last depth only pass writes the depth the stock pass would have written,
+// so everything drawn after (non-rigged alpha, WBOIT, water fog, depth of field) sees the stock
+// depth. Draws the split can't apply to (custom blend functions, shaders without FS_HAIR) are drawn
+// once, stock, in the first pass. Main camera and mirrors only; impostors and reflection probes keep
+// the stock pass. Returns false when the stock pass should run instead.
+bool LLDrawPoolAlpha::renderRiggedAlphaTwoPass()
+{
+    static LLCachedControl<bool> two_pass(gSavedSettings, "FSRenderHairTwoPass", false);
+    static LLCachedControl<F32> threshold_setting(gSavedSettings, "FSRenderHairAlphaThreshold", 0.9f);
+
+    if (!two_pass || LLPipeline::sImpostorRender || gCubeSnapshot)
+    {
+        return false;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+
+    const F32 threshold = llclamp((F32)threshold_setting, 0.05f, 1.f);
+    setHairUniforms(threshold, false);
+
+    // <ID> Improved Transparency already splits rigged alpha this way: its depth-mask pass writes
+    // the solid cores (fs_hair_cut as its cut-off) and the weighted passes blend the fringe unsorted
+    if (LLPipeline::RenderOITWeighted && LLPipeline::sOITPass != 0)
+    {
+        return false;
+    }
+    // </ID>
+
+    mHairPass = HAIR_CORE;
+    forwardRender(true);
+    mHairPass = HAIR_FRINGE;
+    forwardRender(true);
+    mHairPass = HAIR_DEPTH;
+    forwardRender(true);
+    mHairPass = HAIR_OFF;
+
+    // the same shaders draw rigged alpha everywhere else (probes, impostors, the other pool)
+    setHairUniforms(threshold, true);
+
+    return true;
+}
+
+// The pass itself is set per draw in renderAlpha. Here: the threshold, and back to stock output.
+void LLDrawPoolAlpha::setHairUniforms(F32 threshold, bool reset)
+{
+    static LLStaticHashedString fs_hair_pass("fs_hair_pass");
+    static LLStaticHashedString fs_hair_cut("fs_hair_cut");
+
+    std::vector<LLGLSLShader*> shaders = { simple_shader, fullbright_shader, pbr_shader };
+    for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
+    {
+        if ((i & 0x3) == LLMaterial::DIFFUSE_ALPHA_MODE_BLEND)
+        {
+            shaders.push_back(&gDeferredMaterialProgram[i]);
+        }
+    }
+
+    for (LLGLSLShader* shader : shaders)
+    {
+        LLGLSLShader* rigged = shader ? shader->mRiggedVariant : nullptr;
+        if (rigged && rigged != shader && rigged->isComplete() && rigged->getUniformLocation(fs_hair_pass) >= 0)
+        {
+            rigged->bind();
+            rigged->uniform1i(fs_hair_pass, (S32)HAIR_OFF);
+            if (!reset)
+            {
+                rigged->uniform1f(fs_hair_cut, threshold);
+            }
+        }
+    }
+
+    LLGLSLShader::unbind();
+}
+// </FS:Trish>
 
 void LLDrawPoolAlpha::renderDebugAlpha()
 {
@@ -994,6 +1098,27 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     }
                 }
 
+                // <FS:Trish> Two-pass rigged alpha: only plain source-over draws with an FS_HAIR shader
+                // are split into core, fringe and depth; the rest are drawn once, stock, in the core pass
+                bool hair_split = false;
+                if (mHairPass != HAIR_OFF)
+                {
+                    static LLStaticHashedString fs_hair_pass("fs_hair_pass");
+                    const bool hair_shader = current_shader && current_shader->getUniformLocation(fs_hair_pass) >= 0;
+                    hair_split = hair_shader &&
+                        params.mBlendFuncSrc == LLRender::BF_SOURCE_ALPHA &&
+                        params.mBlendFuncDst == LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+                    if (!hair_split && mHairPass != HAIR_CORE)
+                    {
+                        continue;
+                    }
+                    if (hair_shader)
+                    {
+                        current_shader->uniform1i(fs_hair_pass, hair_split ? (S32)mHairPass : (S32)HAIR_OFF);
+                    }
+                }
+                // </FS:Trish>
+
                 if (params.mAvatar && !uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, lastAvatarShader, skipLastSkin))
                 {
                     continue;
@@ -1054,6 +1179,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                 // If this alpha mesh has glow, then draw it a second time to add the destination-alpha (=glow).  Interleaving these state-changing calls is expensive, but glow must be drawn Z-sorted with alpha.
                 if (getType() != LLDrawPool::POOL_ALPHA_PRE_WATER &&
+                    // <FS:Trish> Two-pass rigged alpha: a split draw's glow goes with its fringe pass
+                    (mHairPass == HAIR_OFF || hair_split == (mHairPass == HAIR_FRINGE)) &&
+                    // </FS:Trish>
                     params.mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_EMISSIVE))
                 {
                     if (params.mAvatar != nullptr)

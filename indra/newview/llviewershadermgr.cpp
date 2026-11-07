@@ -380,6 +380,31 @@ static void add_specular_aa(LLGLSLShader* shader)
 }
 // </FS:Trish>
 
+// <FS:Trish> Two-pass rigged alpha (FSRenderHairTwoPass, see LLDrawPoolAlpha::renderRiggedAlphaTwoPass):
+// FS_HAIR goes on the rigged world alpha shaders only. make_rigged_variant copies the defines, so the
+// static shader takes it off again before it is built.
+static bool fs_use_hair_two_pass()
+{
+    static LLCachedControl<bool> two_pass(gSavedSettings, "FSRenderHairTwoPass", false);
+    return two_pass;
+}
+
+static bool make_rigged_variant_fs_hair(LLGLSLShader& shader, LLGLSLShader& riggedShader)
+{
+    const bool hair = fs_use_hair_two_pass();
+    if (hair)
+    {
+        shader.addPermutation("FS_HAIR", "1");
+    }
+    bool success = make_rigged_variant(shader, riggedShader);
+    if (hair)
+    {
+        shader.removePermutation("FS_HAIR");
+    }
+    return success;
+}
+// </FS:Trish>
+
 static void add_common_permutations(LLGLSLShader* shader)
 {
     static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
@@ -1657,6 +1682,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             {
                 gDeferredMaterialProgram[i].addPermutation("HAS_SKIN", "1");
                 gDeferredMaterialProgram[i].mFeatures.hasObjectSkinning = true;
+                // <FS:Trish> Two-pass rigged alpha, blended alpha mode only
+                if (alpha_mode == LLMaterial::DIFFUSE_ALPHA_MODE_BLEND && fs_use_hair_two_pass())
+                {
+                    gDeferredMaterialProgram[i].addPermutation("FS_HAIR", "1");
+                }
+                // </FS:Trish>
             }
             else
             {
@@ -1802,7 +1833,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_specular_aa(shader); // <FS:Trish/>
-        success = make_rigged_variant(*shader, gDeferredSkinnedPBRAlphaProgram);
+        // <FS:Trish> Two-pass rigged alpha
+        //success = make_rigged_variant(*shader, gDeferredSkinnedPBRAlphaProgram);
+        success = make_rigged_variant_fs_hair(*shader, gDeferredSkinnedPBRAlphaProgram);
+        // </FS:Trish>
         if (success)
         {
             success = shader->createShader();
@@ -2154,6 +2188,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             if (rigged)
             {
                 shader->addPermutation("HAS_SKIN", "1");
+                // <FS:Trish> Two-pass rigged alpha
+                if (fs_use_hair_two_pass())
+                {
+                    shader->addPermutation("FS_HAIR", "1");
+                }
+                // </FS:Trish>
             }
 
             if (hud)
@@ -2357,7 +2397,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredFullbrightAlphaMaskAlphaProgram);
 
         gDeferredFullbrightAlphaMaskAlphaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = make_rigged_variant(gDeferredFullbrightAlphaMaskAlphaProgram, gDeferredSkinnedFullbrightAlphaMaskAlphaProgram);
+        // <FS:Trish> Two-pass rigged alpha
+        //success = make_rigged_variant(gDeferredFullbrightAlphaMaskAlphaProgram, gDeferredSkinnedFullbrightAlphaMaskAlphaProgram);
+        success = make_rigged_variant_fs_hair(gDeferredFullbrightAlphaMaskAlphaProgram, gDeferredSkinnedFullbrightAlphaMaskAlphaProgram);
+        // </FS:Trish>
         success = success && gDeferredFullbrightAlphaMaskAlphaProgram.createShader();
         llassert(success);
     }

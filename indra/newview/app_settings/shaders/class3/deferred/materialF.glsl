@@ -50,6 +50,18 @@ float blinnPhongLobe(float nh, float glossiness);
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
 
+#ifdef FS_HAIR
+// Two-pass rigged alpha (FSRenderHairTwoPass, see LLDrawPoolAlpha::renderRiggedAlphaTwoPass).
+// Same block in class2 alphaF, class1 fullbrightF, class3 materialF and class2 pbralphaF.
+// fs_hair_pass: 0 stock, 1 solid core only (coverage >= fs_hair_cut, writes depth),
+// 2 soft fringe only (coverage < fs_hair_cut, depth tested only), 3 depth only.
+uniform int fs_hair_pass;
+uniform float fs_hair_cut;
+#define OIT_DEPTH_MASK_CUT fs_hair_cut // <ID/> Improved Transparency's depth mask takes the hair threshold
+#else
+#define OIT_DEPTH_MASK_CUT OIT_DEPTH_MASK_ALPHA_MIN
+#endif
+
 uniform mat4 modelview_matrix;
 uniform mat3 normal_matrix;
 
@@ -339,6 +351,18 @@ void main()
     float emissive = getEmissive(diffcol);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
+#ifdef FS_HAIR
+    if ((fs_hair_pass == 1 && diffcol.a * vertex_color.a < fs_hair_cut) || (fs_hair_pass == 2 && diffcol.a * vertex_color.a >= fs_hair_cut))
+    {
+        discard;
+    }
+    if (fs_hair_pass == 3)
+    { // depth only: the colour mask is off, skip the lighting
+        frag_color = vec4(0.0);
+        return;
+    }
+#endif
+
     //forward rendering, output lit linear color
     diffcol.rgb = srgb_to_linear(diffcol.rgb);
     spec.rgb = srgb_to_linear(spec.rgb);
@@ -484,7 +508,7 @@ void main()
         // Depth-only pre-pass: fragments that are effectively opaque write
         // depth so weighted accumulation cannot blend surfaces behind them
         // through them. Color writes are masked off by the caller.
-        if (out_color.a < OIT_DEPTH_MASK_ALPHA_MIN)
+        if (out_color.a < OIT_DEPTH_MASK_CUT)
         {
             discard;
         }

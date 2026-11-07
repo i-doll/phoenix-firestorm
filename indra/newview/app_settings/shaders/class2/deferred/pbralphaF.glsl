@@ -60,6 +60,18 @@ uniform int classic_mode;
 layout(location = 0) out vec4 frag_color;
 layout(location = 1) out vec4 frag_reveal;
 
+#ifdef FS_HAIR
+// Two-pass rigged alpha (FSRenderHairTwoPass, see LLDrawPoolAlpha::renderRiggedAlphaTwoPass).
+// Same block in class2 alphaF, class1 fullbrightF, class3 materialF and class2 pbralphaF.
+// fs_hair_pass: 0 stock, 1 solid core only (coverage >= fs_hair_cut, writes depth),
+// 2 soft fringe only (coverage < fs_hair_cut, depth tested only), 3 depth only.
+uniform int fs_hair_pass;
+uniform float fs_hair_cut;
+#define OIT_DEPTH_MASK_CUT fs_hair_cut // <ID/> Improved Transparency's depth mask takes the hair threshold
+#else
+#define OIT_DEPTH_MASK_CUT OIT_DEPTH_MASK_ALPHA_MIN
+#endif
+
 in vec3 vary_fragcoord;
 
 #ifdef HAS_SUN_SHADOW
@@ -238,6 +250,18 @@ void main()
     }
 #endif
 
+#ifdef FS_HAIR
+    if ((fs_hair_pass == 1 && basecolor.a * vertex_color.a < fs_hair_cut) || (fs_hair_pass == 2 && basecolor.a * vertex_color.a >= fs_hair_cut))
+    {
+        discard;
+    }
+    if (fs_hair_pass == 3)
+    { // depth only: the colour mask is off, skip the lighting
+        frag_color = vec4(0.0);
+        return;
+    }
+#endif
+
     float scol = 1.0;
     vec3 sunlit;
     vec3 amblit;
@@ -338,7 +362,7 @@ void main()
         // Depth-only pre-pass: fragments that are effectively opaque write
         // depth so weighted accumulation cannot blend surfaces behind them
         // through them. Color writes are masked off by the caller.
-        if (out_color.a < OIT_DEPTH_MASK_ALPHA_MIN)
+        if (out_color.a < OIT_DEPTH_MASK_CUT)
         {
             discard;
         }
@@ -433,7 +457,7 @@ void main()
         // Depth-only pre-pass: fragments that are effectively opaque write
         // depth so weighted accumulation cannot blend surfaces behind them
         // through them. Color writes are masked off by the caller.
-        if (linear_color.a < OIT_DEPTH_MASK_ALPHA_MIN)
+        if (linear_color.a < OIT_DEPTH_MASK_CUT)
         {
             discard;
         }
