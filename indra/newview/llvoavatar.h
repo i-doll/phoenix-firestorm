@@ -514,6 +514,7 @@ public:
 
     LLVector3           mCurRootToHeadOffset;
     LLVector3           mTargetRootToHeadOffset;
+    bool                mNameTagPosSkipped = false; // <FS:Trish/> idleUpdate() skipped idleCalcNameTagPosition()
 
     S32                 mLastSkeletonSerialNum;
 

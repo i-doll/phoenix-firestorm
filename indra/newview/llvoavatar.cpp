@@ -3307,7 +3307,19 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
     bool voice_enabled = (visualizers_in_calls || LLVoiceClient::getInstance()->inProximalChannel()) &&
                          LLVoiceClient::getInstance()->getVoiceEnabled(mID);
 
-    LLVector3 hud_name_pos = idleCalcNameTagPosition(mLastRootPos);
+    // <FS:Trish> Only needed by the voice dots and an existing name tag. idleUpdateNameTag()
+    // computes it itself if it is about to create a tag.
+    //LLVector3 hud_name_pos = idleCalcNameTagPosition(mLastRootPos);
+    LLVector3 hud_name_pos;
+    if (voice_enabled || mNameText.notNull())
+    {
+        hud_name_pos = idleCalcNameTagPosition(mLastRootPos);
+    }
+    else
+    {
+        mNameTagPosSkipped = true;
+    }
+    // </FS:Trish>
 
     idleUpdateVoiceVisualizer(voice_enabled, hud_name_pos);
     idleUpdateMisc( detailed_update );
@@ -4043,6 +4055,14 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
         return;
     }
 
+    // <FS:Trish> idleUpdate() skipped the position as there was no tag yet, compute it now
+    LLVector3 name_tag_pos = root_pos_last;
+    if (mNameTagPosSkipped)
+    {
+        name_tag_pos = idleCalcNameTagPosition(mLastRootPos);
+    }
+    // </FS:Trish>
+
     if (!mNameText)
     {
         mNameText = static_cast<LLHUDNameTag*>( LLHUDObject::addHUDObject(
@@ -4057,7 +4077,10 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
         new_name = true;
     }
 
-    mNameText->setPositionAgent(root_pos_last);
+    // <FS:Trish>
+    //mNameText->setPositionAgent(root_pos_last);
+    mNameText->setPositionAgent(name_tag_pos);
+    // </FS:Trish>
 
     idleUpdateNameTagText(new_name);
     // Wolfspirit: Following thing is already handled in LLHUDNameTag::lineSegmentIntersect
@@ -4644,6 +4667,10 @@ void LLVOAvatar::invalidateNameTags()
 // Compute name tag position during idle update
 LLVector3 LLVOAvatar::idleCalcNameTagPosition(const LLVector3 &root_pos_last)
 {
+    // <FS:Trish> After skipped frames, start from the current head offset instead of easing in from a stale one
+    const bool was_skipped = mNameTagPosSkipped;
+    mNameTagPosSkipped = false;
+    // </FS:Trish>
     LLQuaternion root_rot = mRoot->getWorldRotation();
     LLQuaternion inv_root_rot = ~root_rot;
     LLVector3 pixel_right_vec;
@@ -4682,6 +4709,14 @@ LLVector3 LLVOAvatar::idleCalcNameTagPosition(const LLVector3 &root_pos_last)
     local_camera_at.scaleVec(avatar_ellipsoid);
 
     LLVector3 head_offset = (mHeadp->getLastWorldPosition() - mRoot->getLastWorldPosition()) * inv_root_rot;
+
+    // <FS:Trish>
+    if (was_skipped)
+    {
+        mTargetRootToHeadOffset = head_offset;
+        mCurRootToHeadOffset = head_offset;
+    }
+    // </FS:Trish>
 
     if (dist_vec(head_offset, mTargetRootToHeadOffset) > NAMETAG_UPDATE_THRESHOLD)
     {
