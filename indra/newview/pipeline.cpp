@@ -4659,7 +4659,15 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
         {
             //update reflection probe uniform
             mReflectionMapManager.updateUniforms();
-            mHeroProbeManager.updateUniforms();
+            // <FS:Trish> LLReflectionMapManager::updateUniforms already ran the hero update and packed its
+            // result into the UBO; with probes disabled there is no mirror to update
+            //mHeroProbeManager.updateUniforms();
+            static LLCachedControl<bool> probe_uniform_cache(gSavedSettings, "FSPerfProbeUniformCache", false);
+            if (!probe_uniform_cache)
+            {
+                mHeroProbeManager.updateUniforms();
+            }
+            // </FS:Trish>
         }
 
         U32 cur_type = 0;
