@@ -1458,6 +1458,21 @@ void LLStatusBar::buildLocationString(std::string& loc_str, bool show_coords)
 void LLStatusBar::setParcelInfoText(const std::string& new_text)
 {
     const S32 ParcelInfoSpacing = 5;
+    // <FS:Trish> Skip measuring and layout when neither the text nor the layout inputs changed
+    LLRect panelBorderRect = mBalancePanel->getRect();
+    if (mSearchPanel && mSearchPanel->getVisible())
+        panelBorderRect = mSearchPanel->getRect();
+    if (mOmnifilterPanel && mOmnifilterPanel->getVisible())
+        panelBorderRect = mOmnifilterPanel->getRect();
+    const S32 border_right = panelBorderRect.mLeft - ParcelInfoSpacing;
+    if (new_text == mCurrentLocationString
+        && border_right == mParcelInfoBorderRight
+        && mParcelInfoText->getRect() == mParcelInfoTextRectSet
+        && mParcelInfoPanel->getRect() == mParcelInfoPanelRectSet)
+    {
+        return;
+    }
+    // </FS:Trish>
     const LLFontGL* font = mParcelInfoText->getFont();
     S32 new_text_width = font->getWidth(new_text);
 
@@ -1495,6 +1510,12 @@ void LLStatusBar::setParcelInfoText(const std::string& new_text)
     mParcelInfoText->reshape(rect.getWidth(), rect.getHeight(), true);
     mParcelInfoText->setRect(rect);
     mParcelInfoPanel->setRect(panelParcelInfoRect);
+
+    // <FS:Trish> Remember what was applied
+    mParcelInfoBorderRight = border_right;
+    mParcelInfoTextRectSet = mParcelInfoText->getRect();
+    mParcelInfoPanelRectSet = mParcelInfoPanel->getRect();
+    // </FS:Trish>
 }
 
 void LLStatusBar::update()
@@ -1527,8 +1548,33 @@ void LLStatusBar::updateParcelInfoText()
     static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
     std::string new_text;
 
+    // <FS:Trish> Called every frame from draw(). Rebuild at about 4 Hz, or at once when the
+    // rounded position or the coordinates setting changed, or someone else set the text
+    // (update(), settings callbacks).
+    const LLVector3 pos = gAgent.getPositionAgent();
+    const S32 pos_x = S32(pos.mV[VX] + 0.5f);
+    const S32 pos_y = S32(pos.mV[VY] + 0.5f);
+    const S32 pos_z = S32(pos.mV[VZ] + 0.5f);
+    const bool coords = show_coords;
+    if (!mParcelInfoTextTimer.hasExpired()
+        && mCurrentLocationString == mParcelInfoTextBuilt
+        && coords == mParcelInfoTextCoords
+        && (!coords || (pos_x == mParcelInfoTextPos[0] && pos_y == mParcelInfoTextPos[1] && pos_z == mParcelInfoTextPos[2])))
+    {
+        // Text is current; still keep the layout in step with neighbouring panels
+        setParcelInfoText(mCurrentLocationString);
+        return;
+    }
+    mParcelInfoTextTimer.resetWithExpiry(0.25f);
+    mParcelInfoTextCoords = coords;
+    mParcelInfoTextPos[0] = pos_x;
+    mParcelInfoTextPos[1] = pos_y;
+    mParcelInfoTextPos[2] = pos_z;
+    // </FS:Trish>
+
     buildLocationString(new_text, show_coords);
     setParcelInfoText(new_text);
+    mParcelInfoTextBuilt = mCurrentLocationString; // <FS:Trish/>
 }
 
 void LLStatusBar::updateParcelIcons()

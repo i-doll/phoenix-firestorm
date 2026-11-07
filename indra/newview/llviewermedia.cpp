@@ -696,6 +696,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     static LLFrameTimer priority_timer;
     static U64 last_signature = 0;
     U64 signature = 0;
+    bool has_in_world_media = false;
     // </FS:Trish>
 
     {
@@ -706,6 +707,10 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
             pimpl->update();
             // <FS:Trish> Interest is calculated in the throttled pass below
             //pimpl->calculateInterest();
+            if (!pimpl->getUsedInUI() && !pimpl->isParcelMedia())
+            {
+                has_in_world_media = true;
+            }
             U64 flags = (pimpl->getVisible() ? 1 : 0) | (pimpl->hasFocus() ? 2 : 0) | (pimpl->getUsedInUI() ? 4 : 0)
                 | (pimpl->hasMedia() ? 8 : 0) | (pimpl->isMediaPlaying() ? 16 : 0) | (pimpl->mNeedsMuteCheck ? 32 : 0);
             U64 h = ((U64)(uintptr_t)pimpl ^ flags) * 0x9E3779B97F4A7C15ULL;
@@ -715,6 +720,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     }
 
     // <FS:Trish> Decide whether to run the interest, sort and priority pass this frame
+    mHasInWorldMedia = has_in_world_media;
     signature += (U64)sViewerMediaImplList.size() * 0xC2B2AE3D27D4EB4FULL;
     signature ^= (gViewerWindow->getActive() ? 1ULL : 0) | (gFocusMgr.getAppHasFocus() ? 2ULL : 0)
         | (inworld_media_enabled() ? 4ULL : 0) | (inworld_audio_enabled() ? 8ULL : 0);
@@ -1609,19 +1615,22 @@ LLPluginClassMedia* LLViewerMedia::getSpareBrowserMediaSource()
 
 bool LLViewerMedia::hasInWorldMedia()
 {
-    impl_list::iterator iter = sViewerMediaImplList.begin();
-    impl_list::iterator end = sViewerMediaImplList.end();
-    // This should be quick, because there should be very few non-in-world-media impls
-    for (; iter != end; iter++)
-    {
-        LLViewerMediaImpl* pimpl = *iter;
-        if (!pimpl->getUsedInUI() && !pimpl->isParcelMedia())
-        {
-            // Found an in-world media impl
-            return true;
-        }
-    }
-    return false;
+    // <FS:Trish> Cached once per frame in updateMedia(); the status bar asks every frame
+    //impl_list::iterator iter = sViewerMediaImplList.begin();
+    //impl_list::iterator end = sViewerMediaImplList.end();
+    //// This should be quick, because there should be very few non-in-world-media impls
+    //for (; iter != end; iter++)
+    //{
+    //    LLViewerMediaImpl* pimpl = *iter;
+    //    if (!pimpl->getUsedInUI() && !pimpl->isParcelMedia())
+    //    {
+    //        // Found an in-world media impl
+    //        return true;
+    //    }
+    //}
+    //return false;
+    return mHasInWorldMedia;
+    // </FS:Trish>
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////

@@ -177,6 +177,7 @@ private:
 
     bool mAnyMediaShowing;
     bool mAnyMediaPlaying;
+    bool mHasInWorldMedia = false; // <FS:Trish/> Cached in updateMedia()
     S32 mMaxIntances = 8;
     LLURL mOpenIDURL;
     std::string mOpenIDCookie;

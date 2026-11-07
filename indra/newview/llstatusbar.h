@@ -403,6 +403,16 @@ private:
 // </FS:Zi>
 
     std::string mCurrentLocationString;
+
+    // <FS:Trish> Avoid rebuilding and re-laying out the location text every frame
+    LLFrameTimer    mParcelInfoTextTimer;
+    std::string     mParcelInfoTextBuilt;
+    bool            mParcelInfoTextCoords = false;
+    S32             mParcelInfoTextPos[3] = { 0, 0, 0 };
+    LLRect          mParcelInfoTextRectSet;
+    LLRect          mParcelInfoPanelRectSet;
+    S32             mParcelInfoBorderRight = 0;
+    // </FS:Trish>
 };
 
 // *HACK: Status bar owns your cached money balance. JC
