@@ -84,7 +84,7 @@ namespace
     const LLColor4 DIAL_ARROW(1.f, 0.85f, 0.3f, 1.f);
 
     const char* const TYPE_BUTTONS[] = { "type_cumulus", "type_cumulonimbus", "type_stratus",
-                                         "type_stratocumulus", "type_altocumulus", "type_cirrus" };
+                                         "type_stratocumulus", "type_altocumulus", "type_cirrus", "type_fog" };
     static_assert(LL_ARRAY_SIZE(TYPE_BUTTONS) == static_cast<size_t>(IDCloudType::Count));
 
     LLColor4 dimmed(const LLColor4& c, bool enabled)
@@ -253,6 +253,7 @@ bool IDCloudAltitudeColumn::handleHover(S32 x, S32 y, MASK mask)
         IDCloudLayer& l = mLayers[mSelected];
         const F32 old_base = l.mBaseM;
         const F32 old_top = l.mTopM;
+        const F32 min_thickness = idCloudMinThickness(l.mType);
         switch (mDrag)
         {
             case Drag::Move:
@@ -263,11 +264,11 @@ bool IDCloudAltitudeColumn::handleHover(S32 x, S32 y, MASK mask)
                 break;
             }
             case Drag::Top:
-                l.mTopM = llclamp(mStartTopM + delta, mStartBaseM + MIN_THICKNESS_M,
-                                  std::max(ALT_MAX_M, mStartBaseM + MIN_THICKNESS_M));
+                l.mTopM = llclamp(mStartTopM + delta, mStartBaseM + min_thickness,
+                                  std::max(ALT_MAX_M, mStartBaseM + min_thickness));
                 break;
             case Drag::Base:
-                l.mBaseM = llclamp(mStartBaseM + delta, 0.f, mStartTopM - MIN_THICKNESS_M);
+                l.mBaseM = llclamp(mStartBaseM + delta, 0.f, mStartTopM - min_thickness);
                 break;
             default:
                 break;
@@ -471,13 +472,13 @@ bool IDFloaterVolumetricClouds::postBuild()
         const F32 v = mBaseSlider->getValueF32();
         editSelected([v](IDCloudLayer& l)
         {
-            l.mBaseM = llclamp(v, 0.f, std::max(0.f, l.mTopM - IDCloudAltitudeColumn::MIN_THICKNESS_M));
+            l.mBaseM = llclamp(v, 0.f, std::max(0.f, l.mTopM - idCloudMinThickness(l.mType)));
         });
     });
     mTopSlider->setCommitCallback([this](LLUICtrl*, const LLSD&)
     {
         const F32 v = mTopSlider->getValueF32();
-        editSelected([v](IDCloudLayer& l) { l.mTopM = std::max(v, l.mBaseM + IDCloudAltitudeColumn::MIN_THICKNESS_M); });
+        editSelected([v](IDCloudLayer& l) { l.mTopM = std::max(v, l.mBaseM + idCloudMinThickness(l.mType)); });
     });
     mCoverageSlider->setCommitCallback([this](LLUICtrl*, const LLSD&)
     {

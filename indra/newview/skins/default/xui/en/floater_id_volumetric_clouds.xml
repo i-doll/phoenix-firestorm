@@ -4,7 +4,7 @@
  can_minimize="true"
  can_resize="false"
  save_rect="true"
- height="490"
+ height="516"
  width="540"
  name="floater_id_volumetric_clouds"
  title="Volumetric Clouds">
@@ -181,6 +181,16 @@
      left_pad="6"
      name="type_cirrus"
      top_delta="0"
+     width="124" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Fog"
+     layout="topleft"
+     left="145"
+     name="type_fog"
+     top_pad="4"
      width="124" />
 
     <slider

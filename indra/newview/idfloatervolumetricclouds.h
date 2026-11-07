@@ -28,7 +28,6 @@ public:
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params> {};
 
     static constexpr F32 ALT_MAX_M = 10000.f;
-    static constexpr F32 MIN_THICKNESS_M = 50.f;
 
     void setLayers(const std::vector<IDCloudLayer>& layers);
     const std::vector<IDCloudLayer>& getLayers() const { return mLayers; }

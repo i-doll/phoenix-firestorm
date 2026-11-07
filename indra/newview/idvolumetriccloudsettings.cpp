@@ -24,8 +24,9 @@ namespace
     const char* SETTING_STATE = "IDVolumetricCloudsState";
     const char* PRESET_DIR    = "volumetric_clouds";
     const S32   FORMAT_VERSION = 1;
+    const S32   FORMAT_VERSION_FOG = 2;
 
-    const char* const TYPE_NAMES[] = { "Cumulus", "Cumulonimbus", "Stratus", "Stratocumulus", "Altocumulus", "Cirrus" };
+    const char* const TYPE_NAMES[] = { "Cumulus", "Cumulonimbus", "Stratus", "Stratocumulus", "Altocumulus", "Cirrus", "Fog" };
 
     IDCloudPreset defaultPreset()
     {
@@ -112,9 +113,15 @@ IDCloudLayer idCloudTypeDefaults(IDCloudType type)
         case IDCloudType::Stratocumulus: l.mBaseM = 1000.f; l.mTopM = 1600.f; l.mCoverage = 0.80f; l.mDensity = 0.50f; l.mDetail = 0.50f; break;
         case IDCloudType::Altocumulus:   l.mBaseM = 3000.f; l.mTopM = 3500.f; l.mCoverage = 0.50f; l.mDensity = 0.40f; l.mDetail = 0.60f; break;
         case IDCloudType::Cirrus:        l.mBaseM = 7000.f; l.mTopM = 7500.f; l.mCoverage = 0.50f; l.mDensity = 0.15f; l.mDetail = 0.80f; break;
+        case IDCloudType::Fog:           l.mBaseM = 0.f;    l.mTopM = 60.f;   l.mCoverage = 1.00f; l.mDensity = 0.50f; l.mDetail = 0.60f; l.mWindSpeedMS = 1.f; break;
         default: break;
     }
     return l;
+}
+
+F32 idCloudMinThickness(IDCloudType type)
+{
+    return type == IDCloudType::Fog ? 10.f : 50.f;
 }
 
 const char* idCloudTypeName(IDCloudType type)
@@ -139,15 +146,22 @@ LLSD toLLSD(const IDCloudPreset& p)
         e["wind_speed_ms"] = l.mWindSpeedMS;
         layers.append(e);
     }
+    const bool has_fog = std::any_of(p.mLayers.begin(), p.mLayers.end(),
+                                     [](const IDCloudLayer& l) { return l.mType == IDCloudType::Fog; });
     LLSD sd;
-    sd["version"] = FORMAT_VERSION;
+    sd["version"] = has_fog ? FORMAT_VERSION_FOG : FORMAT_VERSION;
     sd["layers"] = layers;
     return sd;
 }
 
 bool fromLLSD(const LLSD& sd, IDCloudPreset& out)
 {
-    if (!sd.isMap() || !sd.has("version") || sd["version"].asInteger() != FORMAT_VERSION || !sd["layers"].isArray())
+    if (!sd.isMap() || !sd.has("version") || !sd["layers"].isArray())
+    {
+        return false;
+    }
+    const S32 version = sd["version"].asInteger();
+    if (version != FORMAT_VERSION && version != FORMAT_VERSION_FOG)
     {
         return false;
     }
@@ -182,9 +196,10 @@ bool fromLLSD(const LLSD& sd, IDCloudPreset& out)
 
         l.mBaseM = clampF(l.mBaseM, 0.f, 12000.f);
         l.mTopM = clampF(l.mTopM, 0.f, 12000.f);
-        if (l.mTopM < l.mBaseM + 50.f)
+        const F32 min_thickness = idCloudMinThickness(l.mType);
+        if (l.mTopM < l.mBaseM + min_thickness)
         {
-            l.mTopM = l.mBaseM + 50.f;
+            l.mTopM = l.mBaseM + min_thickness;
         }
         l.mCoverage = clampF(l.mCoverage, 0.f, 1.f);
         l.mDensity = clampF(l.mDensity, 0.f, 1.f);
