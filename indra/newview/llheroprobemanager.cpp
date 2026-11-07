@@ -295,10 +295,48 @@ void LLHeroProbeManager::renderProbes()
             LL_PROFILE_ZONE_NUM(rate);
 
             bool dynamic = mNearestHero->getReflectionProbeIsDynamic() && sDetail() > 0;
+
+            // <FS:Trish> Faces that only look behind the mirror plane are never sampled by the mirror surface.
+            // Refresh them every HIDDEN_FACE_REFRESH frames and whenever the mirror, its orientation or the
+            // cube map storage changes, so whatever off-mirror glossy fragment might sample them is never
+            // more than a few frames out of date.
+            static LLCachedControl<bool> skip_hidden_faces(gSavedSettings, "FSPerfHeroProbeSkipHiddenFaces", false);
+            constexpr U32 HIDDEN_FACE_REFRESH = 16;
+            U32 hidden_mask = 0;
+            if (skip_hidden_faces)
+            {
+                hidden_mask = getHiddenFaceMask();
+                if (hidden_mask != mHiddenFaceMask || mNearestHero.get() != mHiddenFaceHero || mTexture.get() != mHiddenFaceTexture)
+                {
+                    mHiddenFaceMask = hidden_mask;
+                    mHiddenFaceHero = mNearestHero.get();
+                    mHiddenFaceTexture = mTexture.get();
+                    // force every face to render on its next scheduled frame
+                    for (U32 i = 0; i < 6; ++i)
+                    {
+                        mFaceRenderFrame[i] = gFrameCount - HIDDEN_FACE_REFRESH;
+                    }
+                }
+            }
+            else
+            {
+                mHiddenFaceMask = 0;
+                mHiddenFaceHero = nullptr;
+                mHiddenFaceTexture = nullptr;
+            }
+            // </FS:Trish>
+
             for (U32 i = 0; i < 6; ++i)
             {
                 if ((gFrameCount % rate) == (i % rate))
                 { // update 6/rate faces per frame
+                    // <FS:Trish> Skip faces that look entirely behind the mirror plane (FSPerfHeroProbeSkipHiddenFaces)
+                    if ((hidden_mask & (1 << i)) && (gFrameCount - mFaceRenderFrame[i]) < HIDDEN_FACE_REFRESH)
+                    {
+                        continue;
+                    }
+                    mFaceRenderFrame[i] = gFrameCount;
+                    // </FS:Trish>
                     LL_PROFILE_ZONE_NUM(i);
                     updateProbeFace(mProbes[0], i, dynamic, near_clip);
                 }
@@ -314,6 +352,43 @@ void LLHeroProbeManager::renderProbes()
         mProbes[0]->autoAdjustOrigin();
     }
 }
+
+// <FS:Trish> FSPerfHeroProbeSkipHiddenFaces
+// The hero probe sits at the camera position reflected through the mirror plane, and every reflection
+// ray from the mirror surface leaves it towards the mirror side (dot(dir, mMirrorNormal) > 0).
+// A cube face whose whole frustum (including its corners) points away from the mirror side can never
+// be hit by those rays. Face order and orientation match LLViewerWindow::cubeSnapshot (+X, -X, +Y, -Y, +Z, -Z).
+U32 LLHeroProbeManager::getHiddenFaceMask() const
+{
+    // margin keeps faces whose edge only just grazes the mirror plane (seamless filtering, normal maps)
+    constexpr F32 MARGIN = 0.05f;
+
+    const F32 ax = fabsf(mMirrorNormal.mV[VX]);
+    const F32 ay = fabsf(mMirrorNormal.mV[VY]);
+    const F32 az = fabsf(mMirrorNormal.mV[VZ]);
+    const F32 sum = ax + ay + az;
+
+    // most positive dot(corner direction, normal) for each face: n.look + |n.right| + |n.up|
+    const F32 reach[6] = {
+         mMirrorNormal.mV[VX] + sum - ax,
+        -mMirrorNormal.mV[VX] + sum - ax,
+         mMirrorNormal.mV[VY] + sum - ay,
+        -mMirrorNormal.mV[VY] + sum - ay,
+         mMirrorNormal.mV[VZ] + sum - az,
+        -mMirrorNormal.mV[VZ] + sum - az
+    };
+
+    U32 mask = 0;
+    for (U32 i = 0; i < 6; ++i)
+    {
+        if (reach[i] < -MARGIN)
+        {
+            mask |= 1 << i;
+        }
+    }
+    return mask;
+}
+// </FS:Trish>
 
 // Do the reflection map update render passes.
 // For every 12 calls of this function, one complete reflection probe radiance map and irradiance map is generated

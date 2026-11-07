@@ -144,6 +144,14 @@ private:
     std::vector<LLPointer<LLVOVolume>>                       mHeroVOList;
     LLPointer<LLVOVolume>                                 mNearestHero;
 
+    // <FS:Trish> FSPerfHeroProbeSkipHiddenFaces: cube faces that look entirely behind the mirror plane
+    U32 getHiddenFaceMask() const;
+    U32 mHiddenFaceMask = 0;
+    const LLVOVolume* mHiddenFaceHero = nullptr;
+    const LLCubeMapArray* mHiddenFaceTexture = nullptr;
+    U32 mFaceRenderFrame[6] = { 0, 0, 0, 0, 0, 0 };
+    // </FS:Trish>
+
     // Part of a hacky workaround to fix #3331.
     bool mInitialized = false;
 };
