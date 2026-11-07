@@ -10664,6 +10664,8 @@ void LLPipeline::doAtmospherics()
 
         unbindDeferredShader(haze_shader);
 
+        IDVolumetricClouds::instance().onHazeApplied(); // <ID:VolumetricClouds/>
+
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
 }

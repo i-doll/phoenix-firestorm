@@ -6,6 +6,8 @@
  * Part of Five's custom Firestorm fork.
  */
 
+#ifdef ID_VOLUMETRIC_CLOUDS
+
 uniform sampler3D idCloudNoiseBase;
 uniform sampler3D idCloudNoiseDetail;
 uniform sampler2D idCloudWeather;
@@ -189,9 +191,12 @@ float idSampleCloudShadow(vec3 pos_eye)
 uniform sampler2D idCloudScene;
 uniform sampler2D idCloudDepth;
 uniform int id_cloud_scene_active;
+uniform int id_haze_pending;
 
-// rgb: in-scatter of the cloud mass in front of pos_eye, a: its transmittance.
-vec4 idCloudsInFront(vec3 pos_eye)
+// rgb: in-scatter of the cloud mass in front of pos_eye, a: its transmittance. While the haze pass
+// is still to run it will fog this pixel again, so the in-scatter is pre-compensated the way the
+// cloud composite does it; haze_add and haze_atten are this fragment's haze colour and attenuation.
+vec4 idCloudsInFront(vec3 pos_eye, vec3 haze_add, float haze_atten)
 {
     if (id_cloud_scene_active == 0)
     {
@@ -201,17 +206,31 @@ vec4 idCloudsInFront(vec3 pos_eye)
     float cd = texelFetch(idCloudDepth, ivec2(gl_FragCoord.xy), 0).r;
     float behind = smoothstep(cd - 50.0, cd + 50.0, length(pos_eye));
     vec3 S_f = cs.rgb * behind;  float T_f = mix(1.0, cs.a, behind);
+    if (id_haze_pending != 0 && T_f < 1.0)
+    {
+        S_f = clamp((S_f - (1.0 - T_f) * haze_add) / max(haze_atten, 0.02), vec3(-11.2), vec3(11.2));
+    }
     return vec4(S_f, T_f);
 }
 
 // The destination already holds the clouds over the opaque scene. Blended with the fragment's
-// own alpha a, the result is S_f + T_f*(a*c + (1-a)*behind_scene).
-vec3 idApplyClouds(vec3 color, vec3 pos_eye)
+// own alpha a, the result is S_f + T_f*(a*c + (1-a)*behind_scene). The result can be negative
+// while the haze pass is pending.
+vec3 idApplyClouds(vec3 color, vec3 pos_eye, vec3 haze_add, float haze_atten)
 {
     if (id_cloud_scene_active == 0)
     {
         return color;
     }
-    vec4 cloud = idCloudsInFront(pos_eye);
+    vec4 cloud = idCloudsInFront(pos_eye, haze_add, haze_atten);
     return color * cloud.a + cloud.rgb;
 }
+
+#else
+
+// Some drivers reject an empty compilation unit.
+void idCloudUtilDisabled()
+{
+}
+
+#endif

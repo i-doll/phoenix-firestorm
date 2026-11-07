@@ -962,6 +962,15 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["SSR"] = "1";
     }
 
+    // <ID:VolumetricClouds> without it no shader declares a cloud sampler, so other platforms keep their texture units
+#if LL_LINUX
+    if (IDVolumetricClouds::isSupported())
+    {
+        attribs["ID_VOLUMETRIC_CLOUDS"] = "1";
+    }
+#endif
+    // </ID:VolumetricClouds>
+
     if (has_reflection_probes)
     {
         attribs["REFMAP_LEVEL"] = std::to_string(probe_level);

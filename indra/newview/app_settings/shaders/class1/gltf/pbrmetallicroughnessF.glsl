@@ -98,7 +98,12 @@ uniform float clipSign;
 void waterClip(vec3 pos);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
-vec3 idApplyClouds(vec3 color, vec3 pos_eye); // <ID:VolumetricClouds/>
+// <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+vec3 idApplyClouds(vec3 color, vec3 pos_eye, vec3 haze_add, float haze_atten);
+vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
+#endif
+// </ID:VolumetricClouds>
 #endif
 // ==================================
 
@@ -321,11 +326,19 @@ void main()
     float a = basecolor.a;
 
     frag_color = max(vec4(color.rgb,a), vec4(0));
-    frag_color.rgb = idApplyClouds(frag_color.rgb, pos.xyz); // <ID:VolumetricClouds/>
+    // <ID:VolumetricClouds>
+#if defined(ID_VOLUMETRIC_CLOUDS)
+    frag_color.rgb = idApplyClouds(frag_color.rgb, pos.xyz, atmosFragLightingLinear(vec3(0.0), additive, atten), atten.r);
+#endif
+    // </ID:VolumetricClouds>
 #else // UNLIT
     vec4 color = basecolor;
     color.rgb += emissive.rgb;
-    color.rgb = idApplyClouds(color.rgb, pos.xyz); // <ID:VolumetricClouds/>
+    // <ID:VolumetricClouds>
+#if defined(ID_VOLUMETRIC_CLOUDS)
+    color.rgb = idApplyClouds(color.rgb, pos.xyz, atmosFragLightingLinear(vec3(0.0), additive, atten), atten.r);
+#endif
+    // </ID:VolumetricClouds>
     frag_color = color;
 #endif
 #endif  // ALPHA_BLEND

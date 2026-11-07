@@ -33,6 +33,7 @@ public:
     void renderShadowMap();
     void render(LLRenderTarget* screen, LLRenderTarget* depth_src);
     void bindForSampling(LLGLSLShader& shader);
+    void onHazeApplied() { mHazePending = false; }
 
 private:
     void cleanupSingleton() override;
@@ -54,6 +55,8 @@ private:
     // Attachment 0: RGBA16F fogged in-scatter + transmittance. Attachment 1: R32F mean cloud distance.
     LLRenderTarget mSceneRT;
     U32 mSceneFrame = U32_MAX;
+    // Composited this frame and the deferred haze pass, which fogs it again, has not run yet.
+    bool mHazePending = false;
 
     // R16F sunlight transmittance through all layers, top-down around the camera.
     LLRenderTarget mShadowRT;

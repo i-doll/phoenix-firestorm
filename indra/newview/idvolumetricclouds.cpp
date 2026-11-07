@@ -843,6 +843,7 @@ void IDVolumetricClouds::renderShadowMap()
 void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_src)
 {
     mSceneFrame = U32_MAX;
+    mHazePending = false;
     if (!screen || !depth_src || !isActive())
     {
         return;
@@ -861,6 +862,7 @@ void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_sr
     march(mSceneRT, depth_src, full ? FULL_STEPS : LIVE_STEPS, full ? FULL_SAMPLES : 1);
     composite(depth_src);
     mSceneFrame = LLFrameTimer::getFrameCount();
+    mHazePending = LLPipeline::RenderDeferredAtmospheric;
 }
 
 bool IDVolumetricClouds::ensureSceneTarget(U32 width, U32 height)
@@ -1054,7 +1056,7 @@ void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
     static LLStaticHashedString s_active("id_clouds_active");
     static LLStaticHashedString s_matrix("id_cloud_shadow_matrix");
     static LLStaticHashedString s_scene_active("id_cloud_scene_active");
-    static LLStaticHashedString s_haze_compensate("id_haze_compensate");
+    static LLStaticHashedString s_haze_pending("id_haze_pending");
 
     if (LLPipeline::sRenderingHUDs || !isActive())
     {
@@ -1085,7 +1087,9 @@ void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
     {
         shader.bindTexture(LLShaderMgr::ID_CLOUD_SCENE, &mSceneRT, false, LLTexUnit::TFO_POINT, 0);
         shader.bindTexture(LLShaderMgr::ID_CLOUD_DEPTH, &mSceneRT, false, LLTexUnit::TFO_POINT, 1);
-        shader.uniform1i(s_haze_compensate, LLPipeline::RenderDeferredAtmospheric ? 1 : 0);
+        // While the camera is under water the haze pass skips pixels below the water plane.
+        const bool haze_pending = mHazePending && LLDrawPoolAlpha::sWaterPlane.mV[VW] > 0.f;
+        shader.uniform1i(s_haze_pending, haze_pending ? 1 : 0);
         scene = true;
     }
     shader.uniform1i(s_scene_active, scene ? 1 : 0);

@@ -57,8 +57,9 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 void mirrorClip(vec3 pos);
 
 // <ID:VolumetricClouds>
-#if defined(IS_ALPHA) && !defined(IS_HUD)
-vec3 idApplyClouds(vec3 color, vec3 pos_eye);
+#if defined(ID_VOLUMETRIC_CLOUDS) && defined(IS_ALPHA) && !defined(IS_HUD)
+vec3 idApplyClouds(vec3 color, vec3 pos_eye, vec3 haze_add, float haze_atten);
+vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
 #endif
 // </ID:VolumetricClouds>
 
@@ -108,8 +109,8 @@ void main()
     vec4 out_color = max(color, vec4(0));
 
     // <ID:VolumetricClouds>
-#if defined(IS_ALPHA) && !defined(IS_HUD)
-    out_color.rgb = idApplyClouds(out_color.rgb, pos);
+#if defined(ID_VOLUMETRIC_CLOUDS) && defined(IS_ALPHA) && !defined(IS_HUD)
+    out_color.rgb = idApplyClouds(out_color.rgb, pos, atmosFragLightingLinear(vec3(0.0), additive, atten), atten.r);
 #endif
     // </ID:VolumetricClouds>
 

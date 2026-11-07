@@ -53,7 +53,11 @@ uniform mat4 inv_proj;
 uniform vec2 screen_res;
 uniform int sun_up_factor;
 
-float idSampleCloudShadow(vec3 pos_eye); // <ID:VolumetricClouds/>
+// <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+float idSampleCloudShadow(vec3 pos_eye);
+#endif
+// </ID:VolumetricClouds>
 
 // <ID:PCSS> Soft shadows whose edges widen with the distance between caster and receiver
 uniform float sun_shadow_softness;   // penumbra width per meter of caster height, 0 keeps the fixed filter
@@ -289,12 +293,30 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
     }
     else
     {
-        return idSampleCloudShadow(pos); // lit beyond the far split... <ID:VolumetricClouds/>
+        // <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+        return idSampleCloudShadow(pos); // lit beyond the far split...
+#else
+        return 1.0f; // lit beyond the far split...
+#endif
+        // </ID:VolumetricClouds>
     }
     //shadow = min(dp_directional_light,shadow);
-    return shadow * idSampleCloudShadow(pos); // <ID:VolumetricClouds/>
+    // <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+    return shadow * idSampleCloudShadow(pos);
 #else
-    return idSampleCloudShadow(pos); // <ID:VolumetricClouds/>
+    return shadow;
+#endif
+    // </ID:VolumetricClouds>
+#else
+    // <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+    return idSampleCloudShadow(pos);
+#else
+    return 1.0;
+#endif
+    // </ID:VolumetricClouds>
 #endif
 }
 
