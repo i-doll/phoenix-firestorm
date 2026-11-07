@@ -1338,7 +1338,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRPlanarSampleCount", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRNormalsEnabled", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", handleSetShaderChanged);
+    // <FS:Trish> A uniform now (LLViewerShaderMgr::uploadValueUniforms), no rebuild needed
+    //setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", handleSetShaderChanged);
+    // </FS:Trish>
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
@@ -1348,7 +1350,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderUIBuffer", handleWindowResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleSetShaderChanged);
+    // <FS:Trish> A uniform now (LLViewerShaderMgr::uploadValueUniforms), no rebuild needed
+    //setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleSetShaderChanged);
+    // </FS:Trish>
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropic", handleAnisotropicChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
     setting_setup_signal_listener(gSavedSettings, "RenderProjectorShadowCount", handleShadowsResized);

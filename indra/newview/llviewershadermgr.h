@@ -133,6 +133,10 @@ public:
 
     /* virtual */ void updateShaderUniforms(LLGLSLShader * shader);
 
+    // <FS:Trish> Setting values read as uniforms instead of global defines (see the .cpp)
+    static void uploadValueUniforms(LLGLSLShader& shader);
+    // </FS:Trish>
+
 private:
     // the list of shaders we need to propagate parameters to.
     std::vector<LLGLSLShader *> mShaderList;

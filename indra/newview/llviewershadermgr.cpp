@@ -1078,11 +1078,15 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["HAS_EMISSIVE"] = "1";
     }
 
-    // Blinn-Phong exponent at full glossiness, for deferredUtil's blinnPhongLobe. A define
-    // rather than a uniform because it reaches a shared object -- this map is what compiles
-    // those, and a program's own mShaderFiles never see it, which is fine: the lobe is
-    // evaluated in deferredUtil and nowhere else.
-    attribs["SPECULAR_EXPONENT"] = llformat("%.1f", gSavedSettings.getF32("RenderSpecularExponent"));
+    // <FS:Trish> The Blinn-Phong exponent (RenderSpecularExponent) is the uniform
+    // specular_exponent, uploaded in uploadValueUniforms: as a global define every new value
+    // changed every program's cache key and recompiled all of them.
+    //// Blinn-Phong exponent at full glossiness, for deferredUtil's blinnPhongLobe. A define
+    //// rather than a uniform because it reaches a shared object -- this map is what compiles
+    //// those, and a program's own mShaderFiles never see it, which is fine: the lobe is
+    //// evaluated in deferredUtil and nowhere else.
+    //attribs["SPECULAR_EXPONENT"] = llformat("%.1f", gSavedSettings.getF32("RenderSpecularExponent"));
+    // </FS:Trish>
 
     bool ssr = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
 
@@ -1146,8 +1150,11 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     { // PBR terrain
         const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
         attribs["TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT"] = llformat("%d", mapping);
-        const F32 triplanar_factor = gSavedSettings.getF32("RenderTerrainPBRTriplanarBlendFactor");
-        attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", triplanar_factor);
+        // <FS:Trish> The triplanar blend factor is the uniform terrain_triplanar_blend_factor,
+        // uploaded in uploadValueUniforms, so changing it does not recompile every program
+        //const F32 triplanar_factor = gSavedSettings.getF32("RenderTerrainPBRTriplanarBlendFactor");
+        //attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", triplanar_factor);
+        // </FS:Trish>
         S32 detail = gSavedSettings.getS32("RenderTerrainPBRDetail");
         detail = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
         attribs["TERRAIN_PBR_DETAIL"] = llformat("%d", detail);
@@ -4191,7 +4198,29 @@ void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
         shader->uniform1f(sThreshold, llclamp((F32)threshold, 0.f, 1.f));
     }
     // </FS:Trish>
+
+    uploadValueUniforms(*shader); // <FS:Trish/>
 }
+
+// <FS:Trish> Setting values the shared shader objects read as uniforms rather than global
+// defines, so that changing one does not change every program's binary cache key. Called from
+// updateShaderUniforms, which reaches the listed programs and their rigged variants (materials,
+// PBR terrain) on the first bind of each frame, and from LLPipeline::bindDeferredShader for the
+// deferred light and soften programs, which are not listed. Programs without a uniform have no
+// location for it, which makes its upload a no-op; uniform1f skips unchanged values.
+// The values are rounded as the defines' text was (%.1f and %.2f), so rendering is unchanged.
+// static
+void LLViewerShaderMgr::uploadValueUniforms(LLGLSLShader& shader)
+{
+    static LLCachedControl<F32> specular_exponent(gSavedSettings, "RenderSpecularExponent", 368.f);
+    static LLCachedControl<F32> triplanar_factor(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", 8.f);
+    static LLStaticHashedString sSpecularExponent("specular_exponent");
+    static LLStaticHashedString sTriplanarFactor("terrain_triplanar_blend_factor");
+
+    shader.uniform1f(sSpecularExponent, (F32)ll_round((F32)specular_exponent * 10.f) / 10.f);
+    shader.uniform1f(sTriplanarFactor, (F32)ll_round((F32)triplanar_factor * 100.f) / 100.f);
+}
+// </FS:Trish>
 
 LLViewerShaderMgr::shader_iter LLViewerShaderMgr::beginShaders() const
 {

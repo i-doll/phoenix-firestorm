@@ -65,7 +65,7 @@ vec3 srgb_to_linear(vec3 c);
 // making PBR terrain blending more performant. Should be greater than 0 to work.
 #define TERRAIN_RAMP_MIX_THRESHOLD 0.1
 // A small threshold for triplanar mapping sampling cutoff. This and
-// TERRAIN_TRIPLANAR_BLEND_FACTOR together ensures that only one or two samples
+// terrain_triplanar_blend_factor together ensures that only one or two samples
 // per texture are used in most places, making triplanar mapping more
 // performant. Should be greater than 0 to work.
 // There's also an artistic design choice in the use of these factors, and the
@@ -260,9 +260,13 @@ vec3 get_weight3_from_terrain_weight(vec4 weight)
 }
 
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+// RenderTerrainPBRTriplanarBlendFactor, uploaded by LLViewerShaderMgr::uploadValueUniforms (a
+// uniform, so changing it does not rebuild the shaders)
+uniform float terrain_triplanar_blend_factor;
+
 TerrainTriplanar _t_triplanar()
 {
-    float sharpness = TERRAIN_TRIPLANAR_BLEND_FACTOR;
+    float sharpness = terrain_triplanar_blend_factor;
     float threshold = TERRAIN_TRIPLANAR_MIX_THRESHOLD;
     vec3 weight_signed = pow(abs(vary_vertex_normal), vec3(sharpness));
     weight_signed /= (weight_signed.x + weight_signed.y + weight_signed.z);

@@ -133,7 +133,8 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
 
 // The normalized Blinn-Phong specular lobe for a legacy glossiness.
 //
-// SPECULAR_EXPONENT is injected alongside the GBuffer flags, from RenderSpecularExponent. The
+// specular_exponent is RenderSpecularExponent, uploaded by LLViewerShaderMgr::uploadValueUniforms
+// (a uniform, so changing it does not rebuild the shaders). The
 // square is this tree's mapping from an 8-bit material field to an exponent, and it is what
 // makes the top of the glossiness range spend most of its resolution on very tight lobes.
 //
@@ -145,9 +146,11 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
 // Every caller takes nh from calcHalfVectors, which floors it above zero -- pow() is undefined
 // at a zero base with a zero exponent, which is reachable here only through a glossiness of
 // zero, and every call site already gates on that being positive.
+uniform float specular_exponent;
+
 float blinnPhongLobe(float nh, float glossiness)
 {
-    float n = glossiness * glossiness * SPECULAR_EXPONENT;
+    float n = glossiness * glossiness * specular_exponent;
     float norm = ((n + 2.0) * (n + 4.0)) / (8.0 * M_PI * (exp2(-n * 0.5) + n));
 
     return pow(nh, n) * norm;
