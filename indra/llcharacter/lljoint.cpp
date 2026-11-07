@@ -36,6 +36,7 @@
 
 S32 LLJoint::sNumUpdates = 0;
 S32 LLJoint::sNumTouches = 0;
+U64 LLJoint::sWorldMatrixSerial = 0; // <FS:Trish/>
 
 template <class T>
 bool attachment_map_iter_compare_key(const T& a, const T& b)
@@ -110,6 +111,7 @@ void LLJoint::init()
     mUpdateXform = true;
     mSupport = SUPPORT_BASE;
     mEnd = LLVector3(0.0f, 0.0f, 0.0f);
+    mWorldMatrixSerial = 0; // <FS:Trish/>
 }
 
 LLJoint::LLJoint() :
@@ -987,6 +989,7 @@ void LLJoint::updateWorldMatrix()
         sNumUpdates++;
         mXform.updateMatrix(false);
         mWorldMatrix.loadu(mXform.getWorldMatrix());
+        mWorldMatrixSerial = ++sWorldMatrixSerial; // <FS:Trish/>
         mDirtyFlags = 0x0;
     }
 }

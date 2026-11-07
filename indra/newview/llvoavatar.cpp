@@ -11478,12 +11478,45 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
     const bool use_local_origin = LLViewerShaderMgr::sRiggedLocalOrigin;
     // </FS:Trish>
 
+    // <FS:Trish> Rebuild only when a joint in the palette was recomputed since the last build
+    static LLCachedControl<bool> rigged_palette_cache(gSavedSettings, "FSPerfRiggedPaletteCache", false);
+    if (rigged_palette_cache && entry.mFrame != gFrameCount && entry.mUsesLocalOrigin == use_local_origin)
+    {
+        U32 count = LLSkinningUtil::getMeshJointCount(skin);
+        bool unchanged = count > 0 && count == entry.mJointSerials.size() && count == entry.mMatrixPalette.size();
+        if (unchanged)
+        {
+            LLSkinningUtil::initJointNums(const_cast<LLMeshSkinInfo*>(skin), this);
+            LLVector3 skin_origin = use_local_origin
+                ? (mRoot ? mRoot->getWorldPosition() : getPositionAgent()) : LLVector3::zero;
+            unchanged = skin_origin == entry.mSkinOrigin && skin->mJointNums.size() >= count;
+            for (U32 j = 0; unchanged && j < count; ++j)
+            {
+                LLJoint* joint = getJoint(skin->mJointNums[j]);
+                if (!joint)
+                {
+                    unchanged = false;
+                    break;
+                }
+                joint->getWorldMatrix4a(); // apply any pending update, as the build would
+                unchanged = joint->mWorldMatrixSerial == entry.mJointSerials[j];
+            }
+        }
+        if (unchanged)
+        {
+            entry.mFrame = gFrameCount;
+            return entry;
+        }
+    }
+    // </FS:Trish>
+
     if (entry.mFrame != gFrameCount || entry.mUsesLocalOrigin != use_local_origin)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
         entry.mFrame = gFrameCount;
         entry.mUsesLocalOrigin = use_local_origin;
+        entry.mJointSerials.clear(); // <FS:Trish/>
 
         //build matrix palette
         U32 count = LLSkinningUtil::getMeshJointCount(skin);
@@ -11496,6 +11529,18 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
         }
         entry.mMatrixPalette.resize(count);
         LLSkinningUtil::initSkinningMatrixPalette(&(entry.mMatrixPalette[0]), count, skin, this);
+
+        // <FS:Trish> Remember which joint state this palette was built from
+        if (rigged_palette_cache && skin->mJointNums.size() >= count && skin->mInvBindMatrix.size() >= count)
+        {
+            entry.mJointSerials.resize(count);
+            for (U32 j = 0; j < count; ++j)
+            {
+                LLJoint* joint = getJoint(skin->mJointNums[j]);
+                entry.mJointSerials[j] = joint ? joint->mWorldMatrixSerial : 0;
+            }
+        }
+        // </FS:Trish>
 
         const LLMatrix4a* mat = &(entry.mMatrixPalette[0]);
 

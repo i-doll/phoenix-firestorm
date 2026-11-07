@@ -144,6 +144,11 @@ public:
 
     S32             mJointNum;
 
+    // <FS:Trish> Unique stamp of the last world matrix recompute, so a cached skin palette can tell if this joint moved
+    U64             mWorldMatrixSerial;
+    static U64      sWorldMatrixSerial;
+    // </FS:Trish>
+
     // child joints
     typedef std::vector<LLJoint*> joints_t;
     joints_t mChildren;

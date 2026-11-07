@@ -968,6 +968,10 @@ public:
         LLVector3 mSkinOrigin;
         bool mUsesLocalOrigin;
 
+        // <FS:Trish> LLJoint::mWorldMatrixSerial of each joint when the palette was built
+        std::vector<U64> mJointSerials;
+        // </FS:Trish>
+
         MatrixPaletteCache() :
             mFrame(gFrameCount - 1),
             mSkinOrigin(LLVector3::zero),
