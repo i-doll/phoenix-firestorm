@@ -1574,6 +1574,27 @@ void LLGLManager::initExtensions()
     LL_INFOS("RenderInit") << "Parallel shader compile available: " << mHasParallelShaderCompile << LL_ENDL;
     // </FS:Trish>
 
+    // <FS:Trish> Single pass sun shadow cascades (FSPerfShadowSinglePass): the vertex shader picks the
+    // viewport (gl_ViewportIndex). Needs viewport arrays (OpenGL 4.1, loaded below) and one of these.
+    mFSVertexViewportIndex = 0;
+    if (mGLVersion >= 4.09f)
+    {
+        if (id_gl_extension_supported("GL_ARB_shader_viewport_layer_array"))
+        {
+            mFSVertexViewportIndex = 1;
+        }
+        else if (id_gl_extension_supported("GL_NV_viewport_array2"))
+        {
+            mFSVertexViewportIndex = 2;
+        }
+        else if (id_gl_extension_supported("GL_AMD_vertex_shader_viewport_index"))
+        {
+            mFSVertexViewportIndex = 3;
+        }
+    }
+    LL_INFOS("RenderInit") << "Vertex shader viewport index: " << mFSVertexViewportIndex << LL_ENDL;
+    // </FS:Trish>
+
     mInited = true;
 
 // <FS:Zi> Linux support

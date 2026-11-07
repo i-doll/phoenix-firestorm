@@ -706,6 +706,7 @@ U32 LLVertexBuffer::sLastMask = 0;
 LLVertexBuffer::fs_rigged_draw_hook_t LLVertexBuffer::sFSRiggedDrawHook = nullptr;
 static U32 sFSNextContentSerial = 0;
 // </FS:Trish>
+U32 LLVertexBuffer::sFSInstanceCount = 0; // <FS:Trish/> FSPerfShadowSinglePass
 U32 LLVertexBuffer::sVertexCount = 0;
 
 
@@ -952,6 +953,15 @@ void LLVertexBuffer::drawRange(U32 mode, U32 start, U32 end, U32 count, U32 indi
     }
     // </FS:Trish>
     STOP_GLERROR;
+    // <FS:Trish> FSPerfShadowSinglePass: one instance per sun cascade
+    if (sFSInstanceCount)
+    {
+        glDrawElementsInstanced(sGLMode[mode], count, mIndicesType,
+            (GLvoid*) (indices_offset * (size_t) mIndicesStride), sFSInstanceCount);
+        STOP_GLERROR;
+        return;
+    }
+    // </FS:Trish>
     glDrawRangeElements(sGLMode[mode], start, end, count, mIndicesType,
         (GLvoid*) (indices_offset * (size_t) mIndicesStride));
     STOP_GLERROR;

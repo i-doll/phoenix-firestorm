@@ -23,6 +23,20 @@
  * $/LicenseInfo$
  */
 
+#ifdef FS_SHADOW_SINGLE_PASS
+// Single pass sun shadow cascades (FSPerfShadowSinglePass): instance i draws the vertex into the
+// atlas viewport of cascade fs_shadow_cascade[i], transformed by that cascade's light matrices.
+#if FS_SHADOW_SINGLE_PASS == 2
+#extension GL_NV_viewport_array2 : require
+#elif FS_SHADOW_SINGLE_PASS == 3
+#extension GL_AMD_vertex_shader_viewport_index : require
+#else
+#extension GL_ARB_shader_viewport_layer_array : require
+#endif
+uniform mat4 fs_shadow_clip[4];     // light projection * view of each cascade, from agent space
+uniform vec4 fs_shadow_cascade;     // cascade drawn by each instance
+#endif
+
 #ifdef RIGGED_PRECISE_MATH
 invariant gl_Position;
 precise gl_Position;
@@ -39,6 +53,9 @@ uniform mat4 modelview_projection_matrix;
 #endif
 
 uniform float shadow_target_width;
+#ifdef FS_SHADOW_SINGLE_PASS
+uniform vec4 fs_shadow_width;       // shadow_target_width of each cascade
+#endif
 
 in vec3 position;
 in vec4 diffuse_color;
@@ -56,13 +73,23 @@ void main()
     //transform vertex
 #if defined(HAS_SKIN)
     vec4 pos = skinTransformH(getSkinBlend(), position.xyz, modelview_matrix);
+#ifndef FS_SHADOW_SINGLE_PASS
     pos = projection_matrix * pos;
+#endif
 #else
     vec4 pre_pos = vec4(position.xyz, 1.0);
     vec4 pos = modelview_projection_matrix * pre_pos;
 #endif
 
+#ifdef FS_SHADOW_SINGLE_PASS
+    // the model matrices above leave pos in agent space
+    int cascade = int(fs_shadow_cascade[gl_InstanceID]);
+    pos = fs_shadow_clip[cascade] * pos;
+    gl_ViewportIndex = cascade;
+    target_pos_x = 0.5 * (fs_shadow_width[cascade] - 1.0) * pos.x;
+#else
     target_pos_x = 0.5 * (shadow_target_width - 1.0) * pos.x;
+#endif
 
     post_pos = pos;
 

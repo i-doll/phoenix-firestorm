@@ -3862,7 +3862,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="834"
+                 height="860"
                  layout="topleft"
                  left="0"
                  name="experimental_performance_settings"
@@ -4116,6 +4116,18 @@
                      tool_tip="EXPERIMENTAL. With the static far shadow cache, the far shadows follow the sun in steps of this many degrees, 0 to 2. Larger steps redraw the cache less often under a moving sun."
                      top="510"
                      width="100" />
+                    <check_box
+                     control_name="FSPerfShadowSinglePass"
+                     enabled_control="RenderShadowDetail"
+                     follows="left|top"
+                     height="20"
+                     label="Draw sun shadow cascades in one pass"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfshadowsinglepass"
+                     tool_tip="EXPERIMENTAL. Sends buildings, objects, rigged mesh and alpha masked surfaces to the sun shadow maps once instead of once per shadow cascade; the graphics card copies each to every cascade it reaches. Shadows look the same; saves CPU time in busy scenes. Needs a graphics card and driver that can pick the viewport in the vertex shader (most NVIDIA and AMD cards with current drivers); otherwise nothing changes. Uses one extra depth buffer the size of the four sun shadow maps."
+                     top="542"
+                     width="475" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
@@ -4123,7 +4135,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_shaders"
-                     top="552"
+                     top="578"
                      width="475">
                         Shaders
                     </text>
@@ -4136,7 +4148,7 @@
                      left="15"
                      name="fs_fsperfparallelshadercompile"
                      tool_tip="EXPERIMENTAL. Shorter pauses when graphics settings change and shaders are rebuilt, because the graphics driver compiles them on several threads at once. Needs a driver that supports parallel shader compile (current NVIDIA and AMD drivers, Mesa). Without that support nothing changes. Applies from the next shader rebuild."
-                     top="578"
+                     top="604"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4145,7 +4157,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_textures"
-                     top="618"
+                     top="644"
                      width="475">
                         Textures
                     </text>
@@ -4158,7 +4170,7 @@
                      left="15"
                      name="fs_fsperftextureuploadpbo"
                      tool_tip="EXPERIMENTAL. Copies newly loaded textures to the graphics card asynchronously, which can reduce stutter when many textures arrive at once. Only has an effect when textures are not already created on a background thread (usually AMD and Intel graphics). Needs OpenGL 4.4."
-                     top="644"
+                     top="670"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4167,7 +4179,7 @@
                      left="35"
                      name="fs_fsperftextureuploadbudgetmb_label"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="672"
+                     top="698"
                      width="285">
                         Texture upload budget per frame (MB)
                     </text>
@@ -4183,7 +4195,7 @@
                      min_val="0"
                      name="fs_fsperftextureuploadbudgetmb"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="670"
+                     top="696"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4192,7 +4204,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_variable_rate_shading"
-                     top="712"
+                     top="738"
                      width="475">
                         Variable rate shading
                     </text>
@@ -4205,7 +4217,7 @@
                      left="15"
                      name="fs_fsrendervrs"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / GTX 16xx (Turing) or newer only; does nothing on other graphics cards. Shades low-detail parts of the scene (flat or low-contrast surfaces, the sky, areas blurred by depth of field) at a coarser rate to save GPU time in the opaque geometry pass. Edges and fine detail stay at full rate. Snapshots are always rendered at full rate."
-                     top="738"
+                     top="764"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4214,7 +4226,7 @@
                      left="35"
                      name="fs_fsrendervrsquality_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="766"
+                     top="792"
                      width="285">
                         Quality
                     </text>
@@ -4231,7 +4243,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsquality"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="764"
+                     top="790"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4240,7 +4252,7 @@
                      left="35"
                      name="fs_fsrendervrsperiphery_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="794"
+                     top="820"
                      width="285">
                         Coarser at screen edges
                     </text>
@@ -4257,7 +4269,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsperiphery"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="792"
+                     top="818"
                      width="100" />
                 </panel>
             </scroll_container>

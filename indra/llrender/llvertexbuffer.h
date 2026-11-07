@@ -290,6 +290,10 @@ public:
     typedef void (*fs_rigged_draw_hook_t)(const LLVertexBuffer* vb, U32 start, U32 end);
     static fs_rigged_draw_hook_t sFSRiggedDrawHook;
     // </FS:Trish>
+    // <FS:Trish> Single pass sun shadow cascades (FSPerfShadowSinglePass): while non-zero, drawRange()
+    // draws this many instances, one per cascade the batch goes to. Zero everywhere else.
+    static U32 sFSInstanceCount;
+    // </FS:Trish>
 
 protected:
     U32     mGLBuffer = 0;      // GL VBO handle
