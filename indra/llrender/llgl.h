@@ -99,6 +99,7 @@ public:
     bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
     bool mHasDSA = false;
+    bool mHasNVRepresentativeFragmentTest = false; // <FS:Trish/> GL_NV_representative_fragment_test (FSPerfRepresentativeFragmentTest)
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;

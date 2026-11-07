@@ -1079,6 +1079,12 @@ extern void glGetBufferPointervARB (GLenum, GLenum, GLvoid* *);
 #define GL_GPU_MEMORY_INFO_EVICTED_MEMORY_NVX            0x904B
 #endif
 
+// <FS:Trish> GL_NV_representative_fragment_test constants
+#ifndef GL_REPRESENTATIVE_FRAGMENT_TEST_NV
+#define GL_REPRESENTATIVE_FRAGMENT_TEST_NV               0x937F
+#endif
+// </FS:Trish>
+
 //GL_ATI_meminfo constants
 #ifndef GL_ATI_meminfo
 #define GL_ATI_meminfo

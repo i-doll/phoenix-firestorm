@@ -1458,6 +1458,17 @@ void LLGLManager::shutdownGL()
     }
 }
 
+// <ID:GLBackport>
+static bool id_gl_extension_supported(const char* name)
+{
+#if LL_SDL
+    return SDL_GL_ExtensionSupported(name);
+#else
+    return gGLHExts.mSysExts && ExtensionExists(name, gGLHExts.mSysExts);
+#endif
+}
+// </ID:GLBackport>
+
 // these are used to turn software blending on. They appear in the Debug/Avatar menu
 // presence of vertex skinning/blending or vertex programs will set these to false by default.
 
@@ -1505,6 +1516,12 @@ void LLGLManager::initExtensions()
     glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
     glGetIntegerv(GL_MAX_ELEMENTS_INDICES, (GLint*) &mGLMaxIndexRange);
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, (GLint*) &mGLMaxTextureSize);
+
+    // <FS:Trish> Representative fragment test for occlusion queries (FSPerfRepresentativeFragmentTest):
+    // NVIDIA Turing and newer. State only, no entry points.
+    mHasNVRepresentativeFragmentTest = id_gl_extension_supported("GL_NV_representative_fragment_test");
+    LL_INFOS("RenderInit") << "NV representative fragment test available: " << mHasNVRepresentativeFragmentTest << LL_ENDL;
+    // </FS:Trish>
 
     mInited = true;
 

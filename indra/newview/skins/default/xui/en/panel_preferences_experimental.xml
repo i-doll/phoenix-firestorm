@@ -3862,7 +3862,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="624"
+                 height="646"
                  layout="topleft"
                  left="0"
                  name="experimental_performance_settings"
@@ -3956,6 +3956,17 @@
                      tool_tip="EXPERIMENTAL. Work out the shadow map bounds from the objects the camera already found visible, instead of searching the scene again for every shadow cascade."
                      top="178"
                      width="475" />
+                    <check_box
+                     control_name="FSPerfRepresentativeFragmentTest"
+                     follows="left|top"
+                     height="20"
+                     label="Faster occlusion queries (NVIDIA)"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfrepresentativefragmenttest"
+                     tool_tip="EXPERIMENTAL. Lets NVIDIA Turing and newer graphics cards stop drawing an occlusion test box as soon as one pixel of it is found visible, which makes the hidden-object checks cheaper. Visibility results stay the same. Has no effect on other graphics cards."
+                     top="200"
+                     width="475" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
@@ -3963,7 +3974,7 @@
                      layout="topleft"
                      left="15"
                      name="perf_heading_lightingandreflections"
-                     top="208"
+                     top="230"
                      width="475">
                         Lighting and reflections
                     </text>
@@ -3976,7 +3987,7 @@
                      left="15"
                      name="perf_lightrescanthrottle"
                      tool_tip="EXPERIMENTAL. Rescan the scene for the nearest local lights 10 times a second, or when the camera moves, instead of every frame."
-                     top="231"
+                     top="253"
                      width="475" />
                     <check_box
                      control_name="FSPerfHeroProbeSkipHiddenFaces"
@@ -3987,7 +3998,7 @@
                      left="15"
                      name="perf_heroprobeskiphiddenfaces"
                      tool_tip="EXPERIMENTAL. Do not render the sides of a mirror's reflection cube that face away from the mirror surface."
-                     top="253"
+                     top="275"
                      width="475" />
                     <check_box
                      control_name="FSPerfProbeUniformCache"
@@ -3998,7 +4009,7 @@
                      left="15"
                      name="perf_probeuniformcache"
                      tool_tip="EXPERIMENTAL. Do not update the mirror (hero) probe data a second time in each render pass; the reflection probe update already includes it."
-                     top="275"
+                     top="297"
                      width="475" />
                     <check_box
                      control_name="FSPerfBatchedLocalLights"
@@ -4009,7 +4020,7 @@
                      left="15"
                      name="fs_fsperfbatchedlocallights"
                      tool_tip="EXPERIMENTAL. Draws point lights in a few instanced calls instead of one call per light, cutting CPU time where hundreds of lights are visible (clubs, cities). Lighting should look the same. Spotlights and projectors are unchanged. Rebuilds shaders when changed."
-                     top="305"
+                     top="327"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4018,7 +4029,7 @@
                      layout="topleft"
                      left="15"
                      name="perf_heading_other"
-                     top="331"
+                     top="353"
                      width="475">
                         Other
                     </text>
@@ -4031,7 +4042,7 @@
                      left="15"
                      name="perf_audiothrottlechecks"
                      tool_tip="EXPERIMENTAL. Re-check whether each sound source is muted or allowed by parcel rules 4 times a second, or right away when the mute list, parcel or your position changes, instead of every frame."
-                     top="354"
+                     top="376"
                      width="475" />
                     <check_box
                      control_name="FSPerfInventoryIdleThrottle"
@@ -4042,7 +4053,7 @@
                      left="15"
                      name="perf_inventoryidlethrottle"
                      tool_tip="EXPERIMENTAL. Inventory panels that are not on screen update their folder views twice a second instead of every frame."
-                     top="376"
+                     top="398"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4051,7 +4062,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_shadows"
-                     top="410"
+                     top="432"
                      width="475">
                         Shadows
                     </text>
@@ -4065,7 +4076,7 @@
                      left="15"
                      name="fs_fsperfshadowmergedbatches"
                      tool_tip="EXPERIMENTAL. Sends the opaque shadow casters of each shadow pass as fewer, larger draw calls. Shadows look the same; saves CPU time in scenes with many objects."
-                     top="436"
+                     top="458"
                      width="475" />
                     <check_box
                      control_name="FSPerfShadowStaticCache"
@@ -4077,7 +4088,7 @@
                      left="15"
                      name="fs_fsperfshadowstaticcache"
                      tool_tip="EXPERIMENTAL. Keeps the shadows of buildings and terrain in the two far sun shadow maps between frames and only redraws moving things into them. Needs 'Snap sun shadows to texels' (FSRenderShadowTexelSnap). Uses one extra depth buffer per far shadow map."
-                     top="462"
+                     top="484"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4086,7 +4097,7 @@
                      left="35"
                      name="fs_fsperfshadowstaticcachesunangle_label"
                      tool_tip="EXPERIMENTAL. With the static far shadow cache, the far shadows follow the sun in steps of this many degrees, 0 to 2. Larger steps redraw the cache less often under a moving sun."
-                     top="490"
+                     top="512"
                      width="285">
                         Far shadow sun step (degrees)
                     </text>
@@ -4103,7 +4114,7 @@
                      min_val="0"
                      name="fs_fsperfshadowstaticcachesunangle"
                      tool_tip="EXPERIMENTAL. With the static far shadow cache, the far shadows follow the sun in steps of this many degrees, 0 to 2. Larger steps redraw the cache less often under a moving sun."
-                     top="488"
+                     top="510"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4112,7 +4123,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_textures"
-                     top="530"
+                     top="552"
                      width="475">
                         Textures
                     </text>
@@ -4125,7 +4136,7 @@
                      left="15"
                      name="fs_fsperftextureuploadpbo"
                      tool_tip="EXPERIMENTAL. Copies newly loaded textures to the graphics card asynchronously, which can reduce stutter when many textures arrive at once. Only has an effect when textures are not already created on a background thread (usually AMD and Intel graphics). Needs OpenGL 4.4."
-                     top="556"
+                     top="578"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4134,7 +4145,7 @@
                      left="35"
                      name="fs_fsperftextureuploadbudgetmb_label"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="584"
+                     top="606"
                      width="285">
                         Texture upload budget per frame (MB)
                     </text>
@@ -4150,7 +4161,7 @@
                      min_val="0"
                      name="fs_fsperftextureuploadbudgetmb"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="582"
+                     top="604"
                      width="100" />
                 </panel>
             </scroll_container>
