@@ -212,6 +212,7 @@ LLGLSLShader            gFSSunRaysCompositeProgram;
 LLGLSLShader            gFSBloomPrefilterProgram;
 LLGLSLShader            gFSBloomDownProgram;
 LLGLSLShader            gFSBloomUpProgram;
+LLGLSLShader            gFSLensDirtProgram;
 LLGLSLShader            gFSLensEffectsProgram;
 // <ID:VolumetricClouds>
 LLGLSLShader            gIDCloudsProgram;
@@ -1341,6 +1342,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSBloomPrefilterProgram.unload();
         gFSBloomDownProgram.unload();
         gFSBloomUpProgram.unload();
+        gFSLensDirtProgram.unload();
         gFSLensEffectsProgram.unload();
         // </FS:Trish>
         // <ID:VolumetricClouds>
@@ -2834,6 +2836,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             { &gFSBloomPrefilterProgram,   "FS Bloom Prefilter",    "deferred/fsBloomPrefilterF.glsl",   false },
             { &gFSBloomDownProgram,        "FS Bloom Downsample",   "deferred/fsBloomDownF.glsl",        false },
             { &gFSBloomUpProgram,          "FS Bloom Upsample",     "deferred/fsBloomUpF.glsl",          false },
+            { &gFSLensDirtProgram,         "FS Lens Dirt",          "deferred/fsLensDirtF.glsl",         false },
             { &gFSLensEffectsProgram,      "FS Lens Effects",       "deferred/fsLensEffectsF.glsl",      false },
         };
         for (const FSPostShader& post : fs_post_shaders)

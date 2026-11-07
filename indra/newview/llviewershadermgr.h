@@ -269,6 +269,7 @@ extern LLGLSLShader         gFSSunRaysCompositeProgram;
 extern LLGLSLShader         gFSBloomPrefilterProgram;
 extern LLGLSLShader         gFSBloomDownProgram;
 extern LLGLSLShader         gFSBloomUpProgram;
+extern LLGLSLShader         gFSLensDirtProgram;
 extern LLGLSLShader         gFSLensEffectsProgram;
 // </FS:Trish>
 

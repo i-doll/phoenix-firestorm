@@ -12206,6 +12206,34 @@ void LLPipeline::renderSunRays()
     }
 }
 
+// Lens dirt: scales the summed bloom by 1 + mask * strength, with a procedural smudge mask fixed
+// to the screen, so bright lights and the sun light up the grime on the lens. A blend of
+// (dst colour, one) does the multiply in place, without another target.
+static void fs_apply_lens_dirt(LLRenderTarget& bloom, LLVertexBuffer* vb)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderBloomLensDirt", false);
+    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderBloomLensDirtStrength", 1.f);
+    static LLStaticHashedString s_strength("dirt_strength");
+
+    const F32 dirt = llclamp((F32)strength, 0.f, 10.f);
+    if (!enabled || dirt <= 0.f || !gFSLensDirtProgram.isComplete())
+    {
+        return;
+    }
+
+    LL_PROFILE_GPU_ZONE("lens dirt");
+    LLGLEnable blend(GL_BLEND);
+    gGL.blendFunc(LLRender::BF_DEST_COLOR, LLRender::BF_ONE);
+    bloom.bindTarget();
+    gFSLensDirtProgram.bind();
+    gFSLensDirtProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)bloom.getWidth(), (F32)bloom.getHeight());
+    gFSLensDirtProgram.uniform1f(s_strength, dirt);
+    fs_draw_screen_triangle(vb);
+    gFSLensDirtProgram.unbind();
+    bloom.flush();
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+}
+
 // Bloom from the HDR scene: the bright parts at half resolution, blurred down a chain of ever
 // smaller levels and summed back up into the first. The tonemap pass adds the result in.
 void LLPipeline::renderBloom()
@@ -12300,6 +12328,8 @@ void LLPipeline::renderBloom()
         gFSBloomUpProgram.unbind();
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
+
+    fs_apply_lens_dirt(mBloomLevels[0], mScreenTriangleVB);
 
     mBloomLevelCount = count;
 }
