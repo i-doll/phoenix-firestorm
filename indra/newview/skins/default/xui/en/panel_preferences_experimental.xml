@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ border="true"
+ follows="all"
+ height="480"
+ layout="topleft"
+ left="1"
+ top="1"
+ width="540"
+ label="Experimental"
+ name="experimental">
+    <scroll_container
+     follows="all"
+     height="478"
+     layout="topleft"
+     left="1"
+     name="experimental_scroll"
+     reserve_scroll_corner="false"
+     top="1"
+     width="538">
+        <panel
+         follows="left|top"
+         height="690"
+         layout="topleft"
+         left="0"
+         name="experimental_settings"
+         top="0"
+         width="510">
+            <text
+             follows="left|top"
+             height="32"
+             layout="topleft"
+             left="15"
+             name="experimental_warning"
+             text_color="EmphasisColor"
+             top="12"
+             width="475">
+                Experimental and diagnostic settings. Some changes require a viewer restart.
+            </text>
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="18"
+             layout="topleft"
+             left="15"
+             name="network_heading"
+             top_pad="14"
+             width="475">
+                Region and network diagnostics
+            </text>
+            <check_box
+             control_name="FSRenderNeighborAdjacentOnly"
+             follows="left|top"
+             height="20"
+             label="Only connect to adjacent regions"
+             layout="topleft"
+             left="15"
+             name="render_neighbor_adjacent_only"
+             tool_tip="Only connect to the current and adjacent regions, plus the teleport target, to limit neighbor loading"
+             top_pad="6"
+             width="475" />
+            <check_box
+             control_name="FSExperimentalReleaseNonAdjacentRegions"
+             enabled_control="FSRenderNeighborAdjacentOnly"
+             follows="left|top"
+             height="20"
+             label="Release regions that are no longer adjacent (experimental)"
+             layout="topleft"
+             left="30"
+             name="release_non_adjacent_regions"
+             tool_tip="EXPERIMENTAL. Releases a neighbor region once it has been non-adjacent for 5 seconds, by closing that region's connection only. Requires 'Only connect to adjacent regions'. Logged under FSRegionRelease."
+             top_pad="6"
+             width="460" />
+            <check_box
+             control_name="FSFetchOfflineIMsWhileOnline"
+             follows="left|top"
+             height="20"
+             label="Fetch offline messages while online"
+             layout="topleft"
+             left="15"
+             name="fetch_offline_ims"
+             tool_tip="Periodically request offline instant messages while online"
+             top_pad="6"
+             width="475" />
+            <text
+             follows="left|top"
+             height="18"
+             layout="topleft"
+             left="35"
+             name="offline_im_interval_label"
+             top_pad="6"
+             width="285">
+                Offline message fetch interval (seconds)
+            </text>
+            <spinner
+             control_name="FSOfflineIMFetchIntervalSeconds"
+             decimal_digits="0"
+             enabled_control="FSFetchOfflineIMsWhileOnline"
+             follows="left|top"
+             height="20"
+             increment="1"
+             layout="topleft"
+             left="330"
+             max_val="3600"
+             min_val="0"
+             name="offline_im_interval"
+             top_delta="-2"
+             width="100" />
+            <text
+             follows="left|top"
+             height="18"
+             layout="topleft"
+             left="35"
+             name="dc_threshold_label"
+             top_pad="6"
+             width="285">
+                Disconnect recovery threshold (seconds)
+            </text>
+            <spinner
+             control_name="FSDebugDcThreshold"
+             decimal_digits="1"
+             follows="left|top"
+             height="20"
+             increment="1"
+             layout="topleft"
+             left="330"
+             max_val="3600"
+             min_val="0"
+             name="dc_threshold"
+             top_delta="-2"
+             width="100" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="18"
+             layout="topleft"
+             left="15"
+             name="rendering_heading"
+             top_pad="14"
+             width="475">
+                Rendering and diagnostics
+            </text>
+            <check_box
+             control_name="RenderAlphaBlendShadows"
+             follows="left|top"
+             height="20"
+             label="Render alpha-blended objects into shadow maps"
+             layout="topleft"
+             left="15"
+             name="render_alpha_blend_shadows"
+             tool_tip="Render alpha-blended objects into shadow maps; animated transparent effects may be expensive shadow casters"
+             top_pad="6"
+             width="475" />
+            <check_box
+             control_name="RLVaDebugSphereUseOpaqueDepth"
+             follows="left|top"
+             height="20"
+             label="Use opaque depth for the RLVa debug sphere"
+             layout="topleft"
+             left="15"
+             name="rlva_debug_sphere_opaque_depth"
+             tool_tip="Use a pre-alpha depth snapshot so alpha wearables do not punch through the RLVa sphere effect"
+             top_pad="6"
+             width="475" />
+            <check_box
+             control_name="TextureFetchPipelineDiagnostics"
+             follows="left|top"
+             height="20"
+             label="Log texture fetch pipeline diagnostics"
+             layout="topleft"
+             left="15"
+             name="texture_fetch_pipeline_diagnostics"
+             tool_tip="Periodically log a texture HTTP pipeline snapshot for diagnosing stalled texture fetches"
+             top_pad="6"
+             width="475" />
+            <check_box
+             control_name="RLVaExperimentalLoginPrivacy"
+             follows="left|top"
+             height="20"
+             label="Protect privacy while RLVa attachments load"
+             layout="topleft"
+             left="15"
+             name="rlva_experimental_login_privacy"
+             tool_tip="Temporarily hide the world, names, location, maps, and nearby avatars during login; restrictions not resent by attachments are released after loading or a safety timeout"
+             top_pad="6"
+             width="475" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="18"
+             layout="topleft"
+             left="15"
+             name="developer_heading"
+             top_pad="14"
+             width="475">
+                Developer tools and performance
+            </text>
+            <text
+             follows="left|top"
+             height="18"
+             layout="topleft"
+             left="35"
+             name="mass_object_edit_workers_label"
+             top_pad="6"
+             width="285">
+                Mass Object Edit inventory workers
+            </text>
+            <spinner
+             control_name="FSMassObjectEditInventoryWorkers"
+             decimal_digits="0"
+             increment="1"
+             follows="left|top"
+             height="20"
+             layout="topleft"
+             left="330"
+             max_val="32"
+             min_val="1"
+             name="mass_object_edit_workers"
+             top_delta="-2"
+             width="100" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="18"
+             layout="topleft"
+             left="15"
+             name="texture_loading_heading"
+             top_pad="14"
+             width="475">
+                Texture loading
+            </text>
+            <check_box
+             control_name="FSTextureUseLiveVRAM"
+             follows="left|top"
+             height="20"
+             label="Use the video memory the driver reports for the texture budget"
+             layout="topleft"
+             left="15"
+             name="use_live_vram"
+             tool_tip="EXPERIMENTAL. On NVIDIA and AMD, textures are reduced when the GPU itself is running out of video memory, counting everything else using it, instead of using a fixed share of it. Has no effect when the texture memory limit is set manually."
+             top_pad="6"
+             width="475" />
+            <text
+             follows="left|top"
+             height="18"
+             layout="topleft"
+             left="35"
+             name="texture_bias_soft_zone_label"
+             tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
+             top_pad="6"
+             width="285">
+                Start reducing textures before memory is full
+            </text>
+            <spinner
+             control_name="FSTextureBiasSoftZone"
+             decimal_digits="2"
+             follows="left|top"
+             height="20"
+             increment="0.05"
+             layout="topleft"
+             left="330"
+             max_val="0.5"
+             min_val="0"
+             name="texture_bias_soft_zone"
+             tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
+             top_delta="-2"
+             width="100" />
+        </panel>
+    </scroll_container>
+</panel>
