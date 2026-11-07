@@ -37,6 +37,7 @@
 //#include "llfloaterimnearbychat.h"
 #include "fsfloaternearbychat.h"
 // </FS:Ansariel> [FS communication UI]
+#include "llframetimer.h"
 #include "llimview.h"
 #include "llinventoryobserver.h"
 #include "llinventorymodel.h"
@@ -88,6 +89,23 @@
 #include "NACLantispam.h"
 
 extern void on_new_message(const LLSD& msg);
+
+namespace
+{
+    bool sOfflineIMRequestInFlight = false;
+    bool sOfflineIMRequestEverSent = false;
+    LLUUID sOfflineIMRequestAgentId;
+    LLUUID sOfflineIMRequestSessionId;
+    LLFrameTimer sOfflineIMRequestTimer;
+
+    struct OfflineIMRequestGuard
+    {
+        ~OfflineIMRequestGuard()
+        {
+            sOfflineIMRequestInFlight = false;
+        }
+    };
+}
 
 // Strip out "Resident" for display, but only if the message came from a user
 // (rather than a script)
@@ -2451,46 +2469,78 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
 void LLIMProcessing::requestOfflineMessages()
 {
-    static bool requested = false;
-    if (!requested
-        && gMessageSystem
-        && !gDisconnected
-        && isAgentAvatarValid()
-        && gAgent.getRegion()
-        && gAgent.getRegion()->capabilitiesReceived()
-        && LLMuteList::getInstance()->updateLoadState())
+    static LLCachedControl<bool> fetch_while_online(gSavedSettings, "FSFetchOfflineIMsWhileOnline");
+    static LLCachedControl<F32> fetch_interval_seconds(gSavedSettings, "FSOfflineIMFetchIntervalSeconds");
+
+    if (gAgent.getID() != sOfflineIMRequestAgentId || gAgent.getSessionID() != sOfflineIMRequestSessionId)
     {
-        std::string cap_url = gAgent.getRegionCapability("ReadOfflineMsgs");
+        sOfflineIMRequestAgentId = gAgent.getID();
+        sOfflineIMRequestSessionId = gAgent.getSessionID();
+        sOfflineIMRequestEverSent = false;
+        sOfflineIMRequestInFlight = false;
+        sOfflineIMRequestTimer.reset();
+    }
 
-        // <FS:Ansariel> Optional legacy offline messages
-        if (!gSavedSettings.getBOOL("FSUseReadOfflineMsgsCap"))
-        {
-            cap_url = "";
-        }
-        // </FS:Ansariel>
+    if (sOfflineIMRequestInFlight)
+    {
+        return;
+    }
 
-        // Auto-accepted inventory items may require the avatar object
-        // to build a correct name.  Likewise, inventory offers from
-        // muted avatars require the mute list to properly mute.
-        if (cap_url.empty()
-            || gAgent.getRegionCapability("AcceptFriendship").empty()
-            || gAgent.getRegionCapability("AcceptGroupInvite").empty())
-        {
-            // Offline messages capability provides no session/transaction ids for message AcceptFriendship and IM_GROUP_INVITATION to work
-            // So make sure we have the caps before using it.
-            requestOfflineMessagesLegacy();
-        }
-        else
-        {
-            LLCoros::instance().launch("LLIMProcessing::requestOfflineMessagesCoro",
-                boost::bind(&LLIMProcessing::requestOfflineMessagesCoro, cap_url));
-        }
-        requested = true;
+    if (!gMessageSystem
+        || gDisconnected
+        || !isAgentAvatarValid()
+        || !gAgent.getRegion()
+        || !gAgent.getRegion()->capabilitiesReceived()
+        || !LLMuteList::getInstance()->updateLoadState())
+    {
+        return;
+    }
+
+    const bool allow_periodic = fetch_while_online && (fetch_interval_seconds > 0.f);
+    const bool should_request = !sOfflineIMRequestEverSent
+        || (allow_periodic && sOfflineIMRequestTimer.getElapsedTimeF32() >= fetch_interval_seconds);
+
+    if (!should_request)
+    {
+        return;
+    }
+
+    sOfflineIMRequestEverSent = true;
+    sOfflineIMRequestInFlight = true;
+    sOfflineIMRequestTimer.reset();
+
+    std::string cap_url = gAgent.getRegionCapability("ReadOfflineMsgs");
+
+    // <FS:Ansariel> Optional legacy offline messages
+    if (!gSavedSettings.getBOOL("FSUseReadOfflineMsgsCap"))
+    {
+        cap_url = "";
+    }
+    // </FS:Ansariel>
+
+    // Auto-accepted inventory items may require the avatar object
+    // to build a correct name.  Likewise, inventory offers from
+    // muted avatars require the mute list to properly mute.
+    if (cap_url.empty()
+        || gAgent.getRegionCapability("AcceptFriendship").empty()
+        || gAgent.getRegionCapability("AcceptGroupInvite").empty())
+    {
+        // Offline messages capability provides no session/transaction ids for message AcceptFriendship and IM_GROUP_INVITATION to work
+        // So make sure we have the caps before using it.
+        requestOfflineMessagesLegacy();
+        sOfflineIMRequestInFlight = false;
+    }
+    else
+    {
+        LLCoros::instance().launch("LLIMProcessing::requestOfflineMessagesCoro",
+            boost::bind(&LLIMProcessing::requestOfflineMessagesCoro, cap_url));
     }
 }
 
 void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
 {
+    OfflineIMRequestGuard in_flight_guard;
+
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
         httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestOfflineMessagesCoro", httpPolicy);
