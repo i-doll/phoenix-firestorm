@@ -1614,7 +1614,10 @@ void LLSpatialBridge::setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* 
                 LLVOAvatar* avatarp = (LLVOAvatar*) objparent;
                 if (avatarp->isVisible())
                 {
-                    impostor = objparent->isAvatar() && !LLPipeline::sImpostorRender && ((LLVOAvatar*) objparent)->isImpostor();
+                    // <FS:Trish> Once per avatar per frame, not per attachment and pass
+                    //impostor = objparent->isAvatar() && !LLPipeline::sImpostorRender && ((LLVOAvatar*) objparent)->isImpostor();
+                    impostor = objparent->isAvatar() && !LLPipeline::sImpostorRender && ((LLVOAvatar*) objparent)->isImpostorThisFrame();
+                    // </FS:Trish>
                     loaded   = objparent->isAvatar() && ((LLVOAvatar*) objparent)->isFullyLoaded();
                 }
                 else
@@ -1715,7 +1718,10 @@ void LLSpatialBridge::updateDistance(LLCamera& camera_in, bool force_update)
             if (parent && parent->getVObj())
             {
                 LLVOAvatar* av = parent->getVObj()->asAvatar();
-                if (av && av->isImpostor())
+                // <FS:Trish> Once per avatar per frame, not per attachment
+                //if (av && av->isImpostor())
+                if (av && av->isImpostorThisFrame())
+                // </FS:Trish>
                 {
                     return;
                 }

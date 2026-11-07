@@ -764,6 +764,17 @@ private:
     //--------------------------------------------------------------------
 public:
     virtual bool isImpostor();
+    // <FS:Trish> Culling runs these checks once per attachment and render pass; the results only
+    // change in idle updates, so cache them per drawable frame (LLDrawable::getCurrentFrame())
+    bool        isImpostorThisFrame();
+    AvatarOverallAppearance getOverallAppearanceThisFrame() const;
+private:
+    S32         mImpostorCacheFrame = S32_MIN;
+    bool        mImpostorCache = false;
+    mutable S32 mAppearanceCacheFrame = S32_MIN;
+    mutable AvatarOverallAppearance mAppearanceCache = AOA_NORMAL;
+public:
+    // </FS:Trish>
     bool        shouldImpostor(const F32 rank_factor = 1.0);
     bool        needsImpostorUpdate() const;
     const LLVector3& getImpostorOffset() const;

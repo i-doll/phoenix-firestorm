@@ -12619,6 +12619,30 @@ bool LLVOAvatar::isImpostor()
 // </FS:Beq>
 }
 
+// <FS:Trish> Per drawable frame caches for culling
+bool LLVOAvatar::isImpostorThisFrame()
+{
+    const S32 frame = LLDrawable::getCurrentFrame();
+    if (mImpostorCacheFrame != frame)
+    {
+        mImpostorCache = isImpostor();
+        mImpostorCacheFrame = frame;
+    }
+    return mImpostorCache;
+}
+
+LLVOAvatar::AvatarOverallAppearance LLVOAvatar::getOverallAppearanceThisFrame() const
+{
+    const S32 frame = LLDrawable::getCurrentFrame();
+    if (mAppearanceCacheFrame != frame)
+    {
+        mAppearanceCache = getOverallAppearance();
+        mAppearanceCacheFrame = frame;
+    }
+    return mAppearanceCache;
+}
+// </FS:Trish>
+
 bool LLVOAvatar::shouldImpostor(const F32 rank_factor)
 {
     if (isSelf())

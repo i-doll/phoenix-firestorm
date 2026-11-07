@@ -3423,10 +3423,15 @@ void LLPipeline::markVisible(LLDrawable *drawablep, LLCamera& camera)
                     if (vobj) // this test may not be needed, see above
                     {
                         LLVOAvatar* av = vobj->asAvatar();
+                        // <FS:Trish> Avatar-wide checks cached once per avatar per frame instead of per attachment and pass
+                        //if (av &&
+                        //    ((!sImpostorRender && av->isImpostor()) //ignore impostor flag during impostor pass
+                        //     //|| av->isInMuteList() // <FS:Ansariel> Partially undo MAINT-5700: Draw imposter for muted avatars
+                        //     || (LLVOAvatar::AOA_JELLYDOLL == av->getOverallAppearance() && !av->needsImpostorUpdate()) ))
                         if (av &&
-                            ((!sImpostorRender && av->isImpostor()) //ignore impostor flag during impostor pass
-                             //|| av->isInMuteList() // <FS:Ansariel> Partially undo MAINT-5700: Draw imposter for muted avatars
-                             || (LLVOAvatar::AOA_JELLYDOLL == av->getOverallAppearance() && !av->needsImpostorUpdate()) ))
+                            ((!sImpostorRender && av->isImpostorThisFrame()) //ignore impostor flag during impostor pass
+                             || (LLVOAvatar::AOA_JELLYDOLL == av->getOverallAppearanceThisFrame() && !av->needsImpostorUpdate()) ))
+                        // </FS:Trish>
                         {
                             return;
                         }
