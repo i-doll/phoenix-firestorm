@@ -583,10 +583,11 @@ float sunDiscRoughness(float perceptualRoughness)
     return sqrt(clamp(alpha + SUN_ANGULAR_RADIUS, 0.0, 1.0));
 }
 
-// Firestorm shading occlusion terms. The strength is a uniform (LLViewerShaderMgr::
-// uploadValueUniforms), 0 when its setting is off -- and a program nobody uploads it to reads
-// 0 too. At 0 the helper returns its "off" value exactly, so the image is unchanged.
+// Firestorm shading occlusion terms. Both strengths are uniforms (LLViewerShaderMgr::
+// uploadValueUniforms), 0 when their setting is off -- and a program nobody uploads them to
+// reads 0 too. At 0 each helper returns its "off" value exactly, so the image is unchanged.
 uniform float fs_specular_occlusion; // FSRenderSpecularOcclusion ? FSRenderSpecularOcclusionStrength : 0
+uniform float fs_micro_shadow;       // FSRenderMicroShadows ? FSRenderMicroShadowsStrength : 0
 
 // Specular occlusion from ambient visibility (Lagarde and de Rousiers 2014, "Moving Frostbite to
 // PBR", listing 26).
@@ -609,6 +610,28 @@ float fsSpecularOcclusion(float ao, float nv, float perceptualRoughness)
     float alpha = perceptualRoughness * perceptualRoughness;
     float so = clamp(pow(clamp(nv, 0.0, 1.0) + ao, exp2(-16.0 * alpha - 1.0)) - 1.0 + ao, 0.0, 1.0);
     return mix(ao, so, min(fs_specular_occlusion, 1.0));
+}
+
+// Normal-map micro-shadowing (Chan 2018, "Material Advances in Call of Duty: WWII").
+//
+// The occlusion of a normal-mapped surface describes a cone of directions the detail leaves open,
+// with its axis along the shading normal. A light low enough to fall outside that cone is blocked
+// by the very bumps the normal map draws, which no shadow map is fine enough to see. The cone's
+// half-angle follows from the visibility (cos^2 = 1 - ao for a cosine-weighted cone), and
+// |N.L| + 2 ao^2 - 1 is the smooth form of "is L inside it".
+//
+// nl is against the perturbed normal: the G-buffer keeps only that one for the lighting passes,
+// and the formula needs nothing else -- the grazing test is relative to the shading normal, and
+// the geometry is carried by the occlusion. Returns 1 when off.
+float fsMicroShadow(float nl, float ao)
+{
+    if (fs_micro_shadow <= 0.0)
+    {
+        return 1.0;
+    }
+
+    float micro = clamp(abs(nl) + 2.0 * ao * ao - 1.0, 0.0, 1.0);
+    return mix(1.0, micro, min(fs_micro_shadow, 1.0));
 }
 
 // set colorDiffuse and colorSpec to the results of GLTF PBR style IBL

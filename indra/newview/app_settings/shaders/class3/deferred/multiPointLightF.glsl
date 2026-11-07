@@ -45,6 +45,7 @@ float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
 vec3 clampRadiance(vec3 c);
+float fsMicroShadow(float nl, float ao); // deferredUtil.glsl: normal-map micro-shadows, 1 when off
 float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 vec4 getPosition(vec2 pos_screen);
@@ -126,6 +127,7 @@ void main()
                 vec3 diff = vec3(0);
                 vec3 specPunc = vec3(0);
                 pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diff, specPunc);
+                intensity *= fsMicroShadow(nl, orm.r);
                 final_color += intensity * clampRadiance(nl * (diff + specPunc));
             }
         }

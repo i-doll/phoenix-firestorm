@@ -66,6 +66,7 @@ float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
 vec3 clampRadiance(vec3 c);
+float fsMicroShadow(float nl, float ao); // deferredUtil.glsl: normal-map micro-shadows, 1 when off
 float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 bool clipProjectedLightVars(vec3 center, vec3 pos, out float dist, out float l_dist, out vec3 lv, out vec4 proj_tc );
@@ -193,6 +194,7 @@ void main()
                 dlit = getProjectedLightDiffuseColor( l_dist, proj_tc.xy );
 
                 vec3 intensity = dist_atten * dlit * PUNCTUAL_LIGHT_SCALE * shadow;
+                intensity *= fsMicroShadow(nl, orm.r);
 
                 final_color += intensity * clampRadiance(nl * (diffPunc + specPunc));
                 lit = clamp(nl * dist_atten, 0.0, 1.0);

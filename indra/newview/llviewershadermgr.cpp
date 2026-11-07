@@ -4202,16 +4202,21 @@ void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
     uploadValueUniforms(*shader); // <FS:Trish/>
 }
 
-// <FS:Trish> Specular occlusion strength for deferredUtil.glsl (fsSpecularOcclusion). 0 is
-// off, and at 0 the helper returns its input unchanged, so the image is exactly as before. A
-// uniform, so the strength spinner never rebuilds shaders.
+// <FS:Trish> Specular occlusion and normal-map micro-shadow strengths for deferredUtil.glsl
+// (fsSpecularOcclusion, fsMicroShadow). 0 is off, and at 0 both helpers return their inputs
+// unchanged, so the image is exactly as before. Uniforms, so the strength spinners never
+// rebuild shaders.
 static void fs_upload_shading_occlusion(LLGLSLShader& shader)
 {
     static LLCachedControl<bool> spec_occ(gSavedSettings, "FSRenderSpecularOcclusion", false);
     static LLCachedControl<F32> spec_occ_strength(gSavedSettings, "FSRenderSpecularOcclusionStrength", 1.f);
+    static LLCachedControl<bool> micro(gSavedSettings, "FSRenderMicroShadows", false);
+    static LLCachedControl<F32> micro_strength(gSavedSettings, "FSRenderMicroShadowsStrength", 1.f);
     static LLStaticHashedString sSpecularOcclusion("fs_specular_occlusion");
+    static LLStaticHashedString sMicroShadow("fs_micro_shadow");
 
     shader.uniform1f(sSpecularOcclusion, spec_occ ? llclamp((F32)spec_occ_strength, 0.f, 1.f) : 0.f);
+    shader.uniform1f(sMicroShadow, micro ? llclamp((F32)micro_strength, 0.f, 1.f) : 0.f);
 }
 // </FS:Trish>
 

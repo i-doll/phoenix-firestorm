@@ -114,6 +114,7 @@ vec3 pbrBaseLight(vec3 diffuseColor,
 GBufferInfo getGBuffer(vec2 screenpos);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
 float fsSpecularOcclusion(float ao, float nv, float perceptualRoughness); // deferredUtil.glsl
+float fsMicroShadow(float nl, float ao);
 vec3 clampHDRRange(vec3 color);
 
 void adjustIrradiance(inout vec3 irradiance, float ambocc)
@@ -260,6 +261,7 @@ void main()
         calcDiffuseSpecular(baseColor.rgb, metallic, diffuseColor, specularColor);
 
         vec3 v = -normalize(pos.xyz);
+        scol *= fsMicroShadow(dot(gb.normal, light_dir), visibility); // normal-map micro-shadows, 1 when off
         color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten);
     }
     else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
@@ -307,6 +309,12 @@ void main()
         float fs_nv = dot(gb.normal, -normalize(pos.xyz));
         glossenv *= fsSpecularOcclusion(envVisibility, fs_nv, 1.0 - spec.a);
         legacyenv *= fsSpecularOcclusion(envVisibility, fs_nv, 0.0);
+
+        // Normal-map micro-shadows on the sun, 1 when off. Both halves of min(da, scol) and the
+        // specular's scol, so it scales the sun term rather than only capping it.
+        float fs_micro = fsMicroShadow(da, envVisibility);
+        da *= fs_micro;
+        scol *= fs_micro;
 
         // apply lambertian IBL only (see pbrIbl)
         color.rgb = irradiance;
