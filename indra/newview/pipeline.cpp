@@ -133,6 +133,7 @@
 #include "SMAAAreaTex.h"
 #include "SMAASearchTex.h"
 #include "llerror.h"
+#include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -1484,6 +1485,13 @@ void LLPipeline::releaseGLBuffers()
 
     gBumpImageList.destroyGL();
     LLVOAvatar::resetImpostors();
+
+    // <ID:VolumetricClouds>
+    if (IDVolumetricClouds::instanceExists())
+    {
+        IDVolumetricClouds::instance().release();
+    }
+    // </ID:VolumetricClouds>
 }
 
 void LLPipeline::releaseLUTBuffers()
@@ -10037,6 +10045,9 @@ void LLPipeline::renderDeferredLighting()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderDeferredLighting");
+
+    IDVolumetricClouds::instance().update(); // <ID:VolumetricClouds/>
+
     if (!sCull)
     {
         return;

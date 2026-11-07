@@ -95,6 +95,7 @@ set(viewer_SOURCE_FILES
     idfloaterwornitems.cpp  # <ID> Another avatar's worn attachments
     idmcpserver.cpp  # <ID> Embedded MCP server
     idvolumetriccloudsettings.cpp  # <ID> Volumetric clouds: layer model and presets
+    idvolumetricclouds.cpp  # <ID> Volumetric clouds: renderer
     idmcpconnection.cpp  # <ID> Embedded MCP server: connection
     idmcprlvgate.cpp  # <ID> Embedded MCP server: RLV gate
     idmcptools_inventory.cpp  # <ID> Embedded MCP server: inventory tools
@@ -999,6 +1000,7 @@ set(viewer_HEADER_FILES
     idmcp.h  # <ID> Embedded MCP server: stable facade
     idmcpserver.h  # <ID> Embedded MCP server
     idvolumetriccloudsettings.h  # <ID> Volumetric clouds: layer model and presets
+    idvolumetricclouds.h  # <ID> Volumetric clouds: renderer
     idmcpconnection.h  # <ID> Embedded MCP server: connection
     idmcptoolregistry.h  # <ID> Embedded MCP server: tool registry
     idmcprlvgate.h  # <ID> Embedded MCP server: RLV gate

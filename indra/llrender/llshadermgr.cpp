@@ -1646,6 +1646,15 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("tonyMcMapfaceLut");
 
+    // <ID:VolumetricClouds>
+    mReservedUniforms.push_back("idCloudNoiseBase");
+    mReservedUniforms.push_back("idCloudNoiseDetail");
+    mReservedUniforms.push_back("idCloudWeather");
+    mReservedUniforms.push_back("idCloudShadow");
+    mReservedUniforms.push_back("idCloudScene");
+    mReservedUniforms.push_back("idCloudDepth");
+    // </ID:VolumetricClouds>
+
     llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
 
     std::set<std::string> dupe_check;
