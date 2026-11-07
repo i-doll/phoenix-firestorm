@@ -854,7 +854,7 @@ FunctionEnd
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Function CloseSecondLife
   Push $0
-  FindWindow $0 "Second Life" ""
+  FindWindow $0 "Idyll" ""
   IntCmp $0 0 DONE
   
   StrCmp $SKIP_DIALOGS "true" CLOSE
@@ -868,7 +868,7 @@ Function CloseSecondLife
     SendMessage $0 16 0 0
 
   LOOP:
-	  FindWindow $0 "Second Life" ""
+	  FindWindow $0 "Idyll" ""
 	  IntCmp $0 0 SLEEP
 	  Sleep 500
 	  Goto LOOP
@@ -892,7 +892,7 @@ FunctionEnd
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Function un.CloseSecondLife
   Push $0
-  FindWindow $0 "Second Life" ""
+  FindWindow $0 "Idyll" ""
   IntCmp $0 0 DONE
   MessageBox MB_OKCANCEL $(CloseSecondLifeUnInstMB) IDOK CLOSE IDCANCEL CANCEL_UNINSTALL
 
@@ -904,7 +904,7 @@ Function un.CloseSecondLife
     SendMessage $0 16 0 0
 
   LOOP:
-	  FindWindow $0 "Second Life" ""
+	  FindWindow $0 "Idyll" ""
 	  IntCmp $0 0 DONE
 	  Sleep 500
 	  Goto LOOP
@@ -1067,6 +1067,13 @@ FunctionEnd
 ;; Note:  You must list all files here, because we only want to delete our files,
 ;; not things users left in the program directory.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+# Delete a URL handler key only if it launches this install
+!macro IdDeleteOwnedUrlKey ROOT KEY
+  ReadRegStr $1 ${ROOT} "${KEY}\shell\open\command" ""
+  StrCmp $1 '"$INSTDIR\${VIEWER_EXE}" -url "%1"' 0 +2
+    DeleteRegKey ${ROOT} "${KEY}"
+!macroend
+
 Function un.ProgramFiles
 
 # This placeholder is replaced by the complete list of files to uninstall by viewer_manifest.py
@@ -1125,18 +1132,20 @@ ifSilent NoDelete 0
 	MessageBox MB_YESNO $(DeleteRegistryKeysMB) IDYES DeleteKeys IDNO NoDelete
 
 DeleteKeys:
-  DeleteRegKey SHELL_CONTEXT "SOFTWARE\Classes\x-grid-info" # <FS:Ansariel> FIRE-30446: Register x-grid-info hypergrid protocol
-  DeleteRegKey SHELL_CONTEXT "SOFTWARE\Classes\x-grid-location-info"
-  DeleteRegKey SHELL_CONTEXT "SOFTWARE\Classes\secondlife"
-  DeleteRegKey HKEY_CLASSES_ROOT "x-grid-info" # <FS:Ansariel> FIRE-30446: Register x-grid-info hypergrid protocol
-  DeleteRegKey HKEY_CLASSES_ROOT "x-grid-location-info"
-  DeleteRegKey HKEY_CLASSES_ROOT "secondlife"
+  Push $1
+  !insertmacro IdDeleteOwnedUrlKey SHELL_CONTEXT "SOFTWARE\Classes\x-grid-info" # <FS:Ansariel> FIRE-30446: Register x-grid-info hypergrid protocol
+  !insertmacro IdDeleteOwnedUrlKey SHELL_CONTEXT "SOFTWARE\Classes\x-grid-location-info"
+  !insertmacro IdDeleteOwnedUrlKey SHELL_CONTEXT "SOFTWARE\Classes\secondlife"
+  !insertmacro IdDeleteOwnedUrlKey HKEY_CLASSES_ROOT "x-grid-info" # <FS:Ansariel> FIRE-30446: Register x-grid-info hypergrid protocol
+  !insertmacro IdDeleteOwnedUrlKey HKEY_CLASSES_ROOT "x-grid-location-info"
+  !insertmacro IdDeleteOwnedUrlKey HKEY_CLASSES_ROOT "secondlife"
   # <FS:Ansariel> Unregister hop:// protocol registry info
   ${If} ${ISOPENSIM} == "1"
-    DeleteRegKey SHELL_CONTEXT "SOFTWARE\Classes\hop"
-    DeleteRegKey HKEY_CLASSES_ROOT "hop"
+    !insertmacro IdDeleteOwnedUrlKey SHELL_CONTEXT "SOFTWARE\Classes\hop"
+    !insertmacro IdDeleteOwnedUrlKey HKEY_CLASSES_ROOT "hop"
   ${EndIf}
   # </FS:Ansariel>
+  Pop $1
 
 NoDelete:
 

@@ -265,13 +265,13 @@ cd /path/to/firestorm
 etc/refresh_desktop_app_entry.sh
 ```
 
-Then open your applications menu and look in the Internet or Network branch for the Firestorm launcher.
+Then open your applications menu and look in the Internet or Network branch for the Idyll launcher.
 
 ### Running from command line or file browser
 
 ```
-cd /path/to/firestorm
-./firestorm
+cd /path/to/idyll
+./idyll
 ```
 
 ## Troubleshooting

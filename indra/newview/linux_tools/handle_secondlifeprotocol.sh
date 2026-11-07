@@ -13,11 +13,11 @@ fi
 
 RUN_PATH=`dirname "$0" || echo .`
 #cd "${RUN_PATH}/.."
-ch "${RUN_PATH}"
+cd "${RUN_PATH}"
 
 #exec ./idyll -url \'"${URL}"\'
 if [ `pidof do-not-directly-run-idyll-bin` ]; then
-	exec dbus-send --type=method_call --dest=com.secondlife.ViewerAppAPIService /com/secondlife/ViewerAppAPI com.secondlife.ViewerAppAPI.GoSLURL string:"$1"
+	exec dbus-send --type=method_call --dest=org.idyllviewer.ViewerAppAPIService /org/idyllviewer/ViewerAppAPI org.idyllviewer.ViewerAppAPI.GoSLURL string:"$1"
 else
 	exec ../idyll -url \'"${URL}"\'
 fi
