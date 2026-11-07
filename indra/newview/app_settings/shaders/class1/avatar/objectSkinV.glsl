@@ -30,8 +30,30 @@ uniform mat3x4 matrixPalette[MAX_JOINTS_PER_MESH_OBJECT];
 uniform int matrixPaletteSize;
 uniform vec3 skin_origin;
 
+#ifdef FS_SKIN_ONCE
+// FSPerfSkinOncePerFrame: the blended skin matrix of every vertex of this draw was captured
+// once this frame by transform feedback (avatar/fsSkinOnceV.glsl, fsskinonce.cpp), three
+// RGBA32F texels per vertex. fs_skin_once is 0 whenever the capture is unavailable and the
+// palette below is used as before.
+uniform int fs_skin_once;
+uniform int fs_skin_base;
+uniform samplerBuffer fs_skin_buffer;
+#endif
+
 mat3x4 getSkinBlend()
 {
+#ifdef FS_SKIN_ONCE
+    if (fs_skin_once != 0)
+    {
+        int row = (fs_skin_base + gl_VertexID) * 3;
+        mat3x4 captured;
+        captured[0] = texelFetch(fs_skin_buffer, row);
+        captured[1] = texelFetch(fs_skin_buffer, row + 1);
+        captured[2] = texelFetch(fs_skin_buffer, row + 2);
+        return captured;
+    }
+#endif
+
     SKIN_PRECISE vec4 w = fract(weight4);
     vec4 index = floor(weight4);
 
