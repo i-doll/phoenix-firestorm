@@ -125,6 +125,7 @@ void LLSurfacePatch::setSurface(LLSurface *surfacep)
         mVObjp->setPatch(this);
         mVObjp->setPositionRegion(mCenterRegion);
         gPipeline.createObject(mVObjp);
+        ++LLSurface::sPatchVisibilityGeneration; // <FS:Trish/> New patch object needs a visibility update
     }
 }
 
@@ -514,6 +515,7 @@ void LLSurfacePatch::updateVerticalStats()
         mVObjp->dirtyPatch();
     }
     mDirtyZStats = false;
+    ++LLSurface::sPatchVisibilityGeneration; // <FS:Trish/> Height stats feed patch visibility and stride
 }
 
 
@@ -937,6 +939,7 @@ void LLSurfacePatch::setOriginGlobal(const LLVector3d &origin_global)
     mVisInfo.mDistance = 512.0f;
     mVisInfo.mRenderLevel = 0;
     mVisInfo.mRenderStride = mSurfacep->getGridsPerPatchEdge();
+    ++LLSurface::sPatchVisibilityGeneration; // <FS:Trish/> Visibility info was reset
 
 }
 

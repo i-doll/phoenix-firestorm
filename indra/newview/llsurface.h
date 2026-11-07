@@ -134,6 +134,10 @@ public:
 
     static void setTextureSize(const S32 texture_size);
 
+    // <FS:Trish> Bumped whenever patch data feeding patch visibility changes, so LLWorld can skip unchanged frames
+    static U32 sPatchVisibilityGeneration;
+    // </FS:Trish>
+
     friend class LLSurfacePatch;
     friend std::ostream& operator<<(std::ostream &s, const LLSurface &S);
 

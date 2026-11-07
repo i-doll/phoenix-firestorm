@@ -57,6 +57,7 @@ namespace
 LLColor4U MAX_WATER_COLOR(0, 48, 96, 240);
 
 S32 LLSurface::sTextureSize = 256;
+U32 LLSurface::sPatchVisibilityGeneration = 0; // <FS:Trish/> Skip unchanged terrain visibility updates
 
 // ---------------- LLSurface:: Public Members ---------------
 

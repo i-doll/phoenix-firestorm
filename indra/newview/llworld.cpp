@@ -54,6 +54,7 @@
 #include "llvlcomposition.h"
 #include "llvoavatar.h"
 #include "llvocache.h"
+#include "llvosurfacepatch.h" // <FS:Trish/> Skip unchanged terrain visibility updates
 #include "llvowater.h"
 #include "message.h"
 #include "pipeline.h"
@@ -1073,9 +1074,47 @@ LLVector3 LLWorld::resolveLandNormalGlobal(const LLVector3d &pos_global)
 }
 
 
+extern bool gShiftFrame; // <FS:Trish/> Skip unchanged terrain visibility updates
+
 void LLWorld::updateVisibilities()
 {
     F32 cur_far_clip = LLViewerCamera::getInstance()->getFar();
+
+    // <FS:Trish> Skip the per patch visibility pass and the sort when nothing that feeds them changed.
+    // Not LLViewerCamera::isChanged(): that updates the camera's own last-planes state used by updateRegions().
+    static LLPlane sLastPlanes[LLCamera::AGENT_PLANE_USER_CLIP_NUM];
+    static LLVector3d sLastCameraPos;
+    static F32 sLastTerrainLODFactor = -1.f;
+    static bool sLastDynamicLOD = false;
+    static U32 sLastPatchGeneration = 0;
+    static bool sLastValid = false;
+
+    bool needs_update = !sLastValid || gShiftFrame;
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+    for (U32 i = 0; i < LLCamera::AGENT_PLANE_USER_CLIP_NUM; ++i)
+    {
+        const LLPlane& plane = camera->getAgentPlane(i);
+        if (!plane.equal(sLastPlanes[i]))
+        {
+            needs_update = true;
+            sLastPlanes[i].set(plane);
+        }
+    }
+    const LLVector3d& camera_pos = gAgentCamera.getCameraPositionGlobal();
+    if (camera_pos != sLastCameraPos
+        || LLVOSurfacePatch::sLODFactor != sLastTerrainLODFactor
+        || LLPipeline::sDynamicLOD != sLastDynamicLOD
+        || LLSurface::sPatchVisibilityGeneration != sLastPatchGeneration)
+    {
+        needs_update = true;
+        sLastCameraPos = camera_pos;
+        sLastTerrainLODFactor = LLVOSurfacePatch::sLODFactor;
+        sLastDynamicLOD = LLPipeline::sDynamicLOD;
+        sLastPatchGeneration = LLSurface::sPatchVisibilityGeneration;
+    }
+    // updatePatchVisibilities() does nothing on a shift frame, so redo it on the next one
+    sLastValid = !gShiftFrame;
+    // </FS:Trish>
 
     // Go through the culled list and check for visible regions (region is visible if land is visible)
     for (region_list_t::iterator iter = mCulledRegionList.begin();
@@ -1093,6 +1132,7 @@ void LLWorld::updateVisibilities()
             {
                 mCulledRegionList.erase(curiter);
                 mVisibleRegionList.push_back(regionp);
+                needs_update = true; // <FS:Trish/> Newly visible region needs its patches updated
             }
         }
     }
@@ -1115,8 +1155,15 @@ void LLWorld::updateVisibilities()
             const LLVector4a* bounds = group->getBounds();
             if (LLViewerCamera::getInstance()->AABBInFrustum(bounds[0], bounds[1]))
             {
-                regionp->calculateCameraDistance();
-                regionp->getLand().updatePatchVisibilities(gAgent);
+                // <FS:Trish> Skip unchanged frames
+                //regionp->calculateCameraDistance();
+                //regionp->getLand().updatePatchVisibilities(gAgent);
+                if (needs_update)
+                {
+                    regionp->calculateCameraDistance();
+                    regionp->getLand().updatePatchVisibilities(gAgent);
+                }
+                // </FS:Trish>
             }
             else
             {
@@ -1127,7 +1174,13 @@ void LLWorld::updateVisibilities()
     }
 
     // Sort visible regions
-    mVisibleRegionList.sort(LLViewerRegion::CompareDistance());
+    // <FS:Trish> Skip unchanged frames
+    //mVisibleRegionList.sort(LLViewerRegion::CompareDistance());
+    if (needs_update)
+    {
+        mVisibleRegionList.sort(LLViewerRegion::CompareDistance());
+    }
+    // </FS:Trish>
 
     LLViewerCamera::getInstance()->setFar(cur_far_clip);
 }
