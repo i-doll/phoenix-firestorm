@@ -8817,6 +8817,7 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         F32 exp_min = 1.f;
         F32 exp_max = 1.f;
         getExposureRange(exp_min, exp_max);
+        setExposureAdaptation(shader, exp_min, exp_max);
         // </FS:Trish>
 
         shader->uniform1f(dt, gFrameIntervalSeconds);
@@ -8876,6 +8877,33 @@ void LLPipeline::getExposureRange(F32& exp_min, F32& exp_max)
             }
         }
     }
+}
+// </FS:Trish>
+
+// <FS:Trish> Eye adaptation controls. Narrows the exposure range to a limit in stops around its
+// middle, and passes the adaptation speeds and centre weighting to the exposure shader. At the
+// defaults (no limit, both speeds 1, no centre weight) the result is the stock one.
+void LLPipeline::setExposureAdaptation(LLGLSLShader* shader, F32& exp_min, F32& exp_max)
+{
+    static LLCachedControl<F32> speed_to_bright(gSavedSettings, "FSRenderExposureSpeedToBright", 1.f);
+    static LLCachedControl<F32> speed_to_dark(gSavedSettings, "FSRenderExposureSpeedToDark", 1.f);
+    static LLCachedControl<F32> centre_weight(gSavedSettings, "FSRenderExposureCenterWeight", 0.f);
+    static LLCachedControl<F32> range_limit(gSavedSettings, "FSRenderExposureRangeLimit", 0.f);
+    static LLStaticHashedString s_fs_exposure_params("fs_exposure_params");
+
+    if (range_limit > 0.f && exp_min > 0.f && exp_max > exp_min)
+    {
+        const F32 middle = sqrtf(exp_min * exp_max);
+        const F32 span = powf(2.f, llmin((F32)range_limit, 10.f));
+        exp_min = llmax(exp_min, middle / span);
+        exp_max = llmin(exp_max, middle * span);
+    }
+
+    shader->uniform4f(s_fs_exposure_params,
+                      llclamp((F32)speed_to_bright, 0.01f, 100.f),
+                      llclamp((F32)speed_to_dark, 0.01f, 100.f),
+                      llclamp((F32)centre_weight, 0.f, 1.f),
+                      0.f);
 }
 // </FS:Trish>
 

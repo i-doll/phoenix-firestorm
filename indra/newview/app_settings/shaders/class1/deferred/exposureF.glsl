@@ -37,6 +37,9 @@ uniform vec2 noiseVec;
 
 uniform vec4 dynamic_exposure_params;
 uniform vec4 dynamic_exposure_params2;
+// x speed multiplier adapting to a brighter scene, y to a darker one, z centre weight (0 = the
+// whole metered area), w unused
+uniform vec4 fs_exposure_params;
 
 float lum(vec3 col)
 {
@@ -49,6 +52,13 @@ void main()
     vec2 tc = vec2(0.5,0.5);
 
     float L = textureLod(emissiveRect, tc, 8).r;
+    if (fs_exposure_params.z > 0.0)
+    {
+        // Centre weighted metering: the middle of the 256 square luminance map, from the
+        // centre sample of the 8x8 and 4x4 levels (the middle quarter and half of it)
+        float centre = 0.5 * (textureLod(emissiveRect, tc, 5).r + textureLod(emissiveRect, tc, 6).r);
+        L = mix(L, centre, clamp(fs_exposure_params.z, 0.0, 1.0));
+    }
     float max_L = dynamic_exposure_params.x;
     L = clamp(L, 0.0, max_L);
     L /= max_L;
@@ -58,6 +68,8 @@ void main()
     float prev = texture(exposureMap, vec2(0.5,0.5)).r;
 
     float speed = -log(dynamic_exposure_params.w) / dynamic_exposure_params2.w;
+    // A brighter scene lowers the exposure scale, a darker one raises it
+    speed *= s < prev ? fs_exposure_params.x : fs_exposure_params.y;
     s = mix(prev, s, 1 - exp(-speed * dt));
 #endif
 

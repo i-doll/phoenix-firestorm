@@ -27092,6 +27092,50 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>2</integer>
     </map>
+    <key>FSRenderExposureSpeedToBright</key>
+    <map>
+      <key>Comment</key>
+      <string>Auto exposure: multiplier on the adaptation speed when the scene gets brighter (exposure going down). 1 is the stock speed. Eyes adapt to bright light faster than to dark, so values above 1 here with values below 1 for FSRenderExposureSpeedToDark feel natural. Applies live.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSRenderExposureSpeedToDark</key>
+    <map>
+      <key>Comment</key>
+      <string>Auto exposure: multiplier on the adaptation speed when the scene gets darker (exposure going up). 1 is the stock speed. Applies live.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSRenderExposureCenterWeight</key>
+    <map>
+      <key>Comment</key>
+      <string>Auto exposure: centre weighted metering, 0 to 1. 0 meters the whole sampled area as before; 1 meters only the middle of the screen, so a bright sky at the edge doesn't darken a subject in the centre. Applies live.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSRenderExposureRangeLimit</key>
+    <map>
+      <key>Comment</key>
+      <string>Auto exposure: limits how far exposure can adapt, in stops either side of the middle of its range. 0 = no limit (stock). Applies live.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
