@@ -986,6 +986,14 @@ void LLVOAvatar::markDead()
     mVoiceVisualizer->markDead();
     LLLoadedCallbackEntry::cleanUpCallbackList(&mCallbackTextureList) ;
     LLViewerObject::markDead();
+
+    // <FS:Trish> Object updates no longer force a re-rank, so re-rank the remaining avatars here
+    static LLCachedControl<bool> perf_rank_hysteresis(gSavedSettings, "FSPerfAvatarRankHysteresis", false);
+    if (perf_rank_hysteresis)
+    {
+        setCullNeedsUpdate();
+    }
+    // </FS:Trish>
 }
 
 

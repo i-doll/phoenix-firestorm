@@ -562,7 +562,14 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
         objectp->setLastUpdateType(OUT_FULL_COMPRESSED); //newly cached
         objectp->setLastUpdateCached(true);
     }
-    LLVOAvatar::setCullNeedsUpdate();
+    // <FS:Trish> Only force an avatar re-rank for new avatars, the rest goes through the idleUpdate hysteresis
+    //LLVOAvatar::setCullNeedsUpdate();
+    static LLCachedControl<bool> perf_rank_hysteresis(gSavedSettings, "FSPerfAvatarRankHysteresis", false);
+    if (!perf_rank_hysteresis || (justCreated && objectp->isAvatar()))
+    {
+        LLVOAvatar::setCullNeedsUpdate();
+    }
+    // </FS:Trish>
 
     // <FS:Trish> Parcel derender
     if (justCreated)
@@ -644,6 +651,11 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
     U8 compressed_dpbuffer[2048];
     LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, 2048);
     LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
+
+    // <FS:Trish> Only force an avatar re-rank when an avatar was created or sat/stood in this message
+    static LLCachedControl<bool> perf_rank_hysteresis(gSavedSettings, "FSPerfAvatarRankHysteresis", false);
+    bool avatar_rank_changed = false;
+    // </FS:Trish>
 
     for (i = 0; i < num_objects; i++)
     {
@@ -907,6 +919,11 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         }
 #endif
 
+        // <FS:Trish> Remember the avatar's parent to detect sitting down or standing up
+        bool is_avatar = perf_rank_hysteresis && objectp->isAvatar();
+        LLViewerObject* old_avatar_parent = is_avatar ? (LLViewerObject*)objectp->getParent() : NULL;
+        // </FS:Trish>
+
         //bool bCached = false;
         if (compressed)
         {
@@ -942,6 +959,13 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         recorder.objectUpdateEvent(update_type);
         objectp->setLastUpdateType(update_type);
 
+        // <FS:Trish> Avatar created or sat/stood
+        if (is_avatar && (justCreated || old_avatar_parent != (LLViewerObject*)objectp->getParent()))
+        {
+            avatar_rank_changed = true;
+        }
+        // </FS:Trish>
+
         // <FS:Trish> Parcel derender
         if (justCreated)
         {
@@ -950,7 +974,13 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         // </FS:Trish>
     }
 
-    LLVOAvatar::setCullNeedsUpdate();
+    // <FS:Trish> Rely on the idleUpdate hysteresis unless an avatar was created or sat/stood
+    //LLVOAvatar::setCullNeedsUpdate();
+    if (!perf_rank_hysteresis || avatar_rank_changed)
+    {
+        LLVOAvatar::setCullNeedsUpdate();
+    }
+    // </FS:Trish>
 }
 
 void LLViewerObjectList::processCompressedObjectUpdate(LLMessageSystem *mesgsys,

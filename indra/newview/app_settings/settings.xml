@@ -26667,6 +26667,18 @@ Change of this parameter will affect the layout of buttons in notification toast
     <map>
       <key>Comment</key>
       <string>Build each rigged mesh's joint matrix palette once per skeleton update and reuse it in every render pass (camera, shadows, probes), instead of rebuilding it for each pass.</string>
+      <string>Keep a client side undo history of build tool moves, rotations and resizes. Ctrl+Z/Ctrl+Y step through it, even after deselecting; the simulator's own undo is used when it is empty.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSPerfAvatarRankHysteresis</key>
+    <map>
+      <key>Comment</key>
+      <string>Only re-rank avatars for impostors and loading when one is added, removed or reseated, or when its on-screen size changes enough. Without this, every object update in the region re-sorts all avatars every frame.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
