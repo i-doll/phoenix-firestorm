@@ -1216,9 +1216,18 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
 
     if (shadow_detail > 0)
     { //allocate 4 sun shadow maps
+        // <FS:Trish> The two far cascades can use fewer texels, they cover far more ground per texel anyway
+        static LLCachedControl<F32> far_cascade_resolution(gSavedSettings, "FSRenderShadowFarCascadeResolution", 1.f);
+        const F32 far_scale = gCubeSnapshot ? 1.f : llclamp((F32)far_cascade_resolution, 0.25f, 1.f);
+        // </FS:Trish>
         for (U32 i = 0; i < 4; i++)
         {
-            if (!mRT->shadow[i].allocate(sun_shadow_map_width, sun_shadow_map_height, 0, true))
+            // <FS:Trish>
+            //if (!mRT->shadow[i].allocate(sun_shadow_map_width, sun_shadow_map_height, 0, true))
+            const U32 width = i >= 2 ? BlurHappySize(resX, scale * far_scale) : sun_shadow_map_width;
+            const U32 height = i >= 2 ? BlurHappySize(resY, scale * far_scale) : sun_shadow_map_height;
+            if (!mRT->shadow[i].allocate(llmax(width, 16U), llmax(height, 16U), 0, true))
+            // </FS:Trish>
             {
                 return false;
             }

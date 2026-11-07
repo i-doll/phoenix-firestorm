@@ -143,23 +143,25 @@ float pcfShadow(sampler2DShadow shadowMap, vec3 norm, vec4 stc, float bias_mul, 
         return texture(shadowMap, stc.xyz);
     }
 
+    vec2 res = vec2(textureSize(shadowMap, 0));
+
     // <ID:PCSS>
     if (sun_shadow_softness > 0.0)
     {
         mat4 m = shadow_matrix[cascade];
         vec2 uv_per_meter = vec2(length(vec3(m[0][0], m[1][0], m[2][0])), length(vec3(m[0][1], m[1][1], m[2][1])));
         float depth_per_meter = length(vec3(m[0][2], m[1][2], m[2][2]));
-        return pcssShadow(shadowMap, stc.xyz, sun_shadow_softness * uv_per_meter / depth_per_meter, 1.0 / shadow_res, 1.5);
+        return pcssShadow(shadowMap, stc.xyz, sun_shadow_softness * uv_per_meter / depth_per_meter, 1.0 / res, 1.5);
     }
     // </ID:PCSS>
 
-    stc.x = floor(stc.x*shadow_res.x + fract(pos_screen.y*shadow_res.y))/shadow_res.x; // add some chaotic jitter to X sample pos according to Y to disguise the snapping going on here
+    stc.x = floor(stc.x*res.x + fract(pos_screen.y*res.y))/res.x; // add some chaotic jitter to X sample pos according to Y to disguise the snapping going on here
     float cs = texture(shadowMap, stc.xyz);
     float shadow = cs * 4.0;
-    shadow += texture(shadowMap, stc.xyz+vec3( 1.5/shadow_res.x,  0.5/shadow_res.y, 0.0));
-    shadow += texture(shadowMap, stc.xyz+vec3( 0.5/shadow_res.x, -1.5/shadow_res.y, 0.0));
-    shadow += texture(shadowMap, stc.xyz+vec3(-1.5/shadow_res.x, -0.5/shadow_res.y, 0.0));
-    shadow += texture(shadowMap, stc.xyz+vec3(-0.5/shadow_res.x,  1.5/shadow_res.y, 0.0));
+    shadow += texture(shadowMap, stc.xyz+vec3( 1.5/res.x,  0.5/res.y, 0.0));
+    shadow += texture(shadowMap, stc.xyz+vec3( 0.5/res.x, -1.5/res.y, 0.0));
+    shadow += texture(shadowMap, stc.xyz+vec3(-1.5/res.x, -0.5/res.y, 0.0));
+    shadow += texture(shadowMap, stc.xyz+vec3(-0.5/res.x,  1.5/res.y, 0.0));
     return clamp(shadow * 0.125, 0.0, 1.0);
 #else
     return 1.0;
