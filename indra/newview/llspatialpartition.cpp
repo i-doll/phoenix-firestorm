@@ -311,6 +311,24 @@ void LLSpatialGroup::expandExtents(const LLVector4a* addingExtents, const LLXfor
     mBounds[1].mul(0.5f);
 }
 
+// <FS:Trish> FSPerfShadowStaticCache: report static geometry changes (agent space extents) to the
+// far sun cascade cache. Bridged partitions are skipped: their batches are always drawn as dynamic.
+static void fs_note_static_shadow_change(LLSpatialGroup* group, const LLVector4a* extents)
+{
+    if (!gPipeline.mFSShadowCacheInUse || !group || !extents)
+    {
+        return;
+    }
+    LLSpatialPartition* part = group->getSpatialPartition();
+    if (!part || part->isBridge() ||
+        (part->mPartitionType != LLViewerRegion::PARTITION_VOLUME && part->mPartitionType != LLViewerRegion::PARTITION_TERRAIN))
+    {
+        return;
+    }
+    gPipeline.fsNoteShadowStaticChange(extents);
+}
+// </FS:Trish>
+
 bool LLSpatialGroup::addObject(LLDrawable *drawablep)
 {
     if(!drawablep)
@@ -318,6 +336,7 @@ bool LLSpatialGroup::addObject(LLDrawable *drawablep)
         return false;
     }
     {
+        fs_note_static_shadow_change(this, drawablep->getSpatialExtents()); // <FS:Trish/>
         drawablep->setGroup(this);
         setState(static_cast<U32>(OBJECT_DIRTY) | static_cast<U32>(GEOM_DIRTY));
         setOcclusionState(LLSpatialGroup::DISCARD_QUERY, LLSpatialGroup::STATE_MODE_ALL_CAMERAS);
@@ -339,7 +358,14 @@ void LLSpatialGroup::rebuildGeom()
 {
     if (!isDead())
     {
+        const bool fs_geom_dirty = hasState(LLSpatialGroup::GEOM_DIRTY); // <FS:Trish/>
         getSpatialPartition()->rebuildGeom(this);
+        // <FS:Trish> FSPerfShadowStaticCache
+        if (fs_geom_dirty)
+        {
+            fs_note_static_shadow_change(this, getObjectExtents());
+        }
+        // </FS:Trish>
 
         if (hasState(LLSpatialGroup::MESH_DIRTY))
         {
@@ -352,6 +378,12 @@ void LLSpatialGroup::rebuildMesh()
 {
     if (!isDead())
     {
+        // <FS:Trish> FSPerfShadowStaticCache
+        if (hasState(LLSpatialGroup::MESH_DIRTY))
+        {
+            fs_note_static_shadow_change(this, getObjectExtents());
+        }
+        // </FS:Trish>
         getSpatialPartition()->rebuildMesh(this);
     }
 }
@@ -437,6 +469,7 @@ bool LLSpatialGroup::removeObject(LLDrawable *drawablep, bool from_octree)
         return false;
     }
 
+    fs_note_static_shadow_change(this, drawablep->getSpatialExtents()); // <FS:Trish/> FSPerfShadowStaticCache
     unbound();
     if (mOctreeNode && !from_octree)
     {

@@ -278,6 +278,42 @@ public:
     bool fsRenderShadowOpaqueBatches(const U32* types, U32 type_count);
     void fsCountShadowDraws(U32 batches, U32 draws);
     // </FS:Trish>
+    // <FS:Trish> FSPerfShadowStaticCache: static casters of the far sun cascades kept in a depth target of
+    // their own, copied into the cascade each update, with only the dynamic casters drawn on top
+    enum EFSShadowCasterFilter { FS_SHADOW_ALL = 0, FS_SHADOW_STATIC, FS_SHADOW_DYNAMIC };
+    struct FSShadowCache
+    {
+        LLRenderTarget  mTarget;
+        glm::mat4       mClip = glm::mat4(1.f);     // projection * view the target was rendered with
+        glm::mat4       mPendingClip = glm::mat4(1.f);
+        U64             mHash = 0;                  // static draw list it holds
+        U32             mTex = 0;                   // cascade depth texture it was rendered for
+        bool            mValid = false;
+        bool            mMatch = false;             // this update's projection matches the cached one
+        LLVector3       mLight;                     // light direction the cascade is built with
+        bool            mLightSet = false;
+        F32             mDepthNear = 0.f;           // world anchored, snapped light space depth range
+        F32             mDepthFar = 0.f;
+        bool            mDepthSet = false;
+    };
+    FSShadowCache           mFSShadowCache[2];      // sun cascades 2 and 3
+    std::vector<LLVector4a> mFSShadowDirty;         // agent space extents (min, max) of changed static geometry
+    std::vector<const LLMatrix4*> mFSShadowStaticMatrices; // region render matrices: model matrix of static batches
+    bool                    mFSShadowDirtyAll = false;
+    bool                    mFSShadowCacheInUse = false;
+    S32                     mFSShadowCacheCascade = -1; // sun cascade being rendered with the cache, or -1
+    U32                     mFSShadowCasterFilter = FS_SHADOW_ALL;
+    void fsShadowCacheBeginFrame(bool texel_snap);
+    LLVector3 fsShadowCacheLightDir(S32 cascade, const LLVector3& light_dir);
+    void fsShadowCacheSnapDepth(S32 cascade, F32 grid_z, F32& znear, F32& zfar);
+    void fsShadowCacheBeginCascade(S32 cascade, const glm::mat4& proj, const glm::mat4& view);
+    void fsShadowCacheEndCascade();
+    void fsShadowCacheRenderStatic(LLCamera& shadow_cam, const U32* types, U32 type_count);
+    bool fsIsStaticShadowBatch(const LLDrawInfo* params) const;
+    bool fsShadowPoolAllowed(U32 pool_type) const;
+    void fsNoteShadowStaticChange(const LLVector4a* extents);
+    void fsReleaseShadowCache();
+    // </FS:Trish>
 
     // Populate given LLCullResult with results of a frustum cull of the entire scene against the given LLCamera
     void updateCull(LLCamera& camera, LLCullResult& result, bool hud_attachments = false);

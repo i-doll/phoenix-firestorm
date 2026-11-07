@@ -1593,6 +1593,7 @@ void LLPipeline::releaseSunShadowTargets()
     {
         releaseSunShadowTarget(i);
     }
+    fsReleaseShadowCache(); // <FS:Trish/> FSPerfShadowStaticCache
 }
 
 void LLPipeline::releaseSpotShadowTargets()
@@ -5158,7 +5159,10 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
         cur_type = poolp->getType();
 
         pool_set_t::iterator iter2 = iter1;
-        if (hasRenderType(poolp->getType()) && poolp->getNumShadowPasses() > 0)
+        // <FS:Trish> FSPerfShadowStaticCache: terrain goes with the static casters
+        //if (hasRenderType(poolp->getType()) && poolp->getNumShadowPasses() > 0)
+        if (hasRenderType(poolp->getType()) && poolp->getNumShadowPasses() > 0 && fsShadowPoolAllowed(cur_type))
+        // </FS:Trish>
         {
             poolp->prerender() ;
 
@@ -11633,6 +11637,8 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
 
     stop_glerror();
 
+    fsShadowCacheRenderStatic(shadow_cam, types, LL_ARRAY_SIZE(types)); // <FS:Trish/> FSPerfShadowStaticCache, far sun cascades only
+
     struct CompareVertexBuffer
     {
         bool operator()(const LLDrawInfo* const& lhs, const LLDrawInfo* const& rhs)
@@ -11802,13 +11808,16 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
 // A batch that lies entirely inside the range just drawn (the same LLDrawInfo in two pass maps) is
 // dropped, as drawing it again can't change the depth.
 // Returns false when the per pass type path should run instead (option off).
+// FSPerfShadowStaticCache filters this list down to the static or the dynamic batches (mFSShadowCasterFilter),
+// merged or not depending on FSPerfShadowMergedBatches.
 bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     static LLCachedControl<bool> merged_batches(gSavedSettings, "FSPerfShadowMergedBatches", false);
     static LLCachedControl<bool> batch_stats(gSavedSettings, "FSPerfShadowBatchStats", false);
 
-    if (!merged_batches)
+    const U32 filter = mFSShadowCasterFilter;
+    if (!merged_batches && filter == FS_SHADOW_ALL)
     {
         if (batch_stats)
         {   // count what the per pass type path is about to draw: one call per non-empty batch
@@ -11834,7 +11843,8 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
         {
             LLDrawInfo* params = *i;
             LLCullResult::increment_iterator(i, end);
-            if (params && params->mCount && params->mVertexBuffer.notNull())
+            if (params && params->mCount && params->mVertexBuffer.notNull() &&
+                (filter == FS_SHADOW_ALL || fsIsStaticShadowBatch(params) == (filter == FS_SHADOW_STATIC)))
             {
                 batches.push_back(params);
             }
@@ -11874,7 +11884,7 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
         U32 index_end = offset + first->mCount;
 
         size_t next = i + 1;
-        for (; next < count; ++next)
+        for (; merged_batches && next < count; ++next)
         {
             const LLDrawInfo* params = batches[next];
             if (params->mModelMatrix != first->mModelMatrix || params->mVertexBuffer.get() != buffer)
@@ -11932,6 +11942,362 @@ void LLPipeline::fsCountShadowDraws(U32 batches, U32 draws)
         total_draws = 0;
         passes = 0;
         timer.reset();
+    }
+}
+// </FS:Trish>
+
+// <FS:Trish> FSPerfShadowStaticCache
+// The far sun cascades (2 and 3) keep the depth of their static casters in a target of their own. Static
+// means an opaque, non-rigged volume batch drawn with its region's render matrix (a drawable that isn't
+// active, so it sits in the region octree in agent space) and terrain. Everything else, avatars, rigged
+// and animesh, active (moving or recently moved) objects, alpha masked and alpha blended surfaces, GLTF,
+// trees and grass, is dynamic and drawn every update as before.
+// The cached depth is reused while all of these hold:
+//  - FSRenderShadowTexelSnap is on: without it the cascade projection follows every camera move and turn,
+//    so it never matches and the cache is not used at all,
+//  - the cascade's projection * view matches the one the cache was rendered with (same texel cell, same
+//    size, same depth range, same sun direction),
+//  - the cascade depth texture is the same one and has the same size,
+//  - the static draw list of this update hashes the same (groups culled in or out, rebuilt batches,
+//    region matrices),
+//  - no static geometry inside the cascade's bounds was added, removed or rebuilt since (LLSpatialGroup
+//    hooks report the extents to fsNoteShadowStaticChange).
+// To make the match likely, the cached cascades build their light space from a sun direction that only
+// follows the real one once it moved more than FSPerfShadowStaticCacheSunAngle degrees, and their depth
+// range is widened onto a world anchored grid with some hysteresis.
+
+void LLPipeline::fsReleaseShadowCache()
+{
+    for (FSShadowCache& cache : mFSShadowCache)
+    {
+        cache.mTarget.release();
+        cache.mValid = false;
+        cache.mMatch = false;
+        cache.mLightSet = false;
+        cache.mDepthSet = false;
+    }
+    mFSShadowDirty.clear();
+    mFSShadowDirtyAll = false;
+    mFSShadowCacheInUse = false;
+}
+
+void LLPipeline::fsShadowCacheBeginFrame(bool texel_snap)
+{
+    if (gCubeSnapshot)
+    {
+        return;
+    }
+
+    static LLCachedControl<bool> static_cache(gSavedSettings, "FSPerfShadowStaticCache", false);
+    const bool enable = static_cache && texel_snap && RenderShadowDetail > 0 && RenderShadowDetail <= 2 &&
+                        RenderShadowSplits >= 2;
+    if (!enable)
+    {
+        if (mFSShadowCacheInUse)
+        {
+            fsReleaseShadowCache();
+        }
+        return;
+    }
+    mFSShadowCacheInUse = true;
+
+    // drop the caches whose cascade bounds saw static geometry change since the last update
+    for (FSShadowCache& cache : mFSShadowCache)
+    {
+        if (!cache.mValid)
+        {
+            continue;
+        }
+        if (mFSShadowDirtyAll)
+        {
+            cache.mValid = false;
+            continue;
+        }
+        for (size_t i = 0; i + 1 < mFSShadowDirty.size(); i += 2)
+        {
+            const LLVector4a& lo = mFSShadowDirty[i];
+            const LLVector4a& hi = mFSShadowDirty[i + 1];
+            glm::vec2 mn(FLT_MAX, FLT_MAX);
+            glm::vec2 mx(-FLT_MAX, -FLT_MAX);
+            for (U32 c = 0; c < 8; ++c)
+            {
+                const glm::vec4 p = cache.mClip * glm::vec4((c & 1) ? hi[0] : lo[0],
+                                                            (c & 2) ? hi[1] : lo[1],
+                                                            (c & 4) ? hi[2] : lo[2], 1.f);
+                const F32 w = fabsf(p.w) > 1e-6f ? p.w : 1e-6f;
+                mn = glm::min(mn, glm::vec2(p.x / w, p.y / w));
+                mx = glm::max(mx, glm::vec2(p.x / w, p.y / w));
+            }
+            // depth isn't tested: casters toward the sun past the near plane are depth clamped into the map
+            if (mx.x >= -1.f && mn.x <= 1.f && mx.y >= -1.f && mn.y <= 1.f)
+            {
+                cache.mValid = false;
+                break;
+            }
+        }
+    }
+    mFSShadowDirty.clear();
+    mFSShadowDirtyAll = false;
+}
+
+LLVector3 LLPipeline::fsShadowCacheLightDir(S32 cascade, const LLVector3& light_dir)
+{
+    if (!mFSShadowCacheInUse || gCubeSnapshot || cascade < 2 || cascade > 3)
+    {
+        return light_dir;
+    }
+    static LLCachedControl<F32> sun_angle(gSavedSettings, "FSPerfShadowStaticCacheSunAngle", 0.05f);
+    const F32 cos_angle = cosf(llclamp((F32)sun_angle, 0.f, 2.f) * DEG_TO_RAD);
+    FSShadowCache& cache = mFSShadowCache[cascade - 2];
+    if (!cache.mLightSet || cache.mLight * light_dir < cos_angle)
+    {
+        cache.mLight = light_dir;
+        cache.mLightSet = true;
+    }
+    return cache.mLight;
+}
+
+void LLPipeline::fsShadowCacheSnapDepth(S32 cascade, F32 grid_z, F32& znear, F32& zfar)
+{
+    if (!mFSShadowCacheInUse || gCubeSnapshot || cascade < 2 || cascade > 3)
+    {
+        return;
+    }
+    // light space depth plus the grid origin's depth doesn't depend on where the camera is
+    FSShadowCache& cache = mFSShadowCache[cascade - 2];
+    const F32 world_near = znear + grid_z;
+    const F32 world_far = zfar + grid_z;
+    const F32 range = world_far - world_near;
+    if (!cache.mDepthSet || world_near < cache.mDepthNear || world_far > cache.mDepthFar ||
+        range < (cache.mDepthFar - cache.mDepthNear) * 0.8f)
+    {
+        const F32 step = powf(2.f, ceilf(log2f(llmax(range / 32.f, 0.001f))));
+        cache.mDepthNear = floorf(world_near / step) * step - step;
+        cache.mDepthFar = ceilf(world_far / step) * step + step;
+        cache.mDepthSet = true;
+    }
+    znear = cache.mDepthNear - grid_z;
+    zfar = cache.mDepthFar - grid_z;
+}
+
+void LLPipeline::fsShadowCacheBeginCascade(S32 cascade, const glm::mat4& proj, const glm::mat4& view)
+{
+    mFSShadowCacheCascade = -1;
+    if (!mFSShadowCacheInUse || gCubeSnapshot || cascade < 2 || cascade > 3 || cascade > RenderShadowSplits)
+    {
+        return;
+    }
+
+    FSShadowCache& cache = mFSShadowCache[cascade - 2];
+    LLRenderTarget& shadow = mRT->shadow[cascade];
+    const U32 width = shadow.getWidth();
+    const U32 height = shadow.getHeight();
+    if (!shadow.getDepth() || !width || !height)
+    {
+        return;
+    }
+    if (cache.mTarget.getWidth() != width || cache.mTarget.getHeight() != height || !cache.mTarget.getDepth())
+    {
+        cache.mValid = false;
+        if (!cache.mTarget.allocate(width, height, 0, true))
+        {
+            cache.mTarget.release();
+            return;
+        }
+    }
+
+    cache.mPendingClip = proj * view;
+    bool match = cache.mValid && cache.mTex == shadow.getDepth();
+    for (S32 c = 0; match && c < 4; ++c)
+    {
+        for (S32 r = 0; r < 4; ++r)
+        {
+            const F32 a = cache.mClip[c][r];
+            const F32 b = cache.mPendingClip[c][r];
+            if (fabsf(a - b) > llmax(fabsf(a), fabsf(b)) * 1e-5f + 1e-6f)
+            {
+                match = false;
+                break;
+            }
+        }
+    }
+    cache.mMatch = match;
+
+    // the region render matrices static batches are drawn with
+    mFSShadowStaticMatrices.clear();
+    for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+    {
+        if (region)
+        {
+            mFSShadowStaticMatrices.push_back(&region->mRenderMatrix);
+        }
+    }
+
+    mFSShadowCacheCascade = cascade;
+}
+
+void LLPipeline::fsShadowCacheEndCascade()
+{
+    mFSShadowCacheCascade = -1;
+    mFSShadowCasterFilter = FS_SHADOW_ALL;
+}
+
+bool LLPipeline::fsIsStaticShadowBatch(const LLDrawInfo* params) const
+{
+    if (!params->mModelMatrix || params->mAvatar.notNull() || params->mSkinInfo.notNull())
+    {
+        return false;
+    }
+    for (const LLMatrix4* mat : mFSShadowStaticMatrices)
+    {
+        if (mat == params->mModelMatrix)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool LLPipeline::fsShadowPoolAllowed(U32 pool_type) const
+{
+    switch (mFSShadowCasterFilter)
+    {
+        case FS_SHADOW_STATIC:  return pool_type == LLDrawPool::POOL_TERRAIN;
+        case FS_SHADOW_DYNAMIC: return pool_type != LLDrawPool::POOL_TERRAIN;
+        default:                return true;
+    }
+}
+
+void LLPipeline::fsNoteShadowStaticChange(const LLVector4a* extents)
+{
+    if (!mFSShadowCacheInUse || !extents)
+    {
+        return;
+    }
+    if (mFSShadowDirty.size() >= 8192)
+    {
+        mFSShadowDirtyAll = true;
+        return;
+    }
+    mFSShadowDirty.push_back(extents[0]);
+    mFSShadowDirty.push_back(extents[1]);
+}
+
+// Called from renderShadow once the cascade's render map is sorted and its matrices are loaded, with the
+// cascade target bound and cleared. Either copies the cached static depth in, or draws the static casters
+// and keeps a copy of them; then leaves only the dynamic casters for the rest of renderShadow.
+void LLPipeline::fsShadowCacheRenderStatic(LLCamera& shadow_cam, const U32* types, U32 type_count)
+{
+    if (mFSShadowCacheCascade < 0)
+    {
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    LL_PROFILE_GPU_ZONE("shadow static cache");
+
+    const S32 cascade = mFSShadowCacheCascade;
+    FSShadowCache& cache = mFSShadowCache[cascade - 2];
+    LLRenderTarget& shadow = mRT->shadow[cascade];
+
+    // hash of the static casters of this update, order independent
+    auto mix = [](U64 x) -> U64
+    {
+        x += 0x9e3779b97f4a7c15ULL;
+        x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+        x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+        return x ^ (x >> 31);
+    };
+    U64 hash = 0;
+    U64 items = 0;
+    for (U32 t = 0; t < type_count; ++t)
+    {
+        for (LLCullResult::drawinfo_iterator i = beginRenderMap(types[t]), end = endRenderMap(types[t]); i != end; ++i)
+        {
+            const LLDrawInfo* params = *i;
+            if (params && params->mCount && params->mVertexBuffer.notNull() && fsIsStaticShadowBatch(params))
+            {
+                hash += mix((U64)(uintptr_t)params ^ mix((U64)(uintptr_t)params->mVertexBuffer.get()) ^
+                            mix(((U64)params->mOffset << 32) | params->mCount) ^
+                            mix(((U64)params->mStart << 16) | params->mEnd) ^ mix((U64)(uintptr_t)params->mModelMatrix));
+                ++items;
+            }
+        }
+    }
+    if (hasRenderType(LLDrawPool::POOL_TERRAIN))
+    {
+        for (LLDrawPool* poolp : mPools)
+        {
+            if (poolp->getType() != LLDrawPool::POOL_TERRAIN || !poolp->isFacePool())
+            {
+                continue;
+            }
+            for (LLFace* face : ((LLFacePool*)poolp)->mDrawFace)
+            {
+                if (face)
+                {
+                    hash += mix((U64)(uintptr_t)face ^ mix((U64)(uintptr_t)face->getVertexBuffer()) ^
+                                mix(((U64)(U32)face->getIndicesStart() << 32) | face->getIndicesCount()));
+                    ++items;
+                }
+            }
+        }
+    }
+    for (const LLMatrix4* mat : mFSShadowStaticMatrices)
+    {
+        U32 tx = 0;
+        U32 ty = 0;
+        memcpy(&tx, &mat->mMatrix[3][0], sizeof(tx));
+        memcpy(&ty, &mat->mMatrix[3][1], sizeof(ty));
+        hash += mix((U64)(uintptr_t)mat ^ mix(((U64)tx << 32) | ty));
+    }
+    hash = mix(hash ^ mix(items));
+
+    static LLCachedControl<bool> batch_stats(gSavedSettings, "FSPerfShadowBatchStats", false);
+    static U32 hits = 0;
+    static U32 misses = 0;
+    static LLFrameTimer stats_timer;
+
+    const S32 width = (S32)shadow.getWidth();
+    const S32 height = (S32)shadow.getHeight();
+    if (cache.mMatch && cache.mHash == hash)
+    {
+        shadow.copyContents(cache.mTarget, 0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        ++hits;
+    }
+    else
+    {
+        mFSShadowCasterFilter = FS_SHADOW_STATIC;
+
+        gDeferredShadowProgram.bind(false);
+        gGL.diffuseColor4f(1, 1, 1, 1);
+        gGL.setColorMask(false, false);
+        gGL.getTexUnit(0)->disable();
+        if (!fsRenderShadowOpaqueBatches(types, type_count))
+        {   // can't happen with the filter set, but keep the cache honest if it does
+            cache.mValid = false;
+        }
+        gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
+
+        renderGeomShadow(shadow_cam); // terrain only under FS_SHADOW_STATIC
+
+        cache.mTarget.copyContents(shadow, 0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        cache.mClip = cache.mPendingClip;
+        cache.mHash = hash;
+        cache.mTex = shadow.getDepth();
+        cache.mValid = true;
+        ++misses;
+    }
+
+    gGL.loadMatrix(gGLModelView);
+    gGLLastMatrix = NULL;
+    mFSShadowCasterFilter = FS_SHADOW_DYNAMIC;
+
+    if (batch_stats && stats_timer.getElapsedTimeF32() >= 10.f)
+    {
+        LL_INFOS("FSShadowBatches") << "Static shadow cache: " << hits << " reused, " << misses << " re-rendered far cascade updates" << LL_ENDL;
+        hits = 0;
+        misses = 0;
+        stats_timer.reset();
     }
 }
 // </FS:Trish>
@@ -13433,6 +13799,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         }
     }
     // </FS:Trish>
+    fsShadowCacheBeginFrame(texel_snap); // <FS:Trish/> FSPerfShadowStaticCache
 
 
     // convenience array of 4 near clip plane distances
@@ -13657,7 +14024,10 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             // </FS:Trish>
 
             //get a temporary view projection
-            view[j] = look(camera.getOrigin(), lightDir, -up);
+            // <FS:Trish> FSPerfShadowStaticCache: cached far cascades follow the sun in small steps
+            //view[j] = look(camera.getOrigin(), lightDir, -up);
+            view[j] = look(camera.getOrigin(), fsShadowCacheLightDir(j, lightDir), -up);
+            // </FS:Trish>
 
             std::vector<LLVector3> wpf;
 
@@ -13779,6 +14149,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     znear = zmid - 0.5f;
                     zfar = zmid + 0.5f;
                 }
+                fsShadowCacheSnapDepth(j, grid_origin.z, znear, zfar); // <FS:Trish/> FSPerfShadowStaticCache
 
                 proj[j] = glm::ortho(left, left + texel_x * shadow_map_width,
                                      bottom, bottom + texel_y * shadow_map_height,
@@ -14018,7 +14389,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     bucketShadowCull(sUnionShadowResult, shadow_cam, result[j], min_caster_size); // <FS:Trish/>
                 }
                 sShadowMinCasterSize = have_union_cull ? 0.f : min_caster_size; // <FS:Trish/> used by LLOctreeCullShadow
+                fsShadowCacheBeginCascade(j, proj[j], view[j]); // <FS:Trish/> FSPerfShadowStaticCache
                 renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull);
+                fsShadowCacheEndCascade(); // <FS:Trish/>
                 sShadowMinCasterSize = 0.f; // <FS:Trish/>
             }
 

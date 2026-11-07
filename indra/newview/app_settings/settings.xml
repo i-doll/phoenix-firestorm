@@ -26905,6 +26905,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSPerfShadowStaticCache</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Keep the shadows of static objects and terrain in the two far sun shadow maps in a cache, and only draw avatars, attachments, moving objects, rigged and alpha masked surfaces, trees and grass into them each update. The cache is redrawn when the camera moves the cascade by a shadow map texel, the sun moves (see FSPerfShadowStaticCacheSunAngle), or objects are added, removed, moved or change detail there. Needs FSRenderShadowTexelSnap; does nothing without it. Uses one extra depth buffer per far cascade.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfShadowStaticCacheSunAngle</key>
+    <map>
+      <key>Comment</key>
+      <string>With FSPerfShadowStaticCache, the far sun shadow maps follow the sun in steps of this many degrees, so a slowly moving sun doesn't redraw the cache every frame. 0 follows every movement. Up to 2.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.05</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
