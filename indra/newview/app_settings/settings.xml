@@ -13337,7 +13337,7 @@ Change of this parameter will affect the layout of buttons in notification toast
   <key>RenderResolutionMultiplier</key>
   <map>
     <key>Comment</key>
-    <string>Multiplier for rendering 3D scene at reduced resolution. Valid values: 0 &lt; RenderResolutionMultiplier &lt;= 1.0 </string>
+    <string>Multiplier for the resolution the 3D scene renders at. Below 1.0 renders at reduced resolution, above 1.0 supersamples (up to 2.0, uses much more GPU time and memory, shadow maps scale with it). Valid values: 0 &lt; RenderResolutionMultiplier &lt;= 2.0 </string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -26277,6 +26277,390 @@ Change of this parameter will affect the layout of buttons in notification toast
       <string>Boolean</string>
       <key>Value</key>
       <integer>0</integer>
+    </map>
+    <key>FSSnapshotWaitForTextures</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Before the snapshot floater captures, wait until the textures on screen have loaded at the resolution the snapshot needs (sharper than the screen for snapshots larger than the window), up to FSSnapshotTextureWaitTimeout seconds</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSSnapshotTextureWaitTimeout</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Longest time, in seconds, a snapshot waits for textures (see FSSnapshotWaitForTextures)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>10.0</real>
+    </map>
+    <key>FSRenderShadowMaxDistance</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Furthest distance, in meters, sun and moon shadows reach (16 to 512). The shadow maps cover this range, so shorter distances give sharper shadows nearby and no shadows beyond it.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>512.0</real>
+    </map>
+    <key>FSRenderSunRays</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: light scattered in the air, broken into shafts by whatever casts sun shadows. Needs sun shadows on.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderSunRaysStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: brightness multiplier.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>FSRenderSunRaysDensity</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: how much the air scatters, per meter. Higher is hazier.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.002</real>
+    </map>
+    <key>FSRenderSunRaysAnisotropy</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: 0 scatters light evenly in all directions, toward 0.95 the rays concentrate around the sun.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.6</real>
+    </map>
+    <key>FSRenderSunRaysSteps</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: samples along each ray (4 to 128). More gives cleaner shafts and costs more GPU time.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>24</integer>
+    </map>
+    <key>FSRenderSunRaysDistance</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: how far from the camera, in meters, air is lit (also limited by the sun shadow distance).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>128.0</real>
+    </map>
+    <key>FSRenderSunRaysResolution</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Sun rays: resolution they are computed at, as a fraction of the screen (0.25 to 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>FSRenderBloom</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Bloom: bright parts of the image glow onto their surroundings, from the HDR scene. Separate from the classic glow.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderBloomStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Bloom: how much is added.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.15</real>
+    </map>
+    <key>FSRenderBloomThreshold</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Bloom: brightness on screen above which light blooms. 1 is full white, lower values bloom more of the image.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSRenderBloomKnee</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Bloom: how gradually bloom fades in below the threshold.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>FSRenderBloomLevels</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Bloom: blur levels, each twice as wide as the last (1 to 8). More gives a wider, softer bloom.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>6</integer>
+    </map>
+    <key>FSColorGrade</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading after tone mapping.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSColorGradeTemperature</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: white balance in Kelvin. 6500 is neutral, lower is warmer, higher is cooler.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>6500.0</real>
+    </map>
+    <key>FSColorGradeTint</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: white balance tint, positive toward green, negative toward magenta (-1 to 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSColorGradeLift</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: raises (positive) or crushes (negative) the blacks without moving white.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSColorGradeGamma</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: midtone brightness, above 1 brightens.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSColorGradeGain</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: scales the image toward white.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSColorGradeContrast</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: contrast around mid grey.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSColorGradeSaturation</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: saturation, 0 is black and white.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSColorGradeVibrance</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: saturates muted colours more than strong ones, negative mutes them.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSColorGradeShadowTint</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: tint for the shadows, white leaves them alone.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Color4</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>1.0</real>
+      </array>
+    </map>
+    <key>FSColorGradeHighlightTint</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: tint for the highlights, white leaves them alone.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Color4</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>1.0</real>
+      </array>
+    </map>
+    <key>FSColorGradeSplitBalance</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: moves the line between shadow and highlight tint, positive gives the highlight tint more of the image.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSColorGradeLUT</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: lookup table, a .cube file or a PNG strip (size*size by size, green increasing downward). A full path, or a file name in the luts folder of the user settings folder. Empty for none.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string></string>
+    </map>
+    <key>FSColorGradeLUTStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Colour grading: how much of the lookup table is applied (0 to 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSRenderChromaticAberration</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Lens: red and blue fringing toward the edges of the frame, in pixels at the corners. 0 is off.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSRenderChromaticAberrationDoFOnly</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Lens: chromatic aberration only where depth of field blurs the image, scaled by how blurred. Needs depth of field on.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSRenderLensFlare</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Lens: lens flare strength when the sun or moon is in view and not hidden. 0 is off.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSRenderFilmGrain</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Lens: film grain strength (0 to 1). 0 is off.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSRenderFilmGrainSize</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Lens: film grain size in pixels.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.5</real>
     </map>
     <key>FSTextureBiasSoftZone</key>
     <map>

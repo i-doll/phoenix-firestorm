@@ -203,6 +203,14 @@ LLGLSLShader            gDeferredPostTonemapGammaCorrectProgram;
 LLGLSLShader            gNoPostTonemapGammaCorrectProgram;
 LLGLSLShader            gDeferredPostTonemapLegacyGammaCorrectProgram;
 LLGLSLShader            gNoPostTonemapLegacyGammaCorrectProgram;
+// <FS:Trish> Sun rays, bloom and lens effects
+LLGLSLShader            gFSSunRaysProgram;
+LLGLSLShader            gFSSunRaysCompositeProgram;
+LLGLSLShader            gFSBloomPrefilterProgram;
+LLGLSLShader            gFSBloomDownProgram;
+LLGLSLShader            gFSBloomUpProgram;
+LLGLSLShader            gFSLensEffectsProgram;
+// </FS:Trish>
 LLGLSLShader            gDeferredPostGammaCorrectProgram;
 LLGLSLShader            gLegacyPostGammaCorrectProgram;
 LLGLSLShader            gExposureProgram;
@@ -1207,6 +1215,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gNoPostTonemapGammaCorrectProgram.unload();
         gDeferredPostTonemapLegacyGammaCorrectProgram.unload();
         gNoPostTonemapLegacyGammaCorrectProgram.unload();
+        // <FS:Trish> Sun rays, bloom and lens effects
+        gFSSunRaysProgram.unload();
+        gFSSunRaysCompositeProgram.unload();
+        gFSBloomPrefilterProgram.unload();
+        gFSBloomDownProgram.unload();
+        gFSBloomUpProgram.unload();
+        gFSLensEffectsProgram.unload();
+        // </FS:Trish>
 
         for (auto i = 0; i < 4; ++i)
         {
@@ -2651,6 +2667,44 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = gNoPostTonemapLegacyGammaCorrectProgram.createShader();
         llassert(success);
     }
+
+    // <FS:Trish> Sun rays, bloom and lens effects. Each is optional: one that fails to build
+    // leaves its effect off (the pipeline checks isComplete()) instead of failing the deferred
+    // renderer.
+    if (success)
+    {
+        struct FSPostShader
+        {
+            LLGLSLShader* mShader;
+            const char* mName;
+            const char* mFile;
+            bool mDeferred;
+        };
+        const FSPostShader fs_post_shaders[] = {
+            { &gFSSunRaysProgram,          "FS Sun Rays",           "deferred/fsSunRaysF.glsl",          true },
+            { &gFSSunRaysCompositeProgram, "FS Sun Rays Composite", "deferred/fsSunRaysCompositeF.glsl", true },
+            { &gFSBloomPrefilterProgram,   "FS Bloom Prefilter",    "deferred/fsBloomPrefilterF.glsl",   false },
+            { &gFSBloomDownProgram,        "FS Bloom Downsample",   "deferred/fsBloomDownF.glsl",        false },
+            { &gFSBloomUpProgram,          "FS Bloom Upsample",     "deferred/fsBloomUpF.glsl",          false },
+            { &gFSLensEffectsProgram,      "FS Lens Effects",       "deferred/fsLensEffectsF.glsl",      false },
+        };
+        for (const FSPostShader& post : fs_post_shaders)
+        {
+            post.mShader->mName = post.mName;
+            post.mShader->mFeatures.isDeferred = post.mDeferred;
+            post.mShader->mShaderFiles.clear();
+            post.mShader->clearPermutations();
+            post.mShader->mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+            post.mShader->mShaderFiles.push_back(make_pair(post.mFile, GL_FRAGMENT_SHADER));
+            post.mShader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            if (!post.mShader->createShader())
+            {
+                LL_WARNS("ShaderLoading") << post.mName << " failed to build, that effect stays off" << LL_ENDL;
+                post.mShader->unload();
+            }
+        }
+    }
+    // </FS:Trish>
 
     if (success && gGLManager.mGLVersion > 3.9f)
     {

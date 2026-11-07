@@ -167,6 +167,11 @@ private:
     bool                        mAllowRenderUI;
     bool                        mAllowFullScreenPreview;
     LLFrameTimer                mSnapshotDelayTimer;
+    // <FS:Trish> Wait for on screen textures to finish loading before capturing
+    LLFrameTimer                mTextureWaitTimer;
+    bool                        waitForTextures();
+    void                        endTextureWait();
+    // </FS:Trish>
     S32                         mShineCountdown;
     LLFrameTimer                mShineAnimTimer;
     F32                         mFlashAlpha;

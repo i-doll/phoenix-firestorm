@@ -129,6 +129,13 @@ LLSnapshotLivePreview::LLSnapshotLivePreview (const LLSnapshotLivePreview::Param
 
 LLSnapshotLivePreview::~LLSnapshotLivePreview()
 {
+    // <FS:Trish> Closed while waiting for textures: drop the snapshot texture boost
+    if (mTextureWaitTimer.getStarted())
+    {
+        endTextureWait();
+    }
+    // </FS:Trish>
+
     // delete images
     mPreviewImage = NULL;
     mPreviewImageEncoded = NULL;
@@ -764,6 +771,12 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
     // time to produce a snapshot
     if(!previewp->getSnapshotUpToDate())
     {
+        // <FS:Trish> Wait for on screen textures to finish loading before capturing
+        if (previewp->waitForTextures())
+        {
+            return false;
+        }
+        // </FS:Trish>
         LL_DEBUGS("Snapshot") << "producing snapshot" << LL_ENDL;
         if (!previewp->mPreviewImage)
         {
@@ -814,6 +827,7 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
             previewp->generateThumbnailImage(true) ;
         }
         previewp->getWindow()->decBusyCount();
+        previewp->endTextureWait(); // <FS:Trish/>
         previewp->setVisible(use_freeze_frame && previewp->mAllowFullScreenPreview); // only show fullscreen preview when in freeze frame mode
         previewp->mSnapshotActive = false;
         LL_DEBUGS("Snapshot") << "done creating snapshot" << LL_ENDL;
@@ -832,6 +846,73 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 
     return true;
 }
+
+// <FS:Trish> Wait for on screen textures to finish loading before capturing.
+// Returns true while the capture should keep waiting.
+bool LLSnapshotLivePreview::waitForTextures()
+{
+    static LLCachedControl<bool> wait_for_textures(gSavedSettings, "FSSnapshotWaitForTextures", true);
+    static LLCachedControl<F32> wait_timeout(gSavedSettings, "FSSnapshotTextureWaitTimeout", 15.f);
+
+    if (!wait_for_textures || wait_timeout <= 0.f ||
+        mSnapshotBufferType == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH ||
+        mSnapshotBufferType == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24)
+    {
+        return false;
+    }
+
+    if (!mTextureWaitTimer.getStarted())
+    {
+        // Textures pick their discard level from their size on screen. A snapshot larger than
+        // the window shows them over more pixels: one level sharper per doubling, at most two.
+        const F32 window_w = (F32)llmax(gViewerWindow->getWorldViewWidthRaw(), 1);
+        const F32 window_h = (F32)llmax(gViewerWindow->getWorldViewHeightRaw(), 1);
+        const F32 ratio = llmax((F32)getWidth() / window_w, (F32)getHeight() / window_h);
+        LLViewerTexture::sSnapshotDiscardBoost = ratio > 1.f ? llclamp((S32)ceilf(log2f(ratio)), 0, 2) : 0;
+
+        mTextureWaitTimer.start();
+        return true;
+    }
+
+    // Texture stats are refreshed over several frames, give the desired discard levels time to
+    // settle before trusting them
+    const F32 elapsed = mTextureWaitTimer.getElapsedTimeF32();
+    if (elapsed < 1.f)
+    {
+        return true;
+    }
+
+    S32 pending = 0;
+    for (const LLPointer<LLViewerFetchedTexture>& texture : gTextureList)
+    {
+        LLViewerFetchedTexture* tex = texture.get();
+        // Only what is on screen now, and only what can still arrive
+        if (!tex || tex->isMissingAsset() || tex->getMaxVirtualSize() <= 10.f)
+        {
+            continue;
+        }
+        const S32 current = tex->getDiscardLevel();
+        if (current < 0 || current > tex->getDesiredDiscardLevel())
+        {
+            ++pending;
+        }
+    }
+
+    if (pending > 0 && elapsed < wait_timeout)
+    {
+        return true;
+    }
+
+    LL_INFOS("Snapshot") << "Waited " << elapsed << "s for textures, " << pending << " still loading" << LL_ENDL;
+    return false;
+}
+
+void LLSnapshotLivePreview::endTextureWait()
+{
+    mTextureWaitTimer.stop();
+    LLViewerTexture::sSnapshotDiscardBoost = 0;
+}
+// </FS:Trish>
 
 void LLSnapshotLivePreview::prepareFreezeFrame()
 {

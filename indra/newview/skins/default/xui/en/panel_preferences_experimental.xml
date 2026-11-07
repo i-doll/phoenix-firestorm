@@ -9,306 +9,1405 @@
  width="540"
  label="Experimental"
  name="experimental">
-    <scroll_container
+    <text
+     follows="left|top|right"
+     height="18"
+     layout="topleft"
+     left="10"
+     name="experimental_warning"
+     text_color="EmphasisColor"
+     top="6"
+     width="520">
+        Experimental and diagnostic settings. Some changes require a viewer restart.
+    </text>
+    <tab_container
      follows="all"
-     height="478"
      layout="topleft"
      left="1"
-     name="experimental_scroll"
-     reserve_scroll_corner="false"
-     top="1"
-     width="538">
+     name="experimental_tabs"
+     right="-1"
+     tab_min_width="60"
+     tab_position="top"
+     top="28"
+     bottom="-1">
         <panel
-         follows="left|top"
-         height="790"
+         follows="all"
+         label="General"
          layout="topleft"
-         left="0"
-         name="experimental_settings"
+         left="1"
+         name="experimental_general_tab"
+         right="-1"
          top="0"
-         width="510">
-            <text
-             follows="left|top"
-             height="32"
+         bottom="-1">
+            <scroll_container
+             follows="all"
              layout="topleft"
-             left="15"
-             name="experimental_warning"
-             text_color="EmphasisColor"
-             top="12"
-             width="475">
-                Experimental and diagnostic settings. Some changes require a viewer restart.
-            </text>
-            <text
-             follows="left|top"
-             font="SansSerifBold"
-             height="18"
-             layout="topleft"
-             left="15"
-             name="network_heading"
-             top_pad="14"
-             width="475">
-                Region and network diagnostics
-            </text>
-            <check_box
-             control_name="FSRenderNeighborAdjacentOnly"
-             follows="left|top"
-             height="20"
-             label="Only connect to adjacent regions"
-             layout="topleft"
-             left="15"
-             name="render_neighbor_adjacent_only"
-             tool_tip="Only connect to the current and adjacent regions, plus the teleport target, to limit neighbor loading"
-             top_pad="6"
-             width="475" />
-            <check_box
-             control_name="FSExperimentalReleaseNonAdjacentRegions"
-             enabled_control="FSRenderNeighborAdjacentOnly"
-             follows="left|top"
-             height="20"
-             label="Release regions that are no longer adjacent (experimental)"
-             layout="topleft"
-             left="30"
-             name="release_non_adjacent_regions"
-             tool_tip="EXPERIMENTAL. Releases a neighbor region once it has been non-adjacent for 5 seconds, by closing that region's connection only. Requires 'Only connect to adjacent regions'. Logged under FSRegionRelease."
-             top_pad="6"
-             width="460" />
-            <check_box
-             control_name="FSFetchOfflineIMsWhileOnline"
-             follows="left|top"
-             height="20"
-             label="Fetch offline messages while online"
-             layout="topleft"
-             left="15"
-             name="fetch_offline_ims"
-             tool_tip="Periodically request offline instant messages while online"
-             top_pad="6"
-             width="475" />
-            <text
-             follows="left|top"
-             height="18"
-             layout="topleft"
-             left="35"
-             name="offline_im_interval_label"
-             top_pad="6"
-             width="285">
-                Offline message fetch interval (seconds)
-            </text>
-            <spinner
-             control_name="FSOfflineIMFetchIntervalSeconds"
-             decimal_digits="0"
-             enabled_control="FSFetchOfflineIMsWhileOnline"
-             follows="left|top"
-             height="20"
-             increment="1"
-             layout="topleft"
-             left="330"
-             max_val="3600"
-             min_val="0"
-             name="offline_im_interval"
-             top_delta="-2"
-             width="100" />
-            <text
-             follows="left|top"
-             height="18"
-             layout="topleft"
-             left="35"
-             name="dc_threshold_label"
-             top_pad="6"
-             width="285">
-                Disconnect recovery threshold (seconds)
-            </text>
-            <spinner
-             control_name="FSDebugDcThreshold"
-             decimal_digits="1"
-             follows="left|top"
-             height="20"
-             increment="1"
-             layout="topleft"
-             left="330"
-             max_val="3600"
-             min_val="0"
-             name="dc_threshold"
-             top_delta="-2"
-             width="100" />
-            <text
-             follows="left|top"
-             font="SansSerifBold"
-             height="18"
-             layout="topleft"
-             left="15"
-             name="rendering_heading"
-             top_pad="14"
-             width="475">
-                Rendering and diagnostics
-            </text>
-            <check_box
-             control_name="RenderAlphaBlendShadows"
-             follows="left|top"
-             height="20"
-             label="Render alpha-blended objects into shadow maps"
-             layout="topleft"
-             left="15"
-             name="render_alpha_blend_shadows"
-             tool_tip="Render alpha-blended objects into shadow maps; animated transparent effects may be expensive shadow casters"
-             top_pad="6"
-             width="475" />
-            <check_box
-             control_name="RLVaDebugSphereUseOpaqueDepth"
-             follows="left|top"
-             height="20"
-             label="Use opaque depth for the RLVa debug sphere"
-             layout="topleft"
-             left="15"
-             name="rlva_debug_sphere_opaque_depth"
-             tool_tip="Use a pre-alpha depth snapshot so alpha wearables do not punch through the RLVa sphere effect"
-             top_pad="6"
-             width="475" />
-            <check_box
-             control_name="TextureFetchPipelineDiagnostics"
-             follows="left|top"
-             height="20"
-             label="Log texture fetch pipeline diagnostics"
-             layout="topleft"
-             left="15"
-             name="texture_fetch_pipeline_diagnostics"
-             tool_tip="Periodically log a texture HTTP pipeline snapshot for diagnosing stalled texture fetches"
-             top_pad="6"
-             width="475" />
-            <check_box
-             control_name="RLVaExperimentalLoginPrivacy"
-             follows="left|top"
-             height="20"
-             label="Protect privacy while RLVa attachments load"
-             layout="topleft"
-             left="15"
-             name="rlva_experimental_login_privacy"
-             tool_tip="Temporarily hide the world, names, location, maps, and nearby avatars during login; restrictions not resent by attachments are released after loading or a safety timeout"
-             top_pad="6"
-             width="475" />
-            <text
-             follows="left|top"
-             font="SansSerifBold"
-             height="18"
-             layout="topleft"
-             left="15"
-             name="developer_heading"
-             top_pad="14"
-             width="475">
-                Developer tools and performance
-            </text>
-            <text
-             follows="left|top"
-             height="18"
-             layout="topleft"
-             left="35"
-             name="mass_object_edit_workers_label"
-             top_pad="6"
-             width="285">
-                Mass Object Edit inventory workers
-            </text>
-            <spinner
-             control_name="FSMassObjectEditInventoryWorkers"
-             decimal_digits="0"
-             increment="1"
-             follows="left|top"
-             height="20"
-             layout="topleft"
-             left="330"
-             max_val="32"
-             min_val="1"
-             name="mass_object_edit_workers"
-             top_delta="-2"
-             width="100" />
-            <text
-             follows="left|top"
-             font="SansSerifBold"
-             height="18"
-             layout="topleft"
-             left="15"
-             name="texture_loading_heading"
-             top_pad="14"
-             width="475">
-                Texture loading
-            </text>
-            <check_box
-             control_name="FSTextureUseLiveVRAM"
-             follows="left|top"
-             height="20"
-             label="Use the video memory the driver reports for the texture budget"
-             layout="topleft"
-             left="15"
-             name="use_live_vram"
-             tool_tip="EXPERIMENTAL. On NVIDIA and AMD, textures are reduced when the GPU itself is running out of video memory, counting everything else using it, instead of using a fixed share of it. Has no effect when the texture memory limit is set manually."
-             top_pad="6"
-             width="475" />
-            <text
-             follows="left|top"
-             height="18"
-             layout="topleft"
-             left="35"
-             name="texture_bias_soft_zone_label"
-             tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
-             top_pad="6"
-             width="285">
-                Start reducing textures before memory is full
-            </text>
-            <spinner
-             control_name="FSTextureBiasSoftZone"
-             decimal_digits="2"
-             follows="left|top"
-             height="20"
-             increment="0.05"
-             layout="topleft"
-             left="330"
-             max_val="0.5"
-             min_val="0"
-             name="texture_bias_soft_zone"
-             tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
-             top_delta="-2"
-             width="100" />
-            <text
-             follows="left|top"
-             font="SansSerifBold"
-             height="18"
-             layout="topleft"
-             left="15"
-             name="avatar_loading_heading"
-             top_pad="10"
-             width="475">
-                Avatar loading
-            </text>
-            <check_box
-             control_name="FSAvatarCloudFastRetry"
-             follows="left|top"
-             height="20"
-             label="Retry sooner for avatars stuck as a cloud"
-             layout="topleft"
-             left="15"
-             name="avatar_cloud_fast_retry"
-             tool_tip="EXPERIMENTAL. When another avatar is missing its shape or body textures, ask the region for its appearance again after 15, 30 and 60 seconds, instead of only every 2 minutes."
-             top_pad="4"
-             width="475" />
-            <check_box
-             control_name="FSAvatarRetryEmptyAppearance"
-             follows="left|top"
-             height="20"
-             label="Ask again when an avatar's appearance arrives without a shape"
-             layout="topleft"
-             left="15"
-             name="avatar_retry_empty_appearance"
-             tool_tip="EXPERIMENTAL. When the region sends another avatar's appearance without a shape, ask for it again right away (at most every 10 seconds) instead of waiting for the cloud timeout."
-             top_pad="2"
-             width="475" />
-            <check_box
-             control_name="FSAvatarDropStaleAppearance"
-             follows="left|top"
-             height="20"
-             label="Ignore out of order appearance updates"
-             layout="topleft"
-             left="15"
-             name="avatar_drop_stale_appearance"
-             tool_tip="EXPERIMENTAL. During an outfit change, appearance updates for another avatar can arrive out of order. Ignore one that is older than the last applied, if it arrives within 10 seconds of it. Logged under Avatar."
-             top_pad="2"
-             width="475" />
+             left="0"
+             name="experimental_general_scroll"
+             reserve_scroll_corner="false"
+             right="-1"
+             top="0"
+             bottom="-1">
+                <panel
+                 follows="left|top"
+                 height="560"
+                 layout="topleft"
+                 left="0"
+                 name="experimental_general_settings"
+                 top="0"
+                 width="510">
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="network_heading"
+                     top="10"
+                     width="475">
+                        Region and network diagnostics
+                    </text>
+                    <check_box
+                     control_name="FSRenderNeighborAdjacentOnly"
+                     follows="left|top"
+                     height="20"
+                     label="Only connect to adjacent regions"
+                     layout="topleft"
+                     left="15"
+                     name="render_neighbor_adjacent_only"
+                     tool_tip="Only connect to the current and adjacent regions, plus the teleport target, to limit neighbor loading"
+                     top_pad="6"
+                     width="475" />
+                    <check_box
+                     control_name="FSExperimentalReleaseNonAdjacentRegions"
+                     enabled_control="FSRenderNeighborAdjacentOnly"
+                     follows="left|top"
+                     height="20"
+                     label="Release regions that are no longer adjacent (experimental)"
+                     layout="topleft"
+                     left="30"
+                     name="release_non_adjacent_regions"
+                     tool_tip="EXPERIMENTAL. Releases a neighbor region once it has been non-adjacent for 5 seconds, by closing that region's connection only. Requires 'Only connect to adjacent regions'. Logged under FSRegionRelease."
+                     top_pad="6"
+                     width="460" />
+                    <check_box
+                     control_name="FSFetchOfflineIMsWhileOnline"
+                     follows="left|top"
+                     height="20"
+                     label="Fetch offline messages while online"
+                     layout="topleft"
+                     left="15"
+                     name="fetch_offline_ims"
+                     tool_tip="Periodically request offline instant messages while online"
+                     top_pad="6"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="offline_im_interval_label"
+                     top_pad="6"
+                     width="285">
+                        Offline message fetch interval (seconds)
+                    </text>
+                    <spinner
+                     control_name="FSOfflineIMFetchIntervalSeconds"
+                     decimal_digits="0"
+                     enabled_control="FSFetchOfflineIMsWhileOnline"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="3600"
+                     min_val="0"
+                     name="offline_im_interval"
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="dc_threshold_label"
+                     top_pad="6"
+                     width="285">
+                        Disconnect recovery threshold (seconds)
+                    </text>
+                    <spinner
+                     control_name="FSDebugDcThreshold"
+                     decimal_digits="1"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="3600"
+                     min_val="0"
+                     name="dc_threshold"
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="rendering_heading"
+                     top_pad="14"
+                     width="475">
+                        Rendering and diagnostics
+                    </text>
+                    <check_box
+                     control_name="RenderAlphaBlendShadows"
+                     follows="left|top"
+                     height="20"
+                     label="Render alpha-blended objects into shadow maps"
+                     layout="topleft"
+                     left="15"
+                     name="render_alpha_blend_shadows"
+                     tool_tip="Render alpha-blended objects into shadow maps; animated transparent effects may be expensive shadow casters"
+                     top_pad="6"
+                     width="475" />
+                    <check_box
+                     control_name="RLVaDebugSphereUseOpaqueDepth"
+                     follows="left|top"
+                     height="20"
+                     label="Use opaque depth for the RLVa debug sphere"
+                     layout="topleft"
+                     left="15"
+                     name="rlva_debug_sphere_opaque_depth"
+                     tool_tip="Use a pre-alpha depth snapshot so alpha wearables do not punch through the RLVa sphere effect"
+                     top_pad="6"
+                     width="475" />
+                    <check_box
+                     control_name="TextureFetchPipelineDiagnostics"
+                     follows="left|top"
+                     height="20"
+                     label="Log texture fetch pipeline diagnostics"
+                     layout="topleft"
+                     left="15"
+                     name="texture_fetch_pipeline_diagnostics"
+                     tool_tip="Periodically log a texture HTTP pipeline snapshot for diagnosing stalled texture fetches"
+                     top_pad="6"
+                     width="475" />
+                    <check_box
+                     control_name="RLVaExperimentalLoginPrivacy"
+                     follows="left|top"
+                     height="20"
+                     label="Protect privacy while RLVa attachments load"
+                     layout="topleft"
+                     left="15"
+                     name="rlva_experimental_login_privacy"
+                     tool_tip="Temporarily hide the world, names, location, maps, and nearby avatars during login; restrictions not resent by attachments are released after loading or a safety timeout"
+                     top_pad="6"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_max_distance_label"
+                     tool_tip="EXPERIMENTAL. How far sun and moon shadows reach. The shadow maps are spread over this distance, so a shorter one makes nearby shadows much sharper, at the cost of no shadows further away. Reflection probes keep the full distance."
+                     top_pad="6"
+                     width="285">
+                        Sun shadow distance (meters)
+                    </text>
+                    <spinner
+                     control_name="FSRenderShadowMaxDistance"
+                     decimal_digits="0"
+                     follows="left|top"
+                     height="20"
+                     increment="8"
+                     layout="topleft"
+                     left="330"
+                     max_val="512"
+                     min_val="16"
+                     name="shadow_max_distance"
+                     tool_tip="EXPERIMENTAL. How far sun and moon shadows reach. The shadow maps are spread over this distance, so a shorter one makes nearby shadows much sharper, at the cost of no shadows further away. Reflection probes keep the full distance."
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="developer_heading"
+                     top_pad="14"
+                     width="475">
+                        Developer tools and performance
+                    </text>
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="mass_object_edit_workers_label"
+                     top_pad="6"
+                     width="285">
+                        Mass Object Edit inventory workers
+                    </text>
+                    <spinner
+                     control_name="FSMassObjectEditInventoryWorkers"
+                     decimal_digits="0"
+                     increment="1"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="330"
+                     max_val="32"
+                     min_val="1"
+                     name="mass_object_edit_workers"
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="texture_loading_heading"
+                     top_pad="14"
+                     width="475">
+                        Texture loading
+                    </text>
+                    <check_box
+                     control_name="FSTextureUseLiveVRAM"
+                     follows="left|top"
+                     height="20"
+                     label="Use the video memory the driver reports for the texture budget"
+                     layout="topleft"
+                     left="15"
+                     name="use_live_vram"
+                     tool_tip="EXPERIMENTAL. On NVIDIA and AMD, textures are reduced when the GPU itself is running out of video memory, counting everything else using it, instead of using a fixed share of it. Has no effect when the texture memory limit is set manually."
+                     top_pad="6"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="texture_bias_soft_zone_label"
+                     tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
+                     top_pad="6"
+                     width="285">
+                        Start reducing textures before memory is full
+                    </text>
+                    <spinner
+                     control_name="FSTextureBiasSoftZone"
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.5"
+                     min_val="0"
+                     name="texture_bias_soft_zone"
+                     tool_tip="EXPERIMENTAL. How far below the texture memory target textures start being reduced, a little at a time, so memory levels off before it runs out instead of dropping detail all at once. 0.1 starts at 90% of the target. 0 waits until the target is reached."
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="avatar_loading_heading"
+                     top_pad="10"
+                     width="475">
+                        Avatar loading
+                    </text>
+                    <check_box
+                     control_name="FSAvatarCloudFastRetry"
+                     follows="left|top"
+                     height="20"
+                     label="Retry sooner for avatars stuck as a cloud"
+                     layout="topleft"
+                     left="15"
+                     name="avatar_cloud_fast_retry"
+                     tool_tip="EXPERIMENTAL. When another avatar is missing its shape or body textures, ask the region for its appearance again after 15, 30 and 60 seconds, instead of only every 2 minutes."
+                     top_pad="4"
+                     width="475" />
+                    <check_box
+                     control_name="FSAvatarRetryEmptyAppearance"
+                     follows="left|top"
+                     height="20"
+                     label="Ask again when an avatar's appearance arrives without a shape"
+                     layout="topleft"
+                     left="15"
+                     name="avatar_retry_empty_appearance"
+                     tool_tip="EXPERIMENTAL. When the region sends another avatar's appearance without a shape, ask for it again right away (at most every 10 seconds) instead of waiting for the cloud timeout."
+                     top_pad="2"
+                     width="475" />
+                    <check_box
+                     control_name="FSAvatarDropStaleAppearance"
+                     follows="left|top"
+                     height="20"
+                     label="Ignore out of order appearance updates"
+                     layout="topleft"
+                     left="15"
+                     name="avatar_drop_stale_appearance"
+                     tool_tip="EXPERIMENTAL. During an outfit change, appearance updates for another avatar can arrive out of order. Ignore one that is older than the last applied, if it arrives within 10 seconds of it. Logged under Avatar."
+                     top_pad="2"
+                     width="475" />
+                </panel>
+            </scroll_container>
         </panel>
-    </scroll_container>
+        <panel
+         follows="all"
+         label="Photo"
+         layout="topleft"
+         left="1"
+         name="experimental_photo_tab"
+         right="-1"
+         top="0"
+         bottom="-1">
+            <scroll_container
+             follows="all"
+             layout="topleft"
+             left="0"
+             name="experimental_photo_scroll"
+             reserve_scroll_corner="false"
+             right="-1"
+             top="0"
+             bottom="-1">
+                <panel
+                 follows="left|top"
+                 height="283"
+                 layout="topleft"
+                 left="0"
+                 name="experimental_photo_settings"
+                 top="0"
+                 width="510">
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="photography_heading"
+                     top="10"
+                     width="475">
+                        Photography
+                    </text>
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="resolution_multiplier_label"
+                     tool_tip="EXPERIMENTAL. Renders the scene at this multiple of the window size and filters it down: above 1 smooths edges and fine detail (2 is the cleanest), below 1 renders faster at lower resolution. Above 1 costs a lot of GPU time and memory, and sun shadow maps grow with it. Ignored while the resolution divisor debug setting is above 1."
+                     top="34"
+                     width="285">
+                        Render resolution (supersampling above 1)
+                    </text>
+                    <spinner
+                     control_name="RenderResolutionMultiplier"
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="2"
+                     min_val="0.25"
+                     name="resolution_multiplier"
+                     tool_tip="EXPERIMENTAL. Renders the scene at this multiple of the window size and filters it down: above 1 smooths edges and fine detail (2 is the cleanest), below 1 renders faster at lower resolution. Above 1 costs a lot of GPU time and memory, and sun shadow maps grow with it. Ignored while the resolution divisor debug setting is above 1."
+                     top="32"
+                     width="100" />
+                    <check_box
+                     control_name="FSSnapshotWaitForTextures"
+                     follows="left|top"
+                     height="20"
+                     label="Snapshots wait for textures to finish loading"
+                     layout="topleft"
+                     left="15"
+                     name="snapshot_wait_for_textures"
+                     tool_tip="EXPERIMENTAL. Before the snapshot floater captures, wait until the textures on screen have loaded at the resolution the picture needs. Snapshots larger than the window ask for sharper textures than the screen does."
+                     top="60"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="snapshot_texture_wait_label"
+                     tool_tip="EXPERIMENTAL. Longest time a snapshot waits for textures before capturing anyway."
+                     top="86"
+                     width="285">
+                        Longest texture wait (seconds)
+                    </text>
+                    <spinner
+                     control_name="FSSnapshotTextureWaitTimeout"
+                     decimal_digits="0"
+                     enabled_control="FSSnapshotWaitForTextures"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="60"
+                     min_val="1"
+                     name="snapshot_texture_wait"
+                     tool_tip="EXPERIMENTAL. Longest time a snapshot waits for textures before capturing anyway."
+                     top="84"
+                     width="100" />
+                    <check_box
+                     control_name="RenderScreenSpaceReflections"
+                     follows="left|top"
+                     height="20"
+                     label="Screen space reflections"
+                     layout="topleft"
+                     left="15"
+                     name="ssr_enabled"
+                     tool_tip="Reflect what is on screen in shiny surfaces, on top of the reflection probes."
+                     top="112"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="ssr_iterations_label"
+                     tool_tip="EXPERIMENTAL. How many steps each reflection ray takes looking for what it hits. More steps find more of the scene and further away. Default 25."
+                     top="138"
+                     width="285">
+                        Reflection ray steps
+                    </text>
+                    <spinner
+                     control_name="RenderScreenSpaceReflectionIterations"
+                     decimal_digits="0"
+                     enabled_control="RenderScreenSpaceReflections"
+                     follows="left|top"
+                     height="20"
+                     increment="5"
+                     layout="topleft"
+                     left="330"
+                     max_val="100"
+                     min_val="1"
+                     name="ssr_iterations"
+                     tool_tip="EXPERIMENTAL. How many steps each reflection ray takes looking for what it hits. More steps find more of the scene and further away. Default 25."
+                     top="136"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="ssr_ray_step_label"
+                     tool_tip="EXPERIMENTAL. Length of the first reflection ray step. Smaller steps give more precise reflections close to the surface but reach less far for the same number of steps. Default 0.1."
+                     top="166"
+                     width="285">
+                        Reflection ray step length
+                    </text>
+                    <spinner
+                     control_name="RenderScreenSpaceReflectionRayStep"
+                     decimal_digits="3"
+                     enabled_control="RenderScreenSpaceReflections"
+                     follows="left|top"
+                     height="20"
+                     increment="0.01"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="0.01"
+                     name="ssr_ray_step"
+                     tool_tip="EXPERIMENTAL. Length of the first reflection ray step. Smaller steps give more precise reflections close to the surface but reach less far for the same number of steps. Default 0.1."
+                     top="164"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="ssr_glossy_samples_label"
+                     tool_tip="EXPERIMENTAL. Rays traced per pixel for reflections on rough surfaces. More rays give smoother, less noisy glossy reflections. Default 4."
+                     top="194"
+                     width="285">
+                        Glossy reflection samples
+                    </text>
+                    <spinner
+                     control_name="RenderScreenSpaceReflectionGlossySamples"
+                     decimal_digits="0"
+                     enabled_control="RenderScreenSpaceReflections"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="32"
+                     min_val="1"
+                     name="ssr_glossy_samples"
+                     tool_tip="EXPERIMENTAL. Rays traced per pixel for reflections on rough surfaces. More rays give smoother, less noisy glossy reflections. Default 4."
+                     top="192"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="ssr_distance_bias_label"
+                     tool_tip="EXPERIMENTAL. How close a ray has to come to a surface to count as hitting it. Larger values fill in gaps in reflections but can smear them. Default 0.015."
+                     top="222"
+                     width="285">
+                        Reflection hit tolerance
+                    </text>
+                    <spinner
+                     control_name="RenderScreenSpaceReflectionDistanceBias"
+                     decimal_digits="3"
+                     enabled_control="RenderScreenSpaceReflections"
+                     follows="left|top"
+                     height="20"
+                     increment="0.005"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.5"
+                     min_val="0"
+                     name="ssr_distance_bias"
+                     tool_tip="EXPERIMENTAL. How close a ray has to come to a surface to count as hitting it. Larger values fill in gaps in reflections but can smear them. Default 0.015."
+                     top="220"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="ssr_reject_bias_label"
+                     tool_tip="EXPERIMENTAL. Depth difference below which a reflection hit is thrown away as the surface reflecting itself. Raise it if reflections show speckles on flat surfaces. Default 0.001."
+                     top="250"
+                     width="285">
+                        Reflection self-hit rejection
+                    </text>
+                    <spinner
+                     control_name="RenderScreenSpaceReflectionDepthRejectBias"
+                     decimal_digits="4"
+                     enabled_control="RenderScreenSpaceReflections"
+                     follows="left|top"
+                     height="20"
+                     increment="0.0005"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.1"
+                     min_val="0"
+                     name="ssr_reject_bias"
+                     tool_tip="EXPERIMENTAL. Depth difference below which a reflection hit is thrown away as the surface reflecting itself. Raise it if reflections show speckles on flat surfaces. Default 0.001."
+                     top="248"
+                     width="100" />
+                </panel>
+            </scroll_container>
+        </panel>
+        <panel
+         follows="all"
+         label="Effects"
+         layout="topleft"
+         left="1"
+         name="experimental_effects_tab"
+         right="-1"
+         top="0"
+         bottom="-1">
+            <scroll_container
+             follows="all"
+             layout="topleft"
+             left="0"
+             name="experimental_effects_scroll"
+             reserve_scroll_corner="false"
+             right="-1"
+             top="0"
+             bottom="-1">
+                <panel
+                 follows="left|top"
+                 height="1013"
+                 layout="topleft"
+                 left="0"
+                 name="experimental_effects_settings"
+                 top="0"
+                 width="510">
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="sun_rays_heading"
+                     top="10"
+                     width="475">
+                        Sun rays
+                    </text>
+                    <check_box
+                     control_name="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     label="Sun rays (light shafts)"
+                     layout="topleft"
+                     left="15"
+                     name="sun_rays"
+                     tool_tip="EXPERIMENTAL. Light scattered in the air, broken into shafts wherever something casts a sun shadow: through trees, windows, gaps in buildings. Needs sun shadows on. The sun shadow distance setting limits how far they reach."
+                     top="36"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_rays_strength_label"
+                     tool_tip="EXPERIMENTAL. Brightness of the sun rays."
+                     top="66"
+                     width="285">
+                        Brightness
+                    </text>
+                    <spinner
+                     control_name="FSRenderSunRaysStrength"
+                     decimal_digits="2"
+                     enabled_control="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="4"
+                     min_val="0"
+                     name="sun_rays_strength"
+                     tool_tip="EXPERIMENTAL. Brightness of the sun rays."
+                     top="64"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_rays_density_label"
+                     tool_tip="EXPERIMENTAL. How much the air scatters light. Higher values give thicker, hazier rays."
+                     top="94"
+                     width="285">
+                        Haze density
+                    </text>
+                    <spinner
+                     control_name="FSRenderSunRaysDensity"
+                     decimal_digits="4"
+                     enabled_control="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     increment="0.0005"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.02"
+                     min_val="0.0002"
+                     name="sun_rays_density"
+                     tool_tip="EXPERIMENTAL. How much the air scatters light. Higher values give thicker, hazier rays."
+                     top="92"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_rays_anisotropy_label"
+                     tool_tip="EXPERIMENTAL. 0 scatters light evenly in every direction. Higher values concentrate the rays around the sun, the way haze looks when facing the light."
+                     top="122"
+                     width="285">
+                        Concentrate toward the sun
+                    </text>
+                    <spinner
+                     control_name="FSRenderSunRaysAnisotropy"
+                     decimal_digits="2"
+                     enabled_control="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.95"
+                     min_val="0"
+                     name="sun_rays_anisotropy"
+                     tool_tip="EXPERIMENTAL. 0 scatters light evenly in every direction. Higher values concentrate the rays around the sun, the way haze looks when facing the light."
+                     top="120"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_rays_steps_label"
+                     tool_tip="EXPERIMENTAL. Samples taken along each ray. More gives cleaner shafts with less banding, at more GPU time."
+                     top="150"
+                     width="285">
+                        Quality (samples per ray)
+                    </text>
+                    <spinner
+                     control_name="FSRenderSunRaysSteps"
+                     decimal_digits="0"
+                     enabled_control="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     increment="4"
+                     layout="topleft"
+                     left="330"
+                     max_val="128"
+                     min_val="4"
+                     name="sun_rays_steps"
+                     tool_tip="EXPERIMENTAL. Samples taken along each ray. More gives cleaner shafts with less banding, at more GPU time."
+                     top="148"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_rays_distance_label"
+                     tool_tip="EXPERIMENTAL. How far from the camera the air is lit."
+                     top="178"
+                     width="285">
+                        Reach (meters)
+                    </text>
+                    <spinner
+                     control_name="FSRenderSunRaysDistance"
+                     decimal_digits="0"
+                     enabled_control="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     increment="8"
+                     layout="topleft"
+                     left="330"
+                     max_val="512"
+                     min_val="16"
+                     name="sun_rays_distance"
+                     tool_tip="EXPERIMENTAL. How far from the camera the air is lit."
+                     top="176"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_rays_resolution_label"
+                     tool_tip="EXPERIMENTAL. Resolution the rays are computed at. 0.5 is a quarter of the pixels and looks nearly the same, since the rays are soft."
+                     top="206"
+                     width="285">
+                        Resolution (fraction of screen)
+                    </text>
+                    <spinner
+                     control_name="FSRenderSunRaysResolution"
+                     decimal_digits="2"
+                     enabled_control="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="0.25"
+                     name="sun_rays_resolution"
+                     tool_tip="EXPERIMENTAL. Resolution the rays are computed at. 0.5 is a quarter of the pixels and looks nearly the same, since the rays are soft."
+                     top="204"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="bloom_heading"
+                     top="240"
+                     width="475">
+                        Bloom
+                    </text>
+                    <check_box
+                     control_name="FSRenderBloom"
+                     follows="left|top"
+                     height="20"
+                     label="HDR bloom"
+                     layout="topleft"
+                     left="15"
+                     name="bloom"
+                     tool_tip="EXPERIMENTAL. Bright parts of the image glow onto their surroundings: sun on water, lamps, emissive surfaces. Works from the full brightness range of the scene, separately from the classic glow."
+                     top="266"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="bloom_strength_label"
+                     tool_tip="EXPERIMENTAL. How much bloom is added."
+                     top="296"
+                     width="285">
+                        Strength
+                    </text>
+                    <spinner
+                     control_name="FSRenderBloomStrength"
+                     decimal_digits="2"
+                     enabled_control="FSRenderBloom"
+                     follows="left|top"
+                     height="20"
+                     increment="0.01"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="0"
+                     name="bloom_strength"
+                     tool_tip="EXPERIMENTAL. How much bloom is added."
+                     top="294"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="bloom_threshold_label"
+                     tool_tip="EXPERIMENTAL. Brightness above which light blooms. 1 is full white on screen, lower values let more of the image bloom."
+                     top="324"
+                     width="285">
+                        Threshold
+                    </text>
+                    <spinner
+                     control_name="FSRenderBloomThreshold"
+                     decimal_digits="2"
+                     enabled_control="FSRenderBloom"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="4"
+                     min_val="0"
+                     name="bloom_threshold"
+                     tool_tip="EXPERIMENTAL. Brightness above which light blooms. 1 is full white on screen, lower values let more of the image bloom."
+                     top="322"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="bloom_knee_label"
+                     tool_tip="EXPERIMENTAL. How gradually bloom fades in below the threshold."
+                     top="352"
+                     width="285">
+                        Softness
+                    </text>
+                    <spinner
+                     control_name="FSRenderBloomKnee"
+                     decimal_digits="2"
+                     enabled_control="FSRenderBloom"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="2"
+                     min_val="0"
+                     name="bloom_knee"
+                     tool_tip="EXPERIMENTAL. How gradually bloom fades in below the threshold."
+                     top="350"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="bloom_levels_label"
+                     tool_tip="EXPERIMENTAL. Blur levels, each twice as wide as the last. More gives a wider, softer bloom."
+                     top="380"
+                     width="285">
+                        Size (levels)
+                    </text>
+                    <spinner
+                     control_name="FSRenderBloomLevels"
+                     decimal_digits="0"
+                     enabled_control="FSRenderBloom"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="1"
+                     name="bloom_levels"
+                     tool_tip="EXPERIMENTAL. Blur levels, each twice as wide as the last. More gives a wider, softer bloom."
+                     top="378"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="color_grade_heading"
+                     top="414"
+                     width="475">
+                        Colour grading
+                    </text>
+                    <check_box
+                     control_name="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     label="Colour grading"
+                     layout="topleft"
+                     left="15"
+                     name="color_grade"
+                     tool_tip="EXPERIMENTAL. Adjust the colour of the finished image, after tone mapping, like a photo editor."
+                     top="440"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_temperature_label"
+                     tool_tip="EXPERIMENTAL. 6500 is neutral. Lower values warm the image toward orange, higher values cool it toward blue."
+                     top="470"
+                     width="285">
+                        White balance (Kelvin)
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeTemperature"
+                     decimal_digits="0"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="100"
+                     layout="topleft"
+                     left="330"
+                     max_val="15000"
+                     min_val="2000"
+                     name="color_grade_temperature"
+                     tool_tip="EXPERIMENTAL. 6500 is neutral. Lower values warm the image toward orange, higher values cool it toward blue."
+                     top="468"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_tint_label"
+                     tool_tip="EXPERIMENTAL. Positive values shift the image toward green, negative toward magenta."
+                     top="498"
+                     width="285">
+                        Tint
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeTint"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="-1"
+                     name="color_grade_tint"
+                     tool_tip="EXPERIMENTAL. Positive values shift the image toward green, negative toward magenta."
+                     top="496"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_lift_label"
+                     tool_tip="EXPERIMENTAL. Raises the blacks (positive, faded look) or crushes them (negative), without moving white."
+                     top="526"
+                     width="285">
+                        Lift (blacks)
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeLift"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.01"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.5"
+                     min_val="-0.5"
+                     name="color_grade_lift"
+                     tool_tip="EXPERIMENTAL. Raises the blacks (positive, faded look) or crushes them (negative), without moving white."
+                     top="524"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_gamma_label"
+                     tool_tip="EXPERIMENTAL. Brightens (above 1) or darkens (below 1) the midtones, leaving black and white in place."
+                     top="554"
+                     width="285">
+                        Gamma (midtones)
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeGamma"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="3"
+                     min_val="0.25"
+                     name="color_grade_gamma"
+                     tool_tip="EXPERIMENTAL. Brightens (above 1) or darkens (below 1) the midtones, leaving black and white in place."
+                     top="552"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_gain_label"
+                     tool_tip="EXPERIMENTAL. Scales the image toward white."
+                     top="582"
+                     width="285">
+                        Gain (highlights)
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeGain"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="3"
+                     min_val="0"
+                     name="color_grade_gain"
+                     tool_tip="EXPERIMENTAL. Scales the image toward white."
+                     top="580"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_contrast_label"
+                     tool_tip="EXPERIMENTAL. Contrast around mid grey."
+                     top="610"
+                     width="285">
+                        Contrast
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeContrast"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="3"
+                     min_val="0"
+                     name="color_grade_contrast"
+                     tool_tip="EXPERIMENTAL. Contrast around mid grey."
+                     top="608"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_saturation_label"
+                     tool_tip="EXPERIMENTAL. 0 is black and white."
+                     top="638"
+                     width="285">
+                        Saturation
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeSaturation"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="3"
+                     min_val="0"
+                     name="color_grade_saturation"
+                     tool_tip="EXPERIMENTAL. 0 is black and white."
+                     top="636"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_vibrance_label"
+                     tool_tip="EXPERIMENTAL. Saturates muted colours more than ones that are already strong, which keeps skin from going orange. Negative values mute them."
+                     top="666"
+                     width="285">
+                        Vibrance
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeVibrance"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="2"
+                     min_val="-1"
+                     name="color_grade_vibrance"
+                     tool_tip="EXPERIMENTAL. Saturates muted colours more than ones that are already strong, which keeps skin from going orange. Negative values mute them."
+                     top="664"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_shadow_tint_label"
+                     tool_tip="EXPERIMENTAL. Colour the shadows are tinted toward. White leaves them alone."
+                     top="694"
+                     width="285">
+                        Shadow tint
+                    </text>
+                    <color_swatch
+                     border.border_thickness="0"
+                     can_apply_immediately="true"
+                     control_name="FSColorGradeShadowTint"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     label_height="0"
+                     layout="topleft"
+                     left="330"
+                     name="color_grade_shadow_tint"
+                     tool_tip="EXPERIMENTAL. Colour the shadows are tinted toward. White leaves them alone."
+                     top="692"
+                     width="44" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_highlight_tint_label"
+                     tool_tip="EXPERIMENTAL. Colour the highlights are tinted toward. White leaves them alone."
+                     top="722"
+                     width="285">
+                        Highlight tint
+                    </text>
+                    <color_swatch
+                     border.border_thickness="0"
+                     can_apply_immediately="true"
+                     control_name="FSColorGradeHighlightTint"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     label_height="0"
+                     layout="topleft"
+                     left="330"
+                     name="color_grade_highlight_tint"
+                     tool_tip="EXPERIMENTAL. Colour the highlights are tinted toward. White leaves them alone."
+                     top="720"
+                     width="44" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_split_balance_label"
+                     tool_tip="EXPERIMENTAL. Moves the line between the shadow and highlight tints. Positive gives the highlight tint more of the image."
+                     top="750"
+                     width="285">
+                        Shadow/highlight balance
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeSplitBalance"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="-1"
+                     name="color_grade_split_balance"
+                     tool_tip="EXPERIMENTAL. Moves the line between the shadow and highlight tints. Positive gives the highlight tint more of the image."
+                     top="748"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_lut_label"
+                     tool_tip="EXPERIMENTAL. A .cube file, as exported by most grading tools, or a PNG strip (size*size by size pixels, green increasing downward). A full path, or just the file name of one in the luts folder inside your user settings folder. Leave empty for none."
+                     top="778"
+                     width="285">
+                        Lookup table file
+                    </text>
+                    <line_editor
+                     control_name="FSColorGradeLUT"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="330"
+                     max_length_bytes="1024"
+                     name="color_grade_lut"
+                     tool_tip="EXPERIMENTAL. A .cube file, as exported by most grading tools, or a PNG strip (size*size by size pixels, green increasing downward). A full path, or just the file name of one in the luts folder inside your user settings folder. Leave empty for none."
+                     top="776"
+                     width="160" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="color_grade_lut_strength_label"
+                     tool_tip="EXPERIMENTAL. How much of the lookup table is applied."
+                     top="806"
+                     width="285">
+                        Lookup table strength
+                    </text>
+                    <spinner
+                     control_name="FSColorGradeLUTStrength"
+                     decimal_digits="2"
+                     enabled_control="FSColorGrade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="0"
+                     name="color_grade_lut_strength"
+                     tool_tip="EXPERIMENTAL. How much of the lookup table is applied."
+                     top="804"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="lens_heading"
+                     top="840"
+                     width="475">
+                        Lens effects
+                    </text>
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="chromatic_aberration_label"
+                     tool_tip="EXPERIMENTAL. Red and blue fringes that grow toward the edges of the frame, as with a real lens. The value is the fringe width at the corners. 0 is off."
+                     top="868"
+                     width="285">
+                        Chromatic aberration (pixels)
+                    </text>
+                    <spinner
+                     control_name="FSRenderChromaticAberration"
+                     decimal_digits="1"
+                     follows="left|top"
+                     height="20"
+                     increment="0.5"
+                     layout="topleft"
+                     left="330"
+                     max_val="20"
+                     min_val="0"
+                     name="chromatic_aberration"
+                     tool_tip="EXPERIMENTAL. Red and blue fringes that grow toward the edges of the frame, as with a real lens. The value is the fringe width at the corners. 0 is off."
+                     top="866"
+                     width="100" />
+                    <check_box
+                     control_name="FSRenderChromaticAberrationDoFOnly"
+                     follows="left|top"
+                     height="20"
+                     label="Only where depth of field blurs"
+                     layout="topleft"
+                     left="15"
+                     name="chromatic_aberration_dof"
+                     tool_tip="EXPERIMENTAL. Limit chromatic aberration to out of focus areas, scaled by how blurred they are. Needs depth of field on."
+                     top="894"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="lens_flare_label"
+                     tool_tip="EXPERIMENTAL. Flare, glare and ghosts when the sun or moon is in view and not hidden behind anything. 0 is off."
+                     top="924"
+                     width="285">
+                        Lens flare
+                    </text>
+                    <spinner
+                     control_name="FSRenderLensFlare"
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="2"
+                     min_val="0"
+                     name="lens_flare"
+                     tool_tip="EXPERIMENTAL. Flare, glare and ghosts when the sun or moon is in view and not hidden behind anything. 0 is off."
+                     top="922"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="film_grain_label"
+                     tool_tip="EXPERIMENTAL. Film grain, strongest in the midtones. 0 is off."
+                     top="952"
+                     width="285">
+                        Film grain
+                    </text>
+                    <spinner
+                     control_name="FSRenderFilmGrain"
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.02"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="0"
+                     name="film_grain"
+                     tool_tip="EXPERIMENTAL. Film grain, strongest in the midtones. 0 is off."
+                     top="950"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="film_grain_size_label"
+                     tool_tip="EXPERIMENTAL. Size of the grain."
+                     top="980"
+                     width="285">
+                        Film grain size (pixels)
+                    </text>
+                    <spinner
+                     control_name="FSRenderFilmGrainSize"
+                     decimal_digits="1"
+                     follows="left|top"
+                     height="20"
+                     increment="0.5"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="1"
+                     name="film_grain_size"
+                     tool_tip="EXPERIMENTAL. Size of the grain."
+                     top="978"
+                     width="100" />
+                </panel>
+            </scroll_container>
+        </panel>
+    </tab_container>
 </panel>

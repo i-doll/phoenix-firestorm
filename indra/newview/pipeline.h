@@ -771,6 +771,32 @@ public:
     // for use by SSR
     LLRenderTarget          mSceneMap;
 
+    // <FS:Trish> Sun rays, bloom, colour grading and lens effects
+    LLRenderTarget          mSunRayMap;
+    static constexpr U32    FS_BLOOM_MAX_LEVELS = 8;
+    LLRenderTarget          mBloomLevels[FS_BLOOM_MAX_LEVELS];
+    U32                     mBloomLevelCount = 0;       // levels drawn this frame, 0 when bloom is off
+    LLPointer<LLImageGL>    mColorGradeLUT;
+    std::string             mColorGradeLUTName;
+    S32                     mColorGradeLUTSize = 0;
+    struct LensDoF          // this frame's depth of field, for chromatic aberration that follows it
+    {
+        bool mActive = false;
+        F32 mFocalDistance = 0.f;
+        F32 mBlurConstant = 0.f;
+        F32 mTanPixelAngle = 0.f;
+        F32 mMagnification = 0.f;
+        F32 mMaxCoF = 0.f;
+    } mLensDoF;
+
+    void renderSunRays();
+    void renderBloom();
+    bool renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst);
+    void bindColorGrading(LLGLSLShader* shader);
+    void loadColorGradeLUT(const std::string& name);
+    void releaseFSPostTargets();
+    // </FS:Trish>
+
     // exposure map for getting average color in scene
     LLRenderTarget          mLuminanceMap;
     LLRenderTarget          mExposureMap;

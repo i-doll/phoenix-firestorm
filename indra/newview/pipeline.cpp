@@ -851,6 +851,26 @@ void LLPipeline::resizeShadowTexture()
     gResizeShadowTexture = false;
 }
 
+// <FS:Trish> RenderResolutionMultiplier above 1 supersamples: the scene renders larger and the
+// final present's bilinear fetch filters it down (an exact 2x2 box at 2.0). Capped at 2 and at
+// the largest texture the GPU can allocate. Returns 1 when no scaling applies.
+static F32 fs_resolution_multiplier(U32 resX, U32 resY)
+{
+    F32 mult = LLPipeline::RenderResolutionMultiplier;
+    if (mult <= 0.f || mult == 1.f)
+    {
+        return 1.f;
+    }
+    if (mult > 1.f)
+    {
+        mult = llmin(mult, 2.f);
+        const U32 largest = llmax(llmax(resX, resY), 1u);
+        mult = llmax(1.f, llmin(mult, (F32)gGLManager.mGLMaxTextureSize / (F32)largest));
+    }
+    return mult;
+}
+// </FS:Trish>
+
 void LLPipeline::resizeScreenTexture()
 {
     if (gPipeline.shadersLoaded())
@@ -866,11 +886,18 @@ void LLPipeline::resizeScreenTexture()
             scaledResX /= RenderResolutionDivisor;
             scaledResY /= RenderResolutionDivisor;
         }
-        else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier < 1.f)
+        // <FS:Trish> Allow supersampling
+        //else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier < 1.f)
+        //{
+        //    scaledResX = (GLuint)(scaledResX * RenderResolutionMultiplier);
+        //    scaledResY = (GLuint)(scaledResY * RenderResolutionMultiplier);
+        //}
+        else if (F32 mult = fs_resolution_multiplier(resX, resY); mult != 1.f)
         {
-            scaledResX = (GLuint)(scaledResX * RenderResolutionMultiplier);
-            scaledResY = (GLuint)(scaledResY * RenderResolutionMultiplier);
+            scaledResX = (GLuint)(scaledResX * mult);
+            scaledResY = (GLuint)(scaledResY * mult);
         }
+        // </FS:Trish>
 // [/SL:KB]
 
 //      if (gResizeScreenTexture || (resX != mRT->screen.getWidth()) || (resY != mRT->screen.getHeight()))
@@ -997,11 +1024,19 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         resY /= res_mod;
     }
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier < 1.f)
+    // <FS:Trish> Allow supersampling
+    //else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier < 1.f)
+    //{
+    //    resX = (GLuint)(resX * RenderResolutionMultiplier);
+    //    resY = (GLuint)(resY * RenderResolutionMultiplier);
+    //}
+    // Reflection probe and mirror targets have fixed sizes of their own, never supersample those
+    else if (F32 mult = fs_resolution_multiplier(resX, resY); mult < 1.f || (mult > 1.f && mRT == &mMainRT))
     {
-        resX = (GLuint)(resX * RenderResolutionMultiplier);
-        resY = (GLuint)(resY * RenderResolutionMultiplier);
+        resX = (GLuint)(resX * mult);
+        resY = (GLuint)(resY * mult);
     }
+    // </FS:Trish>
 // [/SL:KB]
 
     S32 shadow_detail = RenderShadowDetail;
@@ -1491,6 +1526,8 @@ void LLPipeline::releaseScreenBuffers()
 
     mPreviewScreen.release(); // <FS:Beq/> dedicated preview target
     mOITBuffer.release();
+
+    releaseFSPostTargets(); // <FS:Trish/>
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
@@ -4704,6 +4741,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
     sRenderRiggedAlpha = true;
     sRenderNonRiggedAlpha = true;
+
 
     while ( iter1 != mPools.end() )
     {
@@ -8500,6 +8538,27 @@ void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_co
         shader->uniform1i(tonemap_type, tonemap_type_value);
         shader->uniform1f(tonemap_mix, psky->getTonemapMix(should_auto_adjust()));
 
+        // <FS:Trish> Bloom and colour grading, both part of this pass
+        if (!no_post)
+        {
+            static LLStaticHashedString s_bloom_strength("bloom_strength");
+            static LLStaticHashedString s_bloom_levels("bloom_levels");
+            static LLCachedControl<F32> bloom_strength(gSavedSettings, "FSRenderBloomStrength", 0.15f);
+            if (mBloomLevelCount > 0)
+            {
+                shader->bindTexture(LLShaderMgr::DEFERRED_BLOOM, &mBloomLevels[0], false, LLTexUnit::TFO_BILINEAR);
+                shader->uniform1f(s_bloom_strength, llmax((F32)bloom_strength, 0.f));
+                shader->uniform1f(s_bloom_levels, (F32)mBloomLevelCount);
+            }
+            else
+            {
+                shader->uniform1f(s_bloom_strength, 0.f);
+            }
+
+            bindColorGrading(shader);
+        }
+        // </FS:Trish>
+
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
@@ -9417,6 +9476,14 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
             F32 screen_to_target_scale_factor = (F32)gViewerWindow->getWindowHeightRaw()/dst->getHeight();
             F32 adj_COF = CameraMaxCoF / screen_to_target_scale_factor;
             // </FS:Beq>
+            // <FS:Trish> Chromatic aberration can follow the depth of field's blur
+            mLensDoF.mActive = true;
+            mLensDoF.mFocalDistance = -subject_distance / 1000.f;
+            mLensDoF.mBlurConstant = blur_constant;
+            mLensDoF.mTanPixelAngle = tanf(1.f / LLDrawable::sCurPixelAngle) * screen_to_target_scale_factor;
+            mLensDoF.mMagnification = magnification;
+            mLensDoF.mMaxCoF = adj_COF;
+            // </FS:Trish>
             { // build diffuse+bloom+CoF
                 mRT->deferredLight.bindTarget();
 
@@ -9532,9 +9599,18 @@ void LLPipeline::renderFinalize()
 
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
     bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
+
+    mLensDoF.mActive = false; // <FS:Trish/> renderDoF sets it again when depth of field runs
+
     if (hdr)
     {
         copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
+
+        // <FS:Trish> Added into the HDR scene before exposure is measured, so the exposure accounts
+        // for them. After the SSR copy, so reflections don't pick them up a second time.
+        renderSunRays();
+        renderBloom();
+        // </FS:Trish>
 
         generateLuminance(&mRT->screen, &mLuminanceMap);
 
@@ -9594,7 +9670,16 @@ void LLPipeline::renderFinalize()
 
     // <FS:Beq> Restore shader post proc for Vignette
     LLRenderTarget* auxActiveBuffer = sourceBuffer;
-    LLRenderTarget* auxTargetBuffer = RenderFSAAType ? &mRT->screen : &mPostPingMap;
+    // <FS:Trish> Use whichever ping/pong buffer isn't the source, it depends on glow and DoF
+    //LLRenderTarget* auxTargetBuffer = RenderFSAAType ? &mRT->screen : &mPostPingMap;
+    LLRenderTarget* auxTargetBuffer = RenderFSAAType ? &mRT->screen : (sourceBuffer == &mPostPingMap ? &mPostPongMap : &mPostPingMap);
+    // </FS:Trish>
+    // <FS:Trish> Lens effects, on the anti-aliased image so the aberration and grain stay crisp
+    if (renderLensEffects(auxActiveBuffer, auxTargetBuffer))
+    {
+        std::swap(auxActiveBuffer, auxTargetBuffer);
+    }
+    // </FS:Trish>
 // [RLVa:KB] - @setsphere
     if (RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
     {
@@ -11524,6 +11609,633 @@ public:
     }
 };
 
+// <FS:Trish> Sun rays, bloom, colour grading and lens effects
+
+void LLPipeline::releaseFSPostTargets()
+{
+    mSunRayMap.release();
+    for (LLRenderTarget& level : mBloomLevels)
+    {
+        level.release();
+    }
+    mBloomLevelCount = 0;
+}
+
+// (Re)allocate a post target when its size or format no longer matches
+static bool fs_ensure_target(LLRenderTarget& target, U32 width, U32 height, U32 format)
+{
+    if (target.isComplete() && target.getWidth() == width && target.getHeight() == height)
+    {
+        return true;
+    }
+    target.release();
+    return target.allocate(width, height, format);
+}
+
+static void fs_draw_screen_triangle(LLVertexBuffer* vb)
+{
+    vb->setBuffer();
+    vb->drawArrays(LLRender::TRIANGLES, 0, 3);
+}
+
+// Light scattered in the air toward the camera, darkened wherever the sun shadow maps say the
+// sunlight is blocked: shafts through foliage, windows and clouds of particles. Marched at
+// reduced resolution, then filtered up and added to the HDR scene.
+void LLPipeline::renderSunRays()
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderSunRays", false);
+    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderSunRaysStrength", 1.f);
+    static LLCachedControl<F32> density(gSavedSettings, "FSRenderSunRaysDensity", 0.004f);
+    static LLCachedControl<F32> anisotropy(gSavedSettings, "FSRenderSunRaysAnisotropy", 0.6f);
+    static LLCachedControl<S32> steps(gSavedSettings, "FSRenderSunRaysSteps", 24);
+    static LLCachedControl<F32> max_distance(gSavedSettings, "FSRenderSunRaysDistance", 256.f);
+    static LLCachedControl<F32> resolution(gSavedSettings, "FSRenderSunRaysResolution", 0.5f);
+
+    if (!enabled || strength <= 0.f || density <= 0.f || RenderShadowDetail <= 0 ||
+        gSnapshotNoPost || sUnderWaterRender ||
+        !gFSSunRaysProgram.isComplete() || !gFSSunRaysCompositeProgram.isComplete())
+    {
+        return;
+    }
+
+    LLEnvironment& environment = LLEnvironment::instance();
+    const bool sun_up = environment.getIsSunUp();
+    if (!sun_up && !environment.getIsMoonUp())
+    {
+        return;
+    }
+
+    LL_PROFILE_GPU_ZONE("sun rays");
+
+    const F32 scale = llclamp((F32)resolution, 0.25f, 1.f);
+    const U32 width = llmax((U32)(mRT->screen.getWidth() * scale), 1u);
+    const U32 height = llmax((U32)(mRT->screen.getHeight() * scale), 1u);
+    if (!fs_ensure_target(mSunRayMap, width, height, GL_R16F))
+    {
+        return;
+    }
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+
+    static LLStaticHashedString s_ray_steps("ray_steps");
+    static LLStaticHashedString s_ray_max_dist("ray_max_dist");
+    static LLStaticHashedString s_ray_density("ray_density");
+    static LLStaticHashedString s_ray_anisotropy("ray_anisotropy");
+    static LLStaticHashedString s_ray_texel("ray_texel");
+    static LLStaticHashedString s_ray_color("ray_color");
+
+    // March
+    {
+        LLGLDisable blend(GL_BLEND);
+        mSunRayMap.bindTarget();
+        bindDeferredShader(gFSSunRaysProgram); // depth, shadow maps, their matrices and the light directions
+        gFSSunRaysProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up ? 1 : 0);
+        gFSSunRaysProgram.uniform1i(s_ray_steps, llclamp((S32)steps, 4, 128));
+        gFSSunRaysProgram.uniform1f(s_ray_max_dist, llclamp((F32)max_distance, 8.f, 1024.f));
+        gFSSunRaysProgram.uniform1f(s_ray_density, (F32)density);
+        gFSSunRaysProgram.uniform1f(s_ray_anisotropy, llclamp((F32)anisotropy, 0.f, 0.95f));
+        fs_draw_screen_triangle(mScreenTriangleVB);
+        unbindDeferredShader(gFSSunRaysProgram);
+        mSunRayMap.flush();
+    }
+
+    // Composite onto the HDR scene
+    {
+        LLColor3 light = sun_up ? LLColor3(mSunDiffuse.mV) : LLColor3(mMoonDiffuse.mV);
+        light = linearColor3(light) * (F32)strength;
+
+        mRT->screen.bindTarget();
+        gGL.setColorMask(true, false); // the screen's alpha is glow
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ADD);
+
+        gFSSunRaysCompositeProgram.bind();
+        gFSSunRaysCompositeProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mSunRayMap, false, LLTexUnit::TFO_BILINEAR);
+        gFSSunRaysCompositeProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+        gFSSunRaysCompositeProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
+        gFSSunRaysCompositeProgram.uniform2f(s_ray_texel, 1.f / (F32)width, 1.f / (F32)height);
+        gFSSunRaysCompositeProgram.uniform3fv(s_ray_color, 1, light.mV);
+        fs_draw_screen_triangle(mScreenTriangleVB);
+        gFSSunRaysCompositeProgram.unbind();
+
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        gGL.setColorMask(true, true);
+        mRT->screen.flush();
+    }
+}
+
+// Bloom from the HDR scene: the bright parts at half resolution, blurred down a chain of ever
+// smaller levels and summed back up into the first. The tonemap pass adds the result in.
+void LLPipeline::renderBloom()
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderBloom", false);
+    static LLCachedControl<F32> threshold(gSavedSettings, "FSRenderBloomThreshold", 1.f);
+    static LLCachedControl<F32> knee(gSavedSettings, "FSRenderBloomKnee", 0.5f);
+    static LLCachedControl<S32> levels(gSavedSettings, "FSRenderBloomLevels", 6);
+    static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
+
+    mBloomLevelCount = 0;
+    if (!enabled || gSnapshotNoPost ||
+        !gFSBloomPrefilterProgram.isComplete() || !gFSBloomDownProgram.isComplete() || !gFSBloomUpProgram.isComplete())
+    {
+        return;
+    }
+
+    LL_PROFILE_GPU_ZONE("bloom");
+
+    // Each level is half the previous, down to 8 pixels or the level count
+    const U32 max_levels = (U32)llclamp((S32)levels, 1, (S32)FS_BLOOM_MAX_LEVELS);
+    U32 width = mRT->screen.getWidth() / 2;
+    U32 height = mRT->screen.getHeight() / 2;
+    U32 count = 0;
+    while (count < max_levels && width >= 8 && height >= 8)
+    {
+        if (!fs_ensure_target(mBloomLevels[count], width, height, GL_RGBA16F))
+        {
+            break;
+        }
+        ++count;
+        width /= 2;
+        height /= 2;
+    }
+    if (count == 0)
+    {
+        return;
+    }
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+
+    static LLStaticHashedString s_src_texel("src_texel");
+    static LLStaticHashedString s_exposure("exposure");
+    static LLStaticHashedString s_threshold("bloom_threshold");
+    static LLStaticHashedString s_knee("bloom_knee");
+
+    {
+        LLGLDisable blend(GL_BLEND);
+
+        // Bright pass, full resolution scene into the first level
+        mBloomLevels[0].bindTarget();
+        gFSBloomPrefilterProgram.bind();
+        gFSBloomPrefilterProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->screen, false, LLTexUnit::TFO_BILINEAR);
+        gFSBloomPrefilterProgram.bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
+        gFSBloomPrefilterProgram.uniform2f(s_src_texel, 1.f / (F32)mRT->screen.getWidth(), 1.f / (F32)mRT->screen.getHeight());
+        gFSBloomPrefilterProgram.uniform1f(s_exposure, llclamp((F32)exposure, 0.5f, 4.f)); // as tonemap() clamps it
+        gFSBloomPrefilterProgram.uniform1f(s_threshold, llmax((F32)threshold, 0.f));
+        gFSBloomPrefilterProgram.uniform1f(s_knee, llmax((F32)knee, 0.f));
+        fs_draw_screen_triangle(mScreenTriangleVB);
+        gFSBloomPrefilterProgram.unbind();
+        mBloomLevels[0].flush();
+
+        // Down the chain
+        gFSBloomDownProgram.bind();
+        for (U32 i = 1; i < count; ++i)
+        {
+            LLRenderTarget& src = mBloomLevels[i - 1];
+            mBloomLevels[i].bindTarget();
+            gFSBloomDownProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &src, false, LLTexUnit::TFO_BILINEAR);
+            gFSBloomDownProgram.uniform2f(s_src_texel, 1.f / (F32)src.getWidth(), 1.f / (F32)src.getHeight());
+            fs_draw_screen_triangle(mScreenTriangleVB);
+            mBloomLevels[i].flush();
+        }
+        gFSBloomDownProgram.unbind();
+    }
+
+    // Back up, each level added onto the next larger one
+    {
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ADD);
+        gFSBloomUpProgram.bind();
+        for (S32 i = (S32)count - 1; i > 0; --i)
+        {
+            LLRenderTarget& src = mBloomLevels[i];
+            mBloomLevels[i - 1].bindTarget();
+            gFSBloomUpProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &src, false, LLTexUnit::TFO_BILINEAR);
+            gFSBloomUpProgram.uniform2f(s_src_texel, 1.f / (F32)src.getWidth(), 1.f / (F32)src.getHeight());
+            fs_draw_screen_triangle(mScreenTriangleVB);
+            mBloomLevels[i - 1].flush();
+        }
+        gFSBloomUpProgram.unbind();
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    }
+
+    mBloomLevelCount = count;
+}
+
+// White balance as a linear sRGB matrix: von Kries adaptation in CAT02 space from D65 to the
+// white of a black body at this temperature, with tint moving it toward green (positive) or
+// magenta. Lower temperatures warm the image. Normalised so white keeps its brightness.
+static void fs_white_balance_matrix(F32 kelvin, F32 tint, F32 out[9])
+{
+    // Chromaticity of a black body, Kim et al. cubic spline fit, valid 1667 K to 25000 K
+    auto planckian_xy = [](F32 t, F32& x, F32& y)
+    {
+        t = llclamp(t, 1667.f, 25000.f);
+        const F64 t1 = 1.0 / t, t2 = t1 * t1, t3 = t2 * t1;
+        F64 xc = t <= 4000.f
+            ? -0.2661239e9 * t3 - 0.2343589e6 * t2 + 0.8776956e3 * t1 + 0.179910
+            : -3.0258469e9 * t3 + 2.1070379e6 * t2 + 0.2226347e3 * t1 + 0.240390;
+        F64 yc;
+        if (t <= 2222.f)
+        {
+            yc = -1.1063814 * xc * xc * xc - 1.34811020 * xc * xc + 2.18555832 * xc - 0.20219683;
+        }
+        else if (t <= 4000.f)
+        {
+            yc = -0.9549476 * xc * xc * xc - 1.37418593 * xc * xc + 2.09137015 * xc - 0.16748867;
+        }
+        else
+        {
+            yc = 3.0817580 * xc * xc * xc - 5.87338670 * xc * xc + 3.75112997 * xc - 0.37001483;
+        }
+        x = (F32)xc;
+        y = (F32)yc;
+    };
+
+    auto mul = [](const F32 a[9], const F32 b[9], F32 r[9])
+    {
+        for (S32 i = 0; i < 3; ++i)
+        {
+            for (S32 j = 0; j < 3; ++j)
+            {
+                r[i * 3 + j] = a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j];
+            }
+        }
+    };
+    auto apply = [](const F32 m[9], const F32 v[3], F32 r[3])
+    {
+        for (S32 i = 0; i < 3; ++i)
+        {
+            r[i] = m[i * 3] * v[0] + m[i * 3 + 1] * v[1] + m[i * 3 + 2] * v[2];
+        }
+    };
+
+    static const F32 rgb_to_xyz[9] = { 0.4124564f, 0.3575761f, 0.1804375f,
+                                       0.2126729f, 0.7151522f, 0.0721750f,
+                                       0.0193339f, 0.1191920f, 0.9503041f };
+    static const F32 xyz_to_rgb[9] = { 3.2404542f, -1.5371385f, -0.4985314f,
+                                      -0.9692660f,  1.8760108f,  0.0415560f,
+                                       0.0556434f, -0.2040259f,  1.0572252f };
+    static const F32 xyz_to_lms[9] = { 0.7328f, 0.4296f, -0.1624f,
+                                      -0.7036f, 1.6975f,  0.0061f,
+                                       0.0030f, 0.0136f,  0.9834f };
+    static const F32 lms_to_xyz[9] = { 1.0961238f, -0.2788690f, 0.1827452f,
+                                       0.4543690f,  0.4735332f, 0.0720978f,
+                                      -0.0096276f, -0.0056980f, 1.0153256f };
+
+    // Both whites from the same fit, so 6500 K with no tint comes out as the identity
+    F32 ref_x, ref_y, x, y;
+    planckian_xy(6500.f, ref_x, ref_y);
+    planckian_xy(kelvin, x, y);
+    y += tint * 0.02f;
+
+    const F32 ref_xyz[3] = { ref_x / ref_y, 1.f, (1.f - ref_x - ref_y) / ref_y };
+    const F32 dst_xyz[3] = { x / y, 1.f, (1.f - x - y) / y };
+    F32 ref_lms[3], dst_lms[3];
+    apply(xyz_to_lms, ref_xyz, ref_lms);
+    apply(xyz_to_lms, dst_xyz, dst_lms);
+
+    const F32 adapt[9] = { dst_lms[0] / ref_lms[0], 0.f, 0.f,
+                           0.f, dst_lms[1] / ref_lms[1], 0.f,
+                           0.f, 0.f, dst_lms[2] / ref_lms[2] };
+
+    F32 t0[9], t1[9], t2[9];
+    mul(xyz_to_lms, rgb_to_xyz, t0);
+    mul(adapt, t0, t1);
+    mul(lms_to_xyz, t1, t2);
+    mul(xyz_to_rgb, t2, out);
+
+    // Keep white's luminance
+    const F32 white[3] = { 1.f, 1.f, 1.f };
+    F32 w[3];
+    apply(out, white, w);
+    const F32 luma = 0.2126f * w[0] + 0.7152f * w[1] + 0.0722f * w[2];
+    if (luma > 0.f)
+    {
+        for (S32 i = 0; i < 9; ++i)
+        {
+            out[i] /= luma;
+        }
+    }
+}
+
+// A lookup table, either a .cube file (Resolve, Photoshop and most grading tools export these)
+// or a PNG strip of size*size by size pixels, laid out as fsColorGrade expects: one slice per
+// blue step left to right, red across each slice, green increasing down the image. A bare file
+// name is looked for in the user settings "luts" folder.
+void LLPipeline::loadColorGradeLUT(const std::string& name)
+{
+    mColorGradeLUTName = name;
+    mColorGradeLUT = nullptr;
+    mColorGradeLUTSize = 0;
+
+    if (name.empty())
+    {
+        return;
+    }
+
+    std::string path = name;
+    if (!LLFile::isfile(path))
+    {
+        path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "luts", name);
+    }
+    if (!LLFile::isfile(path))
+    {
+        LL_WARNS("ColorGrade") << "Lookup table not found: " << name << LL_ENDL;
+        return;
+    }
+
+    LLPointer<LLImageRaw> strip;
+    S32 size = 0;
+    std::string ext = gDirUtilp->getExtension(path);
+    LLStringUtil::toLower(ext);
+
+    if (ext == "cube")
+    {
+        llifstream file(path.c_str());
+        std::string line;
+        S32 index = 0;
+        while (file.good() && std::getline(file, line))
+        {
+            LLStringUtil::trim(line);
+            if (line.empty() || line[0] == '#')
+            {
+                continue;
+            }
+            if (line.compare(0, 11, "LUT_3D_SIZE") == 0)
+            {
+                size = atoi(line.c_str() + 11);
+                if (size < 2 || size > 64)
+                {
+                    LL_WARNS("ColorGrade") << "Unsupported lookup table size " << size << " in " << path << LL_ENDL;
+                    return;
+                }
+                strip = new LLImageRaw(size * size, size, 3);
+                continue;
+            }
+            if (!isdigit((U8)line[0]) && line[0] != '-' && line[0] != '.')
+            {
+                continue; // TITLE, DOMAIN_MIN, DOMAIN_MAX, LUT_1D_SIZE...
+            }
+            if (!strip || index >= size * size * size)
+            {
+                continue;
+            }
+            F32 r = 0.f, g = 0.f, b = 0.f;
+            if (sscanf(line.c_str(), "%f %f %f", &r, &g, &b) != 3)
+            {
+                continue;
+            }
+            // Red varies fastest, then green, then blue
+            const S32 ri = index % size;
+            const S32 gi = (index / size) % size;
+            const S32 bi = index / (size * size);
+            U8* px = strip->getData() + ((gi * size * size) + bi * size + ri) * 3;
+            px[0] = (U8)llclamp(ll_round(r * 255.f), 0, 255);
+            px[1] = (U8)llclamp(ll_round(g * 255.f), 0, 255);
+            px[2] = (U8)llclamp(ll_round(b * 255.f), 0, 255);
+            ++index;
+        }
+        if (!strip || index != size * size * size)
+        {
+            LL_WARNS("ColorGrade") << "Incomplete or 1D lookup table in " << path << LL_ENDL;
+            return;
+        }
+    }
+    else if (ext == "png")
+    {
+        LLPointer<LLImagePNG> png = new LLImagePNG;
+        LLPointer<LLImageRaw> raw = new LLImageRaw;
+        if (!png->load(path) || !png->decode(raw, 0.f) || raw->getComponents() < 3)
+        {
+            LL_WARNS("ColorGrade") << "Could not read lookup table " << path << LL_ENDL;
+            return;
+        }
+        size = raw->getHeight();
+        if (size < 2 || size > 64 || raw->getWidth() != size * size)
+        {
+            LL_WARNS("ColorGrade") << "Lookup table " << path << " is not a size*size by size strip" << LL_ENDL;
+            return;
+        }
+        // Decoded images are stored bottom row first, the strip has green 0 at the top
+        strip = new LLImageRaw(size * size, size, 3);
+        const S32 comps = raw->getComponents();
+        for (S32 row = 0; row < size; ++row)
+        {
+            const U8* src = raw->getData() + (size - 1 - row) * size * size * comps;
+            U8* dst = strip->getData() + row * size * size * 3;
+            for (S32 x = 0; x < size * size; ++x)
+            {
+                dst[x * 3] = src[x * comps];
+                dst[x * 3 + 1] = src[x * comps + 1];
+                dst[x * 3 + 2] = src[x * comps + 2];
+            }
+        }
+    }
+    else
+    {
+        LL_WARNS("ColorGrade") << "Lookup tables must be .cube or .png: " << path << LL_ENDL;
+        return;
+    }
+
+    // No mipmaps (the shader reads exact slices) and no compression (it would shift colours)
+    mColorGradeLUT = new LLImageGL(strip, false, false);
+    mColorGradeLUTSize = size;
+    LL_INFOS("ColorGrade") << "Loaded " << size << "^3 lookup table " << path << LL_ENDL;
+}
+
+void LLPipeline::bindColorGrading(LLGLSLShader* shader)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSColorGrade", false);
+    static LLCachedControl<F32> temperature(gSavedSettings, "FSColorGradeTemperature", 6500.f);
+    static LLCachedControl<F32> tint(gSavedSettings, "FSColorGradeTint", 0.f);
+    static LLCachedControl<F32> lift(gSavedSettings, "FSColorGradeLift", 0.f);
+    static LLCachedControl<F32> gamma(gSavedSettings, "FSColorGradeGamma", 1.f);
+    static LLCachedControl<F32> gain(gSavedSettings, "FSColorGradeGain", 1.f);
+    static LLCachedControl<F32> contrast(gSavedSettings, "FSColorGradeContrast", 1.f);
+    static LLCachedControl<F32> saturation(gSavedSettings, "FSColorGradeSaturation", 1.f);
+    static LLCachedControl<F32> vibrance(gSavedSettings, "FSColorGradeVibrance", 0.f);
+    static LLCachedControl<LLColor4> shadow_tint(gSavedSettings, "FSColorGradeShadowTint", LLColor4::white);
+    static LLCachedControl<LLColor4> highlight_tint(gSavedSettings, "FSColorGradeHighlightTint", LLColor4::white);
+    static LLCachedControl<F32> split_balance(gSavedSettings, "FSColorGradeSplitBalance", 0.f);
+    static LLCachedControl<std::string> lut_name(gSavedSettings, "FSColorGradeLUT", "");
+    static LLCachedControl<F32> lut_strength(gSavedSettings, "FSColorGradeLUTStrength", 1.f);
+
+    static LLStaticHashedString s_enabled("grade_enabled");
+    static LLStaticHashedString s_white_balance("grade_white_balance");
+    static LLStaticHashedString s_lift("grade_lift");
+    static LLStaticHashedString s_gamma("grade_gamma");
+    static LLStaticHashedString s_gain("grade_gain");
+    static LLStaticHashedString s_contrast("grade_contrast");
+    static LLStaticHashedString s_saturation("grade_saturation");
+    static LLStaticHashedString s_vibrance("grade_vibrance");
+    static LLStaticHashedString s_shadow_tint("grade_shadow_tint");
+    static LLStaticHashedString s_highlight_tint("grade_highlight_tint");
+    static LLStaticHashedString s_split_balance("grade_split_balance");
+    static LLStaticHashedString s_lut_size("grade_lut_size");
+    static LLStaticHashedString s_lut_strength("grade_lut_strength");
+
+    shader->uniform1i(s_enabled, enabled ? 1 : 0);
+    if (!enabled)
+    {
+        return;
+    }
+
+    // Cached: the matrix only changes with the two settings
+    static F32 last_kelvin = -1.f;
+    static F32 last_tint = -100.f;
+    static F32 white_balance[9];
+    if (last_kelvin != temperature || last_tint != tint)
+    {
+        last_kelvin = temperature;
+        last_tint = tint;
+        fs_white_balance_matrix(llclamp((F32)temperature, 1667.f, 25000.f), llclamp((F32)tint, -1.f, 1.f), white_balance);
+    }
+    // Row major above, GL wants it transposed. No by-name matrix setter, so set it directly.
+    const GLint wb_location = shader->getUniformLocation(s_white_balance);
+    if (wb_location >= 0)
+    {
+        glUniformMatrix3fv(wb_location, 1, GL_TRUE, white_balance);
+    }
+
+    shader->uniform1f(s_lift, (F32)lift);
+    shader->uniform1f(s_gamma, llmax((F32)gamma, 0.01f));
+    shader->uniform1f(s_gain, (F32)gain);
+    shader->uniform1f(s_contrast, (F32)contrast);
+    shader->uniform1f(s_saturation, (F32)saturation);
+    shader->uniform1f(s_vibrance, (F32)vibrance);
+    const LLColor4 shadow = shadow_tint;
+    const LLColor4 highlight = highlight_tint;
+    shader->uniform3f(s_shadow_tint, shadow.mV[VRED], shadow.mV[VGREEN], shadow.mV[VBLUE]);
+    shader->uniform3f(s_highlight_tint, highlight.mV[VRED], highlight.mV[VGREEN], highlight.mV[VBLUE]);
+    shader->uniform1f(s_split_balance, (F32)split_balance);
+
+    if (lut_name() != mColorGradeLUTName)
+    {
+        loadColorGradeLUT(lut_name());
+    }
+
+    S32 channel = mColorGradeLUT.notNull() ? shader->enableTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP) : -1;
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->bind(mColorGradeLUT);
+        gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        shader->uniform1f(s_lut_size, (F32)mColorGradeLUTSize);
+        shader->uniform1f(s_lut_strength, llclamp((F32)lut_strength, 0.f, 1.f));
+    }
+    else
+    {
+        shader->uniform1f(s_lut_size, 0.f);
+    }
+}
+
+// Chromatic aberration, lens flare and film grain on the finished, anti-aliased image
+bool LLPipeline::renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst)
+{
+    static LLCachedControl<F32> ca_pixels(gSavedSettings, "FSRenderChromaticAberration", 0.f);
+    static LLCachedControl<bool> ca_dof_only(gSavedSettings, "FSRenderChromaticAberrationDoFOnly", true);
+    static LLCachedControl<F32> flare_strength(gSavedSettings, "FSRenderLensFlare", 0.f);
+    static LLCachedControl<F32> grain_strength(gSavedSettings, "FSRenderFilmGrain", 0.f);
+    static LLCachedControl<F32> grain_size(gSavedSettings, "FSRenderFilmGrainSize", 1.5f);
+
+    if (gSnapshotNoPost || !gFSLensEffectsProgram.isComplete())
+    {
+        return false;
+    }
+
+    // With depth of field off there is no blur for the aberration to follow
+    F32 ca = llmax((F32)ca_pixels, 0.f);
+    const bool ca_dof = ca_dof_only;
+    if (ca_dof && !mLensDoF.mActive)
+    {
+        ca = 0.f;
+    }
+    // Scale with the target, so snapshots larger than the window look the same
+    ca *= (F32)dst->getHeight() / (F32)llmax(gViewerWindow->getWindowHeightRaw(), 1);
+
+    F32 flare = llmax((F32)flare_strength, 0.f);
+    const F32 grain = llclamp((F32)grain_strength, 0.f, 1.f);
+
+    // Where the sun or moon lands on screen
+    LLVector3 sun_screen(0.f, 0.f, 0.f);
+    LLColor3 flare_color(1.f, 1.f, 1.f);
+    if (flare > 0.f)
+    {
+        LLEnvironment& environment = LLEnvironment::instance();
+        const bool sun_up = environment.getIsSunUp();
+        if (!sun_up && !environment.getIsMoonUp())
+        {
+            flare = 0.f;
+        }
+        else
+        {
+            const LLVector4& dir = sun_up ? mTransformedSunDir : mTransformedMoonDir;
+            glm::vec4 clip = get_current_projection() * glm::vec4(dir.mV[VX], dir.mV[VY], dir.mV[VZ], 0.f);
+            if (clip.w > 1e-4f)
+            {
+                sun_screen.set(clip.x / clip.w * 0.5f + 0.5f, clip.y / clip.w * 0.5f + 0.5f, 1.f);
+            }
+            LLColor3 light = sun_up ? LLColor3(mSunDiffuse.mV) : LLColor3(mMoonDiffuse.mV) * 0.35f;
+            const F32 peak = llmax(light.mV[0], llmax(light.mV[1], light.mV[2]));
+            flare_color = peak > 0.f ? light * (1.f / peak) : LLColor3::white;
+            if (!sun_up)
+            {
+                flare *= 0.35f;
+            }
+        }
+    }
+
+    if (ca <= 0.f && flare <= 0.f && grain <= 0.f)
+    {
+        return false;
+    }
+
+    LL_PROFILE_GPU_ZONE("lens effects");
+
+    static LLStaticHashedString s_ca_pixels("ca_pixels");
+    static LLStaticHashedString s_ca_dof("ca_dof");
+    static LLStaticHashedString s_flare_strength("flare_strength");
+    static LLStaticHashedString s_flare_color("flare_color");
+    static LLStaticHashedString s_sun_screen("sun_screen");
+    static LLStaticHashedString s_grain_strength("grain_strength");
+    static LLStaticHashedString s_grain_size("grain_size");
+    static LLStaticHashedString s_grain_seed("grain_seed");
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable blend(GL_BLEND);
+
+    dst->bindTarget();
+    LLGLSLShader& shader = gFSLensEffectsProgram;
+    shader.bind();
+    shader.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_BILINEAR);
+    shader.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+    shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
+
+    shader.uniform1f(s_ca_pixels, ca);
+    shader.uniform1i(s_ca_dof, ca_dof ? 1 : 0);
+    shader.uniform1f(LLShaderMgr::DOF_FOCAL_DISTANCE, mLensDoF.mFocalDistance);
+    shader.uniform1f(LLShaderMgr::DOF_BLUR_CONSTANT, mLensDoF.mBlurConstant);
+    shader.uniform1f(LLShaderMgr::DOF_TAN_PIXEL_ANGLE, mLensDoF.mTanPixelAngle);
+    shader.uniform1f(LLShaderMgr::DOF_MAGNIFICATION, mLensDoF.mMagnification);
+    shader.uniform1f(LLShaderMgr::DOF_MAX_COF, mLensDoF.mMaxCoF);
+
+    shader.uniform1f(s_flare_strength, flare);
+    shader.uniform3fv(s_flare_color, 1, flare_color.mV);
+    shader.uniform3fv(s_sun_screen, 1, sun_screen.mV);
+
+    shader.uniform1f(s_grain_strength, grain * 0.25f);
+    shader.uniform1f(s_grain_size, llclamp((F32)grain_size, 1.f, 8.f));
+    shader.uniform1f(s_grain_seed, (F32)(LLFrameTimer::getFrameCount() % 4096) * 0.6180339f);
+
+    fs_draw_screen_triangle(mScreenTriangleVB);
+    shader.unbind();
+    dst->flush();
+    return true;
+}
+// </FS:Trish>
+
 void LLPipeline::generateSunShadow(LLCamera& camera)
 {
     if (!sRenderDeferred || RenderShadowDetail <= 0)
@@ -11781,7 +12493,13 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         }
 
         near_clip    = llclamp(-max.mV[2], 0.01f, 4.0f);
-        F32 far_clip = llclamp(-min.mV[2]*2.f, 16.0f, 512.0f);
+        // <FS:Trish> How far sun shadows reach. The four cascades share this range, so a shorter
+        // one gives the near cascades many more texels per meter.
+        //F32 far_clip = llclamp(-min.mV[2]*2.f, 16.0f, 512.0f);
+        static LLCachedControl<F32> shadow_max_distance(gSavedSettings, "FSRenderShadowMaxDistance", 512.f);
+        const F32 max_far_clip = gCubeSnapshot ? 512.f : llclamp((F32)shadow_max_distance, 16.f, 512.f); // probes keep the full range
+        F32 far_clip = llclamp(-min.mV[2]*2.f, 16.0f, max_far_clip);
+        // </FS:Trish>
 
         //far_clip = llmin(far_clip, 128.f);
         far_clip = llmin(far_clip, camera.getFar());

@@ -229,6 +229,7 @@ public:
     static S32 sAuxCount;
     static LLFrameTimer sEvaluationTimer;
     static F32 sDesiredDiscardBias;
+    static S32 sSnapshotDiscardBoost; // <FS:Trish/> Discard levels sharper than the screen needs, while a larger snapshot waits for textures
     static U32 sBiasTexturesUpdated;
     static S32 sMaxSculptRez ;
     static U32 sMinLargeImageSize ;
