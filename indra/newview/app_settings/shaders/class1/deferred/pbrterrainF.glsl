@@ -168,6 +168,9 @@ vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag);
 vec4 packORM(vec3 orm);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
+#ifdef FS_SPECULAR_AA
+float fsSpecularAARoughness(float perceptualRoughness, vec3 n, vec3 mapNormal);
+#endif
 
 float terrain_mix(TerrainMix tm, vec4 tms4);
 
@@ -495,7 +498,12 @@ void main()
     // Terrain is the worst case for this: a ground plane runs to the horizon, so its normal
     // maps reach their minification limit within the visible frame every time.
     vec3 orm_out = mix_orm;
+#ifdef FS_SPECULAR_AA
+    // Blended layers, not one texel: no single map vector to read shortening from
+    orm_out.g = fsSpecularAARoughness(orm_out.g, tnorm, vec3(0.0, 0.0, 1.0));
+#else
     orm_out.g = filterSpecularRoughness(orm_out.g, tnorm);
+#endif
 
     mirrorClip(vary_position);
     if (pbr_mix.col.a < minimum_alpha)

@@ -27015,6 +27015,39 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.8</real>
     </map>
+    <key>FSRenderSpecularAA</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Replace the built-in specular anti-aliasing of PBR, terrain and legacy material surfaces with a tunable filter that also accounts for normal-map detail lost to mipmapping (reduces sparkle on shiny surfaces at a distance). Rebuilds shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderSpecularAAStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>Screen-space filter variance for FSRenderSpecularAA: how strongly the change of the surface normal between pixels widens the highlight (0 = off, 0.25 = Tokuyoshi and Kaplanyan default).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.25</real>
+    </map>
+    <key>FSRenderSpecularAAThreshold</key>
+    <map>
+      <key>Comment</key>
+      <string>Ceiling on the roughness (alpha squared) FSRenderSpecularAA may add, so edges and seams do not turn surfaces fully rough.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.18</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

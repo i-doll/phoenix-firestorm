@@ -65,6 +65,9 @@ vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag);
 vec4 packORM(vec3 orm);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
+#ifdef FS_SPECULAR_AA
+float fsSpecularAARoughness(float perceptualRoughness, vec3 n, vec3 mapNormal);
+#endif
 
 uniform mat3 normal_matrix;
 
@@ -101,7 +104,11 @@ void main()
     // Widen roughness by whatever normal detail this pixel lost to minification, before the
     // value is frozen into the GBuffer -- every light that reads it then gets the corrected
     // lobe, and it costs one evaluation instead of one per light.
+#ifdef FS_SPECULAR_AA
+    spec.g = fsSpecularAARoughness(spec.g, tnorm, vNt);
+#else
     spec.g = filterSpecularRoughness(spec.g, tnorm);
+#endif
 
     vec3 emissive = emissiveColor;
     emissive *= srgb_to_linear(texture(emissiveMap, emissive_texcoord.xy).rgb);

@@ -42,6 +42,9 @@ in vec3 vary_position;
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
+#ifdef FS_SPECULAR_AA
+float fsSpecularAARoughness(float perceptualRoughness, vec3 n, vec3 mapNormal);
+#endif
 
 void main()
 {
@@ -54,7 +57,11 @@ void main()
             dot(norm,vary_mat2));
 
     vec3 nvn = normalize(tnorm);
+#ifdef FS_SPECULAR_AA
+    float glossiness = 1.0 - fsSpecularAARoughness(1.0 - vertex_color.a, nvn, norm);
+#else
     float glossiness = 1.0 - filterSpecularRoughness(1.0 - vertex_color.a, nvn);
+#endif
 
     // Evaluate normal derivatives before any potentially non-uniform discard.
     mirrorClip(vary_position);

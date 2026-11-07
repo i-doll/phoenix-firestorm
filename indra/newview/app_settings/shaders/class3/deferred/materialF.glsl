@@ -58,6 +58,9 @@ in vec3 vary_position;
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
+#ifdef FS_SPECULAR_AA
+float fsSpecularAARoughness(float perceptualRoughness, vec3 n, vec3 mapNormal);
+#endif
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 
@@ -317,7 +320,16 @@ void main()
     float env = env_intensity * spec.a;
     float glossiness = specular_color.a;
     vec3 norm = getNormal(glossiness);
+#ifdef FS_SPECULAR_AA
+#ifdef HAS_NORMAL_MAP
+    vec3 fs_map_normal = texture(bumpMap, vary_texcoord1.xy).xyz * 2.0 - 1.0; // same fetch as getNormal
+#else
+    vec3 fs_map_normal = vec3(0.0, 0.0, 1.0);
+#endif
+    glossiness = 1.0 - fsSpecularAARoughness(1.0 - glossiness, norm, fs_map_normal);
+#else
     glossiness = 1.0 - filterSpecularRoughness(1.0 - glossiness, norm);
+#endif
 
     // Evaluate normal derivatives before any potentially non-uniform discard.
     mirrorClip(vary_position);

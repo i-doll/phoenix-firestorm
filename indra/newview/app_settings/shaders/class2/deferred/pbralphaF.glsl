@@ -109,6 +109,9 @@ void waterClip(vec3 pos);
 
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
+#ifdef FS_SPECULAR_AA
+float fsSpecularAARoughness(float perceptualRoughness, vec3 n, vec3 mapNormal);
+#endif
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
 vec3 clampRadiance(vec3 c);
 vec3 clampHDRRange(vec3 color);
@@ -212,7 +215,11 @@ void main()
 
     // The deferred path filters roughness once into the GBuffer; this one shades in place, so
     // it does the same correction against its own normal here.
+#ifdef FS_SPECULAR_AA
+    perceptualRoughness = fsSpecularAARoughness(perceptualRoughness, norm, vNt);
+#else
     perceptualRoughness = filterSpecularRoughness(perceptualRoughness, norm);
+#endif
 
     // emissiveColor is the emissive color factor from GLTF and is already in linear space
     vec3 colorEmissive = emissiveColor;
