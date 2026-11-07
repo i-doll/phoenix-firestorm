@@ -702,6 +702,10 @@ U64 LLVertexBuffer::getBytesAllocated()
 U32 LLVertexBuffer::sGLRenderBuffer = 0;
 U32 LLVertexBuffer::sGLRenderIndices = 0;
 U32 LLVertexBuffer::sLastMask = 0;
+// <FS:Trish> Skin once per frame, see getFSContentSerial()
+LLVertexBuffer::fs_rigged_draw_hook_t LLVertexBuffer::sFSRiggedDrawHook = nullptr;
+static U32 sFSNextContentSerial = 0;
+// </FS:Trish>
 U32 LLVertexBuffer::sVertexCount = 0;
 
 
@@ -941,6 +945,12 @@ void LLVertexBuffer::drawRange(U32 mode, U32 start, U32 end, U32 count, U32 indi
     llassert(mGLBuffer == sGLRenderBuffer);
     llassert(mGLIndices == sGLRenderIndices);
     gGL.syncMatrices();
+    // <FS:Trish> Skin once per frame: capture or reuse this range's skin blends
+    if (sFSRiggedDrawHook && LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->mFeatures.hasObjectSkinning)
+    {
+        sFSRiggedDrawHook(this, start, end);
+    }
+    // </FS:Trish>
     STOP_GLERROR;
     glDrawRangeElements(sGLMode[mode], start, end, count, mIndicesType,
         (GLvoid*) (indices_offset * (size_t) mIndicesStride));
@@ -1036,7 +1046,8 @@ void LLVertexBuffer::cleanupClass()
 
 LLVertexBuffer::LLVertexBuffer(U32 typemask)
 :   LLRefCount(),
-    mTypeMask(typemask)
+    mTypeMask(typemask),
+    mFSContentSerial(++sFSNextContentSerial) // <FS:Trish/>
 {
     //zero out offsets
     for (U32 i = 0; i < TYPE_MAX; i++)
@@ -1406,6 +1417,13 @@ void LLVertexBuffer::flush_vbo(GLenum target, U32 start, U32 end, void* data, U8
     {
         llassert(target == GL_ARRAY_BUFFER ? sGLRenderBuffer == mGLBuffer : sGLRenderIndices == mGLIndices);
 
+        // <FS:Trish> Skin once per frame: vertex data changed
+        if (target == GL_ARRAY_BUFFER)
+        {
+            mFSContentSerial = ++sFSNextContentSerial;
+        }
+        // </FS:Trish>
+
         // skip mapped data and stream to GPU via glBufferSubData
         if (end != 0)
         {
@@ -1457,6 +1475,8 @@ void LLVertexBuffer::_unmapBuffer()
     {
         return;
     }
+
+    mFSContentSerial = ++sFSNextContentSerial; // <FS:Trish/> Skin once per frame: vertex data may have changed
 
     struct SortMappedRegion
     {

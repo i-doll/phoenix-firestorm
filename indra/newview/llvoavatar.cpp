@@ -11603,6 +11603,10 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
         entry.mFrame = gFrameCount;
         entry.mUsesLocalOrigin = use_local_origin;
         entry.mJointSerials.clear(); // <FS:Trish/>
+        // <FS:Trish> Skin once per frame: skin blends captured from the old palette are stale
+        static U32 sFSPaletteBuildSerial = 0;
+        entry.mFSBuildSerial = ++sFSPaletteBuildSerial;
+        // </FS:Trish>
 
         //build matrix palette
         U32 count = LLSkinningUtil::getMeshJointCount(skin);

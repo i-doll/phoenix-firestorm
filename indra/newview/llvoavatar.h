@@ -985,6 +985,10 @@ public:
         std::vector<U64> mJointSerials;
         // </FS:Trish>
 
+        // <FS:Trish> Changes whenever the palette is rebuilt (skin once per frame, fsskinonce.cpp)
+        U32 mFSBuildSerial = 0;
+        // </FS:Trish>
+
         MatrixPaletteCache() :
             mFrame(gFrameCount - 1),
             mSkinOrigin(LLVector3::zero),
