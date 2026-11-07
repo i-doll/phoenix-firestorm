@@ -390,11 +390,12 @@ float idCloudSigma(float density)
 
 uniform sampler2D idCloudShadow;
 uniform mat4 id_cloud_shadow_matrix;
+uniform vec4 id_shadow_layer_base;
+uniform vec4 id_shadow_layer_top;
 uniform int id_clouds_active;
 
-// id_cloud_shadow_matrix gives the shadow map uv in xy and, in z, the height within the cloud
-// column (0 at the lowest base, 1 at the highest top). The map holds the whole column's
-// transmittance; only the part above the point applies.
+// id_cloud_shadow_matrix gives the shadow map uv in xy and the altitude in metres in z. Channel i
+// of the map holds layer i's transmittance; only the part of each layer above the point applies.
 float idSampleCloudShadow(vec3 pos_eye)
 {
     if (id_clouds_active == 0)
@@ -402,13 +403,20 @@ float idSampleCloudShadow(vec3 pos_eye)
         return 1.0;
     }
     vec3 s = (id_cloud_shadow_matrix * vec4(pos_eye, 1.0)).xyz;
-    float above = clamp(1.0 - s.z, 0.0, 1.0);
-    if (above <= 0.0)
+    vec4 above = clamp((id_shadow_layer_top - s.z) / max(id_shadow_layer_top - id_shadow_layer_base, vec4(1e-3)), 0.0, 1.0);
+    if (max(max(above.x, above.y), max(above.z, above.w)) <= 0.0)
     {
         return 1.0;
     }
-    float trans = textureLod(idCloudShadow, s.xy, 0.0).r;
-    float shadow = pow(clamp(trans, 0.0, 1.0), above);
+    vec4 trans = clamp(textureLod(idCloudShadow, s.xy, 0.0), 0.0, 1.0);
+    float shadow = 1.0;
+    for (int i = 0; i < 4; ++i)
+    {
+        if (above[i] > 0.0)
+        {
+            shadow *= pow(trans[i], above[i]);
+        }
+    }
     vec2 edge = abs(s.xy - 0.5);
     return mix(shadow, 1.0, smoothstep(0.45, 0.5, max(edge.x, edge.y)));
 }

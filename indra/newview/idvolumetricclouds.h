@@ -91,9 +91,11 @@ private:
     LLRenderTarget mProbeSceneRT[2];
     bool mWasActive = false;
 
-    // R16F sunlight transmittance through all layers, top-down around the camera.
+    // RGBA16F sunlight transmittance through each layer, top-down around the camera.
     LLRenderTarget mShadowRT;
     glm::mat4 mShadowWorldToUV{ 1.f };
+    glm::vec4 mShadowLayerBase{ 0.f };
+    glm::vec4 mShadowLayerTop{ 0.f };
     bool mShadowReady = false;
     U32 mShadowFrame = U32_MAX;
 

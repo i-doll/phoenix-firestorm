@@ -472,7 +472,7 @@ void IDVolumetricClouds::renderShadowMap()
     {
         return;
     }
-    if (!mShadowRT.isComplete() && !mShadowRT.allocate(SHADOW_RES, SHADOW_RES, GL_R16F))
+    if (!mShadowRT.isComplete() && !mShadowRT.allocate(SHADOW_RES, SHADOW_RES, GL_RGBA16F))
     {
         LL_WARNS_ONCE("VolumetricClouds") << "Could not allocate the cloud shadow map" << LL_ENDL;
         mShadowRT.release();
@@ -482,10 +482,14 @@ void IDVolumetricClouds::renderShadowMap()
     const std::vector<IDCloudLayer>& layers = IDCloudState::instance().current().mLayers;
     F32 lo = F32_MAX;
     F32 hi = -F32_MAX;
+    glm::vec4 layer_base(0.f);
+    glm::vec4 layer_top(0.f);
     for (size_t i = 0; i < layers.size() && i < IDCloudPreset::MAX_LAYERS; ++i)
     {
         lo = llmin(lo, layers[i].mBaseM);
         hi = llmax(hi, layers[i].mTopM);
+        layer_base[(glm::length_t)i] = layers[i].mBaseM;
+        layer_top[(glm::length_t)i] = layers[i].mTopM;
     }
     if (hi <= lo)
     {
@@ -510,20 +514,21 @@ void IDVolumetricClouds::renderShadowMap()
     if (wx < 0.0) wx += wrap;
     if (wy < 0.0) wy += wrap;
 
-    // Agent space to (shadow map uv, height within the cloud column). A point maps to where the
-    // light ray through it crosses sea level.
+    // Agent space to (shadow map uv, altitude). A point maps to where the light ray through it
+    // crosses sea level.
     const F32 inv_size = 1.f / SHADOW_SIZE_M;
     glm::mat4 world_to_uv(0.f);
     world_to_uv[0][0] = inv_size;
     world_to_uv[1][1] = inv_size;
     world_to_uv[2][0] = -drift_x * inv_size;
     world_to_uv[2][1] = -drift_y * inv_size;
-    world_to_uv[2][2] = 1.f / (hi - lo);
+    world_to_uv[2][2] = 1.f;
     world_to_uv[3][0] = 0.5f - center_agent.mV[VX] * inv_size;
     world_to_uv[3][1] = 0.5f - center_agent.mV[VY] * inv_size;
-    world_to_uv[3][2] = -lo / (hi - lo);
     world_to_uv[3][3] = 1.f;
     mShadowWorldToUV = world_to_uv;
+    mShadowLayerBase = layer_base;
+    mShadowLayerTop = layer_top;
 
     static LLStaticHashedString s_center("id_cloud_shadow_center");
     static LLStaticHashedString s_size("id_cloud_shadow_size");
@@ -1014,6 +1019,8 @@ void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
 {
     static LLStaticHashedString s_active("id_clouds_active");
     static LLStaticHashedString s_matrix("id_cloud_shadow_matrix");
+    static LLStaticHashedString s_layer_base("id_shadow_layer_base");
+    static LLStaticHashedString s_layer_top("id_shadow_layer_top");
     static LLStaticHashedString s_scene_active("id_cloud_scene_active");
     static LLStaticHashedString s_haze_pending("id_haze_pending");
 
@@ -1035,6 +1042,8 @@ void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
 
             const glm::mat4 eye_to_uv = mShadowWorldToUV * glm::inverse(get_current_modelview());
             shader.uniformMatrix4fv(s_matrix, 1, GL_FALSE, glm::value_ptr(eye_to_uv));
+            shader.uniform4fv(s_layer_base, 1, glm::value_ptr(mShadowLayerBase));
+            shader.uniform4fv(s_layer_top, 1, glm::value_ptr(mShadowLayerTop));
         }
     }
     shader.uniform1i(s_active, channel > -1 ? 1 : 0);
