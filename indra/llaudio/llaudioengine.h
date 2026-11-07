@@ -192,6 +192,7 @@ public:
 
     // Asset callback when we're retrieved a sound from the asset server.
     void startNextTransfer();
+    void setTransferScanPending() { mTransferScanPending = true; } // <FS:Trish/> Something may need fetching
     static void assetCallback(const LLUUID &uuid, LLAssetType::EType type, void *user_data, S32 result_code, LLExtStat ext_status);
 
     // <FS:Ansariel> Output device selection
@@ -248,6 +249,7 @@ protected:
 
     LLUUID mCurrentTransfer; // Audio file currently being transferred by the system
     LLFrameTimer mCurrentTransferTimer;
+    bool mTransferScanPending = true; // <FS:Trish/> startNextTransfer() from idle only scans when set
 
     // A list of all audio sources that are known to the viewer at this time.
     // This is most likely a superset of the ones that we actually have audio

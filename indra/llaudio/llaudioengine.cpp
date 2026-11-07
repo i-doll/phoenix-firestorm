@@ -488,7 +488,13 @@ void LLAudioEngine::idle()
     // Call this every frame, just in case we somehow
     // missed picking it up in all the places that can add
     // or request new data.
-    startNextTransfer();
+    // <FS:Trish> Only when new data or sources were added, or a transfer could not start
+    //startNextTransfer();
+    if (mTransferScanPending)
+    {
+        startNextTransfer();
+    }
+    // </FS:Trish>
 
     updateInternetStream();
 }
@@ -982,6 +988,7 @@ LLAudioData * LLAudioEngine::getAudioData(const LLUUID &audio_uuid)
         // Create the new audio data
         LLAudioData *adp = new LLAudioData(audio_uuid);
         mAllData[audio_uuid] = adp;
+        mTransferScanPending = true; // <FS:Trish/>
         return adp;
     }
     else
@@ -993,6 +1000,7 @@ LLAudioData * LLAudioEngine::getAudioData(const LLUUID &audio_uuid)
 void LLAudioEngine::addAudioSource(LLAudioSource *asp)
 {
     mAllSources[asp->getID()] = asp;
+    mTransferScanPending = true; // <FS:Trish/>
 }
 
 
@@ -1050,8 +1058,12 @@ void LLAudioEngine::startNextTransfer()
     if (mCurrentTransfer.notNull() || getMuted())
     {
         //LL_INFOS() << "Transfer in progress, aborting" << LL_ENDL;
+        mTransferScanPending = true; // <FS:Trish/> Scan again once the transfer is done or audio is unmuted
         return;
     }
+    // <FS:Trish> This scan covers everything known so far; additions set the flag again
+    mTransferScanPending = false;
+    // </FS:Trish>
 
     // Get the ID for the next asset that we want to transfer.
     // Pick one in the following order:
@@ -2060,6 +2072,10 @@ bool LLAudioData::checkLoadingBuffer()
 
 void LLAudioData::onWAVLoadFailed(const std::string& wav_path)
 {
+    if (gAudiop)
+    {
+        gAudiop->setTransferScanPending(); // <FS:Trish/> This data may need fetching again
+    }
     // <FS:Ansariel> FIRE-480: Opening multiple instances causes sound failures
     if (!gDirUtilp->fileExists(wav_path))
     {

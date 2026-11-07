@@ -55,6 +55,13 @@ private:
     F32                         mObjectGain;
     F32                         mRlvGain;
     // </ID>
+
+    // <FS:Trish> FSPerfAudioThrottleChecks: when the mute/parcel check last ran
+    F64                         mNextMuteCheck = 0.0;
+    U32                         mMuteCheckGeneration = 0;
+    S32                         mMuteCheckParcelId = -1;
+    LLViewerRegion*             mMuteCheckRegion = nullptr;
+    // </FS:Trish>
 };
 
 #endif // LL_LLAUDIOSOURCEVO_H

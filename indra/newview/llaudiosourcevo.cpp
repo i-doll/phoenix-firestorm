@@ -39,6 +39,22 @@
 #include "rlvactions.h"
 // </ID>
 
+// <FS:Trish> FSPerfAudioThrottleChecks: mute list changes force an immediate re-check
+namespace
+{
+    U32 sMuteListGeneration = 0;
+
+    class FSAudioSourceMuteObserver : public LLMuteListObserver
+    {
+    public:
+        void onChange() override { ++sMuteListGeneration; }
+    };
+
+    FSAudioSourceMuteObserver sMuteObserver;
+    bool sMuteObserverAdded = false;
+}
+// </FS:Trish>
+
 LLAudioSourceVO::LLAudioSourceVO(const LLUUID &sound_id, const LLUUID& owner_id, const F32 gain, LLViewerObject *objectp)
 // <FS:CR> FIRE-10512 - Sound explorer fix by Sei Lisa
 //  :   LLAudioSource(sound_id, owner_id, gain, LLAudioEngine::AUDIO_TYPE_SFX),
@@ -245,7 +261,41 @@ void LLAudioSourceVO::update()
     mRlvGain = (mObjectp && !mObjectp->isDead()) ? RlvActions::getSoundGain(mObjectp, mOwnerID) : 0.f;
     // </ID>
 
-    updateMute();
+    // <FS:Trish> Run the mute/parcel check at about 4 Hz per source, staggered, or at once
+    // when the mute list, the agent's parcel or region changed, or the source is new.
+    // Position, velocity and gain below still update every frame.
+    //updateMute();
+    static LLCachedControl<bool> throttle_checks(gSavedSettings, "FSPerfAudioThrottleChecks", false);
+    if (!throttle_checks)
+    {
+        mNextMuteCheck = 0.0;
+        updateMute();
+    }
+    else
+    {
+        if (!sMuteObserverAdded)
+        {
+            LLMuteList::getInstance()->addObserver(&sMuteObserver);
+            sMuteObserverAdded = true;
+        }
+        const F64 now = LLFrameTimer::getElapsedSeconds();
+        const S32 parcel_id = LLViewerParcelMgr::getInstance()->getAgentParcelId();
+        LLViewerRegion* region = gAgent.getRegion();
+        if (!mObjectp || mObjectp->isDead()
+            || now >= mNextMuteCheck
+            || mMuteCheckGeneration != sMuteListGeneration
+            || mMuteCheckParcelId != parcel_id
+            || mMuteCheckRegion != region)
+        {
+            // A new source starts at a random phase so sources do not all check on one frame
+            mNextMuteCheck = now + (mNextMuteCheck == 0.0 ? ll_frand(0.25f) : 0.25);
+            mMuteCheckGeneration = sMuteListGeneration;
+            mMuteCheckParcelId = parcel_id;
+            mMuteCheckRegion = region;
+            updateMute();
+        }
+    }
+    // </FS:Trish>
 
     if (!mObjectp)
     {
