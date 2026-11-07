@@ -6927,8 +6927,14 @@ void LLVOAvatar::checkTextureLoading()
     }
     if(mLoadedCallbacksPaused == pause)
     {
-        if (!pause && mFirstFullyVisible && mLoadedCallbackTextures < mCallbackTextureList.size())
+        // <FS:Trish> Recount about four times a second instead of every frame
+        //if (!pause && mFirstFullyVisible && mLoadedCallbackTextures < mCallbackTextureList.size())
+        constexpr F32 LOADED_TEXTURE_COUNT_INTERVAL = 0.25f;
+        if (!pause && mFirstFullyVisible && mLoadedCallbackTextures < mCallbackTextureList.size()
+            && mLoadedTextureCountTimer.getElapsedTimeF32() >= LOADED_TEXTURE_COUNT_INTERVAL)
+        // </FS:Trish>
         {
+            mLoadedTextureCountTimer.reset(); // <FS:Trish/>
             // We still need to update 'loaded' textures count to decide on 'cloud' visibility
             // Alternatively this can be done on TextureLoaded callbacks, but is harder to properly track
             mLoadedCallbackTextures = 0;

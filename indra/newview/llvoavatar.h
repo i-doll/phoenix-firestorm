@@ -873,6 +873,7 @@ protected:
     bool mLoadedCallbacksPaused;
     S32 mLoadedCallbackTextures; // count of 'loaded' baked textures, filled from mCallbackTextureList
     LLFrameTimer mLastTexCallbackAddedTime;
+    LLFrameTimer mLoadedTextureCountTimer; // <FS:Trish/> throttles the recount in checkTextureLoading()
     std::set<LLUUID>    mTextureIDs;
     //--------------------------------------------------------------------
     // Local Textures
