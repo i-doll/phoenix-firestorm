@@ -469,6 +469,7 @@ void LLImageGL::destroyGL()
     {
         gGL.getTexUnit(stage)->unbind(LLTexUnit::TT_TEXTURE);
     }
+    gGL.invalidateFastBinds(); // <FS:Trish/> GL objects are going away
 }
 
 //static
@@ -1375,6 +1376,10 @@ void LLImageGL::updateClass()
     {
         free_tex_images((GLsizei) sFreeList[idx].size(), sFreeList[idx].data());
         glDeleteTextures((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
+        // <FS:Trish> Deleting a bound texture silently unbinds it and its name can be reused,
+        // so bindFast must not trust what it bound before
+        gGL.invalidateFastBinds();
+        // </FS:Trish>
         sFreeList[idx].resize(0);
     }
 }

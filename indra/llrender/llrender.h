@@ -227,6 +227,11 @@ public:
     static void unregisterFilterCacheTexture(U32 tex);
     // True when setTextureFilteringOption(option) on this unit would not change any GL state
     bool isFilteringOptionCached(eTextureFilterOptions option) const;
+
+    // Forget what bindFast last bound on this unit, so its next call really binds.
+    // Must be called by anything that binds a texture on this unit without going through
+    // LLTexUnit, or that deletes a texture which may be bound.
+    void invalidateFastBind() { mFastBoundTex = 0; }
     // </FS:Trish>
 
     static U32 getInternalType(eTextureType type);
@@ -244,6 +249,10 @@ protected:
     U32                 mCurrTexture;
     eTextureType        mCurrTexType;
     bool                mHasMipMaps;
+    // <FS:Trish> texture name and target bindFast last bound on this unit (0 = unknown)
+    U32                 mFastBoundTex = 0;
+    eTextureType        mFastBoundType = TT_NONE;
+    // </FS:Trish>
 
     void debugTextureUnit(void);
     GLint getTextureSource(eTextureBlendSrc src);
@@ -482,6 +491,7 @@ public:
     void setLineWidth(F32 line_width); // <FS> Line width OGL core profile fix by Rye Mutt
 
     LLTexUnit* getTexUnit(U32 index);
+    void invalidateFastBinds(); // <FS:Trish/> see LLTexUnit::invalidateFastBind
 
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
 

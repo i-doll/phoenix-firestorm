@@ -777,6 +777,8 @@ void GLTFSceneManager::bindTexture(Asset& asset, TextureType texture_type, Textu
         // <FS:Trish> Go through LLTexUnit so LLRender's active unit tracking stays in sync (bindFast relies on it)
         //glActiveTexture(GL_TEXTURE0 + channel);
         gGL.getTexUnit(channel)->activate();
+        // The raw glBindTexture calls below bypass LLTexUnit, so bindFast must rebind next time
+        gGL.getTexUnit(channel)->invalidateFastBind();
         // </FS:Trish>
 
         if (info.mIndex != INVALID_INDEX)

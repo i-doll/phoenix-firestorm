@@ -143,6 +143,8 @@ void LLTexUnit::refreshState(void)
 
     glActiveTexture(GL_TEXTURE0 + mIndex);
 
+    invalidateFastBind(); // <FS:Trish/>
+
     if (mCurrTexType != TT_NONE)
     {
         glBindTexture(sGLTextureType[mCurrTexType], mCurrTexture);
@@ -215,7 +217,17 @@ void LLTexUnit::bindFast(LLTexture* texture)
         gl_tex->forceUpdateBindStats();
         texture->bindDefaultImage(mIndex);
     }
-    glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
+    // <FS:Trish> Skip the bind when bindFast already bound this texture here and nothing
+    // has bound anything on this unit since (every other bind path clears mFastBoundTex)
+    //glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
+    if (mCurrTexture == 0 || mCurrTexture != mFastBoundTex || mCurrTexType != mFastBoundType || gGL.mDirty)
+    {
+        glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
+        // the missing texture path above may have rebound through bind(), so only trust a real name
+        mFastBoundTex = (gl_tex->getTexName() != 0) ? mCurrTexture : 0;
+        mFastBoundType = mCurrTexType;
+    }
+    // </FS:Trish>
     mHasMipMaps = gl_tex->mHasMipMaps;
     if (gl_tex->mTexOptionsDirty)
     {
@@ -246,6 +258,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
                     enable(gl_tex->getTarget());
                     mCurrTexture = gl_tex->getTexName();
                     glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
+                    invalidateFastBind(); // <FS:Trish/>
                     if(gl_tex->updateBindStats())
                     {
                         texture->setActive() ;
@@ -323,6 +336,7 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
         stop_glerror();
         mCurrTexture = texname;
         glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
+        invalidateFastBind(); // <FS:Trish/>
         stop_glerror();
         texture->updateBindStats();
         mHasMipMaps = texture->mHasMipMaps;
@@ -361,6 +375,7 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
             enable(LLTexUnit::TT_CUBE_MAP);
             mCurrTexture = cubeMap->mImages[0]->getTexName();
             glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
+            invalidateFastBind(); // <FS:Trish/>
             mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
             cubeMap->mImages[0]->updateBindStats();
             if (cubeMap->mImages[0]->mTexOptionsDirty)
@@ -416,6 +431,7 @@ bool LLTexUnit::bindManual(eTextureType type, U32 texture, bool hasMips)
         enable(type);
         mCurrTexture = texture;
         glBindTexture(sGLTextureType[type], texture);
+        invalidateFastBind(); // <FS:Trish/>
         mHasMipMaps = hasMips;
     }
     return true;
@@ -436,6 +452,7 @@ void LLTexUnit::unbind(eTextureType type)
     if (mCurrTexType == type)
     {
         mCurrTexture = 0;
+        invalidateFastBind(); // <FS:Trish/>
 
         if (type == LLTexUnit::TT_TEXTURE)
         {
@@ -457,6 +474,7 @@ void LLTexUnit::unbindFast(eTextureType type)
     if (mCurrTexType == type)
     {
         mCurrTexture = 0;
+        invalidateFastBind(); // <FS:Trish/>
 
         if (type == LLTexUnit::TT_TEXTURE)
         {
@@ -1543,6 +1561,16 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
                            sGLBlendFactor[alpha_sfactor], sGLBlendFactor[alpha_dfactor]);
     }
 }
+
+// <FS:Trish> Forget bindFast's bound texture on every unit
+void LLRender::invalidateFastBinds()
+{
+    for (LLTexUnit& unit : mTexUnits)
+    {
+        unit.invalidateFastBind();
+    }
+}
+// </FS:Trish>
 
 LLTexUnit* LLRender::getTexUnit(U32 index)
 {
