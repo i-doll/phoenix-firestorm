@@ -27411,6 +27411,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>6</integer>
     </map>
+    <key>FSRenderProbeFilterQuality</key>
+    <map>
+      <key>Comment</key>
+      <string>Reflection probe radiance prefilter: multiplier on the number of GGX importance samples used to blur each rough-reflection mip, 0.25 to 4. Each sample reads a source mip matched to its solid angle, so fewer samples blur rather than alias, and more samples remove the ghosted copies of bright objects in medium-rough reflections. The filter runs once per finished probe on small mips, so even 4 costs well under a millisecond per probe update. 1 is the stock filter.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

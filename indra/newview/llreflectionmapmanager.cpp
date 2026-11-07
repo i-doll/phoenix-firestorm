@@ -1488,6 +1488,11 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             gRadianceGenProgram.uniform1i(sSourceIdx, sourceIdx);
             gRadianceGenProgram.uniform1f(LLShaderMgr::REFLECTION_PROBE_MAX_LOD, mMaxProbeLOD);
             gRadianceGenProgram.uniform1f(LLShaderMgr::REFLECTION_PROBE_STRENGTH, 1.f);
+            // <FS:Trish> Prefilter sample count multiplier; log2 so an unset uniform (0) means x1
+            static LLCachedControl<F32> fs_filter_quality(gSavedSettings, "FSRenderProbeFilterQuality", 1.f);
+            static LLStaticHashedString sSampleScaleLog2("sample_scale_log2");
+            gRadianceGenProgram.uniform1f(sSampleScaleLog2, log2f(llclamp((F32)fs_filter_quality, 0.25f, 4.f)));
+            // </FS:Trish>
 
             U32 res = mMipChain[0].getWidth();
 

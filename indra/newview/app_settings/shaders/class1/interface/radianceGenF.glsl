@@ -40,6 +40,10 @@ uniform int u_width;
 uniform float max_probe_lod;
 uniform float probe_strength;
 
+// Sample count multiplier as log2, so 0 (never set) keeps PROBE_FILTER_SAMPLES as is.
+// The mip each sample reads follows the sample's solid angle, so fewer samples blur rather than alias.
+uniform float sample_scale_log2;
+
 
 // =============================================================================================================
 // Parts of this file are (c) 2018 Sascha Willems
@@ -130,7 +134,7 @@ vec4 prefilterEnvMap(vec3 R)
     float totalWeight = 0.0;
     float envMapDim = float(textureSize(reflectionProbes, 0).s);
     float roughness = mipLevel/max_probe_lod;
-    uint numSamples = uint(max(PROBE_FILTER_SAMPLES*roughness, 1));
+    uint numSamples = uint(max(PROBE_FILTER_SAMPLES*roughness*exp2(sample_scale_log2), 1));
 
     float numMips = max_probe_lod+1;
 
