@@ -2832,6 +2832,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
             if (shader == &gIDCloudsProgram)
             {
+                shader->mShaderFiles.push_back(make_pair("deferred/idCloudMarchUtil.glsl", GL_FRAGMENT_SHADER));
                 shader->mFeatures.hasShadows = use_sun_shadow;
                 if (use_sun_shadow)
                 {
