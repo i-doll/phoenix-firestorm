@@ -702,8 +702,16 @@ void LLHUDText::updateAll()
     {
         LLHUDText* textp = (*text_it);
         textp->mTargetPositionOffset.clearVec();
-        textp->updateSize();
+        // <FS:Trish> Measure text only for objects that end up visible. updateVisibility()
+        // does not read the size fields, and updateSize() has no history (u = 1).
+        //textp->updateSize();
+        //textp->updateVisibility();
         textp->updateVisibility();
+        if (textp->mVisible)
+        {
+            textp->updateSize();
+        }
+        // </FS:Trish>
     }
 
     // sort back to front for rendering purposes
