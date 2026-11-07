@@ -49,6 +49,7 @@ uniform float shadow_bias;
 uniform float shadow_offset;
 uniform float spot_shadow_bias;
 uniform float spot_shadow_offset;
+uniform float spot_shadow_reach; // metres: projector shadows fade out towards this camera distance
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 uniform int sun_up_factor;
@@ -328,36 +329,25 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 float sampleSpotShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 {
 #if defined(SPOT_SHADOW)
-    float shadow = 0.0f;
     pos += norm * spot_shadow_offset;
 
     vec4 spos = vec4(pos,1.0);
-    if (spos.z > -shadow_clip.w)
+
+    // The projector shadow fades out with the distance from the camera to the pixel (Euclidean, so
+    // it doesn't depend on which way the camera looks) over the last 20 % of spot_shadow_reach. It
+    // used to fade with the sun's cascade splits, which follow what the camera sees: the fade-out
+    // distance went from 16 m to 256 m with the camera's pitch and yaw, and projector shadows came
+    // and went with the view. (From Vulkanstorm, by Anne Skydancer.)
+    float reach = spot_shadow_reach > 1.0 ? spot_shadow_reach : 128.0;
+    float fade = clamp((reach - length(pos)) / (0.2 * reach), 0.0, 1.0);
+    if (fade <= 0.0)
     {
-        vec4 lpos;
-
-        vec4 near_split = shadow_clip*-0.75;
-        vec4 far_split = shadow_clip*-1.25;
-        vec4 transition_domain = near_split-far_split;
-        float weight = 0.0;
-
-        {
-            float w = 1.0;
-            w -= max(spos.z-far_split.z, 0.0)/transition_domain.z;
-
-            lpos = proj_shadow_matrix*spos;
-            shadow += pcfSpotShadow(shadowMap4, lpos, 0.8, spos.xy)*w;
-            weight += w;
-            shadow += max((pos.z+shadow_clip.z)/(shadow_clip.z-shadow_clip.w)*2.0-1.0, 0.0);
-        }
-
-        shadow /= weight;
+        return 1.0;
     }
-    else
-    {
-        shadow = 1.0f;
-    }
-    return shadow;
+
+    vec4 lpos = proj_shadow_matrix*spos;
+    float shadow = pcfSpotShadow(shadowMap4, lpos, 0.8, spos.xy);
+    return mix(1.0, shadow, fade);
 #else
     return 1.0;
 #endif

@@ -10819,6 +10819,14 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniform2f(LLShaderMgr::DEFERRED_PROJ_SHADOW_RES, (GLfloat)mSpotShadow[0].getWidth(), (GLfloat)mSpotShadow[0].getHeight());
     shader.uniform1f(LLShaderMgr::DEFERRED_DEPTH_CUTOFF, RenderEdgeDepthCutoff);
     shader.uniform1f(LLShaderMgr::DEFERRED_NORM_CUTOFF, RenderEdgeNormCutoff);
+    // <FS:Trish> Projector shadows fade out over the last 20 % of this camera distance (see
+    // sampleSpotShadow), the same for every camera orientation; the draw distance caps it.
+    // From Vulkanstorm, by Anne Skydancer.
+    {
+        static const LLStaticHashedString sSpotShadowReach("spot_shadow_reach");
+        shader.uniform1f(sSpotShadowReach, llmin((F32)RenderFarClip, 128.f));
+    }
+    // </FS:Trish>
 
     shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(gGLDeltaModelView));
     shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(gGLInverseDeltaModelView));
