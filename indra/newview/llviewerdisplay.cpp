@@ -1661,10 +1661,18 @@ void render_ui(F32 zoom_factor, int subfield)
         LL_PROFILE_ZONE_NAMED_CATEGORY_UI("HUD");
     render_hud_elements();
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
-        if (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY))
+        // <ID:SetOverlay> Hover text and name tags go under the overlay, HUD attachments and the UI stay above it
+        const bool render_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+        const bool has_overlay = RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY);
+        if (has_overlay)
         {
+            if (render_ui)
+            {
+                LLHUDObject::renderAll();
+            }
             LLVfxManager::instance().runEffect(EVisualEffect::RlvOverlay);
         }
+        // </ID:SetOverlay>
 // [/RLVa:KB]
         LLGLState::checkStates();
         render_hud_attachments();
@@ -1677,7 +1685,6 @@ void render_ui(F32 zoom_factor, int subfield)
             gPipeline.disableLights();
         }
 
-        bool render_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
         if (render_ui)
         {
             if (!gDisconnected)
@@ -1701,7 +1708,12 @@ void render_ui(F32 zoom_factor, int subfield)
         if (render_ui)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_2D);
-            LLHUDObject::renderAll();
+            // <ID:SetOverlay>
+            if (!has_overlay)
+            {
+                LLHUDObject::renderAll();
+            }
+            // </ID:SetOverlay>
             render_ui_2d();
         }
         // <FS:Beq> FIRE-33239 - particles do not sie when UI is disabled
