@@ -239,6 +239,16 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    // <ID:VolumetricClouds> shadowUtil.glsl and the deferred passes sample the cloud shadow
+    if (features->hasShadows || features->isDeferred)
+    {
+        if (!shader->attachFragmentObject("deferred/idCloudUtil.glsl"))
+        {
+            return false;
+        }
+    }
+    // </ID:VolumetricClouds>
+
     if (features->hasShadows)
     {
         if (!shader->attachFragmentObject("deferred/shadowUtil.glsl"))

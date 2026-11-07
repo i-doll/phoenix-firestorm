@@ -37,6 +37,7 @@
 #include <string>
 
 extern bool gSnapshot;
+extern bool gCubeSnapshot;
 
 struct IDCloudNoiseJob
 {
@@ -79,6 +80,10 @@ namespace
     constexpr S32 LIVE_STEPS   = 48;
     constexpr S32 FULL_SAMPLES = 4;
     constexpr F32 PLANET_RADIUS_M = 6360000.f;
+
+    constexpr U32 SHADOW_RES = 1024;
+    constexpr F32 SHADOW_SIZE_M = 16000.f;
+    constexpr F32 SHADOW_MIN_LIGHT_RISE = 0.05f;
 
     const char* CACHE_DIR   = "volumetric_clouds";
     const char* BASE_FILE   = "noise_base_v1_128.raw";
@@ -564,28 +569,35 @@ void IDVolumetricClouds::update()
     static LLCachedControl<bool> enabled(gSavedSettings, "IDVolumetricCloudsEnabled", false);
     if (!enabled || !isSupported())
     {
+        mShadowReady = false;
         return;
     }
 
     const U32 frame = LLFrameTimer::getFrameCount();
-    if (frame == mLastFrame)
+    if (frame != mLastFrame)
     {
-        return;
+        mLastFrame = frame;
+
+        if (!mStateConnection.connected())
+        {
+            mStateConnection = IDCloudState::instance().mChanged.connect([this]() { mWeatherDirty = true; });
+            mWeatherDirty = true;
+        }
+
+        updateNoise();
+        updateWeather();
+
+        if (isActive())
+        {
+            IDCloudState::instance().advance(gFrameIntervalSeconds.value());
+        }
     }
-    mLastFrame = frame;
 
-    if (!mStateConnection.connected())
+    // Probe renders move the viewer camera to the probe, so the map follows the main camera only.
+    if (!gCubeSnapshot && frame != mShadowFrame)
     {
-        mStateConnection = IDCloudState::instance().mChanged.connect([this]() { mWeatherDirty = true; });
-        mWeatherDirty = true;
-    }
-
-    updateNoise();
-    updateWeather();
-
-    if (isActive())
-    {
-        IDCloudState::instance().advance(gFrameIntervalSeconds.value());
+        mShadowFrame = frame;
+        renderShadowMap();
     }
 }
 
@@ -736,12 +748,95 @@ void IDVolumetricClouds::release()
         mWeather = 0;
     }
     mSceneRT.release();
+    mShadowRT.release();
+    mShadowReady = false;
     mWeatherKey.clear();
     mWeatherDirty = true;
 }
 
 void IDVolumetricClouds::renderShadowMap()
 {
+    mShadowReady = false;
+    if (!isActive() || !gIDCloudShadowProgram.isComplete())
+    {
+        return;
+    }
+    if (!mShadowRT.isComplete() && !mShadowRT.allocate(SHADOW_RES, SHADOW_RES, GL_R16F))
+    {
+        LL_WARNS_ONCE("VolumetricClouds") << "Could not allocate the cloud shadow map" << LL_ENDL;
+        mShadowRT.release();
+        return;
+    }
+
+    const std::vector<IDCloudLayer>& layers = IDCloudState::instance().current().mLayers;
+    F32 lo = F32_MAX;
+    F32 hi = -F32_MAX;
+    for (size_t i = 0; i < layers.size() && i < IDCloudPreset::MAX_LAYERS; ++i)
+    {
+        lo = llmin(lo, layers[i].mBaseM);
+        hi = llmax(hi, layers[i].mTopM);
+    }
+    if (hi <= lo)
+    {
+        return;
+    }
+
+    LLVector3 light = LLEnvironment::instance().getLightDirection();
+    light.normalize();
+    const F32 rise = llmax(light.mV[VZ], SHADOW_MIN_LIGHT_RISE);
+    const F32 drift_x = light.mV[VX] / rise;
+    const F32 drift_y = light.mV[VY] / rise;
+
+    // Snapped to whole texels so the shadows hold still while the camera moves.
+    const F64 texel = (F64)SHADOW_SIZE_M / (F64)SHADOW_RES;
+    const LLVector3d cam = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin());
+    const LLVector3d center(std::floor(cam.mdV[VX] / texel) * texel, std::floor(cam.mdV[VY] / texel) * texel, 0.0);
+    const LLVector3 center_agent = gAgent.getPosAgentFromGlobal(center);
+
+    const F64 wrap = (F64)IDCloudState::WIND_WRAP_M;
+    F64 wx = std::fmod(center.mdV[VX], wrap);
+    F64 wy = std::fmod(center.mdV[VY], wrap);
+    if (wx < 0.0) wx += wrap;
+    if (wy < 0.0) wy += wrap;
+
+    // Agent space to (shadow map uv, height within the cloud column). A point maps to where the
+    // light ray through it crosses sea level.
+    const F32 inv_size = 1.f / SHADOW_SIZE_M;
+    glm::mat4 world_to_uv(0.f);
+    world_to_uv[0][0] = inv_size;
+    world_to_uv[1][1] = inv_size;
+    world_to_uv[2][0] = -drift_x * inv_size;
+    world_to_uv[2][1] = -drift_y * inv_size;
+    world_to_uv[2][2] = 1.f / (hi - lo);
+    world_to_uv[3][0] = 0.5f - center_agent.mV[VX] * inv_size;
+    world_to_uv[3][1] = 0.5f - center_agent.mV[VY] * inv_size;
+    world_to_uv[3][2] = -lo / (hi - lo);
+    world_to_uv[3][3] = 1.f;
+    mShadowWorldToUV = world_to_uv;
+
+    static LLStaticHashedString s_center("id_cloud_shadow_center");
+    static LLStaticHashedString s_size("id_cloud_shadow_size");
+    static LLStaticHashedString s_drift("id_cloud_shadow_drift");
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+    LLGLDisable blend(GL_BLEND);
+
+    LLGLSLShader& shader = gIDCloudShadowProgram;
+    mShadowRT.bindTarget();
+    shader.bind();
+    setDensityInputs(shader);
+    shader.uniform2f(s_center, (F32)wx, (F32)wy);
+    shader.uniform1f(s_size, SHADOW_SIZE_M);
+    shader.uniform2f(s_drift, drift_x, drift_y);
+
+    gPipeline.mScreenTriangleVB->setBuffer();
+    gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    clearDensityInputs(shader);
+    shader.unbind();
+    mShadowRT.flush();
+    mShadowReady = true;
 }
 
 void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_src)
@@ -941,4 +1036,23 @@ void IDVolumetricClouds::composite(LLRenderTarget* depth_src)
 
 void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
 {
+    static LLStaticHashedString s_active("id_clouds_active");
+    static LLStaticHashedString s_matrix("id_cloud_shadow_matrix");
+
+    if (!mShadowReady || LLPipeline::sRenderingHUDs || !isActive())
+    {
+        shader.uniform1i(s_active, 0);
+        return;
+    }
+
+    S32 channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_SHADOW);
+    if (channel > -1)
+    {
+        mShadowRT.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+    }
+
+    const glm::mat4 eye_to_uv = mShadowWorldToUV * glm::inverse(get_current_modelview());
+    shader.uniformMatrix4fv(s_matrix, 1, GL_FALSE, glm::value_ptr(eye_to_uv));
+    shader.uniform1i(s_active, channel > -1 ? 1 : 0);
 }

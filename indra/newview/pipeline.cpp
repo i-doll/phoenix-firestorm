@@ -9753,6 +9753,10 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     {
         gGL.getTexUnit(channel)->bind(getSpotShadowTarget(0), true);
     }
+
+    // <ID:VolumetricClouds> Here so the fast bind path rebinds it too
+    IDVolumetricClouds::instance().bindForSampling(shader);
+    // </ID:VolumetricClouds>
 }
 
 void LLPipeline::applyCommonOITUniforms(LLGLSLShader& shader)

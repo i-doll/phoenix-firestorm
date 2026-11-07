@@ -215,6 +215,7 @@ LLGLSLShader            gFSLensEffectsProgram;
 // <ID:VolumetricClouds>
 LLGLSLShader            gIDCloudsProgram;
 LLGLSLShader            gIDCloudsCompositeProgram;
+LLGLSLShader            gIDCloudShadowProgram;
 // </ID:VolumetricClouds>
 // </FS:Trish>
 LLGLSLShader            gDeferredPostGammaCorrectProgram;
@@ -1019,6 +1020,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/gbufferUtil.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/globalF.glsl",                          1));
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
+    index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/idCloudUtil.glsl",                     1) ); // <ID:VolumetricClouds/>
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/pbrterrainUtilF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/tonemapUtilF.glsl",                    1) );
@@ -1298,6 +1300,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // <ID:VolumetricClouds>
         gIDCloudsProgram.unload();
         gIDCloudsCompositeProgram.unload();
+        gIDCloudShadowProgram.unload();
         // </ID:VolumetricClouds>
 
         for (auto i = 0; i < 4; ++i)
@@ -2798,6 +2801,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         const std::pair<LLGLSLShader*, const char*> cloud_shaders[] = {
             { &gIDCloudsProgram,          "deferred/idCloudsF.glsl" },
             { &gIDCloudsCompositeProgram, "deferred/idCloudsCompositeF.glsl" },
+            { &gIDCloudShadowProgram,     "deferred/idCloudShadowF.glsl" },
         };
         for (const auto& [shader, file] : cloud_shaders)
         {

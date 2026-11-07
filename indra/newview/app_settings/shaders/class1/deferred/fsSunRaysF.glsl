@@ -30,6 +30,7 @@ uniform float ray_anisotropy;   // 0 scatters evenly, toward 1 concentrates arou
 
 float getDepth(vec2 pos_screen);
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
+float idSampleCloudShadow(vec3 pos_eye); // <ID:VolumetricClouds/>
 
 // Lit (1) or shadowed (0) at a view space position, one comparison tap in the nearest cascade
 // that covers it. Beyond the last cascade counts as lit.
@@ -107,7 +108,7 @@ void main()
     {
         vec3 sample_pos = view_dir * t;
         // Light scattered at distance t reaches the camera dimmed by the same medium
-        scattered += sunVisibility(sample_pos) * exp(-ray_density * t);
+        scattered += sunVisibility(sample_pos) * idSampleCloudShadow(sample_pos) * exp(-ray_density * t); // <ID:VolumetricClouds/>
         t += step_len;
     }
 

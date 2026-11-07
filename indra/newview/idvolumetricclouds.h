@@ -53,6 +53,12 @@ private:
     // Attachment 0: RGBA16F fogged in-scatter + transmittance. Attachment 1: R32F mean cloud distance.
     LLRenderTarget mSceneRT;
 
+    // R16F sunlight transmittance through all layers, top-down around the camera.
+    LLRenderTarget mShadowRT;
+    glm::mat4 mShadowWorldToUV{ 1.f };
+    bool mShadowReady = false;
+    U32 mShadowFrame = U32_MAX;
+
     std::shared_ptr<IDCloudNoiseJob>   mNoiseJob;
     std::shared_ptr<IDCloudWeatherJob> mWeatherJob;
     bool mNoiseFailed = false;
