@@ -38,6 +38,8 @@ uniform int   id_steps;
 uniform int   id_samples;
 uniform int   id_light_steps;
 uniform int   id_detail_noise;
+// Changes the jitter pattern between passes that are averaged together; 0 for a single pass.
+uniform float id_jitter_seed;
 // The pixels being marched belong to a grid of id_march_grid size (half the screen size, possibly
 // fractional, at half resolution). Each fragment marches the grid pixel at its own coordinate times
 // id_march_block plus id_march_offset.
@@ -63,9 +65,12 @@ const int   ID_MAX_SEGMENTS = 8;
 
 const vec2 ID_SS_OFFSETS[4] = vec2[4](vec2(-0.125, -0.375), vec2(0.375, -0.125), vec2(0.125, 0.375), vec2(-0.375, 0.125));
 
-float idInterleavedGradientNoise(vec2 frag)
+// Interleaved gradient noise: neighbouring pixels get well-spread offsets, so the live view's
+// upsampling and a snapshot's few samples both average it away. White noise left visible grain.
+float idJitter(vec2 frag, float seed)
 {
-    return fract(52.9829189 * fract(dot(frag, vec2(0.06711056, 0.00583715))));
+    frag += seed * vec2(47.0, 17.0);
+    return fract(52.9829189 * fract(dot(frag + 0.5, vec2(0.06711056, 0.00583715))));
 }
 
 // Distances along the view ray (world direction with z component mu) to the sphere at altitude
@@ -191,16 +196,19 @@ float idHenyeyGreenstein(float cos_theta, float g)
     return (1.0 - g2) / (denom * sqrt(denom));
 }
 
+// A strong forward lobe gives the silver lining toward the sun; the broad lobe keeps the side away
+// from the sun from going flat.
 float idPhase(float cos_theta, float scale)
 {
-    return mix(idHenyeyGreenstein(cos_theta, 0.8 * scale), idHenyeyGreenstein(cos_theta, -0.3 * scale), 0.5);
+    return mix(idHenyeyGreenstein(cos_theta, 0.85 * scale), idHenyeyGreenstein(cos_theta, 0.2 * scale), 0.7);
 }
 
 float idLightOpticalDepth(vec3 rel, vec3 light_w, float footprint_m)
 {
-    // Step lengths double each step and always add up to 1890 m, so fewer steps reach as far.
+    // Step lengths double each step and always add up to 4000 m, so fewer steps reach as far and a
+    // tall storm still shades its own base.
     int steps = clamp(id_light_steps, 1, 6);
-    float first = 1890.0 / (exp2(float(steps)) - 1.0);
+    float first = 4000.0 / (exp2(float(steps)) - 1.0);
     float od = 0.0;
     float dist = 0.0;
     for (int j = 0; j < steps; ++j)
@@ -214,19 +222,39 @@ float idLightOpticalDepth(vec3 rel, vec3 light_w, float footprint_m)
     return od;
 }
 
-// The powder term darkens thin cloud seen away from the light.
+// How much sky light reaches a point: cloud above it blocks most of the skylight, which is what
+// darkens thick bases and the shadowed sides of heaps.
+float idSkyVisibility(vec3 rel, float footprint_m)
+{
+    const float lens[3] = float[3](60.0, 180.0, 480.0);
+    float od = 0.0;
+    float dist = 0.0;
+    for (int j = 0; j < 3; ++j)
+    {
+        vec3 p = rel + vec3(0.0, 0.0, dist + 0.5 * lens[j]);
+        dist += lens[j];
+        vec3 wp = vec3(id_camera_global.xy + p.xy, idAltitude(p));
+        od += idCloudSigma(idCloudDensityAll(wp, max(footprint_m, lens[j]), true)) * lens[j];
+    }
+    return exp(-0.5 * od);
+}
+
+// The powder term darkens the soft edges of dense cloud seen away from the light. It is floored so
+// optically thin cloud such as cirrus stays bright.
 float idSunScattering(float od, float cos_theta, float sigma)
 {
-    float powder = mix(1.0 - exp(-2.0 * sigma * 50.0), 1.0, clamp(0.5 + 0.5 * cos_theta, 0.0, 1.0));
+    float powder = mix(0.6 + 0.4 * (1.0 - exp(-2.0 * sigma * 400.0)), 1.0, clamp(0.5 + 0.5 * cos_theta, 0.0, 1.0));
     float a = 1.0;
     float b = 1.0;
     float c = 1.0;
     float sum = 0.0;
-    for (int k = 0; k < 3; ++k)
+    // Multiple scattering: each octave carries light deeper with a weaker, broader lobe, which keeps
+    // cloud interiors from going flat grey behind a bright rim.
+    for (int k = 0; k < 4; ++k)
     {
         sum += a * idPhase(cos_theta, c) * exp(-od * b);
         a *= 0.5;
-        b *= 0.5;
+        b *= 0.35;
         c *= 0.5;
     }
     return sum * powder;
@@ -259,63 +287,98 @@ void idMarch(vec3 dir, float scene_t, int steps, float jitter, float pixel_angle
     float seg1[ID_MAX_SEGMENTS];
     int n = idRaySegments(dir, min(scene_t, ID_MAX_DIST), seg0, seg1);
 
-    float total = 0.0;
-    for (int i = 0; i < n; ++i)
-    {
-        total += seg1[i] - seg0[i];
-    }
-    if (total <= 0.0)
+    if (n == 0)
     {
         return;
     }
 
     float cos_theta = dot(dir, light_w);
-    int seg = 0;
-    float seg_start = 0.0;
+    float fade_far = ID_FADE_START;
 
-    // Sample spacing grows quadratically with distance into the cloud, so near cloud is sampled finely.
-    for (int i = 0; i < steps; ++i)
+    // Empty sky is crossed with long, cheap probes. Once a probe finds cloud, the span is marched
+    // again in short steps sized to the pixel footprint, so near and far cloud both get detail.
+    // Past three quarters of the budget the step doubles every sixteenth of it, so a long ray still
+    // ends; growing earlier slices clouds into visible horizontal plates.
+    int budget = steps * 6;
+    float step_scale = 4.0 * 96.0 / float(steps);
+    int iter = 0;
+    bool done = false;
+    for (int sgi = 0; sgi < n && !done; ++sgi)
     {
-        float ua = float(i) / float(steps);
-        float ub = float(i + 1) / float(steps);
-        float sa = total * ua * ua;
-        float sb = total * ub * ub;
-        float s = mix(sa, sb, jitter);
-        float ds = sb - sa;
-
-        while (seg < n - 1 && s > seg_start + (seg1[seg] - seg0[seg]))
+        float t = seg0[sgi];
+        float t_end = seg1[sgi];
+        bool inside = false;
+        int empty = 0;
+        // The last probe that found nothing. Fine marching restarts there, not at the probe grid,
+        // so the cloud's outer skin is never skipped; skipping it left grid-aligned stripes.
+        float clear_t = t;
+        while (t < t_end && iter < budget)
         {
-            seg_start += seg1[seg] - seg0[seg];
-            ++seg;
-        }
-        float t = min(seg0[seg] + (s - seg_start), seg1[seg]);
+            ++iter;
+            float grow = exp2(max(0.0, float(iter - budget * 3 / 4) / float(max(budget / 16, 1))));
+            float fine = max(8.0, t * pixel_angle * step_scale) * grow;
 
-        vec3 rel = dir * t;
-        float alt = idAltitude(rel);
-        vec3 wp = vec3(id_camera_global.xy + rel.xy, alt);
-        float footprint = max(t * pixel_angle, 1.0);
+            if (!inside)
+            {
+                // Probes grow with distance, so crossing kilometres of clear sky does not use up the
+                // step budget before the ray reaches distant cloud.
+                float coarse = min(max(fine * 4.0, 50.0 + 0.03 * t), t_end - t);
+                float tp = t + coarse * jitter;
+                vec3 prel = dir * tp;
+                vec3 pwp = vec3(id_camera_global.xy + prel.xy, idAltitude(prel));
+                if (idCloudDensityAll(pwp, max(tp * pixel_angle, coarse * 0.25), true) > 0.0)
+                {
+                    inside = true;
+                    empty = 0;
+                    t = clear_t;
+                    continue;
+                }
+                clear_t = tp;
+                t += coarse;
+                continue;
+            }
 
-        float dens = idCloudDensityAll(wp, footprint, id_detail_noise == 0) * (1.0 - smoothstep(ID_FADE_START, ID_MAX_DIST, t));
-        if (dens <= 0.0)
-        {
-            continue;
-        }
+            float ds = min(fine, t_end - t);
+            float ts = t + ds * jitter;
+            t += ds;
 
-        float sigma = idCloudSigma(dens);
-        float od = idLightOpticalDepth(rel, light_w, footprint);
-        vec3 sun = sunlit * idSunScattering(od, cos_theta, sigma);
-        vec3 amb = amblit * mix(0.4, 1.0, idHeightFraction(alt));
+            vec3 rel = dir * ts;
+            float alt = idAltitude(rel);
+            vec3 wp = vec3(id_camera_global.xy + rel.xy, alt);
+            float footprint = max(max(ts * pixel_angle, 0.25 * ds), 1.0);
 
-        float step_trans = exp(-sigma * ds);
-        float absorbed = trans * (1.0 - step_trans);
-        scatter += (sun + amb) * absorbed;
-        w_sum += absorbed;
-        wd_sum += absorbed * t;
-        trans *= step_trans;
+            float dens = idCloudDensityAll(wp, footprint, id_detail_noise == 0) * (1.0 - smoothstep(fade_far, ID_MAX_DIST, ts));
+            if (dens <= 0.0)
+            {
+                if (++empty >= 4)
+                {
+                    inside = false;
+                    clear_t = ts;
+                }
+                continue;
+            }
+            empty = 0;
 
-        if (trans < 0.005)
-        {
-            break;
+            float sigma = idCloudSigma(dens);
+            float od = idLightOpticalDepth(rel, light_w, footprint);
+            vec3 sun = sunlit * idSunScattering(od, cos_theta, sigma);
+            float hf = idHeightFraction(alt);
+            vec3 amb = amblit * mix(0.4, 1.0, hf) * mix(0.5, 1.0, idSkyVisibility(rel, footprint));
+            // Sunlight bounced off the ground lifts the undersides out of a flat grey slab.
+            amb += sunlit * max(light_w.z, 0.0) * 0.12 * (1.0 - hf);
+
+            float step_trans = exp(-sigma * ds);
+            float absorbed = trans * (1.0 - step_trans);
+            scatter += (sun + amb) * absorbed;
+            w_sum += absorbed;
+            wd_sum += absorbed * ts;
+            trans *= step_trans;
+
+            if (trans < 0.005)
+            {
+                done = true;
+                break;
+            }
         }
     }
 }
@@ -360,7 +423,7 @@ void main()
 
     int samples = clamp(id_samples, 1, 4);
     int steps = clamp(id_steps, 1, 256);
-    float jitter = idInterleavedGradientNoise(cell + 0.5);
+    float jitter = idJitter(cell, id_jitter_seed);
 
     vec3 scatter = vec3(0.0);
     float trans = 0.0;

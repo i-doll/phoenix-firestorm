@@ -107,11 +107,11 @@ IDCloudLayer idCloudTypeDefaults(IDCloudType type)
     switch (type)
     {
         case IDCloudType::Cumulus:       l.mBaseM = 1200.f; l.mTopM = 2400.f; l.mCoverage = 0.40f; l.mDensity = 0.60f; l.mDetail = 0.70f; break;
-        case IDCloudType::Cumulonimbus:  l.mBaseM = 1500.f; l.mTopM = 9000.f; l.mCoverage = 0.25f; l.mDensity = 0.90f; l.mDetail = 0.60f; break;
+        case IDCloudType::Cumulonimbus:  l.mBaseM = 1500.f; l.mTopM = 9000.f; l.mCoverage = 0.45f; l.mDensity = 0.90f; l.mDetail = 0.60f; break;
         case IDCloudType::Stratus:       l.mBaseM = 600.f;  l.mTopM = 1100.f; l.mCoverage = 0.90f; l.mDensity = 0.40f; l.mDetail = 0.30f; break;
-        case IDCloudType::Stratocumulus: l.mBaseM = 1000.f; l.mTopM = 2000.f; l.mCoverage = 0.70f; l.mDensity = 0.50f; l.mDetail = 0.50f; break;
-        case IDCloudType::Altocumulus:   l.mBaseM = 3000.f; l.mTopM = 4200.f; l.mCoverage = 0.50f; l.mDensity = 0.40f; l.mDetail = 0.60f; break;
-        case IDCloudType::Cirrus:        l.mBaseM = 7000.f; l.mTopM = 8000.f; l.mCoverage = 0.30f; l.mDensity = 0.15f; l.mDetail = 0.80f; break;
+        case IDCloudType::Stratocumulus: l.mBaseM = 1000.f; l.mTopM = 1600.f; l.mCoverage = 0.80f; l.mDensity = 0.50f; l.mDetail = 0.50f; break;
+        case IDCloudType::Altocumulus:   l.mBaseM = 3000.f; l.mTopM = 3500.f; l.mCoverage = 0.50f; l.mDensity = 0.40f; l.mDetail = 0.60f; break;
+        case IDCloudType::Cirrus:        l.mBaseM = 7000.f; l.mTopM = 7500.f; l.mCoverage = 0.50f; l.mDensity = 0.15f; l.mDetail = 0.80f; break;
         default: break;
     }
     return l;

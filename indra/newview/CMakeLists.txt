@@ -1000,6 +1000,7 @@ set(viewer_HEADER_FILES
     idmcptools_headless.h  # <ID> Headless test mode
     idmcp.h  # <ID> Embedded MCP server: stable facade
     idmcpserver.h  # <ID> Embedded MCP server
+    idcloudnoise.h  # <ID> Volumetric clouds: noise and weather map generation
     idvolumetriccloudsettings.h  # <ID> Volumetric clouds: layer model and presets
     idvolumetricclouds.h  # <ID> Volumetric clouds: renderer
     idfloatervolumetricclouds.h  # <ID> Volumetric clouds: editor floater
