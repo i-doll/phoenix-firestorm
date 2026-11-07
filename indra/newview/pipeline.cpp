@@ -10698,10 +10698,19 @@ static void fs_bind_sun_shadow_extras(LLGLSLShader& shader, const glm::mat4& mod
     static LLCachedControl<bool> cloud_shadows(gSavedSettings, "FSRenderCloudShadows", false);
     static LLCachedControl<F32> cloud_strength(gSavedSettings, "FSRenderCloudShadowStrength", 0.6f);
     static LLCachedControl<F32> cloud_softness(gSavedSettings, "FSRenderCloudShadowSoftness", 0.3f);
+    static LLCachedControl<bool> contact_shadows(gSavedSettings, "FSRenderContactShadows", false);
+    static LLCachedControl<F32> contact_length(gSavedSettings, "FSRenderContactShadowLength", 0.5f);
+    static LLCachedControl<F32> contact_strength(gSavedSettings, "FSRenderContactShadowStrength", 0.8f);
 
     if (gCubeSnapshot)
     {
         return; // the shaders leave probe captures alone
+    }
+
+    if (contact_shadows)
+    {
+        static const LLStaticHashedString sContactShadow("fs_contact_shadow");
+        shader.uniform2f(sContactShadow, llclamp((F32)contact_length, 0.05f, 2.f), llclamp((F32)contact_strength, 0.f, 1.f));
     }
 
     if (cloud_shadows)

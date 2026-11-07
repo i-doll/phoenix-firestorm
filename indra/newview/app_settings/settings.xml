@@ -26993,6 +26993,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSRenderContactShadowLength</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Length in meters of the contact shadow ray (0.05 to 2).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>FSRenderContactShadowStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Darkness of the contact shadows (0 to 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.8</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

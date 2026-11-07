@@ -124,14 +124,85 @@ float fsCloudShadow(vec3 pos, vec3 light_dir)
 }
 #endif // FS_CLOUD_SHADOWS
 
+#if defined(FS_CONTACT_SHADOWS)
+// Screen-space contact shadows: a short march through the depth buffer from the pixel towards the
+// light. Catches the small shadows the cascades are too coarse for (feet on the ground, folds,
+// small props); multiplied into the cascaded shadow, so it can only darken.
+uniform mat4 projection_matrix;
+uniform vec2 fs_contact_shadow;      // x: ray length (m), y: strength 0-1 (0: off)
+
+vec4 getPositionWithDepth(vec2 pos_screen, float depth);
+float getDepth(vec2 pos_screen);
+bool isFarDepth(float d);
+
+#define FS_CONTACT_STEPS      14
+#define FS_CONTACT_FADE_NEAR  24.0   // metres from the camera: full strength up to here
+#define FS_CONTACT_FADE_FAR   48.0   // and none from here on
+#define FS_CONTACT_EDGE       0.04   // screen fraction at the edges over which hits fade out
+#define FS_CONTACT_THICKNESS  0.25   // metres: how deep a surface in the depth buffer is taken to be
+
+float fsContactShadow(vec3 pos, vec3 norm, vec3 light_dir)
+{
+    float len = fs_contact_shadow.x;
+    float dist = -pos.z;
+    float strength = clamp(fs_contact_shadow.y, 0.0, 1.0) * (1.0 - smoothstep(FS_CONTACT_FADE_NEAR, FS_CONTACT_FADE_FAR, dist));
+    if (strength <= 0.0 || len <= 0.0 || dot(norm, light_dir) <= 0.0)
+    {
+        return 1.0; // far away, off, or facing away from the light (already dark)
+    }
+
+    // depth precision falls with distance: leave the surface further and widen the hit test with it
+    float bias = 0.01 + 0.002 * dist;
+    float thickness = FS_CONTACT_THICKNESS + 0.01 * dist;
+    float step_len = len / float(FS_CONTACT_STEPS);
+    vec3 origin = pos + norm * bias;
+    float t = step_len * fsExtrasNoise(gl_FragCoord.xy); // jittered start: banding becomes noise the blur removes
+
+    for (int i = 0; i < FS_CONTACT_STEPS; ++i)
+    {
+        t += step_len;
+        vec3 p = origin + light_dir * t;
+        vec4 clip = projection_matrix * vec4(p, 1.0);
+        if (clip.w <= 0.0)
+        {
+            break; // behind the camera
+        }
+        vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
+        if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
+        {
+            break; // left the screen
+        }
+        float d = getDepth(uv);
+        if (isFarDepth(d))
+        {
+            continue;
+        }
+        // > 0: the surface the depth buffer has there is in front of the ray
+        float delta = getPositionWithDepth(uv, d).z - p.z;
+        if (delta > bias && delta < thickness)
+        {
+            vec2 edge = min(uv, vec2(1.0) - uv);
+            return 1.0 - strength * smoothstep(0.0, FS_CONTACT_EDGE, min(edge.x, edge.y));
+        }
+    }
+    return 1.0;
+}
+#endif // FS_CONTACT_SHADOWS
+
 // sun shadow (light map red channel) of the pixel at view space position pos with normal norm
 float fsSunShadowExtras(float shadow, vec3 pos, vec3 norm)
 {
     if (cube_snapshot != 0)
     {
-        return shadow; // probes keep the plain shadow: they update too rarely for moving clouds
+        return shadow; // probes keep the plain shadow: too rare for moving clouds, too coarse for contact
     }
     vec3 light_dir = normalize((sun_up_factor == 1) ? sun_dir : moon_dir);
+#if defined(FS_CONTACT_SHADOWS)
+    if (shadow > 0.0)
+    {
+        shadow *= fsContactShadow(pos, norm, light_dir);
+    }
+#endif
 #if defined(FS_CLOUD_SHADOWS)
     if (shadow > 0.0)
     {
