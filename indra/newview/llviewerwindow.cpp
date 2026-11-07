@@ -235,6 +235,7 @@
 #include "llnetmap.h"
 #include "lggcontactsets.h"
 #include "fspanellogin.h"
+#include "idvolumetriccloudsettings.h" // <ID:VolumetricClouds/>
 
 #include "lltracerecording.h"
 
@@ -6374,6 +6375,10 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     F32 depth_conversion_factor_1 = (LLViewerCamera::getInstance()->getFar() + LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
     F32 depth_conversion_factor_2 = (LLViewerCamera::getInstance()->getFar() - LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
+
+    // <ID:VolumetricClouds>
+    IDCloudWindFreeze cloud_wind_freeze;
+    // </ID:VolumetricClouds>
 
     // Subimages are in fact partial rendering of the final view. This happens when the final view is bigger than the screen.
     // In most common cases, scale_factor is 1 and there's no more than 1 iteration on x and y

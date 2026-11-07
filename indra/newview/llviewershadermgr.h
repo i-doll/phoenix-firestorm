@@ -276,6 +276,8 @@ extern LLGLSLShader         gFSLensEffectsProgram;
 extern LLGLSLShader         gIDCloudsProgram;
 extern LLGLSLShader         gIDCloudsCompositeProgram;
 extern LLGLSLShader         gIDCloudShadowProgram;
+extern LLGLSLShader         gIDCloudsReprojectProgram;
+extern LLGLSLShader         gIDCloudsUpsampleProgram;
 // </ID:VolumetricClouds>
 extern LLGLSLShader         gExposureProgram;
 extern LLGLSLShader         gExposureProgramNoFade;

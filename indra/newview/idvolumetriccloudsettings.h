@@ -73,6 +73,8 @@ public:
     void setCurrent(const IDCloudPreset& p);
     void advance(F32 dt_seconds);
     LLVector2 windOffsetM(U32 layer) const;
+    void freezeWind() { ++mWindFrozen; }
+    void thawWind() { if (mWindFrozen > 0) --mWindFrozen; }
 
     boost::signals2::signal<void()> mChanged;
 
@@ -81,6 +83,17 @@ private:
 
     IDCloudPreset          mCurrent;
     std::vector<LLVector2> mWind;
+    U32                    mWindFrozen = 0;
+};
+
+// Holds the cloud wind still while it is in scope, so every tile of a snapshot sees the same clouds.
+class IDCloudWindFreeze
+{
+public:
+    IDCloudWindFreeze() { IDCloudState::instance().freezeWind(); }
+    ~IDCloudWindFreeze() { IDCloudState::instance().thawWind(); }
+    IDCloudWindFreeze(const IDCloudWindFreeze&) = delete;
+    IDCloudWindFreeze& operator=(const IDCloudWindFreeze&) = delete;
 };
 
 #endif // ID_VOLUMETRIC_CLOUD_SETTINGS_H

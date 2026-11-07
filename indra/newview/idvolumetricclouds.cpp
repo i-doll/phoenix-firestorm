@@ -79,6 +79,13 @@ namespace
     constexpr S32 FULL_STEPS   = 96;
     constexpr S32 LIVE_STEPS   = 48;
     constexpr S32 FULL_SAMPLES = 4;
+    constexpr S32 MARCH_BLOCK_X = 4;
+    constexpr S32 MARCH_BLOCK_Y = 2;
+    // Bayer-like order over the 4x2 block, so pixels refreshed on consecutive frames lie far apart.
+    const glm::ivec2 MARCH_ORDER[MARCH_BLOCK_X * MARCH_BLOCK_Y] = {
+        { 0, 0 }, { 2, 1 }, { 2, 0 }, { 0, 1 }, { 1, 0 }, { 3, 1 }, { 3, 0 }, { 1, 1 }
+    };
+    constexpr F64 HISTORY_MAX_JUMP_M = 64.0;
     constexpr F32 PLANET_RADIUS_M = 6360000.f;
 
     constexpr U32 SHADOW_RES = 1024;
@@ -580,7 +587,11 @@ void IDVolumetricClouds::update()
 
         if (!mStateConnection.connected())
         {
-            mStateConnection = IDCloudState::instance().mChanged.connect([this]() { mWeatherDirty = true; });
+            mStateConnection = IDCloudState::instance().mChanged.connect([this]()
+            {
+                mWeatherDirty = true;
+                mHistoryValid = false;
+            });
             mWeatherDirty = true;
         }
 
@@ -749,6 +760,10 @@ void IDVolumetricClouds::release()
     }
     mSceneRT.release();
     mSceneFrame = U32_MAX;
+    mMarchRT.release();
+    mHistoryRT[0].release();
+    mHistoryRT[1].release();
+    mHistoryValid = false;
     mShadowRT.release();
     mShadowReady = false;
     mWeatherKey.clear();
@@ -846,12 +861,14 @@ void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_sr
     mHazePending = false;
     if (!screen || !depth_src || !isActive())
     {
+        mHistoryValid = false;
         return;
     }
     llassert(LLRenderTarget::getCurrentBoundTarget() == screen);
 
     if (!ensureSceneTarget(screen->getWidth(), screen->getHeight()))
     {
+        mHistoryValid = false;
         return;
     }
 
@@ -859,10 +876,99 @@ void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_sr
     LLGLDisable cull(GL_CULL_FACE);
 
     const bool full = fullQuality();
-    march(mSceneRT, depth_src, full ? FULL_STEPS : LIVE_STEPS, full ? FULL_SAMPLES : 1);
+    if (full || !renderLive(depth_src))
+    {
+        mHistoryValid = false;
+        march(mSceneRT, depth_src, full ? FULL_STEPS : LIVE_STEPS, full ? FULL_SAMPLES : 1, mSceneRT, glm::ivec2(1), glm::ivec2(0));
+    }
     composite(depth_src);
     mSceneFrame = LLFrameTimer::getFrameCount();
     mHazePending = LLPipeline::RenderDeferredAtmospheric;
+}
+
+bool IDVolumetricClouds::renderLive(LLRenderTarget* depth_src)
+{
+    if (!gIDCloudsReprojectProgram.isComplete() || !gIDCloudsUpsampleProgram.isComplete()
+        || !ensureLiveTargets(mSceneRT.getWidth(), mSceneRT.getHeight()))
+    {
+        return false;
+    }
+
+    const LLVector3d camera = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin());
+    const LLVector3d origin = gAgent.getPosGlobalFromAgent(LLVector3::zero);
+
+    LLRenderTarget& history = mHistoryRT[mHistoryIndex];
+    LLRenderTarget& next = mHistoryRT[1 - mHistoryIndex];
+    if (historyUsable(camera))
+    {
+        const glm::ivec2 offset = MARCH_ORDER[mTemporalIndex++ % (MARCH_BLOCK_X * MARCH_BLOCK_Y)];
+        march(mMarchRT, depth_src, LIVE_STEPS, 1, next, glm::ivec2(MARCH_BLOCK_X, MARCH_BLOCK_Y), offset);
+
+        // Agent coordinates jump by the change of region origin when the camera crosses a region.
+        const LLVector3 shift(origin - mHistoryOrigin);
+        glm::mat4 to_last_agent(1.f);
+        to_last_agent[3] = glm::vec4(shift.mV[VX], shift.mV[VY], shift.mV[VZ], 1.f);
+        const glm::mat4 to_last_eye = get_last_modelview() * to_last_agent * glm::inverse(get_current_modelview());
+        reproject(next, history, depth_src, to_last_eye, offset);
+    }
+    else
+    {
+        march(next, depth_src, LIVE_STEPS, 1, next, glm::ivec2(1), glm::ivec2(0));
+    }
+    upsample(next, depth_src);
+
+    mHistoryIndex = 1 - mHistoryIndex;
+    mHistoryValid = true;
+    mHistoryFrame = LLFrameTimer::getFrameCount();
+    mHistoryCamera = camera;
+    mHistoryOrigin = origin;
+    return true;
+}
+
+// The previous result is only reprojected from the frame right before this one, with the
+// matrices of that frame, and only if the camera did not jump.
+bool IDVolumetricClouds::historyUsable(const LLVector3d& camera) const
+{
+    return mHistoryValid
+        && mHistoryFrame + 1 == LLFrameTimer::getFrameCount()
+        && (camera - mHistoryCamera).length() <= HISTORY_MAX_JUMP_M;
+}
+
+bool IDVolumetricClouds::ensureLiveTargets(U32 width, U32 height)
+{
+    const U32 half_w = llmax((width + 1) / 2, 1u);
+    const U32 half_h = llmax((height + 1) / 2, 1u);
+    const U32 march_w = (half_w + MARCH_BLOCK_X - 1) / MARCH_BLOCK_X;
+    const U32 march_h = (half_h + MARCH_BLOCK_Y - 1) / MARCH_BLOCK_Y;
+
+    bool ready = mMarchRT.isComplete() && mMarchRT.getWidth() == march_w && mMarchRT.getHeight() == march_h;
+    for (const LLRenderTarget& history : mHistoryRT)
+    {
+        ready = ready && history.isComplete() && history.getWidth() == half_w && history.getHeight() == half_h;
+    }
+    if (ready)
+    {
+        return true;
+    }
+
+    mHistoryValid = false;
+    mMarchRT.release();
+    bool ok = mMarchRT.allocate(march_w, march_h, GL_RGBA16F) && mMarchRT.addColorAttachment(GL_RG32F);
+    for (LLRenderTarget& history : mHistoryRT)
+    {
+        history.release();
+        ok = ok && history.allocate(half_w, half_h, GL_RGBA16F) && history.addColorAttachment(GL_RG32F);
+    }
+    if (ok)
+    {
+        return true;
+    }
+
+    LL_WARNS_ONCE("VolumetricClouds") << "Could not allocate the live cloud targets; rendering at full resolution" << LL_ENDL;
+    mMarchRT.release();
+    mHistoryRT[0].release();
+    mHistoryRT[1].release();
+    return false;
 }
 
 bool IDVolumetricClouds::ensureSceneTarget(U32 width, U32 height)
@@ -983,11 +1089,15 @@ void IDVolumetricClouds::clearDensityInputs(LLGLSLShader& shader)
     }
 }
 
-void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples)
+void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples,
+                               const LLRenderTarget& grid, const glm::ivec2& block, const glm::ivec2& offset)
 {
     static LLStaticHashedString s_eye_to_world("id_eye_to_world");
     static LLStaticHashedString s_steps("id_steps");
     static LLStaticHashedString s_samples("id_samples");
+    static LLStaticHashedString s_grid("id_march_grid");
+    static LLStaticHashedString s_block("id_march_block");
+    static LLStaticHashedString s_offset("id_march_offset");
 
     LLGLSLShader& shader = gIDCloudsProgram;
     LLGLDisable blend(GL_BLEND);
@@ -1000,6 +1110,9 @@ void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src
     shader.uniformMatrix4fv(s_eye_to_world, 1, GL_FALSE, glm::value_ptr(eye_to_world));
     shader.uniform1i(s_steps, steps);
     shader.uniform1i(s_samples, samples);
+    shader.uniform2f(s_grid, (F32)grid.getWidth(), (F32)grid.getHeight());
+    shader.uniform2f(s_block, (F32)block.x, (F32)block.y);
+    shader.uniform2f(s_offset, (F32)offset.x, (F32)offset.y);
 
     LLEnvironment& environment = LLEnvironment::instance();
     shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
@@ -1011,6 +1124,65 @@ void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src
     clearDensityInputs(shader);
     gPipeline.unbindDeferredShader(shader);
     target.flush();
+}
+
+void IDVolumetricClouds::reproject(LLRenderTarget& target, LLRenderTarget& history, LLRenderTarget* depth_src,
+                                   const glm::mat4& to_last_eye, const glm::ivec2& offset)
+{
+    static LLStaticHashedString s_reproject("id_reproject");
+    static LLStaticHashedString s_last_proj("id_last_proj");
+    static LLStaticHashedString s_grid("id_march_grid");
+    static LLStaticHashedString s_block("id_march_block");
+    static LLStaticHashedString s_offset("id_march_offset");
+
+    LLGLSLShader& shader = gIDCloudsReprojectProgram;
+    LLGLDisable blend(GL_BLEND);
+
+    target.bindTarget();
+    gPipeline.bindDeferredShader(shader, nullptr, depth_src);
+    shader.bindTexture(LLShaderMgr::ID_CLOUD_SCENE, &mMarchRT, false, LLTexUnit::TFO_POINT, 0);
+    shader.bindTexture(LLShaderMgr::ID_CLOUD_DEPTH, &mMarchRT, false, LLTexUnit::TFO_POINT, 1);
+    S32 channel = shader.bindTexture(LLShaderMgr::ID_CLOUD_HISTORY, &history, false, LLTexUnit::TFO_BILINEAR, 0);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+    }
+    shader.bindTexture(LLShaderMgr::ID_CLOUD_HISTORY_DEPTH, &history, false, LLTexUnit::TFO_POINT, 1);
+
+    shader.uniformMatrix4fv(s_reproject, 1, GL_FALSE, glm::value_ptr(to_last_eye));
+    shader.uniformMatrix4fv(s_last_proj, 1, GL_FALSE, glm::value_ptr(get_last_projection()));
+    shader.uniform2f(s_grid, (F32)target.getWidth(), (F32)target.getHeight());
+    shader.uniform2i(s_block, MARCH_BLOCK_X, MARCH_BLOCK_Y);
+    shader.uniform2i(s_offset, offset.x, offset.y);
+
+    gPipeline.mScreenTriangleVB->setBuffer();
+    gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_SCENE);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_DEPTH);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_HISTORY);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_HISTORY_DEPTH);
+    gPipeline.unbindDeferredShader(shader);
+    target.flush();
+}
+
+void IDVolumetricClouds::upsample(LLRenderTarget& source, LLRenderTarget* depth_src)
+{
+    LLGLSLShader& shader = gIDCloudsUpsampleProgram;
+    LLGLDisable blend(GL_BLEND);
+
+    mSceneRT.bindTarget();
+    gPipeline.bindDeferredShader(shader, nullptr, depth_src);
+    shader.bindTexture(LLShaderMgr::ID_CLOUD_SCENE, &source, false, LLTexUnit::TFO_POINT, 0);
+    shader.bindTexture(LLShaderMgr::ID_CLOUD_DEPTH, &source, false, LLTexUnit::TFO_POINT, 1);
+
+    gPipeline.mScreenTriangleVB->setBuffer();
+    gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_SCENE);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_DEPTH);
+    gPipeline.unbindDeferredShader(shader);
+    mSceneRT.flush();
 }
 
 void IDVolumetricClouds::composite(LLRenderTarget* depth_src)

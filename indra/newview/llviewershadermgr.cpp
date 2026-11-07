@@ -216,6 +216,8 @@ LLGLSLShader            gFSLensEffectsProgram;
 LLGLSLShader            gIDCloudsProgram;
 LLGLSLShader            gIDCloudsCompositeProgram;
 LLGLSLShader            gIDCloudShadowProgram;
+LLGLSLShader            gIDCloudsReprojectProgram;
+LLGLSLShader            gIDCloudsUpsampleProgram;
 // </ID:VolumetricClouds>
 // </FS:Trish>
 LLGLSLShader            gDeferredPostGammaCorrectProgram;
@@ -1310,6 +1312,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gIDCloudsProgram.unload();
         gIDCloudsCompositeProgram.unload();
         gIDCloudShadowProgram.unload();
+        gIDCloudsReprojectProgram.unload();
+        gIDCloudsUpsampleProgram.unload();
         // </ID:VolumetricClouds>
 
         for (auto i = 0; i < 4; ++i)
@@ -2811,6 +2815,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             { &gIDCloudsProgram,          "deferred/idCloudsF.glsl" },
             { &gIDCloudsCompositeProgram, "deferred/idCloudsCompositeF.glsl" },
             { &gIDCloudShadowProgram,     "deferred/idCloudShadowF.glsl" },
+            { &gIDCloudsReprojectProgram, "deferred/idCloudsReprojectF.glsl" },
+            { &gIDCloudsUpsampleProgram,  "deferred/idCloudsUpsampleF.glsl" },
         };
         for (const auto& [shader, file] : cloud_shaders)
         {

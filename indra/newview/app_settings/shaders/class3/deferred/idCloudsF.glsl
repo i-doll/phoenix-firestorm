@@ -8,7 +8,8 @@
 /*[EXTRA_CODE_HERE]*/
 
 // frag_data[0]: rgb in-scattered light, already fogged by the haze in front of the cloud; a transmittance.
-// frag_data[1]: r transmittance-weighted mean cloud distance in metres, 1e9 where there is no cloud.
+// frag_data[1]: r transmittance-weighted mean cloud distance in metres, 1e9 where there is no cloud;
+//               g distance to the scene behind the pixel centre, ID_MAX_DIST for sky.
 out vec4 frag_data[2];
 
 in vec2 vary_fragcoord;
@@ -35,6 +36,11 @@ float idAltitude(vec3 rel)
 uniform mat4  id_eye_to_world;
 uniform int   id_steps;
 uniform int   id_samples;
+// The pixels being marched belong to a grid of id_march_grid size. Each fragment marches the grid
+// pixel at its own coordinate times id_march_block plus id_march_offset.
+uniform vec2  id_march_grid;
+uniform vec2  id_march_block;
+uniform vec2  id_march_offset;
 
 uniform vec3  sun_dir;
 uniform vec3  moon_dir;
@@ -322,16 +328,18 @@ void idHaze(vec3 pos_eye, vec3 light_eye, out vec3 add, out float att)
 
 void main()
 {
-    vec2 tc = vary_fragcoord.xy;
-    vec2 px = vec2(dFdx(tc.x), dFdy(tc.y));
+    vec2 cell = floor(gl_FragCoord.xy) * id_march_block + id_march_offset;
+    vec2 tc = (cell + 0.5) / id_march_grid;
+    vec2 px = 1.0 / id_march_grid;
     float depth = getDepth(tc);
+    float scene_center = depth >= 1.0 ? ID_MAX_DIST : length(getPositionWithDepth(tc, depth).xyz);
 
     mat3 eye_to_world = mat3(id_eye_to_world);
     vec3 light_eye = normalize((sun_up_factor == 1) ? sun_dir : moon_dir);
     vec3 light_w = normalize(eye_to_world * light_eye);
     vec3 up_eye = vec3(eye_to_world[0].z, eye_to_world[1].z, eye_to_world[2].z);
     vec3 center_dir = normalize(getPositionWithDepth(tc, 0.5).xyz);
-    float pixel_angle = max(length(dFdx(center_dir)), length(dFdy(center_dir)));
+    float pixel_angle = max(length(dFdx(center_dir)) / id_march_block.x, length(dFdy(center_dir)) / id_march_block.y);
 
     vec3 sunlit;
     vec3 amblit;
@@ -346,7 +354,7 @@ void main()
 
     int samples = clamp(id_samples, 1, 4);
     int steps = clamp(id_steps, 1, 256);
-    float jitter = idInterleavedGradientNoise(gl_FragCoord.xy);
+    float jitter = idInterleavedGradientNoise(cell + 0.5);
 
     vec3 scatter = vec3(0.0);
     float trans = 0.0;
@@ -383,5 +391,5 @@ void main()
     }
 
     frag_data[0] = vec4(clampHDRRange(scatter), clamp(trans, 0.0, 1.0));
-    frag_data[1] = vec4(cloud_dist, 0.0, 0.0, 1.0);
+    frag_data[1] = vec4(cloud_dist, scene_center, 0.0, 1.0);
 }

@@ -10,6 +10,9 @@
 
 #include "llrendertarget.h"
 #include "llsingleton.h"
+#include "v3dmath.h"
+
+#include "glm/vec2.hpp"
 
 #include <boost/signals2.hpp>
 #include <memory>
@@ -44,7 +47,14 @@ private:
     bool ensureSceneTarget(U32 width, U32 height);
     void setDensityInputs(LLGLSLShader& shader);
     void clearDensityInputs(LLGLSLShader& shader);
-    void march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples);
+    void march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples,
+               const LLRenderTarget& grid, const glm::ivec2& block, const glm::ivec2& offset);
+    bool renderLive(LLRenderTarget* depth_src);
+    bool ensureLiveTargets(U32 width, U32 height);
+    bool historyUsable(const LLVector3d& camera) const;
+    void reproject(LLRenderTarget& target, LLRenderTarget& history, LLRenderTarget* depth_src,
+                   const glm::mat4& to_last_eye, const glm::ivec2& offset);
+    void upsample(LLRenderTarget& source, LLRenderTarget* depth_src);
     void composite(LLRenderTarget* depth_src);
     bool sceneMatchesTarget() const;
 
@@ -57,6 +67,18 @@ private:
     U32 mSceneFrame = U32_MAX;
     // Composited this frame and the deferred haze pass, which fogs it again, has not run yet.
     bool mHazePending = false;
+
+    // Live mode: one pixel per 4x2 block of the half-resolution grid is marched each frame into
+    // mMarchRT, the rest is reprojected from the previous half-resolution result. Both history
+    // targets have the march's two attachments, with the scene distance kept in the second's g.
+    LLRenderTarget mMarchRT;
+    LLRenderTarget mHistoryRT[2];
+    U32 mHistoryIndex = 0;
+    bool mHistoryValid = false;
+    U32 mHistoryFrame = U32_MAX;
+    U32 mTemporalIndex = 0;
+    LLVector3d mHistoryCamera;
+    LLVector3d mHistoryOrigin;
 
     // R16F sunlight transmittance through all layers, top-down around the camera.
     LLRenderTarget mShadowRT;

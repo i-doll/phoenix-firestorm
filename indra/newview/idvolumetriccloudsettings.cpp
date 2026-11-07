@@ -297,6 +297,10 @@ void IDCloudState::setCurrent(const IDCloudPreset& p)
 
 void IDCloudState::advance(F32 dt_seconds)
 {
+    if (mWindFrozen > 0)
+    {
+        return;
+    }
     for (size_t i = 0; i < mCurrent.mLayers.size() && i < mWind.size(); ++i)
     {
         const IDCloudLayer& l = mCurrent.mLayers[i];
