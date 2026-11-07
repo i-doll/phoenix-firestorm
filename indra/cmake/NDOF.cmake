@@ -1,5 +1,6 @@
 # -*- cmake -*-
 include(Prebuilt)
+include(Linking)
 
 set(NDOF ON CACHE BOOL "Use NDOF space navigator joystick library.")
 
