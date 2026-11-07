@@ -256,6 +256,13 @@ protected:
     uuid_set_t   mStalePhysicsFlags;
     uuid_set_t   mPendingPhysicsFlags;
 
+    // <FS:Trish> Debounce cost/physics fetch launches and back off after failed fetches
+    F64 mNextObjectCostFetch = 0.;
+    F64 mNextPhysicsFlagsFetch = 0.;
+    std::unordered_map<LLUUID, F64> mObjectCostRetryTime;
+    std::unordered_map<LLUUID, F64> mPhysicsFlagsRetryTime;
+    // </FS:Trish>
+
     std::vector<LLDebugBeacon> mDebugBeacons;
 
     S32 mCurLazyUpdateIndex;

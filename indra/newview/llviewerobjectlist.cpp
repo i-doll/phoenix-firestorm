@@ -1415,11 +1415,56 @@ void LLViewerObjectList::update(LLAgent &agent)
     sample(LLStatViewer::NUM_ACTIVE_OBJECTS, idle_count);
 }
 
+// <FS:Trish> UI that shows costs or physics flags re-marks the object stale on every refresh.
+// Launch at most one fetch per debounce interval, skip IDs already in flight, and don't
+// retry an ID for a while after a failed fetch.
+constexpr F64 OBJECT_FETCH_DEBOUNCE_SEC = 0.25;
+constexpr F64 OBJECT_FETCH_FAILURE_BACKOFF_SEC = 10.;
+constexpr size_t OBJECT_FETCH_RETRY_PRUNE_SIZE = 1024;
+
+static bool is_fetch_backing_off(std::unordered_map<LLUUID, F64>& retry_times, const LLUUID& id, F64 now)
+{
+    auto it = retry_times.find(id);
+    if (it == retry_times.end())
+    {
+        return false;
+    }
+    if (now < it->second)
+    {
+        return true;
+    }
+    retry_times.erase(it);
+    return false;
+}
+
+static void set_fetch_back_off(std::unordered_map<LLUUID, F64>& retry_times, const LLUUID& id)
+{
+    const F64 now = LLFrameTimer::getTotalSeconds();
+    if (retry_times.size() >= OBJECT_FETCH_RETRY_PRUNE_SIZE)
+    {
+        for (auto it = retry_times.begin(); it != retry_times.end();)
+        {
+            if (now >= it->second) it = retry_times.erase(it);
+            else ++it;
+        }
+    }
+    retry_times[id] = now + OBJECT_FETCH_FAILURE_BACKOFF_SEC;
+}
+// </FS:Trish>
+
 void LLViewerObjectList::fetchObjectCosts()
 {
     // issue http request for stale object physics costs
     if (!mStaleObjectCost.empty())
     {
+        // <FS:Trish> Debounce launches
+        const F64 now = LLFrameTimer::getTotalSeconds();
+        if (now < mNextObjectCostFetch)
+        {
+            return;
+        }
+        // </FS:Trish>
+
         // <FS:Ansariel> FIRE-5496: Missing LI for objects outside agent's region
         //LLViewerRegion* regionp = gAgent.getRegion();
 
@@ -1447,6 +1492,13 @@ void LLViewerObjectList::fetchObjectCosts()
 
         for (const auto& staleObjectId : staleObjectCostIds)
         {
+            // <FS:Trish> Skip IDs already in flight or backing off after a failure
+            if (mPendingObjectCost.find(staleObjectId) != mPendingObjectCost.end() ||
+                is_fetch_backing_off(mObjectCostRetryTime, staleObjectId, now))
+            {
+                continue;
+            }
+            // </FS:Trish>
             LLViewerObject* staleObject = findObject(staleObjectId);
             if (staleObject && staleObject->getRegion())
             {
@@ -1467,6 +1519,7 @@ void LLViewerObjectList::fetchObjectCosts()
             {
                 LLCoros::instance().launch("LLViewerObjectList::fetchObjectCostsCoro",
                     boost::bind(&LLViewerObjectList::fetchObjectCostsCoro, this, url, region.second));
+                mNextObjectCostFetch = now + OBJECT_FETCH_DEBOUNCE_SEC; // <FS:Trish/>
             }
             else
             {
@@ -1601,6 +1654,30 @@ void LLViewerObjectList::fetchPhysicsFlags()
     // issue http request for stale object physics flags
     if (!mStalePhysicsFlags.empty())
     {
+        // <FS:Trish> Debounce launches and drop IDs already in flight or backing off after a failure
+        const F64 now = LLFrameTimer::getTotalSeconds();
+        if (now < mNextPhysicsFlagsFetch)
+        {
+            return;
+        }
+        for (auto it = mStalePhysicsFlags.begin(); it != mStalePhysicsFlags.end();)
+        {
+            if (mPendingPhysicsFlags.find(*it) != mPendingPhysicsFlags.end() ||
+                is_fetch_backing_off(mPhysicsFlagsRetryTime, *it, now))
+            {
+                it = mStalePhysicsFlags.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+        if (mStalePhysicsFlags.empty())
+        {
+            return;
+        }
+        // </FS:Trish>
+
         LLViewerRegion* regionp = gAgent.getRegion();
 
         if (regionp)
@@ -1611,6 +1688,7 @@ void LLViewerObjectList::fetchPhysicsFlags()
             {
                 LLCoros::instance().launch("LLViewerObjectList::fetchPhisicsFlagsCoro",
                     boost::bind(&LLViewerObjectList::fetchPhisicsFlagsCoro, this, url));
+                mNextPhysicsFlagsFetch = now + OBJECT_FETCH_DEBOUNCE_SEC; // <FS:Trish/>
             }
             else
             {
@@ -2089,6 +2167,7 @@ void LLViewerObjectList::onObjectCostFetchFailure(const LLUUID& object_id)
 {
     //LL_WARNS() << "Failed to fetch object cost for object: " << object_id << LL_ENDL;
     mPendingObjectCost.erase(object_id);
+    set_fetch_back_off(mObjectCostRetryTime, object_id); // <FS:Trish/>
 }
 
 void LLViewerObjectList::updatePhysicsFlags(const LLViewerObject* object)
@@ -2128,6 +2207,7 @@ void LLViewerObjectList::onPhysicsFlagsFetchFailure(const LLUUID& object_id)
 {
     //LL_WARNS() << "Failed to fetch physics flags for object: " << object_id << LL_ENDL;
     mPendingPhysicsFlags.erase(object_id);
+    set_fetch_back_off(mPhysicsFlagsRetryTime, object_id); // <FS:Trish/>
 }
 
 void LLViewerObjectList::shiftObjects(const LLVector3 &offset)
