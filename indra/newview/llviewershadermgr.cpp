@@ -218,6 +218,8 @@ LLGLSLShader            gIDCloudsCompositeProgram;
 LLGLSLShader            gIDCloudShadowProgram;
 LLGLSLShader            gIDCloudsReprojectProgram;
 LLGLSLShader            gIDCloudsUpsampleProgram;
+LLGLSLShader            gIDCloudsFroxelProgram;
+LLGLSLShader            gIDCloudsFroxelAccumProgram;
 // </ID:VolumetricClouds>
 // </FS:Trish>
 LLGLSLShader            gDeferredPostGammaCorrectProgram;
@@ -485,6 +487,7 @@ void LLViewerShaderMgr::finalizeShaderList()
     {
         mShaderList.push_back(&gIDCloudsProgram);
         mShaderList.push_back(&gIDCloudsCompositeProgram);
+        mShaderList.push_back(&gIDCloudsFroxelProgram);
     }
     // </ID:VolumetricClouds>
 
@@ -1317,6 +1320,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gIDCloudShadowProgram.unload();
         gIDCloudsReprojectProgram.unload();
         gIDCloudsUpsampleProgram.unload();
+        gIDCloudsFroxelProgram.unload();
+        gIDCloudsFroxelAccumProgram.unload();
         // </ID:VolumetricClouds>
 
         for (auto i = 0; i < 4; ++i)
@@ -2820,6 +2825,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             { &gIDCloudShadowProgram,     "deferred/idCloudShadowF.glsl" },
             { &gIDCloudsReprojectProgram, "deferred/idCloudsReprojectF.glsl" },
             { &gIDCloudsUpsampleProgram,  "deferred/idCloudsUpsampleF.glsl" },
+            { &gIDCloudsFroxelProgram,      "deferred/idCloudsFroxelF.glsl" },
+            { &gIDCloudsFroxelAccumProgram, "deferred/idCloudsFroxelF.glsl" },
         };
         for (const auto& [shader, file] : cloud_shaders)
         {
@@ -2830,7 +2837,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
             shader->mShaderFiles.push_back(make_pair(file, GL_FRAGMENT_SHADER));
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            if (shader == &gIDCloudsProgram)
+            if (shader == &gIDCloudsFroxelAccumProgram)
+            {
+                shader->mName = "deferred/idCloudsFroxelF.glsl (accumulate)";
+                shader->addPermutation("ID_FROXEL_ACCUM", "1");
+            }
+            if (shader == &gIDCloudsProgram || shader == &gIDCloudsFroxelProgram)
             {
                 shader->mShaderFiles.push_back(make_pair("deferred/idCloudMarchUtil.glsl", GL_FRAGMENT_SHADER));
                 shader->mFeatures.hasShadows = use_sun_shadow;

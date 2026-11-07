@@ -61,6 +61,9 @@ private:
     void renderProbe(LLRenderTarget* screen, LLRenderTarget* depth_src);
     bool ensureProbeTargets(U32 slot, U32 width, U32 height);
     bool sceneMatchesTarget() const;
+    void renderFroxels(LLRenderTarget* depth_src);
+    bool ensureFroxels();
+    void releaseFroxels();
 
     U32 mNoiseBase   = 0;
     U32 mNoiseDetail = 0;
@@ -98,6 +101,15 @@ private:
     glm::vec4 mShadowLayerTop{ 0.f };
     bool mShadowReady = false;
     U32 mShadowFrame = U32_MAX;
+
+    // Fog only, for alpha surfaces: a screen-aligned volume with exponentially spaced depth slices.
+    // mFroxelSegments holds the cloud inside each slice, mFroxelVolume the cloud from the camera to
+    // the far edge of each slice. Both RGBA16F, in-scatter and transmittance.
+    U32 mFroxelSegments = 0;
+    U32 mFroxelVolume = 0;
+    U32 mFroxelFBO = 0;
+    U32 mFroxelFrame = U32_MAX;
+    bool mFroxelFailed = false;
 
     std::shared_ptr<IDCloudNoiseJob>   mNoiseJob;
     std::shared_ptr<IDCloudWeatherJob> mWeatherJob;

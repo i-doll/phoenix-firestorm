@@ -436,6 +436,20 @@ uniform sampler2D idCloudDepth;
 uniform int id_cloud_scene_active;
 uniform int id_haze_pending;
 
+uniform sampler3D idCloudFroxel;
+uniform int id_cloud_froxel_active;
+uniform float id_froxel_far;
+
+const float ID_FROXEL_NEAR = 0.5;
+const int ID_FROXEL_SLICES = 64;
+
+// Far edge of froxel slice k. Slices are spaced exponentially from ID_FROXEL_NEAR out to id_froxel_far;
+// slice 0 starts at the camera.
+float idFroxelSliceDist(int k)
+{
+    return ID_FROXEL_NEAR * pow(id_froxel_far / ID_FROXEL_NEAR, float(k) / float(ID_FROXEL_SLICES - 1));
+}
+
 // rgb: in-scatter of the cloud mass in front of pos_eye, a: its transmittance. While the haze pass
 // is still to run it will fog this pixel again, so the in-scatter is pre-compensated the way the
 // cloud composite does it; haze_add and haze_atten are this fragment's haze colour and attenuation.
@@ -447,8 +461,20 @@ vec4 idCloudsInFront(vec3 pos_eye, vec3 haze_add, float haze_atten)
     }
     vec4 cs = texelFetch(idCloudScene, ivec2(gl_FragCoord.xy), 0);
     float cd = texelFetch(idCloudDepth, ivec2(gl_FragCoord.xy), 0).r;
-    float behind = smoothstep(cd - 50.0, cd + 50.0, length(pos_eye));
+    float dist = length(pos_eye);
+    float behind = smoothstep(cd - 50.0, cd + 50.0, dist);
     vec3 S_f = cs.rgb * behind;  float T_f = mix(1.0, cs.a, behind);
+    // Up close the froxels give the cloud in front of this exact distance; they fade out into the
+    // per-pixel result over the last tenth of their range.
+    if (id_cloud_froxel_active != 0 && dist < id_froxel_far)
+    {
+        vec2 uv = gl_FragCoord.xy / vec2(textureSize(idCloudScene, 0));
+        float k = float(ID_FROXEL_SLICES - 1) * log(max(dist, ID_FROXEL_NEAR) / ID_FROXEL_NEAR) / log(id_froxel_far / ID_FROXEL_NEAR);
+        vec4 fr = textureLod(idCloudFroxel, vec3(uv, (k + 0.5) / float(ID_FROXEL_SLICES)), 0.0);
+        float w = 1.0 - smoothstep(0.9 * id_froxel_far, id_froxel_far, dist);
+        S_f = mix(S_f, fr.rgb, w);
+        T_f = mix(T_f, fr.a, w);
+    }
     if (id_haze_pending != 0 && T_f < 1.0)
     {
         S_f = clamp((S_f - (1.0 - T_f) * haze_add) / max(haze_atten, 0.02), vec3(-11.2), vec3(11.2));
