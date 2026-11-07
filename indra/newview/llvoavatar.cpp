@@ -5256,6 +5256,16 @@ void LLVOAvatar::updateFootstepSounds()
         return;
     }
 
+    // <FS:Trish> Check for footstep animations before the ground height queries
+    const LLUUID AGENT_FOOTSTEP_ANIMS[] = {ANIM_AGENT_WALK, ANIM_AGENT_RUN, ANIM_AGENT_LAND};
+    const S32 NUM_AGENT_FOOTSTEP_ANIMS = LL_ARRAY_SIZE(AGENT_FOOTSTEP_ANIMS);
+
+    if (!gAudiop || !isAnyAnimationSignaled(AGENT_FOOTSTEP_ANIMS, NUM_AGENT_FOOTSTEP_ANIMS))
+    {
+        return;
+    }
+    // </FS:Trish>
+
     //-------------------------------------------------------------------------
     // Find the ground under each foot, these are used for a variety
     // of things that follow
@@ -5289,10 +5299,12 @@ void LLVOAvatar::updateFootstepSounds()
         }
     }
 
-    const LLUUID AGENT_FOOTSTEP_ANIMS[] = {ANIM_AGENT_WALK, ANIM_AGENT_RUN, ANIM_AGENT_LAND};
-    const S32 NUM_AGENT_FOOTSTEP_ANIMS = LL_ARRAY_SIZE(AGENT_FOOTSTEP_ANIMS);
+    // <FS:Trish> Moved above the ground height queries
+    //const LLUUID AGENT_FOOTSTEP_ANIMS[] = {ANIM_AGENT_WALK, ANIM_AGENT_RUN, ANIM_AGENT_LAND};
+    //const S32 NUM_AGENT_FOOTSTEP_ANIMS = LL_ARRAY_SIZE(AGENT_FOOTSTEP_ANIMS);
 
-    if ( gAudiop && isAnyAnimationSignaled(AGENT_FOOTSTEP_ANIMS, NUM_AGENT_FOOTSTEP_ANIMS) )
+    //if ( gAudiop && isAnyAnimationSignaled(AGENT_FOOTSTEP_ANIMS, NUM_AGENT_FOOTSTEP_ANIMS) )
+    // </FS:Trish>
     {
         bool playSound = false;
         LLVector3 foot_pos_agent;
