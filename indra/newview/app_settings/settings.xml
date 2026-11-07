@@ -27345,6 +27345,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>3.0</real>
     </map>
+    <key>FSPerfBatchedLocalLights</key>
+    <map>
+      <key>Comment</key>
+      <string>Draw deferred local point lights (not spotlights or projectors) that the camera is outside of as instanced light volumes: all their parameters go up in one uniform buffer per frame and they draw in one call per 512 lights, instead of one draw and five uniform sets per light. Same lighting maths as the stock path. Changing it rebuilds shaders; off, the batched shader is not built.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

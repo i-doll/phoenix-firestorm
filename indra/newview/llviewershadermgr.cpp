@@ -52,6 +52,7 @@
 
 #include "lljoint.h"
 #include "llskinningutil.h"
+#include "fspointlightbatch.h" // <FS:Trish/>
 
 static LLStaticHashedString sTexture0("texture0");
 static LLStaticHashedString sTexture1("texture1");
@@ -161,6 +162,7 @@ LLGLSLShader            gDeferredAvatarProgram;
 LLGLSLShader            gDeferredAvatarAlphaProgram;
 LLGLSLShader            gDeferredLightProgram;
 LLGLSLShader            gDeferredMultiLightProgram[16];
+LLGLSLShader            gFSBatchedPointLightProgram; // <FS:Trish/> instanced point lights
 LLGLSLShader            gDeferredSpotLightProgram;
 LLGLSLShader            gDeferredMultiSpotLightProgram;
 LLGLSLShader            gDeferredSunProgram;
@@ -1434,6 +1436,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredImpostorProgram.unload();
         gDeferredTerrainProgram.unload();
         gDeferredLightProgram.unload();
+        gFSBatchedPointLightProgram.unload(); // <FS:Trish/>
         for (U32 i = 0; i < LL_DEFERRED_MULTI_LIGHT_COUNT; ++i)
         {
             gDeferredMultiLightProgram[i].unload();
@@ -2019,6 +2022,39 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = gDeferredLightProgram.createShader();
         llassert(success);
     }
+
+    // <FS:Trish> Instanced point lights, built only while FSPerfBatchedLocalLights is on.
+    // A failed build is not fatal: the pipeline keeps the stock per-light path.
+    static LLCachedControl<bool> fs_batched_lights(gSavedSettings, "FSPerfBatchedLocalLights", false);
+    if (success && fs_batched_lights)
+    {
+        gFSBatchedPointLightProgram.mName = "FS Batched Point Light Shader";
+        gFSBatchedPointLightProgram.mFeatures.isDeferred = true;
+        gFSBatchedPointLightProgram.mFeatures.hasFullGBuffer = true;
+        gFSBatchedPointLightProgram.mFeatures.hasShadows = true;
+        gFSBatchedPointLightProgram.mFeatures.hasSrgb = true;
+
+        gFSBatchedPointLightProgram.mShaderFiles.clear();
+        gFSBatchedPointLightProgram.mShaderFiles.push_back(make_pair("deferred/fsBatchedPointLightV.glsl", GL_VERTEX_SHADER));
+        gFSBatchedPointLightProgram.mShaderFiles.push_back(make_pair("deferred/pointLightF.glsl", GL_FRAGMENT_SHADER));
+        gFSBatchedPointLightProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+        gFSBatchedPointLightProgram.clearPermutations();
+        gFSBatchedPointLightProgram.addPermutation("FS_BATCHED_LIGHTS", "1");
+
+        add_common_permutations(&gFSBatchedPointLightProgram);
+
+        if (gFSBatchedPointLightProgram.createShader())
+        {
+            FSPointLightBatch::setupProgram(gFSBatchedPointLightProgram);
+        }
+        else
+        {
+            LL_WARNS("Shader") << "Batched point light shader failed, using per-light drawing" << LL_ENDL;
+            gFSBatchedPointLightProgram.unload();
+        }
+    }
+    // </FS:Trish>
 
     for (U32 i = 0; i < LL_DEFERRED_MULTI_LIGHT_COUNT; i++)
     {

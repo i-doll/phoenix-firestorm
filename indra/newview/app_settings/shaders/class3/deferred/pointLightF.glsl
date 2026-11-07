@@ -31,12 +31,23 @@ uniform vec3 env_mat[3];
 uniform float sun_wash;
 
 // light params
+#ifdef FS_BATCHED_LIGHTS
+// Batched path (fsBatchedPointLightV.glsl, FSPerfBatchedLocalLights): one instance per light,
+// its parameters arrive per instance and are copied into these at the top of main()
+flat in vec4 fs_light_color; // rgb linear colour, a falloff
+flat in float fs_light_size;
+flat in vec3 trans_center;
+vec3 color;
+float falloff;
+float size;
+#else
 uniform vec3 color;
 uniform float falloff;
 uniform float size;
+in vec3 trans_center;
+#endif
 
 in vec4 vary_fragcoord;
-in vec3 trans_center;
 
 uniform vec2 screen_res;
 
@@ -72,6 +83,11 @@ GBufferInfo getGBuffer(vec2 screenpos);
 
 void main()
 {
+#ifdef FS_BATCHED_LIGHTS
+    color = fs_light_color.rgb;
+    falloff = fs_light_color.a;
+    size = fs_light_size;
+#endif
     vec3 final_color = vec3(0);
     vec2 tc          = getScreenCoord(vary_fragcoord);
     vec3 pos         = getPosition(tc).xyz;
