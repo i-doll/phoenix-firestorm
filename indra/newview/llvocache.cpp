@@ -1635,7 +1635,8 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
                 {
                     // <FS:Trish> Stop at the end of the file instead of reading a garbage entry. Older
                     // viewers stored a count that included entries they skipped writing.
-                    const S64 file_size = LLFile::size(filename);
+                    llstat file_stat;
+                    const S64 file_size = LLFile::stat(filename, &file_stat) == 0 ? (S64)file_stat.st_size : 0;
                     // </FS:Trish>
                     for (S32 i = 0; i < num_entries && apr_file.eof() != APR_EOF; i++)
                     {
