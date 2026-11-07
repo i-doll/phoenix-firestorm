@@ -526,7 +526,11 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
                 //         }
                 //         processRequest(req);
                 //     });
-                const auto retry_backoff = 16ms;
+                // <FS:Trish> Per request: a worker that is only waiting (for a slot, a capability, a retry
+                // timer) can ask to be polled less often than one that is mid-pipeline.
+                //const auto retry_backoff = 16ms;
+                const auto retry_backoff = std::chrono::milliseconds(req->getRetryDelayMs());
+                // </FS:Trish>
                 auto retry_time = LL::WorkQueue::TimePoint::clock::now() + retry_backoff; 
                 req->defer_until(retry_time);
                 LL_PROFILE_ZONE_NAMED("processRequest - post deferred");

@@ -903,6 +903,19 @@ void LLViewerTextureList::updateImages(F32 max_time)
     }
 
     updateImagesUpdateStats();
+
+    static LLCachedControl<bool> diagnostics_enabled(gSavedSettings, "TextureFetchPipelineDiagnostics", false);
+    static LLFrameTimer diagnostics_timer;
+    if (diagnostics_enabled && diagnostics_timer.getElapsedTimeF32() >= 5.f)
+    {
+        diagnostics_timer.reset();
+        LL_INFOS("Texture") << "Texture list: textures=" << mUUIDMap.size()
+                            << " create_queue=" << mCreateTextureList.size()
+                            << " downscale_queue=" << mDownScaleQueue.size()
+                            << " budget_ms=" << max_time * 1000.f
+                            << " discard_bias=" << LLViewerTexture::sDesiredDiscardBias
+                            << LL_ENDL;
+    }
 }
 
 void LLViewerTextureList::clearFetchingRequests()

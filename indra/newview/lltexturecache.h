@@ -34,6 +34,9 @@
 
 #include "llworkerthread.h"
 
+#include <atomic> // <FS:Trish/> Reads before writes
+#include <unordered_map>
+
 class LLImageFormatted;
 class LLTextureCacheWorker;
 class LLImageRaw;
@@ -139,10 +142,15 @@ public:
     void lockWorkers() { mWorkersMutex.lock(); }
     void unlockWorkers() { mWorkersMutex.unlock(); }
 
+    // <FS:Trish> Reads before writes
+    S32 getPendingReads() const { return mPendingReads.load(std::memory_order_relaxed); }
+    std::atomic<S32> mPendingReads{ 0 };
+    // </FS:Trish>
+
     // debug
     S32 getNumReads() { return static_cast<S32>(mReaders.size()); }
     S32 getNumWrites() { return static_cast<S32>(mWriters.size()); }
-    S64Bytes getUsage() { return S64Bytes(mTexturesSizeTotal); }
+    S64Bytes getUsage() { return S64Bytes(getUsedSize()); }
     S64Bytes getMaxUsage() { return S64Bytes(sCacheMaxTexturesSize); }
     U32 getEntries() { return mHeaderEntriesInfo.mEntries; }
     U32 getMaxEntries() { return sCacheMaxEntries; };
@@ -160,11 +168,11 @@ protected:
 
 private:
     void setDirNames(ELLPath location);
-    void readHeaderCache();
+    void readHeaderCache(std::vector<Entry>* entries_out = nullptr);
     void clearCorruptedCache();
     void purgeAllTextures(bool purge_directories);
     void purgeTexturesLazy(F32 time_limit_sec);
-    void purgeTextures(bool validate);
+    void purgeTextures(bool validate, std::vector<Entry>* loaded_entries = nullptr);
     LLAPRFile* openHeaderEntriesFile(bool readonly, S32 offset);
     void closeHeaderEntriesFile();
     void readEntriesHeader();
@@ -173,6 +181,11 @@ private:
     S32 openAndReadEntry(const LLUUID& id, Entry& entry, bool create);
     bool updateEntry(S32& idx, Entry& entry, S32 new_image_size, S32 new_body_size);
     void updateEntryTimeStamp(S32 idx, Entry& entry) ;
+    void setEntryTime(S32 idx, U32 time);
+    U32 getEntryTime(S32 idx) const;
+    void setEntryInfo(S32 idx, const Entry& entry);
+    bool getEntryInfo(const LLUUID& id, S32 idx, Entry& entry);
+    S64 getUsedSize();
     U32 openAndReadEntries(std::vector<Entry>& entries);
     void writeEntriesAndClose(const std::vector<Entry>& entries);
     void readEntryFromHeaderImmediately(S32& idx, Entry& entry) ;
@@ -226,7 +239,7 @@ private:
     EntriesInfo mHeaderEntriesInfo;
     std::set<S32> mFreeList; // deleted entries
     std::set<LLUUID> mLRU;
-    typedef std::map<LLUUID, S32> id_map_t;
+    typedef std::unordered_map<LLUUID, S32> id_map_t;
     id_map_t mHeaderIDMap;
 
     LLAPRFile*   mFastCachep;
@@ -235,13 +248,20 @@ private:
 
     // BODIES (TEXTURES minus headers)
     std::string mTexturesDirName;
-    typedef std::map<LLUUID,S32> size_map_t;
+    typedef std::unordered_map<LLUUID, S32> size_map_t;
     size_map_t mTexturesSizeMap;
     S64 mTexturesSizeTotal;
     LLAtomicBool mDoPurge;
 
     typedef std::map<S32, Entry> idx_entry_map_t;
     idx_entry_map_t mUpdatedEntryMap;
+    struct EntryInfo
+    {
+        U32 mTime = 0;
+        S32 mImageSize = -1; // unknown, read the entry from the file
+    };
+    std::vector<EntryInfo> mEntryInfos; // Entry::mTime and Entry::mImageSize by header index to avoid unecessary file reads
+    LLTimer mUpdatedEntriesTimer; // time since mUpdatedEntryMap was last written
     typedef std::vector<std::pair<S32, Entry> > idx_entry_vector_t;
     idx_entry_vector_t mPurgeEntryList;
 

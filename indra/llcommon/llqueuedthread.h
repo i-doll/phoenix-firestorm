@@ -103,6 +103,9 @@ public:
         }
 
         virtual bool processRequest() = 0; // Return true when request has completed
+        // How long to wait before running an incomplete request again. Read right after
+        // processRequest() returns false, on the same thread.
+        virtual U32 getRetryDelayMs() const { return 16; }
         virtual void finishRequest(bool completed); // Always called from thread after request has completed or aborted
         virtual void deleteRequest(); // Only method to delete a request
 

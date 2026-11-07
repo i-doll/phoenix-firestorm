@@ -217,6 +217,8 @@ public:
     typedef std::unordered_set<LLPointer<LLViewerFetchedTexture> > image_list_t;
     typedef std::queue<LLPointer<LLViewerFetchedTexture> > image_queue_t;
 
+    size_t getMainThreadBacklog() const { return mCreateTextureList.size(); }
+
     // images that have been loaded but are waiting to be uploaded to GL
     image_queue_t mCreateTextureList;
 

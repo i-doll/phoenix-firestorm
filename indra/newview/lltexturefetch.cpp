@@ -4224,6 +4224,10 @@ void LLTextureFetch::logPipelineDiagnostics()
     S32 retrying = 0;
     F32 oldest_http = 0.0f;
     F32 oldest_capability_wait = 0.0f;
+    // <FS:Trish> Per-state worker counts: where a large request count is actually waiting.
+    S32 state_counts[LLTextureFetchWorker::DONE + 1] = {};
+    S32 zero_priority = 0;
+    // </FS:Trish>
 
     // Keeping the request-map lock while inspecting a worker prevents its
     // deletion. This method runs only on the texture-fetch thread.
@@ -4239,6 +4243,16 @@ void LLTextureFetch::logPipelineDiagnostics()
             }
 
             worker->lockWorkMutex();                                  // +Mw
+            // <FS:Trish> Per-state worker counts
+            if (worker->mState >= 0 && worker->mState <= LLTextureFetchWorker::DONE)
+            {
+                ++state_counts[worker->mState];
+            }
+            if (worker->mImagePriority < F_ALMOST_ZERO)
+            {
+                ++zero_priority;
+            }
+            // </FS:Trish>
             if (worker->mState == LLTextureFetchWorker::WAIT_HTTP_REQ)
             {
                 ++active_http;
@@ -4275,6 +4289,23 @@ void LLTextureFetch::logPipelineDiagnostics()
                       << " oldest_http=" << oldest_http << "s"
                       << " oldest_cap_wait=" << oldest_capability_wait << "s"
                       << LL_ENDL;
+
+    // <FS:Trish> Per-state worker counts, plus the cache thread's backlog
+    std::ostringstream states;
+    for (S32 state = 0; state <= LLTextureFetchWorker::DONE; ++state)
+    {
+        if (state_counts[state] > 0)
+        {
+            states << " " << e_state_name[state] << "=" << state_counts[state];
+        }
+    }
+    LL_INFOS(LOG_TXT) << "Texture fetch states:" << states.str()
+                      << " | zero_priority=" << zero_priority
+                      << " cache_pending_reads=" << (mTextureCache ? mTextureCache->getPendingReads() : -1)
+                      << " cache_reads=" << (mTextureCache ? mTextureCache->getNumReads() : -1)
+                      << " cache_writes=" << (mTextureCache ? mTextureCache->getNumWrites() : -1)
+                      << LL_ENDL;
+    // </FS:Trish>
 }
 
 
