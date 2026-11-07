@@ -26685,6 +26685,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSRenderAvatarShadowDistance</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Avatars and animesh further than this from the camera, with their attachments, cast no shadow. 0 for no limit. Your own avatar always casts.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
     <key>FSRenderShadowMaxDistance</key>
     <map>
       <key>Comment</key>

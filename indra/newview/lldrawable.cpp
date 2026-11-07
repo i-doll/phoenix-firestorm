@@ -1561,6 +1561,34 @@ void LLSpatialBridge::setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* 
     }
 
 
+    // <FS:Trish> Avatars far from the camera cast no shadow, nor do their attachments (rigged
+    // ones included) or animesh
+    if (LLPipeline::sShadowRender)
+    {
+        LLViewerObject* root = mDrawable->getVObj();
+        const LLVOAvatar* avatar = nullptr;
+        if (root)
+        {
+            if (root->isAttachment())
+            {
+                avatar = root->getAvatar();
+            }
+            else if (root->isAnimatedObject())
+            {
+                avatar = root->getControlAvatar();
+            }
+            else if (root->isAvatar())
+            {
+                avatar = root->asAvatar();
+            }
+        }
+        if (avatar && LLPipeline::isBeyondAvatarShadowDistance(avatar))
+        {
+            return;
+        }
+    }
+    // </FS:Trish>
+
     //HACK don't draw attachments for avatars that haven't been visible in more than a frame
     LLViewerObject *vobj = mDrawable->getVObj();
     if (vobj && vobj->isAttachment() && !vobj->isHUDAttachment())

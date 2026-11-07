@@ -386,6 +386,13 @@ void LLDrawPoolAvatar::renderShadow(S32 pass)
         return;
     }
 
+    // <FS:Trish> Avatars far from the camera cast no shadow
+    if (LLPipeline::isBeyondAvatarShadowDistance(avatarp))
+    {
+        return;
+    }
+    // </FS:Trish>
+
     LLVOAvatar::AvatarOverallAppearance oa = avatarp->getOverallAppearance();
     bool impostor = !LLPipeline::sImpostorRender && avatarp->isImpostor();
     // no shadows if the shadows are causing this avatar to breach the limit.
