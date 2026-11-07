@@ -406,6 +406,10 @@ static LLPipelineListener sPipelineListener;
 
 static LLCullResult* sCull = NULL;
 
+// <FS:Trish> Bumped whenever a light joins mLights, so a throttled calcNearbyLights rescans at once
+static U32 sLightSetSerial = 0;
+// </FS:Trish>
+
 void validate_framebuffer_object();
 
 // Add color attachments for deferred rendering
@@ -6836,8 +6840,75 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
             max_dist = llmin(RenderFarClip, LIGHT_MAX_RADIUS * 4.f);
         }
 
+        // <FS:Trish> FSPerfLightRescanThrottle: between full scans (about 10 Hz, or at once when the camera
+        // moved, the draw distance or attached light setting changed, or a light was added) keep the previous
+        // nearby list and only drop lights that can no longer render. Fades still advance in setupHWLights.
+        static LLCachedControl<bool> throttle_rescan(gSavedSettings, "FSPerfLightRescanThrottle", false);
+        static F32 last_scan_time = 0.f;
+        static LLVector3 last_scan_pos;
+        static F32 last_scan_max_dist = -1.f;
+        static U32 last_scan_light_serial = 0;
+        static bool last_scan_attached = true;
+        const F32 now = gFrameTimeSeconds;
+        const bool full_scan = !throttle_rescan
+            || now - last_scan_time >= 0.1f
+            || now < last_scan_time
+            || dist_vec_squared(cam_pos, last_scan_pos) > 0.25f
+            || max_dist != last_scan_max_dist
+            || sLightSetSerial != last_scan_light_serial
+            || sRenderAttachedLights != last_scan_attached;
+        if (full_scan)
+        {
+            last_scan_time = now;
+            last_scan_pos = cam_pos;
+            last_scan_max_dist = max_dist;
+            last_scan_light_serial = sLightSetSerial;
+            last_scan_attached = sRenderAttachedLights;
+        }
+        else
+        {
+            for (light_set_t::iterator iter = mNearbyLights.begin(); iter != mNearbyLights.end(); )
+            {
+                LLDrawable* drawable = iter->drawable;
+                const LLViewerObject* vobj = drawable->getVObj();
+                LLVOAvatar* av = vobj ? vobj->getAvatar() : nullptr;
+                LLVOVolume* volight = drawable->getVOVolume();
+                if ((av && (av->isTooComplex() || av->isInMuteList() || av->isTooSlow()))
+                    || !volight || !drawable->isState(LLDrawable::LIGHT)
+                    || iter->fade <= -LIGHT_FADE_TIME
+                    || (!sRenderAttachedLights && volight->isAttachment()))
+                {
+                    drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                    iter = mNearbyLights.erase(iter);
+                }
+                else
+                {
+                    ++iter;
+                }
+            }
+
+            //mark nearby lights not-removable.
+            for (const Light& light : mNearbyLights)
+            {
+                ((LLViewerOctreeEntryData*) light.drawable)->setVisible();
+            }
+            return;
+        }
+        // </FS:Trish>
+
         // UPDATE THE EXISTING NEARBY LIGHTS
-        light_set_t cur_nearby_lights;
+        // <FS:Trish> Reuse the set nodes instead of allocating a fresh std::set every frame
+        //light_set_t cur_nearby_lights;
+        struct KeptLight
+        {
+            light_set_t::iterator iter;
+            F32 dist;
+            F32 fade;
+        };
+        static std::vector<KeptLight> cur_nearby_lights;
+        static std::vector<light_set_t::node_type> cur_nearby_nodes;
+        cur_nearby_lights.clear();
+        // </FS:Trish>
         for (light_set_t::iterator iter = mNearbyLights.begin();
             iter != mNearbyLights.end(); iter++)
         {
@@ -6900,10 +6971,35 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
                     fade -= LIGHT_FADE_TIME;
                 }
             }
-            cur_nearby_lights.insert(Light(drawable, dist, fade));
+            // <FS:Trish>
+            //cur_nearby_lights.insert(Light(drawable, dist, fade));
+            cur_nearby_lights.push_back({ iter, dist, fade });
+            // </FS:Trish>
         }
         //mNearbyLights = cur_nearby_lights;
-        mNearbyLights.swap(cur_nearby_lights); // <FS:Trish/> no deep copy of the set every frame
+        // <FS:Trish> Move the kept nodes out, update their key, drop the rest and reinsert them in sorted order
+        //mNearbyLights.swap(cur_nearby_lights); // <FS:Trish/> no deep copy of the set every frame
+        cur_nearby_nodes.clear();
+        for (const KeptLight& kept : cur_nearby_lights)
+        {
+            light_set_t::node_type node = mNearbyLights.extract(kept.iter);
+            node.value().dist = kept.dist;
+            node.value().fade = kept.fade;
+            cur_nearby_nodes.push_back(std::move(node));
+        }
+        cur_nearby_lights.clear();
+        mNearbyLights.clear();
+        std::sort(cur_nearby_nodes.begin(), cur_nearby_nodes.end(),
+            [](const light_set_t::node_type& a, const light_set_t::node_type& b)
+            {
+                return Light::compare()(a.value(), b.value());
+            });
+        for (light_set_t::node_type& node : cur_nearby_nodes)
+        {
+            mNearbyLights.insert(mNearbyLights.end(), std::move(node));
+        }
+        cur_nearby_nodes.clear();
+        // </FS:Trish>
 
         // FIND NEW LIGHTS THAT ARE IN RANGE
         light_set_t new_nearby_lights;
@@ -7551,7 +7647,13 @@ void LLPipeline::setLight(LLDrawable *drawablep, bool is_light)
     {
         if (is_light)
         {
-            mLights.insert(drawablep);
+            // <FS:Trish> Count additions for the light rescan throttle
+            //mLights.insert(drawablep);
+            if (mLights.insert(drawablep).second)
+            {
+                ++sLightSetSerial;
+            }
+            // </FS:Trish>
             drawablep->setState(LLDrawable::LIGHT);
         }
         else
