@@ -38,6 +38,9 @@ uniform float fs_dynres_sharpness;  // 0 = plain Catmull-Rom, 1 = strongest
 
 in vec2 vary_fragcoord;
 
+uniform float fs_deband;    // > 0: triangular debanding dither replaces the stock noise
+vec3 fsDeband(vec3 c);      // fsDebandF.glsl
+
 // Dither noise as the stock present adds it
 float hash(vec2 p) { return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x)))); }
 
@@ -114,9 +117,17 @@ void main()
 
     color = clamp(color, mn, mx);
 
-    vec2 tc = uv * screen_res * 4.0;
-    vec3 seed = (color + vec3(1.0)) * vec3(tc.xy, tc.x + tc.y);
-    color += vec3(noise(seed.rg), noise(seed.gb), noise(seed.rb)) * 0.003;
+    if (fs_deband > 0.0)
+    {
+        // Triangular debanding dither (fsDebandF.glsl) in place of the stock noise
+        color = fsDeband(clamp(color, vec3(0.0), vec3(1.0)));
+    }
+    else
+    {
+        vec2 tc = uv * screen_res * 4.0;
+        vec3 seed = (color + vec3(1.0)) * vec3(tc.xy, tc.x + tc.y);
+        color += vec3(noise(seed.rg), noise(seed.gb), noise(seed.rb)) * 0.003;
+    }
 
     // Same guard as clampHDRRange in the stock present
     color = mix(color, vec3(0.0), isnan(color));

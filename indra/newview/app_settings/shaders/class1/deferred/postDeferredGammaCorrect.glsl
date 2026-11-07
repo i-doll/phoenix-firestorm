@@ -34,6 +34,7 @@ uniform vec2 screen_res;
 in vec2 vary_fragcoord;
 
 vec3 linear_to_srgb(vec3 cl);
+vec3 fsDeband(vec3 c); // fsDebandF.glsl
 
 vec3 legacyGamma(vec3 color)
 {
@@ -54,6 +55,7 @@ void main()
 #endif
 
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0));
+    diff.rgb = fsDeband(diff.rgb);
     frag_color = diff;
 }
 

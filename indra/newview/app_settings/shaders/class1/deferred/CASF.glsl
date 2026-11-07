@@ -41,6 +41,7 @@ uniform uvec4 cas_param_1;
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cl);
+vec3 fsDeband(vec3 c); // fsDebandF.glsl
 #endif
 
 #ifndef SHADER_PORTABILITY
@@ -2570,6 +2571,7 @@ void main()
     diff.rgb = legacyGamma(diff.rgb);
 #endif
 
+    diff.rgb = fsDeband(diff.rgb);
     frag_color = diff;
 }
 #endif

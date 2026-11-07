@@ -41,6 +41,10 @@ vec3 toneMap(vec3 color);
 
 vec3 clampHDRRange(vec3 color);
 
+#ifdef GAMMA_CORRECT
+vec3 fsDeband(vec3 c); // fsDebandF.glsl
+#endif
+
 #ifndef NO_POST
 // Bloom, the summed levels of the bloom chain, added before exposure
 uniform sampler2D bloomMap;
@@ -192,6 +196,10 @@ void main()
 #endif
 
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0)); // We should always be 0-1 past this point
+
+#ifdef GAMMA_CORRECT
+    diff.rgb = fsDeband(diff.rgb); // before the write to the 8 bit post buffer
+#endif
 
     //debugExposure(diff.rgb);
     frag_color = diff;

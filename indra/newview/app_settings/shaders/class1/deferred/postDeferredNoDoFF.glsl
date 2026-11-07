@@ -73,16 +73,28 @@ float noise(vec2 x) {
 
 vec3 clampHDRRange(vec3 color);
 
+#ifdef HAS_NOISE
+uniform float fs_deband;    // > 0: triangular debanding dither (fsDebandF.glsl) replaces the noise
+vec3 fsDeband(vec3 c);
+#endif
+
 
 void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord.xy);
 
 #ifdef HAS_NOISE
+    if (fs_deband > 0.0)
+    {
+        diff.rgb = fsDeband(clamp(diff.rgb, vec3(0.0), vec3(1.0)));
+    }
+    else
+    {
     vec2 tc = vary_fragcoord.xy*screen_res*4.0;
     vec3 seed = (diff.rgb+vec3(1.0))*vec3(tc.xy, tc.x+tc.y);
     vec3 nz = vec3(noise(seed.rg), noise(seed.gb), noise(seed.rb));
     diff.rgb += nz*0.003;
+    }
 #endif
 
     diff.rgb = clampHDRRange(diff.rgb);
