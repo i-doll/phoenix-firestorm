@@ -876,6 +876,21 @@ public:
     void loadColorGradeLUT(const std::string& name);
     void releaseFSPostTargets();
 
+    // <FS:Trish> Coloured shadows (FSRenderColoredShadows). Sun cascades 0-1 each get an RGBA8
+    // colour map that shares the cascade's shadow depth: alpha-blended casters multiply their
+    // transmittance into it, depth tested against the opaque casters, never writing depth.
+    // Allocated only while the setting is on, main camera only.
+    static const U32        FS_COLORED_SHADOW_CASCADES = 2;
+    LLRenderTarget          mColoredShadowTarget[FS_COLORED_SHADOW_CASCADES];
+    U32                     mColoredShadowDepth[FS_COLORED_SHADOW_CASCADES] = {};   // shadow depth texture shared into it
+    U32                     mColoredShadowFrame[FS_COLORED_SHADOW_CASCADES] = {};   // frame its map was last drawn
+    S32                     mColoredShadowCascade = -1;     // cascade whose casters renderShadow draws, -1 for none
+    bool                    prepareColoredShadowCascade(U32 cascade);   // generateSunShadow: target ready for this cascade
+    void                    renderColoredShadowCasters();               // renderShadow: draw the translucent casters
+    void                    bindColoredShadowMaps(LLGLSLShader& shader);
+    void                    releaseColoredShadowTarget(U32 cascade);
+    // </FS:Trish>
+
     // Shadow performance
     static bool             isBeyondAvatarShadowDistance(const LLVOAvatar* avatar);
     U32                     mShadowFrame = 0;               // main view shadow updates so far

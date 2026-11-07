@@ -363,6 +363,10 @@ public:
         SNAPSHOT_BORDER_THICKNESS,          // "border_thickness"
         SNAPSHOT_FRAME_RECT,                // "frame_rect"
         // </FS:Beq>
+        // <FS:Trish> Coloured shadows: transmittance maps of sun cascades 0-1
+        FS_COLORED_SHADOW_MAP0,             // "coloredShadowMap0"
+        FS_COLORED_SHADOW_MAP1,             // "coloredShadowMap1"
+        // </FS:Trish>
 
         TONY_MC_MAPFACE_LUT,                //  "tonyMcMapfaceLut"
 

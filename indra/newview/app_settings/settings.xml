@@ -26927,6 +26927,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.05</real>
     </map>
+    <key>FSRenderColoredShadows</key>
+    <map>
+      <key>Comment</key>
+      <string>Coloured sun shadows: sunlight through alpha-blended surfaces (stained glass, tinted windows) is tinted by their colour and opacity instead of passing untouched. Covers the two nearest sun shadow cascades. Each gets an extra RGBA8 map the size of its shadow map, allocated only while this is on. In those cascades alpha-blended objects tint the light instead of casting through RenderAlphaBlendShadows. Needs sun shadows (RenderShadowDetail 1 or more). Changing it rebuilds the shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderColoredShadowAbsorption</key>
+    <map>
+      <key>Comment</key>
+      <string>Coloured sun shadows: how much light a fully opaque alpha-blended surface also blocks, 0 to 1. 0 only tints the light by the surface colour; 1 lets a fully opaque one block it completely. Clear surfaces are unaffected either way.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.25</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

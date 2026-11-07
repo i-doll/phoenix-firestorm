@@ -73,6 +73,10 @@ void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 no
 void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity);
 float getDepth(vec2 pos_screen);
 
+#if defined(FS_COLORED_SHADOW)
+vec3 fsColoredShadowTransmittance(vec3 pos); // fsColoredShadowF.glsl: sunlight through translucent casters
+#endif
+
 vec3 linear_to_srgb(vec3 c);
 float unpackRoughness(vec2 p);
 vec3 srgb_to_linear(vec3 c);
@@ -202,6 +206,9 @@ void main()
     }
 
     vec3 sunlit_linear = sunlit;
+#if defined(FS_COLORED_SHADOW)
+    sunlit_linear *= fsColoredShadowTransmittance(pos.xyz);
+#endif
     vec3 amblit_linear = amblit;
 
 #ifdef FS_WATER_CAUSTICS

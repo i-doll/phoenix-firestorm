@@ -1317,6 +1317,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "FSRenderShadowFastFilter", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "FSRenderWaterCaustics", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "FSRenderWaterFoam", handleSetShaderChanged); // <FS:Trish/>
+    setting_setup_signal_listener(gSavedSettings, "FSRenderColoredShadows", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleReleaseGLBufferChanged);

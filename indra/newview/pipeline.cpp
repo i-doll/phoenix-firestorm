@@ -1585,6 +1585,12 @@ void LLPipeline::releaseSunShadowTarget(U32 index)
     mSunShadowHistoryValid = false;
     mSunShadowFramesSkipped = 0;
     mRT->shadow[index].release();
+    // <FS:Trish> Coloured shadow target shared this depth buffer
+    if (mRT == &mMainRT)
+    {
+        releaseColoredShadowTarget(index);
+    }
+    // </FS:Trish>
 }
 
 void LLPipeline::releaseSunShadowTargets()
@@ -5139,6 +5145,231 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
 }
+
+// <FS:Trish> Coloured shadows (FSRenderColoredShadows). Sunlight through alpha-blended surfaces
+// is tinted by their colour and opacity. Sun cascades 0-1 each get an RGBA8 colour map sharing
+// the cascade's shadow depth buffer. While the cascade renders, the alpha-blended casters are
+// drawn into it with multiplicative blending over a white clear, depth tested against the opaque
+// casters and never writing depth, so only translucent surfaces in front of the nearest opaque
+// caster count. The soften pass (fsColoredShadowF.glsl) multiplies the sunlight by the map.
+// With the setting on, these casters stop going into the depth of cascades 0-1 through
+// RenderAlphaBlendShadows, so the glass tints instead of blocking.
+
+// Called by generateSunShadow before each sun cascade: allocates or re-shares the cascade's
+// colour target when needed, and says whether renderShadow should draw coloured casters for it.
+bool LLPipeline::prepareColoredShadowCascade(U32 cascade)
+{
+    static LLCachedControl<bool> colored_shadows(gSavedSettings, "FSRenderColoredShadows", false);
+
+    if (cascade >= FS_COLORED_SHADOW_CASCADES || gCubeSnapshot || mRT != &mMainRT)
+    {
+        return false;
+    }
+
+    LLRenderTarget& target = mColoredShadowTarget[cascade];
+    if (!colored_shadows || !gFSColoredShadowShaders || !sRenderDeferred || RenderShadowDetail <= 0)
+    {
+        if (target.isComplete())
+        {
+            releaseColoredShadowTarget(cascade);
+        }
+        return false;
+    }
+
+    LLRenderTarget& shadow = mRT->shadow[cascade];
+    const U32 depth = shadow.getDepth();
+    if (!depth || shadow.isBoundInStack())
+    {
+        return false;
+    }
+
+    if (!target.isComplete() || mColoredShadowDepth[cascade] != depth ||
+        target.getWidth() != shadow.getWidth() || target.getHeight() != shadow.getHeight())
+    {
+        releaseColoredShadowTarget(cascade);
+        if (!target.allocate(shadow.getWidth(), shadow.getHeight(), GL_RGBA8))
+        {
+            LL_WARNS_ONCE("Rendering") << "Could not allocate the coloured shadow targets, shadows stay grey" << LL_ENDL;
+            releaseColoredShadowTarget(cascade);
+            return false;
+        }
+        // depth tested against the opaque casters of this cascade, never written
+        shadow.shareDepthBuffer(target);
+        mColoredShadowDepth[cascade] = depth;
+    }
+    return true;
+}
+
+// Called by renderShadow after the opaque and alpha masked casters of a cascade that
+// prepareColoredShadowCascade accepted, with the cascade's matrices and render map in place.
+void LLPipeline::renderColoredShadowCasters()
+{
+    if (mColoredShadowCascade < 0 || mColoredShadowCascade >= (S32)FS_COLORED_SHADOW_CASCADES)
+    {
+        return;
+    }
+    const U32 cascade = (U32)mColoredShadowCascade;
+    LLRenderTarget& target = mColoredShadowTarget[cascade];
+
+    auto* begin = beginRenderMap(LLRenderPass::PASS_ALPHA);
+    auto* end = endRenderMap(LLRenderPass::PASS_ALPHA);
+    if (begin == end || !target.isComplete())
+    {   // nothing translucent in this cascade: its map isn't marked as drawn, the soften pass reads white
+        return;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    LL_PROFILE_GPU_ZONE("shadow colored casters");
+
+    static LLCachedControl<F32> absorption_setting(gSavedSettings, "FSRenderColoredShadowAbsorption", 0.25f);
+    static const LLStaticHashedString s_absorption("colored_shadow_absorption");
+    const F32 absorption = llclamp((F32)absorption_setting, 0.f, 1.f);
+    const S32 sun_up = LLEnvironment::instance().getIsSunUp() ? 1 : 0;
+    const U32 target_width = target.getWidth();
+
+    target.bindTarget();
+    gGL.setColorMask(true, true);
+    static const GLfloat white[] = { 1.f, 1.f, 1.f, 1.f };   // nothing filtered yet
+    glClearBufferfv(GL_COLOR, 0, white);
+
+    {
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_LEQUAL);
+        LLGLEnable blend(GL_BLEND);
+        gGL.blendFunc(LLRender::BF_ZERO, LLRender::BF_SOURCE_COLOR); // dst *= transmittance
+        gGL.setColorMask(true, false);
+
+        gGL.loadMatrix(gGLModelView);
+        gGLLastMatrix = NULL;
+
+        LLGLSLShader* bound = nullptr;
+        auto bind_caster = [&](LLGLSLShader& program, bool rigged)
+        {
+            LLGLSLShader* want = rigged && program.mRiggedVariant ? program.mRiggedVariant : &program;
+            if (bound != want)
+            {
+                program.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (F32)target_width);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(s_absorption, absorption);
+                bound = want;
+            }
+        };
+
+        for (S32 pass = 0; pass < 2; ++pass)
+        {
+            const bool rigged = pass == 1;
+            const LLVOAvatar* last_avatar = nullptr;
+            U64 last_mesh_id = 0;
+            bool skip_last_skin = false;
+            const LLVOAvatar* last_avatar_gltf = nullptr;
+            U64 last_mesh_id_gltf = 0;
+            bool skip_last_skin_gltf = false;
+            LLFetchedGLTFMaterial* last_mat_gltf = nullptr;
+            LLViewerTexture* last_tex_gltf = nullptr;
+
+            for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+            {
+                LLDrawInfo* params = *i;
+                LLCullResult::increment_iterator(i, end);
+
+                if (rigged != (params->mAvatar != nullptr))
+                {
+                    continue;
+                }
+
+                // Only plain source-over blending filters light: additive and other custom blends
+                // (glow, light beams) don't, and a legacy material in this pass for another reason
+                // keeps something other than opacity in its diffuse alpha (as for WBOIT).
+                const bool source_over = params->mBlendFuncSrc == LLRender::BF_SOURCE_ALPHA &&
+                    params->mBlendFuncDst == LLRender::BF_ONE_MINUS_SOURCE_ALPHA &&
+                    (!params->mMaterial || params->mGLTFMaterial ||
+                     (params->mShaderMask & 0x3) == LLMaterial::DIFFUSE_ALPHA_MODE_BLEND);
+                if (!source_over)
+                {
+                    continue;
+                }
+
+                if (params->mGLTFMaterial)
+                {
+                    bind_caster(gFSColoredShadowPBRProgram, rigged);
+                    if (rigged)
+                    {
+                        LLRenderPass::pushRiggedGLTFBatch(*params, last_avatar_gltf, last_mesh_id_gltf, skip_last_skin_gltf, last_mat_gltf, last_tex_gltf);
+                    }
+                    else
+                    {
+                        LLRenderPass::pushGLTFBatch(*params, last_mat_gltf, last_tex_gltf);
+                    }
+                }
+                else
+                {
+                    bind_caster(gFSColoredShadowProgram, rigged);
+                    last_mat_gltf = nullptr; // pushBatch clobbers texture units
+                    last_tex_gltf = nullptr;
+                    if (!rigged || mSimplePool->uploadMatrixPalette(params->mAvatar, params->mSkinInfo, last_avatar, last_mesh_id, skip_last_skin))
+                    {
+                        mSimplePool->pushBatch(*params, true, true);
+                    }
+                }
+            }
+        }
+
+        gGL.loadMatrix(gGLModelView);
+        gGLLastMatrix = NULL;
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    }
+
+    target.flush(); // back to the cascade's shadow map
+    mColoredShadowFrame[cascade] = LLFrameTimer::getFrameCount();
+}
+
+// From bindShadowMaps: the colour maps of programs built with FS_COLORED_SHADOW (the soften
+// program). A map not drawn for the main camera this frame is read as white.
+void LLPipeline::bindColoredShadowMaps(LLGLSLShader& shader)
+{
+    if (shader.getTextureChannel(LLShaderMgr::FS_COLORED_SHADOW_MAP0) < 0 &&
+        shader.getTextureChannel(LLShaderMgr::FS_COLORED_SHADOW_MAP1) < 0)
+    {
+        return;
+    }
+
+    static const LLStaticHashedString s_valid("colored_shadow_valid");
+    const U32 frame = LLFrameTimer::getFrameCount();
+    F32 valid[FS_COLORED_SHADOW_CASCADES] = {};
+    for (U32 k = 0; k < FS_COLORED_SHADOW_CASCADES; ++k)
+    {
+        LLRenderTarget& target = mColoredShadowTarget[k];
+        const bool drawn = !gCubeSnapshot && mRT == &mMainRT && target.isComplete() && mColoredShadowFrame[k] == frame;
+        const S32 channel = shader.enableTexture(LLShaderMgr::FS_COLORED_SHADOW_MAP0 + k);
+        if (channel < 0)
+        {
+            continue;
+        }
+        if (drawn)
+        {
+            gGL.getTexUnit(channel)->bind(&target);
+            gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+            gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+            valid[k] = 1.f;
+        }
+        else
+        {
+            gGL.getTexUnit(channel)->bindFast(LLViewerFetchedTexture::sWhiteImagep);
+        }
+    }
+    shader.uniform2f(s_valid, valid[0], valid[1]);
+}
+
+void LLPipeline::releaseColoredShadowTarget(U32 cascade)
+{
+    if (cascade < FS_COLORED_SHADOW_CASCADES)
+    {
+        mColoredShadowTarget[cascade].release();
+        mColoredShadowDepth[cascade] = 0;
+        mColoredShadowFrame[cascade] = 0;
+    }
+}
+// </FS:Trish>
 
 void LLPipeline::renderGeomShadow(LLCamera& camera)
 {
@@ -10137,6 +10368,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // <ID:VolumetricClouds> Here so the fast bind path rebinds it too
     IDVolumetricClouds::instance().bindForSampling(shader);
     // </ID:VolumetricClouds>
+    bindColoredShadowMaps(shader); // <FS:Trish/> coloured shadows, only programs that sample them
 }
 
 void LLPipeline::applyCommonOITUniforms(LLGLSLShader& shader)
@@ -11717,7 +11949,10 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                 renderMaskedObjects(LLRenderPass::PASS_ALPHA_MASK, true, true, rigged);
             }
 
-            if (render_alpha_blend_shadows)
+            // <FS:Trish> With coloured shadows they tint this cascade instead of blocking light
+            //if (render_alpha_blend_shadows)
+            if (render_alpha_blend_shadows && mColoredShadowCascade < 0)
+            // </FS:Trish>
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha blend");
                 LL_PROFILE_GPU_ZONE("shadow alpha blend");
@@ -11780,6 +12015,8 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
             gGLLastMatrix = NULL;
         }
     }
+
+    renderColoredShadowCasters(); // <FS:Trish/> coloured shadows: translucent casters of this sun cascade
 
     gDeferredShadowCubeProgram.bind();
     gGLLastMatrix = NULL;
@@ -13932,6 +14169,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 mFarCascadeTex[j] = mRT->shadow[j].getDepth();
             }
             // </FS:Trish>
+            mColoredShadowCascade = prepareColoredShadowCascade((U32)j) ? j : -1; // <FS:Trish/> coloured shadows for this cascade
             if (!hasRenderDebugMask(RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
             {
                 mShadowFrustPoints[j].clear();
@@ -14402,6 +14640,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 mShadowCamera[j+4] = shadow_cam;
             }
         }
+        mColoredShadowCascade = -1; // <FS:Trish/> not for the projector shadows below
     }
 
     const U32 shadow_count = getProjectorShadowCount();

@@ -270,6 +270,14 @@ LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 
 LLGLSLShader            gGLTFPBRMetallicRoughnessProgram;
 
+// <FS:Trish> Coloured shadows: translucent casters into the sun cascades' colour maps
+LLGLSLShader            gFSColoredShadowProgram;
+LLGLSLShader            gFSSkinnedColoredShadowProgram;
+LLGLSLShader            gFSColoredShadowPBRProgram;
+LLGLSLShader            gFSSkinnedColoredShadowPBRProgram;
+bool                    gFSColoredShadowShaders = false;    // the caster programs are built and the soften program samples the maps
+// </FS:Trish>
+
 
 //helper for making a rigged variant of a given shader
 static bool make_rigged_variant(LLGLSLShader& shader, LLGLSLShader& riggedShader)
@@ -287,6 +295,52 @@ static bool make_rigged_variant(LLGLSLShader& shader, LLGLSLShader& riggedShader
     shader.mRiggedVariant = &riggedShader;
     return riggedShader.createShader();
 }
+
+// <FS:Trish> Coloured shadows (FSRenderColoredShadows): the programs that draw alpha-blended
+// casters into the sun cascades' colour maps. Legacy prims reuse the alpha mask shadow vertex
+// shader, glTF materials the glTF one; both share one fragment shader.
+static void unload_fs_colored_shadow_casters()
+{
+    gFSColoredShadowProgram.unload();
+    gFSSkinnedColoredShadowProgram.unload();
+    gFSColoredShadowPBRProgram.unload();
+    gFSSkinnedColoredShadowPBRProgram.unload();
+    gFSColoredShadowShaders = false;
+}
+
+static bool load_fs_colored_shadow_casters(S32 shader_level)
+{
+    gFSColoredShadowProgram.mName = "FS Coloured Shadow Caster Shader";
+    gFSColoredShadowProgram.mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
+    gFSColoredShadowProgram.mShaderFiles.clear();
+    gFSColoredShadowProgram.clearPermutations();
+    gFSColoredShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowAlphaMaskV.glsl", GL_VERTEX_SHADER));
+    gFSColoredShadowProgram.mShaderFiles.push_back(make_pair("deferred/fsColoredShadowCasterF.glsl", GL_FRAGMENT_SHADER));
+    gFSColoredShadowProgram.mShaderLevel = shader_level;
+    bool success = make_rigged_variant(gFSColoredShadowProgram, gFSSkinnedColoredShadowProgram);
+    success = success && gFSColoredShadowProgram.createShader();
+
+    if (success)
+    {
+        gFSColoredShadowPBRProgram.mName = "FS Coloured Shadow glTF Caster Shader";
+        gFSColoredShadowPBRProgram.mShaderFiles.clear();
+        gFSColoredShadowPBRProgram.clearPermutations();
+        gFSColoredShadowPBRProgram.mShaderFiles.push_back(make_pair("deferred/pbrShadowAlphaMaskV.glsl", GL_VERTEX_SHADER));
+        gFSColoredShadowPBRProgram.mShaderFiles.push_back(make_pair("deferred/fsColoredShadowCasterF.glsl", GL_FRAGMENT_SHADER));
+        gFSColoredShadowPBRProgram.mShaderLevel = shader_level;
+        gFSColoredShadowPBRProgram.addPermutation("FS_PBR_CASTER", "1");
+        success = make_rigged_variant(gFSColoredShadowPBRProgram, gFSSkinnedColoredShadowPBRProgram);
+        success = success && gFSColoredShadowPBRProgram.createShader();
+    }
+
+    if (!success)
+    {
+        LL_WARNS("ShaderLoading") << "FS coloured shadow casters failed to build, coloured shadows stay off" << LL_ENDL;
+        unload_fs_colored_shadow_casters();
+    }
+    return success;
+}
+// </FS:Trish>
 
 static void add_common_permutations(LLGLSLShader* shader)
 {
@@ -1271,6 +1325,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     bool use_sun_shadow = mShaderLevel[SHADER_DEFERRED] > 1 &&
         gSavedSettings.getS32("RenderShadowDetail") > 0;
 
+    // <FS:Trish> Coloured shadows, sun shadows only
+    const bool use_colored_shadow = use_sun_shadow && gSavedSettings.getBOOL("FSRenderColoredShadows");
+    gFSColoredShadowShaders = false;
+    // </FS:Trish>
+
     if (mShaderLevel[SHADER_DEFERRED] == 0)
     {
         gDeferredTreeProgram.unload();
@@ -1354,6 +1413,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gIDCloudsFroxelProgram.unload();
         gIDCloudsFroxelAccumProgram.unload();
         // </ID:VolumetricClouds>
+        unload_fs_colored_shadow_casters(); // <FS:Trish/>
 
         for (auto i = 0; i < 4; ++i)
         {
@@ -2331,6 +2391,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
+    // <FS:Trish> Coloured shadows: the caster programs first, the soften program samples their maps
+    unload_fs_colored_shadow_casters();
+    if (success && use_colored_shadow)
+    {
+        gFSColoredShadowShaders = load_fs_colored_shadow_casters(mShaderLevel[SHADER_DEFERRED]);
+    }
+    // </FS:Trish>
+
     if (success)
     {
         gDeferredSoftenProgram.mName = "Deferred Soften Shader";
@@ -2371,7 +2439,24 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
         // </FS:Trish>
 
+        // <FS:Trish> Coloured shadows: sunlight through translucent casters
+        //success = gDeferredSoftenProgram.createShader();
+        if (gFSColoredShadowShaders)
+        {
+            gDeferredSoftenProgram.addPermutation("FS_COLORED_SHADOW", "1");
+            gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/fsColoredShadowF.glsl", GL_FRAGMENT_SHADER));
+        }
         success = gDeferredSoftenProgram.createShader();
+        if (!success && gFSColoredShadowShaders)
+        {   // e.g. out of texture units: build it as before and leave coloured shadows off
+            LL_WARNS("ShaderLoading") << "Deferred Soften Shader failed to build with coloured shadows, building it without" << LL_ENDL;
+            unload_fs_colored_shadow_casters();
+            gDeferredSoftenProgram.unload();
+            gDeferredSoftenProgram.removePermutation("FS_COLORED_SHADOW");
+            gDeferredSoftenProgram.mShaderFiles.pop_back();
+            success = gDeferredSoftenProgram.createShader();
+        }
+        // </FS:Trish>
         llassert(success);
     }
 
