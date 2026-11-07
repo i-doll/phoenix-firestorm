@@ -224,6 +224,7 @@ LLGLSLShader            gIDCloudsFroxelProgram;
 LLGLSLShader            gIDCloudsFroxelAccumProgram;
 // </ID:VolumetricClouds>
 // </FS:Trish>
+LLGLSLShader            gFSLocalTonemapLumProgram; // <FS:Trish/> Local tone mapping
 LLGLSLShader            gDeferredPostGammaCorrectProgram;
 LLGLSLShader            gLegacyPostGammaCorrectProgram;
 LLGLSLShader            gExposureProgram;
@@ -1440,6 +1441,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSBloomUpProgram.unload();
         gFSLensDirtProgram.unload();
         gFSLensEffectsProgram.unload();
+        gFSLocalTonemapLumProgram.unload(); // <FS:Trish/> Local tone mapping
         // </FS:Trish>
         // <ID:VolumetricClouds>
         gIDCloudsProgram.unload();
@@ -2978,6 +2980,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             { &gFSBloomUpProgram,          "FS Bloom Upsample",     "deferred/fsBloomUpF.glsl",          false },
             { &gFSLensDirtProgram,         "FS Lens Dirt",          "deferred/fsLensDirtF.glsl",         false },
             { &gFSLensEffectsProgram,      "FS Lens Effects",       "deferred/fsLensEffectsF.glsl",      false },
+            { &gFSLocalTonemapLumProgram,  "FS Local Tonemap Base", "deferred/fsLocalTonemapLumF.glsl",  false },
         };
         for (const FSPostShader& post : fs_post_shaders)
         {

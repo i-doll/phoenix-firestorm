@@ -282,6 +282,7 @@ extern LLGLSLShader         gIDCloudsUpsampleProgram;
 extern LLGLSLShader         gIDCloudsFroxelProgram;
 extern LLGLSLShader         gIDCloudsFroxelAccumProgram;
 // </ID:VolumetricClouds>
+extern LLGLSLShader         gFSLocalTonemapLumProgram; // <FS:Trish/> Local tone mapping
 extern LLGLSLShader         gExposureProgram;
 extern LLGLSLShader         gExposureProgramNoFade;
 extern LLGLSLShader         gLuminanceProgram;

@@ -161,6 +161,11 @@ public:
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void getExposureRange(F32& exp_min, F32& exp_max); // <FS:Trish/>
     void setExposureAdaptation(LLGLSLShader* shader, F32& exp_min, F32& exp_max); // <FS:Trish/> Eye adaptation controls
+    // <FS:Trish> Local tone mapping
+    bool renderLocalTonemapBase(LLRenderTarget* src);
+    void bindLocalTonemap(LLGLSLShader* shader, bool enabled);
+    LLRenderTarget mLocalTonemapMap;    // log2 luminance of the frame at a quarter size, with mips
+    // </FS:Trish>
     void tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_correct);
     void gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst);
     void generateGlow(LLRenderTarget* src);
