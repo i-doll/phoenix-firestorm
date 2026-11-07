@@ -487,6 +487,16 @@ void boxIntersectDebug(vec3 origin, vec3 pos, mat4 i, inout vec4 col)
 }
 
 
+// Shape of the fade at a probe's influence boundary. 0 keeps the linear ramp exactly; 1 is a
+// smoothstep, whose zero slope at the edge lets overlapping probes hand over without a crease.
+uniform float probe_blend_smooth;
+
+float probeBlendCurve(float x)
+{
+    float c = clamp(x, 0.0, 1.0);
+    return mix(x, c * c * (3.0 - 2.0 * c), probe_blend_smooth);
+}
+
 // The distance-only weight of a box probe.
 //
 // tapRefMap and tapIrradianceMap return this through an out parameter that the box branch
@@ -498,7 +508,7 @@ void boxIntersectDebug(vec3 origin, vec3 pos, mat4 i, inout vec4 col)
 //  fade - the probe's fade-in weight, as sphereWeight also folds in
 float boxDistanceWeight(float d, float fade)
 {
-    return clamp(d, 0.0, 1.0) * fade;
+    return clamp(probeBlendCurve(d), 0.0, 1.0) * fade;
 }
 
 // get the weight of a sphere probe
@@ -514,7 +524,7 @@ float sphereWeight(vec3 pos, vec3 dir, vec3 origin, float r, vec4 i, out float d
     vec3 delta = pos.xyz - origin;
     float d2 = max(length(delta), 0.001);
 
-    float atten = 1.0 - max(d2 - r1, 0.0) / max((r - r1), 0.001);
+    float atten = probeBlendCurve(1.0 - max(d2 - r1, 0.0) / max((r - r1), 0.001));
     float w = 1.0 / d2;
 
     w *= i.z;
@@ -545,7 +555,7 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
         float d = 0;
         v = boxIntersect(pos, dir, refBox[i], d);
 
-        w = max(d, 0.001);
+        w = max(probeBlendCurve(d), 0.001);
         dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
@@ -625,7 +635,7 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
     {
         float d = 0.0;
         v = boxIntersect(pos, dir, refBox[i], d, 3.0);
-        w = max(d, 0.001);
+        w = max(probeBlendCurve(d), 0.001);
         dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
@@ -832,7 +842,7 @@ void sampleProbesAmbientAndGloss(vec3 pos, vec3 norm, vec3 refDir, float lod, ve
             vr = boxIntersect(pos, refDir, refBox[i], d, 1.0);
             vi = boxIntersect(pos, norm, refBox[i], d, 3.0);
 
-            w = max(d, 0.001);
+            w = max(probeBlendCurve(d), 0.001);
             dw = boxDistanceWeight(d, refParams[i].z);
         }
         else

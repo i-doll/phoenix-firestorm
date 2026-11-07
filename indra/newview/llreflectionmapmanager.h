@@ -228,6 +228,10 @@ private:
     LLVector3 mEnvAmbient;
     bool mTexturesPending = false;
     U32 mSceneChecksThisFrame = 0;
+
+    // Probe-sampling uniforms that are not in the UBO (FSRenderProbeBlendSmooth)
+    void applyProbeShaderUniforms();
+    bool mBlendUniformTouched = false;
     // </FS:Trish>
 
     // update the neighbors of the given probe

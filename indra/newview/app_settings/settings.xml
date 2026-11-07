@@ -27422,6 +27422,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSRenderProbeBlendSmooth</key>
+    <map>
+      <key>Comment</key>
+      <string>Reflection probe blending: shape of the fade at the edge of a probe's influence volume, 0 to 1. 0 is the stock linear ramp; 1 is a smoothstep, whose zero slope at the boundary hides the crease where overlapping box and sphere probes hand over to each other. Costs a few ALU instructions per probe sample.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
