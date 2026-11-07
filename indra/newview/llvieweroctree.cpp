@@ -875,6 +875,7 @@ LLOcclusionCullingGroup::LLOcclusionCullingGroup(OctreeNode* node, LLViewerOctre
     {
         mOcclusionQuery[i] = 0;
         mOcclusionCheckCount[i] = 0;
+        mOcclusionCheckFrame[i] = 0; // <FS:Trish/>
         mOcclusionIssued[i] = 0;
         mOcclusionState[i] = parent ? SG_STATE_INHERIT_MASK & parent->mOcclusionState[i] : 0;
         mVisible[i] = 0;
@@ -1132,7 +1133,15 @@ void LLOcclusionCullingGroup::checkOcclusion()
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("co - query available");
                 glGetQueryObjectuiv(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_AVAILABLE, &available);
-                mOcclusionCheckCount[LLViewerCamera::sCurCameraID]++;
+                // <FS:Trish> checkOcclusion runs several times per frame (cull and state sort, cube map faces), so count the
+                // timeout in frames, not calls, to avoid a blocking GL_QUERY_RESULT read on a query the GPU hasn't reached yet
+                //mOcclusionCheckCount[LLViewerCamera::sCurCameraID]++;
+                if (mOcclusionCheckFrame[LLViewerCamera::sCurCameraID] != gFrameCount)
+                {
+                    mOcclusionCheckFrame[LLViewerCamera::sCurCameraID] = gFrameCount;
+                    mOcclusionCheckCount[LLViewerCamera::sCurCameraID]++;
+                }
+                // </FS:Trish>
             }
 
             static LLCachedControl<U32> occlusion_timeout(gSavedSettings, "RenderOcclusionTimeout", 4);

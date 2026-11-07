@@ -336,6 +336,7 @@ protected:
     LLViewerOctreePartition* mSpatialPartition;
     U32                      mOcclusionQuery[LLViewerCamera::NUM_CAMERAS];
     U32                      mOcclusionCheckCount[LLViewerCamera::NUM_CAMERAS];
+    U32                      mOcclusionCheckFrame[LLViewerCamera::NUM_CAMERAS]; // <FS:Trish/> frame of the last timeout count
 
 public:
     static std::set<U32> sPendingQueries;
