@@ -13560,8 +13560,35 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             mShadowModelview[i + 4] = view[i + 4];
             mShadowProjection[i + 4] = proj[i + 4];
 
-            if (!gCubeSnapshot) //skip updating spot shadow maps during cubemap updates
+            // <FS:Trish> While the light and its settings are unchanged, re-render its shadow only every N frames
+            static LLCachedControl<U32> spot_update_interval(gSavedSettings, "FSRenderSpotShadowUpdateInterval", 1);
+            SpotShadowState& spot_state = mSpotShadowState[i];
+            const U32 spot_interval = llclamp((U32)spot_update_interval, 1U, 16U);
+            const F32 light_radius = volume->getLightRadius();
+            const bool spot_unchanged = spot_state.mValid &&
+                                        spot_state.mLight == drawable &&
+                                        spot_state.mTex == mSpotShadow[i].getDepth() &&
+                                        spot_state.mCenter == center &&
+                                        spot_state.mRotation == quat &&
+                                        spot_state.mScale == scale &&
+                                        spot_state.mParams == params &&
+                                        spot_state.mRadius == light_radius;
+            const bool spot_skip = spot_interval > 1 && spot_unchanged && (mShadowFrame - spot_state.mFrame) < spot_interval;
+            //if (!gCubeSnapshot) //skip updating spot shadow maps during cubemap updates
+            if (!gCubeSnapshot && !spot_skip) //skip updating spot shadow maps during cubemap updates
+            // </FS:Trish>
             {
+                // <FS:Trish>
+                spot_state.mValid = true;
+                spot_state.mLight = drawable;
+                spot_state.mTex = mSpotShadow[i].getDepth();
+                spot_state.mCenter = center;
+                spot_state.mRotation = quat;
+                spot_state.mScale = scale;
+                spot_state.mParams = params;
+                spot_state.mRadius = light_radius;
+                spot_state.mFrame = mShadowFrame;
+                // </FS:Trish>
                 LLCamera shadow_cam = camera;
                 shadow_cam.setFar(far_clip);
                 shadow_cam.setOrigin(origin);

@@ -838,6 +838,18 @@ public:
     LLVector3               mFarCascadeEye;                 // camera and sun at the last forced update
     LLVector3               mFarCascadeAt;
     LLVector3               mFarCascadeLight;
+    struct SpotShadowState
+    {
+        const LLDrawable*   mLight = nullptr;               // identity only, never dereferenced
+        LLVector3           mCenter;
+        LLQuaternion        mRotation;
+        LLVector3           mScale;
+        LLVector3           mParams;
+        F32                 mRadius = 0.f;
+        U32                 mTex = 0;
+        U32                 mFrame = 0;
+        bool                mValid = false;
+    } mSpotShadowState[MAX_PROJECTOR_SHADOWS];
     // </FS:Trish>
 
     // exposure map for getting average color in scene

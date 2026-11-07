@@ -53,7 +53,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="1040"
+                 height="1066"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -646,6 +646,31 @@
                      min_val="0"
                      name="avatar_shadow_distance"
                      tool_tip="EXPERIMENTAL. Avatars and animesh further than this from the camera, with their attachments, cast no shadow. 0 for no limit. Your own avatar always casts."
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="spot_shadow_update_interval_label"
+                     tool_tip="EXPERIMENTAL. While a projector light and its settings stay unchanged, re-render its shadow only every this many frames. Things moving in its light update with that delay. 1 renders every frame."
+                     top_pad="6"
+                     width="285">
+                        Update still projector shadows every N frames
+                    </text>
+                    <spinner
+                     control_name="FSRenderSpotShadowUpdateInterval"
+                     decimal_digits="0"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="1"
+                     name="spot_shadow_update_interval"
+                     tool_tip="EXPERIMENTAL. While a projector light and its settings stay unchanged, re-render its shadow only every this many frames. Things moving in its light update with that delay. 1 renders every frame."
                      top_delta="-2"
                      width="100" />
                     <text

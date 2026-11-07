@@ -26696,6 +26696,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.0</real>
     </map>
+    <key>FSRenderSpotShadowUpdateInterval</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. While a projector light and its settings stay unchanged, re-render its shadow only every this many frames. Things moving in its light update with that delay. 1 renders every frame.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>FSRenderShadowMaxDistance</key>
     <map>
       <key>Comment</key>
