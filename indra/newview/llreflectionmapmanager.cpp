@@ -727,6 +727,14 @@ void LLReflectionMapManager::update()
         }
     }
 
+    // <FS:Trish> Spread the realtime probe's faces over several frames
+    static LLCachedControl<U32> fs_rt_faces(gSavedSettings, "FSPerfProbeRealtimeFacesPerFrame", 6);
+    if (realtime && closestDynamic != nullptr && fs_rt_faces < 6)
+    {
+        updateRealtimeProbeSpread(closestDynamic, fs_rt_faces);
+    }
+    else
+    // </FS:Trish>
     if (realtime && closestDynamic != nullptr)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("rmmu - realtime");
@@ -1203,6 +1211,13 @@ void LLReflectionMapManager::deleteProbe(U32 i)
         mUpdatingProbe = nullptr;
         mUpdatingFace = 0;
     }
+    // <FS:Trish> Its partial realtime faces belong to nobody now
+    if (mRealtimeProbe == probe)
+    {
+        mRealtimeProbe = nullptr;
+        mRealtimeFace = 0;
+    }
+    // </FS:Trish>
 
     // remove from any Neighbors lists
     for (auto& other : probe->mNeighbors)
@@ -1297,7 +1312,8 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
 
     S32 sourceIdx = mReflectionProbeCount;
 
-    if (probe != mUpdatingProbe)
+    //if (probe != mUpdatingProbe)
+    if (probe != mUpdatingProbe || mRealtimeUpdating) // <FS:Trish/> spread realtime faces must stay in their own scratch cube
     { // this is the "realtime" probe that's updating every frame, use the secondary scratch space channel
         sourceIdx += 1;
     }
@@ -2003,6 +2019,10 @@ void LLReflectionMapManager::initReflectionMaps()
         mUpdatingProbe = nullptr;
         mRadiancePass = false;
         mRealtimeRadiancePass = false;
+        // <FS:Trish>
+        mRealtimeProbe = nullptr;
+        mRealtimeFace = 0;
+        // </FS:Trish>
 
         // if default probe already exists, remember whether or not it's complete (SL-20498)
         bool default_complete = mDefaultProbe.isNull() ? false : mDefaultProbe->mComplete;
@@ -2101,6 +2121,10 @@ void LLReflectionMapManager::cleanup()
 
     mDefaultProbe = nullptr;
     mUpdatingProbe = nullptr;
+    // <FS:Trish>
+    mRealtimeProbe = nullptr;
+    mRealtimeFace = 0;
+    // </FS:Trish>
 
     if (mUBO != 0)
     {
@@ -2190,3 +2214,68 @@ void LLReflectionMapManager::forceDefaultProbeAndUpdateUniforms(bool force)
         sSavedOcclusion.shrink_to_fit();
     }
 }
+
+// <FS:Trish> Realtime probe faces spread over frames (FSPerfProbeRealtimeFacesPerFrame)
+// Render the realtime probe a few faces per frame instead of all six. The faces collect in
+// the realtime scratch cube, and only a finished cube is filtered into the probe's own slot
+// (face 5 does that in updateProbeFace), so what the shaders sample is always a whole cube
+// from one capture: there is no partly updated state to flicker.
+void LLReflectionMapManager::updateRealtimeProbeSpread(LLReflectionMap* probe, U32 faces_per_frame)
+{
+    LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("rmmu - realtime spread");
+
+    static LLVector4a sCaptureOrigin;
+
+    // Finish a cube in progress before moving to another probe. Two dynamic probes at nearly
+    // the same distance can swap places as "closest" from frame to frame, and restarting on
+    // every swap would never complete a cube for either.
+    if (mRealtimeFace != 0 && mRealtimeProbe && mRealtimeProbe != probe &&
+        mRealtimeCubeIndex != -1 && mRealtimeProbe->mCubeIndex == mRealtimeCubeIndex &&
+        mRealtimeProbe->getIsDynamic() && mRealtimeProbe->isRelevant())
+    {
+        probe = mRealtimeProbe;
+    }
+
+    // The scratch cube holds faces from earlier frames. They only belong together if they were
+    // captured for this probe in this slot, so anything else starts the cube over.
+    if (probe != mRealtimeProbe || probe->mCubeIndex != mRealtimeCubeIndex)
+    {
+        mRealtimeProbe = probe;
+        mRealtimeCubeIndex = probe->mCubeIndex;
+        mRealtimeFace = 0;
+    }
+
+    probe->autoAdjustOrigin();
+
+    // Every face of one cube is captured from where the probe was when the cube began. A probe
+    // riding a moving object would otherwise put each face at a different point and seam the
+    // cube at the edges.
+    if (mRealtimeFace == 0)
+    {
+        sCaptureOrigin = probe->mOrigin;
+    }
+    const LLVector4a live_origin = probe->mOrigin;
+    probe->mOrigin = sCaptureOrigin;
+
+    // store and override the value of "isRadiancePass", as the six-face path does
+    const bool radiance_pass = isRadiancePass();
+    mRadiancePass = mRealtimeRadiancePass;
+    mRealtimeUpdating = true;
+
+    const U32 faces = llclamp(faces_per_frame, 1U, 6U);
+    for (U32 i = 0; i < faces; ++i)
+    {
+        updateProbeFace(probe, mRealtimeFace);
+        if (++mRealtimeFace == 6)
+        { // the cube is filtered; the next one is the other pass
+            mRealtimeFace = 0;
+            mRealtimeRadiancePass = !mRealtimeRadiancePass;
+            break;
+        }
+    }
+
+    mRealtimeUpdating = false;
+    mRadiancePass = radiance_pass;
+    probe->mOrigin = live_origin;
+}
+// </FS:Trish>

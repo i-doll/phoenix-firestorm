@@ -27356,6 +27356,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSPerfProbeRealtimeFacesPerFrame</key>
+    <map>
+      <key>Comment</key>
+      <string>Reflection probe scheduling: how many cube faces of the realtime probe (Reflection detail: Real-time) to render each frame, 1 to 6. 6 is the stock behaviour, a whole cube every frame. Fewer spreads each cube over several frames: the faces collect in a scratch cube and only a finished cube is filtered into the probe, so the result never shows a half-updated cube. All faces of one cube are captured from the same point. Each pass (irradiance, then radiance) then takes 6/N frames instead of one, and the per-frame cost of the realtime probe drops to N/6.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>6</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

@@ -209,6 +209,13 @@ private:
     std::vector<LLReflectionMap*> mSlotOwner;
     
     bool mInvalidate = false;
+
+    // Realtime probe faces spread over frames (FSPerfProbeRealtimeFacesPerFrame)
+    void updateRealtimeProbeSpread(LLReflectionMap* probe, U32 faces_per_frame);
+    LLReflectionMap* mRealtimeProbe = nullptr; // probe whose faces sit in the realtime scratch cube
+    S32 mRealtimeCubeIndex = -1;
+    U32 mRealtimeFace = 0;
+    bool mRealtimeUpdating = false;            // updateProbeFace is rendering the realtime probe
     // </FS:Trish>
 
     // update the neighbors of the given probe
