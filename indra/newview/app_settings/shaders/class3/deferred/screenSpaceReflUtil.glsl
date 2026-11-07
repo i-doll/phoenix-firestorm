@@ -387,6 +387,300 @@ float ssrMinGlossiness()
     return SSR_GLOSS_FADE_BIAS / SSR_GLOSS_FADE_SLOPE;
 }
 
+#ifdef FS_SSR_HIZ
+// ---------------------------------------------------------------------------------------------
+// Hierarchical-Z screen-space reflections (FSRenderSSRHiZ).
+//
+// ssrHiZMap is a mip pyramid of the previous frame's scene map built by fsSSRHiZF.glsl: a holds
+// the nearest linear depth under each texel and rgb the box-filtered scene colour. The march runs
+// in (pixel x, pixel y, 1 / linear depth), where a straight view-space ray is a straight line, and
+// climbs to coarser levels while the ray stays in front of everything a cell holds, so empty space
+// costs a step per cell rather than a step per pixel. At level 0 a candidate is checked against
+// the exact depth: hits more than ssrThickness behind the surface (the ray passing behind a thin
+// object) and hits on a surface's back face are skipped and the march goes on behind them.
+//
+// Each hit carries a confidence -- screen-edge distance of the HIT (not of the pixel),
+// penetration depth, and how directly the ray heads back toward the camera -- which becomes the
+// alpha the caller blends the reflection probe result with, so SSR fades into the probes rather
+// than cutting off.
+//
+// ssrHiZActive is set by the pipeline only while ssrHiZMap matches sceneMap; anything else (the
+// water pass, which swaps in its own scene map) keeps the classic march.
+// ---------------------------------------------------------------------------------------------
+uniform sampler2D ssrHiZMap;
+uniform float ssrHiZActive;
+uniform float ssrHiZSteps;
+uniform float ssrThickness;
+uniform float ssrEdgeFade;
+uniform float ssrConeTrace;
+
+// View position (previous frame) -> (pixel x, pixel y, 1 / linear depth). For a perspective
+// projection clip w is the linear depth, so all three are affine in screen space.
+vec3 fsSSRScreen(vec3 v, vec2 res)
+{
+    vec4 c = projection_matrix * vec4(v, 1.0);
+    return vec3((c.xy / c.w * 0.5 + 0.5) * res, 1.0 / c.w);
+}
+
+vec3 fsSSRViewPosAt(ivec2 px, vec2 res)
+{
+    float d = texelFetch(sceneDepth, px, 0).r;
+    vec4 p = inv_proj * vec4((vec2(px) + 0.5) / res * 2.0 - 1.0, ndcZFromScreenDepth(d), 1.0);
+    return p.xyz / p.w;
+}
+
+// Normal of the surface at a hit, rebuilt from the depth buffer (the scene map has no normals),
+// facing the camera. Uses the neighbour on the side with the smaller depth step so silhouettes
+// don't bend it. Zero when it can't be told.
+vec3 fsSSRHitNormal(ivec2 px, vec2 res, vec3 c)
+{
+    ivec2 m = ivec2(res) - 1;
+    vec3 l = fsSSRViewPosAt(clamp(px - ivec2(1, 0), ivec2(0), m), res);
+    vec3 r = fsSSRViewPosAt(clamp(px + ivec2(1, 0), ivec2(0), m), res);
+    vec3 b = fsSSRViewPosAt(clamp(px - ivec2(0, 1), ivec2(0), m), res);
+    vec3 t = fsSSRViewPosAt(clamp(px + ivec2(0, 1), ivec2(0), m), res);
+    vec3 dx = (abs(r.z - c.z) < abs(c.z - l.z)) ? r - c : c - l;
+    vec3 dy = (abs(t.z - c.z) < abs(c.z - b.z)) ? t - c : c - b;
+    vec3 n = cross(dx, dy);
+    float len = length(n);
+    if (len < 1e-8)
+    {
+        return vec3(0.0);
+    }
+    n /= len;
+    return dot(n, c) > 0.0 ? -n : n;
+}
+
+// position, dir - current-frame view space. Returns false on a miss. On a hit: hitUV in the
+// scene map, confidence in [0,1], travelPx the hit's screen distance from the ray origin.
+bool fsTraceHiZ(vec3 position, vec3 dir, out vec2 hitUV, out float confidence, out float travelPx)
+{
+    hitUV = vec2(0.0);
+    confidence = 0.0;
+    travelPx = 0.0;
+
+    // Into the previous frame's camera space, like traceScreenRay.
+    vec3 p0 = (inv_modelview_delta * vec4(position, 1.0)).xyz;
+    vec3 d = normalize(mat3(inv_modelview_delta) * dir);
+
+    float depth0 = -p0.z;
+    if (depth0 <= max(depthRejectBias, 0.0))
+    {
+        return false;
+    }
+
+    vec2 res = vec2(textureSize(ssrHiZMap, 0));
+
+    // A ray heading toward the camera is cut short of the camera plane.
+    float len = 1000.0;
+    if (d.z > 0.0)
+    {
+        len = min(len, (depth0 - 0.05) / d.z);
+        if (len <= 0.0)
+        {
+            return false;
+        }
+    }
+
+    vec3 s0 = fsSSRScreen(p0, res);
+    vec3 sd = fsSSRScreen(p0 + d * len, res) - s0;
+
+    // Parameter range that stays on screen.
+    float tMax = 1.0;
+    if (sd.x > 0.0) tMax = min(tMax, (res.x - s0.x) / sd.x);
+    else if (sd.x < 0.0) tMax = min(tMax, -s0.x / sd.x);
+    if (sd.y > 0.0) tMax = min(tMax, (res.y - s0.y) / sd.y);
+    else if (sd.y < 0.0) tMax = min(tMax, -s0.y / sd.y);
+
+    float spanPx = max(abs(sd.x), abs(sd.y));
+    if (spanPx * tMax < 1.0)
+    {
+        return false; // the ray barely moves on screen
+    }
+
+    // Tiny components get a tiny positive stand-in: the cell boundary is then picked on the same
+    // side the crossing is computed toward, so t never steps backwards.
+    vec2 sdSafe = vec2(abs(sd.x) < 1e-6 ? 1e-6 : sd.x, abs(sd.y) < 1e-6 ? 1e-6 : sd.y);
+    vec2 invD = 1.0 / sdSafe;
+    vec2 cellStep = step(0.0, sdSafe);
+    float tEps = 0.01 / spanPx; // a hundredth of a pixel
+    int maxLevel = int(floor(log2(max(res.x, res.y))));
+    ivec2 lastPx = ivec2(res) - 1;
+
+    // Start just outside the origin pixel.
+    vec2 tb0 = (floor(s0.xy) + cellStep - s0.xy) * invD;
+    float t = min(tb0.x, tb0.y) + tEps;
+
+    int level = 0;
+    int steps = int(ssrHiZSteps);
+    bool hit = false;
+    vec3 h = s0;
+    float pen = 0.0;
+
+    for (int i = 0; i < steps; i++)
+    {
+        if (t >= tMax)
+        {
+            break;
+        }
+        vec3 p = s0 + sd * t;
+        float cellSize = exp2(float(level));
+        vec2 cell = floor(p.xy / cellSize);
+        vec2 tb = ((cell + cellStep) * cellSize - s0.xy) * invD;
+        float tExit = min(tb.x, tb.y);
+
+        ivec2 lastTexel = textureSize(ssrHiZMap, level) - 1;
+        float zNear = texelFetch(ssrHiZMap, clamp(ivec2(cell), ivec2(0), lastTexel), level).a;
+        float izNear = 1.0 / max(zNear, 1e-4);
+        // farthest point of the ray inside this cell (1/z shrinks with distance)
+        float izFar = min(p.z, s0.z + sd.z * min(tExit, tMax));
+
+        if (izFar > izNear)
+        {
+            // Entirely in front of everything in the cell: skip it and widen the search.
+            t = tExit + tEps;
+            level = min(level + 1, maxLevel);
+            continue;
+        }
+
+        // Where the ray first reaches the cell's nearest depth.
+        float tz = t;
+        if (p.z > izNear)
+        {
+            tz = clamp((izNear - s0.z) / sd.z, t, tExit);
+        }
+
+        if (level > 0)
+        {
+            t = tz;
+            level--;
+            continue;
+        }
+
+        h = s0 + sd * tz;
+        ivec2 px = clamp(ivec2(h.xy), ivec2(0), lastPx);
+        float dRaw = texelFetch(sceneDepth, px, 0).r;
+#ifdef REVERSE_Z
+        if (dRaw <= 0.0)
+#else
+        if (dRaw >= 1.0)
+#endif
+        {
+            break; // reached the sky: nothing nearer to find
+        }
+        vec3 sp = fsSSRViewPosAt(px, res);
+        pen = 1.0 / h.z + sp.z; // ray depth - surface depth
+        if (pen < ssrThickness)
+        {
+            vec3 n = fsSSRHitNormal(px, res, sp);
+            if (dot(n, d) < 0.0 || n == vec3(0.0))
+            {
+                hit = true;
+                break;
+            }
+        }
+        // Behind a thin surface, or on its back face: carry on past this pixel.
+        t = tExit + tEps;
+    }
+
+    if (!hit)
+    {
+        return false;
+    }
+
+    hitUV = h.xy / res;
+    travelPx = distance(h.xy, s0.xy);
+
+    vec2 e = min(hitUV, 1.0 - hitUV);
+    float edge = ssrEdgeFade > 0.0 ? smoothstep(0.0, ssrEdgeFade, min(e.x, e.y)) : 1.0;
+    float x = clamp(pen / max(ssrThickness, 1e-3), 0.0, 1.0);
+    float thick = 1.0 - x * x;
+    // Rays heading back toward the camera mostly find what is behind it, which the screen lacks.
+    float facing = 1.0 - smoothstep(0.4, 0.9, dot(d, -normalize(p0)));
+    confidence = edge * thick * facing;
+    return true;
+}
+
+float fsTapScreenSpaceReflectionHiZ(vec2 tc, vec3 viewPos, vec3 n, vec3 rayDir, inout vec4 collectedColor, sampler2D source, float glossiness)
+{
+    collectedColor = vec4(0);
+
+    vec3 rayDirection = normalize(rayDir);
+
+    // The classic per-pixel fades, without its screen-edge vignette of the PIXEL: the edge fade
+    // is taken at the hit instead, where the missing information actually is.
+    float vignette = clamp((dot(normalize(viewPos), n) * 0.5 + 0.5) * 5.5 - 0.8, 0, 1);
+    float zFar = 128.0;
+    vignette *= clamp(1.0 + (viewPos.z / zFar), 0.0, 1.0);
+    vignette *= clamp(glossiness * SSR_GLOSS_FADE_SLOPE - SSR_GLOSS_FADE_BIAS, 0, 1);
+    if (vignette <= 0.0)
+    {
+        return 0.0;
+    }
+
+    float roughness = clamp(1.0 - glossiness, 0.0, 1.0);
+
+    vec2 uv;
+    float conf;
+    float travel;
+
+    if (ssrConeTrace > 0.5 || roughness <= 0.0)
+    {
+        // One ray; roughness widens the colour lookup instead of scattering more rays. The
+        // classic path spreads its rays over a cone of tangent `roughness`, so the footprint at
+        // the hit is 2 * roughness * distance, read from the pyramid level of that size.
+        if (!fsTraceHiZ(viewPos, rayDirection, uv, conf, travel))
+        {
+            return 0.0;
+        }
+        if (roughness > 0.0)
+        {
+            float lod = log2(max(2.0 * roughness * travel, 1.0));
+            collectedColor.rgb = textureLod(ssrHiZMap, uv, lod).rgb;
+        }
+        else
+        {
+            collectedColor.rgb = texture(source, uv).rgb;
+        }
+        collectedColor.a = conf * vignette;
+        return 1.0;
+    }
+
+    // Jittered rays, as the classic path, each traced through the pyramid.
+    int totalSamples = clamp(int(ceil(glossySampleCount * roughness)), 1, max(1, int(glossySampleCount)));
+
+    vec3 axis = abs(rayDirection.z) < 0.999 ? vec3(0, 0, 1) : vec3(0, 1, 0);
+    vec3 firstBasis = normalize(cross(axis, rayDirection));
+    vec3 secondBasis = cross(rayDirection, firstBasis);
+    vec2 sampleRotation = vec2(random(tc), random(tc + vec2(17.0, 59.0)));
+
+    float hits = 0.0;
+    float confSum = 0.0;
+    for (int i = 0; i < totalSamples; i++)
+    {
+        vec2 sampleUV = fract(POISSON3D_SAMPLES[i].xy + sampleRotation);
+        float radius = sqrt(sampleUV.x);
+        float angle = 6.28318530718 * sampleUV.y;
+        vec2 coeffs = radius * vec2(cos(angle), sin(angle));
+        vec3 dir = normalize(rayDirection + (firstBasis * coeffs.x + secondBasis * coeffs.y) * roughness);
+
+        if (fsTraceHiZ(viewPos, dir, uv, conf, travel))
+        {
+            hits += 1.0;
+            confSum += conf;
+            collectedColor.rgb += texture(source, uv).rgb;
+        }
+    }
+
+    if (hits > 0.0)
+    {
+        collectedColor.rgb /= hits;
+    }
+    collectedColor.a = confSum / float(totalSamples) * vignette;
+    return hits;
+}
+#endif // FS_SSR_HIZ
+
 // rayDir - the direction to march, supplied by the caller rather than derived here. The probe
 //          tap bends its lookup toward the normal as the surface roughens (the GGX dominant
 //          direction), and a mirror reflect() computed here pointed somewhere else, so the two
@@ -397,6 +691,12 @@ float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, 
 #ifdef TRANSPARENT_SURFACE
 collectedColor = vec4(1, 0, 1, 1);
     return 0;
+#endif
+#ifdef FS_SSR_HIZ
+    if (ssrHiZActive > 0.5)
+    {
+        return fsTapScreenSpaceReflectionHiZ(tc, viewPos, n, rayDir, collectedColor, source, glossiness);
+    }
 #endif
     collectedColor = vec4(0);
     int hits = 0;

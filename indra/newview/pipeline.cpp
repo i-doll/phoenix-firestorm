@@ -126,6 +126,7 @@
 #include "rlvactions.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
+#include "fsssrhiz.h" // <FS:Trish/>
 
 #include "llenvironment.h"
 
@@ -1524,6 +1525,7 @@ void LLPipeline::releaseGLBuffers()
     mWaterDis.release();
 
     mSceneMap.release();
+    FSSSRHiZ::release(); // <FS:Trish/>
 
     mWaterExclusionMask.release();
 
@@ -9311,6 +9313,7 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
         LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
         dst->copyContents(*src, 0, 0, src->getWidth(), src->getHeight(), 0, 0, dst->getWidth(), dst->getHeight(),
                          GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        FSSSRHiZ::build(*dst, mScreenTriangleVB); // <FS:Trish/> hi-Z pyramid for next frame's SSR
     }
 }
 
@@ -12131,6 +12134,7 @@ void LLPipeline::bindReflectionProbes(LLGLSLShader& shader)
         gGL.getTexUnit(channel)->bind(&mSceneMap, true);
     }
 
+    FSSSRHiZ::bind(shader, mSceneMap); // <FS:Trish/> hi-Z pyramid of mSceneMap
 
 }
 

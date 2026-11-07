@@ -1672,6 +1672,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("coloredShadowMap1");
     mReservedUniforms.push_back("fs_spot_colored_map");
     // </FS:Trish>
+    mReservedUniforms.push_back("ssrHiZMap"); // <FS:Trish/>
 
     mReservedUniforms.push_back("tonyMcMapfaceLut");
 

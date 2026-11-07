@@ -48,6 +48,7 @@
 #include "llenvironment.h"
 #include "llsettingssky.h"
 #include "llsettingswater.h"
+#include "fsssrhiz.h" // <FS:Trish/>
 
 bool LLDrawPoolWater::sSkipScreenCopy = false;
 bool LLDrawPoolWater::sNeedsReflectionUpdate = true;
@@ -245,6 +246,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         const glm::mat4 identity(1.0f);
         shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(identity));
         shader->uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(identity));
+        FSSSRHiZ::disable(*shader); // <FS:Trish/> the hi-Z pyramid is of mSceneMap, not this scene map
     }
 
     LLViewerTexture* tex_a = mWaterNormp[0];

@@ -368,6 +368,7 @@ public:
         FS_COLORED_SHADOW_MAP1,             // "coloredShadowMap1"
         FS_SPOT_COLORED_MAP,                // "fs_spot_colored_map"
         // </FS:Trish>
+        FS_SSR_HIZ_MAP,                     // "ssrHiZMap" <FS:Trish/>
 
         TONY_MC_MAPFACE_LUT,                //  "tonyMcMapfaceLut"
 
