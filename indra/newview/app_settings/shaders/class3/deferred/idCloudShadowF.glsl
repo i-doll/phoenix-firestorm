@@ -1,6 +1,6 @@
 /**
  * @file class3/deferred/idCloudShadowF.glsl
- * @brief <ID> Volumetric clouds: top-down map of sunlight transmittance through the cloud layers.
+ * @brief <ID> Volumetric clouds: top-down map of sunlight transmittance through each cloud layer.
  *
  * Part of Five's custom Firestorm fork.
  */
@@ -37,9 +37,10 @@ void main()
     int count = min(id_layer_count, 4);
     int steps = max(ID_SHADOW_STEPS / max(count, 1), 1);
 
-    float od = 0.0;
+    vec4 trans = vec4(1.0);
     for (int i = 0; i < count; ++i)
     {
+        float od = 0.0;
         float base = id_layer_base[i];
         float dz = (id_layer_top[i] - base) / float(steps);
         float ds = dz * path_per_metre;
@@ -48,7 +49,8 @@ void main()
             float z = base + (float(j) + 0.5) * dz;
             od += idCloudSigma(idCloudDensity(vec3(xy + drift * z, z), i, footprint, true)) * ds;
         }
+        trans[i] = exp(-od);
     }
 
-    frag_color = vec4(exp(-od), 0.0, 0.0, 1.0);
+    frag_color = trans;
 }

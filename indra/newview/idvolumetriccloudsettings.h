@@ -24,6 +24,7 @@ enum class IDCloudType : U8
     Stratocumulus,
     Altocumulus,
     Cirrus,
+    Fog,
     Count
 };
 
@@ -46,6 +47,7 @@ struct IDCloudPreset
 };
 
 IDCloudLayer idCloudTypeDefaults(IDCloudType type);
+F32          idCloudMinThickness(IDCloudType type);
 const char*  idCloudTypeName(IDCloudType type);
 
 LLSD toLLSD(const IDCloudPreset& p);

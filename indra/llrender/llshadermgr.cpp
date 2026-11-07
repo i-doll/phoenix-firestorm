@@ -1666,6 +1666,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("idCloudDepth");
     mReservedUniforms.push_back("idCloudHistory");
     mReservedUniforms.push_back("idCloudHistoryDepth");
+    mReservedUniforms.push_back("idCloudFroxel");
     // </ID:VolumetricClouds>
 
     llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);

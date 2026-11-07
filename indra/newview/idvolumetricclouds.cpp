@@ -92,6 +92,12 @@ namespace
     constexpr F32 SHADOW_SIZE_M = 16000.f;
     constexpr F32 SHADOW_MIN_LIGHT_RISE = 0.05f;
 
+    // ID_FROXEL_SLICES in idCloudUtil.glsl must match FROXEL_D.
+    constexpr S32 FROXEL_W = 160;
+    constexpr S32 FROXEL_H = 90;
+    constexpr S32 FROXEL_D = 64;
+    constexpr F32 FROXEL_FAR_M = 1500.f;
+
     const char* CACHE_DIR   = "volumetric_clouds";
     const char* BASE_FILE   = "noise_base_v1_128.raw";
     const char* DETAIL_FILE = "noise_detail_v1_32.raw";
@@ -171,6 +177,39 @@ namespace
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
         return tex;
     }
+
+    U32 createFroxelTexture()
+    {
+        U32 tex = 0;
+        glGenTextures(1, &tex);
+        if (tex == 0)
+        {
+            return 0;
+        }
+        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, tex);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, FROXEL_W, FROXEL_H, FROXEL_D, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
+        return tex;
+    }
+
+    // The alpha passes bind the froxels without a matching unbind. A unit left recording a
+    // deleted name would skip glBindTexture once GL hands that name out again.
+    void unbindFromAllUnits(U32 tex)
+    {
+        for (U32 i = 0; i < LL_NUM_TEXTURE_LAYERS; ++i)
+        {
+            LLTexUnit* unit = gGL.getTexUnit(i);
+            if (unit && unit->getCurrTexture() == tex)
+            {
+                unit->disable();
+            }
+        }
+    }
 }
 
 IDVolumetricClouds::IDVolumetricClouds()
@@ -215,6 +254,18 @@ bool IDVolumetricClouds::prerequisitesMet() const
         && !IDCloudState::instance().current().mLayers.empty();
 }
 
+bool IDVolumetricClouds::hasFogLayer() const
+{
+    for (const IDCloudLayer& l : IDCloudState::instance().current().mLayers)
+    {
+        if (l.mType == IDCloudType::Fog)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool IDVolumetricClouds::isActive() const
 {
     return prerequisitesMet() && mNoiseBase && mNoiseDetail && mWeather
@@ -253,6 +304,7 @@ void IDVolumetricClouds::update()
                 mHistoryValid = false;
                 mShadowRT.release();
                 mShadowReady = false;
+                releaseFroxels();
             }
         }
     }
@@ -449,6 +501,8 @@ void IDVolumetricClouds::release()
     }
     mShadowRT.release();
     mShadowReady = false;
+    releaseFroxels();
+    mFroxelFailed = false;
     mWeatherKey.clear();
     mWeatherDirty = true;
 }
@@ -460,7 +514,7 @@ void IDVolumetricClouds::renderShadowMap()
     {
         return;
     }
-    if (!mShadowRT.isComplete() && !mShadowRT.allocate(SHADOW_RES, SHADOW_RES, GL_R16F))
+    if (!mShadowRT.isComplete() && !mShadowRT.allocate(SHADOW_RES, SHADOW_RES, GL_RGBA16F))
     {
         LL_WARNS_ONCE("VolumetricClouds") << "Could not allocate the cloud shadow map" << LL_ENDL;
         mShadowRT.release();
@@ -470,10 +524,14 @@ void IDVolumetricClouds::renderShadowMap()
     const std::vector<IDCloudLayer>& layers = IDCloudState::instance().current().mLayers;
     F32 lo = F32_MAX;
     F32 hi = -F32_MAX;
+    glm::vec4 layer_base(0.f);
+    glm::vec4 layer_top(0.f);
     for (size_t i = 0; i < layers.size() && i < IDCloudPreset::MAX_LAYERS; ++i)
     {
         lo = llmin(lo, layers[i].mBaseM);
         hi = llmax(hi, layers[i].mTopM);
+        layer_base[(glm::length_t)i] = layers[i].mBaseM;
+        layer_top[(glm::length_t)i] = layers[i].mTopM;
     }
     if (hi <= lo)
     {
@@ -498,20 +556,21 @@ void IDVolumetricClouds::renderShadowMap()
     if (wx < 0.0) wx += wrap;
     if (wy < 0.0) wy += wrap;
 
-    // Agent space to (shadow map uv, height within the cloud column). A point maps to where the
-    // light ray through it crosses sea level.
+    // Agent space to (shadow map uv, altitude). A point maps to where the light ray through it
+    // crosses sea level.
     const F32 inv_size = 1.f / SHADOW_SIZE_M;
     glm::mat4 world_to_uv(0.f);
     world_to_uv[0][0] = inv_size;
     world_to_uv[1][1] = inv_size;
     world_to_uv[2][0] = -drift_x * inv_size;
     world_to_uv[2][1] = -drift_y * inv_size;
-    world_to_uv[2][2] = 1.f / (hi - lo);
+    world_to_uv[2][2] = 1.f;
     world_to_uv[3][0] = 0.5f - center_agent.mV[VX] * inv_size;
     world_to_uv[3][1] = 0.5f - center_agent.mV[VY] * inv_size;
-    world_to_uv[3][2] = -lo / (hi - lo);
     world_to_uv[3][3] = 1.f;
     mShadowWorldToUV = world_to_uv;
+    mShadowLayerBase = layer_base;
+    mShadowLayerTop = layer_top;
 
     static LLStaticHashedString s_center("id_cloud_shadow_center");
     static LLStaticHashedString s_size("id_cloud_shadow_size");
@@ -547,6 +606,7 @@ void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_sr
     }
 
     mSceneFrame = U32_MAX;
+    mFroxelFrame = U32_MAX;
     mHazePending = false;
     if (!screen || !depth_src || !isActive())
     {
@@ -574,6 +634,15 @@ void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_sr
     composite(mSceneRT, depth_src, LLPipeline::RenderDeferredAtmospheric);
     mSceneFrame = LLFrameTimer::getFrameCount();
     mHazePending = LLPipeline::RenderDeferredAtmospheric;
+
+    if (hasFogLayer())
+    {
+        renderFroxels(depth_src);
+    }
+    else
+    {
+        releaseFroxels();
+    }
 }
 
 void IDVolumetricClouds::onHazeApplied()
@@ -780,6 +849,8 @@ void IDVolumetricClouds::setDensityInputs(LLGLSLShader& shader)
     static LLStaticHashedString s_layer_wind("id_layer_wind");
     static LLStaticHashedString s_layer_streak("id_layer_streak");
     static LLStaticHashedString s_planet_radius("id_planet_radius");
+    static LLStaticHashedString s_min_step("id_min_step");
+    static LLStaticHashedString s_probe_min("id_probe_min");
     static LLStaticHashedString s_camera_global("id_camera_global");
 
     constexpr U32 MAX = IDCloudPreset::MAX_LAYERS;
@@ -824,6 +895,9 @@ void IDVolumetricClouds::setDensityInputs(LLGLSLShader& shader)
     shader.uniform2fv(s_layer_wind, MAX, wind);
     shader.uniform2fv(s_layer_streak, MAX, streak);
     shader.uniform1f(s_planet_radius, PLANET_RADIUS_M);
+    const bool fog = hasFogLayer();
+    shader.uniform1f(s_min_step, fog ? 1.f : 8.f);
+    shader.uniform1f(s_probe_min, fog ? 10.f : 50.f);
 
     const F64 wrap = (F64)IDCloudState::WIND_WRAP_M;
     const LLVector3d cam = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin());
@@ -867,6 +941,9 @@ void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src
     static LLStaticHashedString s_grid("id_march_grid");
     static LLStaticHashedString s_block("id_march_block");
     static LLStaticHashedString s_offset("id_march_offset");
+    static LLStaticHashedString s_fog_shadows("id_fog_shadows");
+    static LLStaticHashedString s_shadow_range("id_shadow_range");
+    static LLStaticHashedString s_clouds_active("id_clouds_active");
 
     LLGLSLShader& shader = gIDCloudsProgram;
     LLGLDisable blend(GL_BLEND);
@@ -884,6 +961,10 @@ void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src
     shader.uniform2f(s_grid, grid.x, grid.y);
     shader.uniform2f(s_block, (F32)block.x, (F32)block.y);
     shader.uniform2f(s_offset, (F32)offset.x, (F32)offset.y);
+    shader.uniform1i(s_fog_shadows, hasFogLayer() && LLPipeline::RenderShadowDetail > 0 ? 1 : 0);
+    shader.uniform1f(s_shadow_range, gPipeline.mSunClipPlanes.mV[VW]);
+    // The light march already dims the sun by cloud; the cloud shadow map would dim it twice.
+    shader.uniform1i(s_clouds_active, 0);
 
     LLEnvironment& environment = LLEnvironment::instance();
     shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
@@ -981,6 +1062,148 @@ void IDVolumetricClouds::composite(LLRenderTarget& scene, LLRenderTarget* depth_
     gPipeline.unbindDeferredShader(shader);
 }
 
+bool IDVolumetricClouds::ensureFroxels()
+{
+    if (mFroxelFBO)
+    {
+        return true;
+    }
+    if (mFroxelFailed)
+    {
+        return false;
+    }
+
+    mFroxelSegments = createFroxelTexture();
+    mFroxelVolume = createFroxelTexture();
+    glGenFramebuffers(1, &mFroxelFBO);
+    if (mFroxelSegments && mFroxelVolume && mFroxelFBO)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, mFroxelFBO);
+        glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, mFroxelVolume, 0, 0);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
+        if (status == GL_FRAMEBUFFER_COMPLETE)
+        {
+            return true;
+        }
+    }
+
+    LL_WARNS_ONCE("VolumetricClouds") << "Could not create the fog froxel volume; see-through surfaces use the per-pixel cloud distance" << LL_ENDL;
+    releaseFroxels();
+    mFroxelFailed = true;
+    return false;
+}
+
+void IDVolumetricClouds::releaseFroxels()
+{
+    if (mFroxelFBO)
+    {
+        glDeleteFramebuffers(1, &mFroxelFBO);
+        mFroxelFBO = 0;
+    }
+    if (mFroxelSegments)
+    {
+        unbindFromAllUnits(mFroxelSegments);
+        LLImageGL::deleteTextures(1, &mFroxelSegments);
+        mFroxelSegments = 0;
+    }
+    if (mFroxelVolume)
+    {
+        unbindFromAllUnits(mFroxelVolume);
+        LLImageGL::deleteTextures(1, &mFroxelVolume);
+        mFroxelVolume = 0;
+    }
+    mFroxelFrame = U32_MAX;
+}
+
+// Draws into its own framebuffer behind LLRenderTarget's back, then rebinds the target that was
+// bound before; draw buffers are framebuffer state, so only the viewport needs restoring by hand.
+void IDVolumetricClouds::renderFroxels(LLRenderTarget* depth_src)
+{
+    if (!gIDCloudsFroxelProgram.isComplete() || !gIDCloudsFroxelAccumProgram.isComplete() || !ensureFroxels())
+    {
+        return;
+    }
+
+    static LLStaticHashedString s_slice("id_froxel_slice");
+    static LLStaticHashedString s_far("id_froxel_far");
+    static LLStaticHashedString s_grid("id_froxel_grid");
+    static LLStaticHashedString s_eye_to_world("id_eye_to_world");
+    static LLStaticHashedString s_light_steps("id_light_steps");
+    static LLStaticHashedString s_detail_noise("id_detail_noise");
+    static LLStaticHashedString s_fog_shadows("id_fog_shadows");
+    static LLStaticHashedString s_shadow_range("id_shadow_range");
+    static LLStaticHashedString s_clouds_active("id_clouds_active");
+
+    LLGLDisable blend(GL_BLEND);
+    gGL.flush();
+    glBindFramebuffer(GL_FRAMEBUFFER, mFroxelFBO);
+    glViewport(0, 0, FROXEL_W, FROXEL_H);
+
+    {
+        LLGLSLShader& shader = gIDCloudsFroxelProgram;
+        gPipeline.bindDeferredShader(shader, nullptr, depth_src);
+        setDensityInputs(shader);
+
+        const glm::mat4 eye_to_world(glm::mat3(glm::inverse(get_current_modelview())));
+        shader.uniformMatrix4fv(s_eye_to_world, 1, GL_FALSE, glm::value_ptr(eye_to_world));
+        shader.uniform1i(s_light_steps, FULL_LIGHT_STEPS);
+        shader.uniform1i(s_detail_noise, 1);
+        shader.uniform1f(s_far, FROXEL_FAR_M);
+        shader.uniform2f(s_grid, (F32)FROXEL_W, (F32)FROXEL_H);
+        shader.uniform1i(s_fog_shadows, LLPipeline::RenderShadowDetail > 0 ? 1 : 0);
+        shader.uniform1f(s_shadow_range, gPipeline.mSunClipPlanes.mV[VW]);
+        // The light march already dims the sun by cloud; the cloud shadow map would dim it twice.
+        shader.uniform1i(s_clouds_active, 0);
+
+        LLEnvironment& environment = LLEnvironment::instance();
+        shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
+        shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+
+        gPipeline.mScreenTriangleVB->setBuffer();
+        for (S32 k = 0; k < FROXEL_D; ++k)
+        {
+            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, mFroxelSegments, 0, k);
+            shader.uniform1i(s_slice, k);
+            gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        }
+
+        clearDensityInputs(shader);
+        gPipeline.unbindDeferredShader(shader);
+    }
+
+    {
+        LLGLSLShader& shader = gIDCloudsFroxelAccumProgram;
+        gPipeline.bindDeferredShader(shader, nullptr, depth_src);
+        const S32 channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_FROXEL, LLTexUnit::TT_TEXTURE_3D);
+        if (channel > -1)
+        {
+            gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mFroxelSegments);
+        }
+
+        gPipeline.mScreenTriangleVB->setBuffer();
+        for (S32 k = 0; k < FROXEL_D; ++k)
+        {
+            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, mFroxelVolume, 0, k);
+            shader.uniform1i(s_slice, k);
+            gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        }
+
+        if (channel > -1)
+        {
+            gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+            shader.disableTexture(LLShaderMgr::ID_CLOUD_FROXEL, LLTexUnit::TT_TEXTURE_3D);
+        }
+        gPipeline.unbindDeferredShader(shader);
+    }
+
+    gGL.flush();
+    glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
+    glViewport(0, 0, LLRenderTarget::sCurResX, LLRenderTarget::sCurResY);
+    mFroxelFrame = LLFrameTimer::getFrameCount();
+}
+
 // The cloud scene belongs to this frame's main view; probes, impostors, previews and any other
 // target of a different size must not read it.
 bool IDVolumetricClouds::sceneMatchesTarget() const
@@ -997,8 +1220,12 @@ void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
 {
     static LLStaticHashedString s_active("id_clouds_active");
     static LLStaticHashedString s_matrix("id_cloud_shadow_matrix");
+    static LLStaticHashedString s_layer_base("id_shadow_layer_base");
+    static LLStaticHashedString s_layer_top("id_shadow_layer_top");
     static LLStaticHashedString s_scene_active("id_cloud_scene_active");
     static LLStaticHashedString s_haze_pending("id_haze_pending");
+    static LLStaticHashedString s_froxel_active("id_cloud_froxel_active");
+    static LLStaticHashedString s_froxel_far("id_froxel_far");
 
     if (LLPipeline::sRenderingHUDs || !isActive())
     {
@@ -1018,6 +1245,8 @@ void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
 
             const glm::mat4 eye_to_uv = mShadowWorldToUV * glm::inverse(get_current_modelview());
             shader.uniformMatrix4fv(s_matrix, 1, GL_FALSE, glm::value_ptr(eye_to_uv));
+            shader.uniform4fv(s_layer_base, 1, glm::value_ptr(mShadowLayerBase));
+            shader.uniform4fv(s_layer_top, 1, glm::value_ptr(mShadowLayerTop));
         }
     }
     shader.uniform1i(s_active, channel > -1 ? 1 : 0);
@@ -1035,4 +1264,17 @@ void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
         scene = true;
     }
     shader.uniform1i(s_scene_active, scene ? 1 : 0);
+
+    bool froxel = false;
+    if (scene && mFroxelFrame == LLFrameTimer::getFrameCount())
+    {
+        channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_FROXEL, LLTexUnit::TT_TEXTURE_3D);
+        if (channel > -1)
+        {
+            gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mFroxelVolume);
+            shader.uniform1f(s_froxel_far, FROXEL_FAR_M);
+            froxel = true;
+        }
+    }
+    shader.uniform1i(s_froxel_active, froxel ? 1 : 0);
 }

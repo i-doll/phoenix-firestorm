@@ -375,6 +375,7 @@ public:
         ID_CLOUD_DEPTH,                     //  "idCloudDepth"
         ID_CLOUD_HISTORY,                   //  "idCloudHistory"
         ID_CLOUD_HISTORY_DEPTH,             //  "idCloudHistoryDepth"
+        ID_CLOUD_FROXEL,                    //  "idCloudFroxel"
         // </ID:VolumetricClouds>
 
         END_RESERVED_UNIFORMS

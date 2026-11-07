@@ -22,6 +22,14 @@ uniform int   id_layer_type[4];
 uniform vec2  id_layer_wind[4];
 uniform vec2  id_layer_streak[4];
 
+uniform mat4  id_eye_to_world;
+
+// id_eye_to_world is a pure rotation, so its transpose takes a camera-relative world vector back to eye space.
+vec3 idEyeFromRel(vec3 rel)
+{
+    return transpose(mat3(id_eye_to_world)) * rel;
+}
+
 const float ID_WEATHER_TILE_M = 40960.0;
 const float ID_WEATHER_TEXEL_M = 80.0;
 const float ID_SIGMA_MAX = 0.04;
@@ -109,6 +117,7 @@ float idCloudTypeExtinction(int type)
     if (type == 3) return 0.8;
     if (type == 4) return 1.4;
     if (type == 5) return 0.6;
+    if (type == 6) return 10.0;
     return 1.0;
 }
 
@@ -186,6 +195,36 @@ float idCloudDensity(vec3 world_pos, int layer, float footprint_m, bool cheap)
     if ((type == 0 || type == 3 || type == 4) ? (reach <= -0.5 && overcast <= 0.0) : (type != 1 && x <= 0.0))
     {
         return 0.0;
+    }
+
+    if (type == 6)
+    {
+        // Feature sizes follow the layer's thickness, so a thin layer is never a flat slab.
+        float thick = clamp(top - base, 10.0, 1000.0);
+        float period = ID_WEATHER_TILE_M / max(1.0, round(ID_WEATHER_TILE_M / (4.0 * thick)));
+        vec3 fp = vec3(xy, world_pos.z) / period;
+        float fog_lod = log2(max(footprint_m / (period / 128.0), 1.0));
+        vec4 fn = fog_lod < 1.0 ? idTextureBSpline3D(idCloudNoiseBase, fp, 0.0) : textureLod(idCloudNoiseBase, fp, fog_lod);
+
+        float fdetail = 0.5;
+        if (!cheap)
+        {
+            float fd_lod = log2(max(footprint_m / (period / 256.0), 1.0));
+            vec3 fdn = textureLod(idCloudNoiseDetail, fp * 8.0, fd_lod).rgb;
+            fdetail = fdn.r * 0.625 + fdn.g * 0.25 + fdn.b * 0.125;
+        }
+
+        float xraw = clamp((idWeatherChannel(idWeatherSample(wuv, weather_lod), layer) + c - 1.0) * inv_c, 0.0, 1.0);
+        float fpatch = mix(smoothstep(0.0, 0.5, xraw), mix(0.5, 1.0, xraw), overcast);
+
+        float fbase = clamp(idRemap(fn.g * 0.625 + fn.b * 0.25 + fn.a * 0.125, 0.3, 0.67, 0.0, 1.0), 0.0, 1.0);
+        // The blanket sinks towards the ground at the edge of a clear patch instead of ending in a wall.
+        float surface = (0.55 + 0.35 * (fbase - 0.5) * 2.0) * mix(smoothstep(0.0, 0.6, xraw), 1.0, overcast);
+        float body = 1.0 - smoothstep(surface - 0.075, surface + 0.075, h);
+        float wisp = smoothstep(0.5, 0.62, fdetail) * (1.0 - smoothstep(surface - 0.1, 1.0, h)) * id_layer_detail[layer];
+        float fd = max(body, wisp * 0.3);
+
+        return fd * fpatch * id_layer_density[layer] * idCloudTypeExtinction(type);
     }
 
     // Stratus and cirrus noise is stretched along the streak direction. streak is an integer
@@ -359,11 +398,12 @@ float idCloudSigma(float density)
 
 uniform sampler2D idCloudShadow;
 uniform mat4 id_cloud_shadow_matrix;
+uniform vec4 id_shadow_layer_base;
+uniform vec4 id_shadow_layer_top;
 uniform int id_clouds_active;
 
-// id_cloud_shadow_matrix gives the shadow map uv in xy and, in z, the height within the cloud
-// column (0 at the lowest base, 1 at the highest top). The map holds the whole column's
-// transmittance; only the part above the point applies.
+// id_cloud_shadow_matrix gives the shadow map uv in xy and the altitude in metres in z. Channel i
+// of the map holds layer i's transmittance; only the part of each layer above the point applies.
 float idSampleCloudShadow(vec3 pos_eye)
 {
     if (id_clouds_active == 0)
@@ -371,13 +411,20 @@ float idSampleCloudShadow(vec3 pos_eye)
         return 1.0;
     }
     vec3 s = (id_cloud_shadow_matrix * vec4(pos_eye, 1.0)).xyz;
-    float above = clamp(1.0 - s.z, 0.0, 1.0);
-    if (above <= 0.0)
+    vec4 above = clamp((id_shadow_layer_top - s.z) / max(id_shadow_layer_top - id_shadow_layer_base, vec4(1e-3)), 0.0, 1.0);
+    if (max(max(above.x, above.y), max(above.z, above.w)) <= 0.0)
     {
         return 1.0;
     }
-    float trans = textureLod(idCloudShadow, s.xy, 0.0).r;
-    float shadow = pow(clamp(trans, 0.0, 1.0), above);
+    vec4 trans = clamp(textureLod(idCloudShadow, s.xy, 0.0), 0.0, 1.0);
+    float shadow = 1.0;
+    for (int i = 0; i < 4; ++i)
+    {
+        if (above[i] > 0.0)
+        {
+            shadow *= pow(trans[i], above[i]);
+        }
+    }
     vec2 edge = abs(s.xy - 0.5);
     return mix(shadow, 1.0, smoothstep(0.45, 0.5, max(edge.x, edge.y)));
 }
@@ -388,6 +435,20 @@ uniform sampler2D idCloudScene;
 uniform sampler2D idCloudDepth;
 uniform int id_cloud_scene_active;
 uniform int id_haze_pending;
+
+uniform sampler3D idCloudFroxel;
+uniform int id_cloud_froxel_active;
+uniform float id_froxel_far;
+
+const float ID_FROXEL_NEAR = 0.5;
+const int ID_FROXEL_SLICES = 64;
+
+// Far edge of froxel slice k. Slices are spaced exponentially from ID_FROXEL_NEAR out to id_froxel_far;
+// slice 0 starts at the camera.
+float idFroxelSliceDist(int k)
+{
+    return ID_FROXEL_NEAR * pow(id_froxel_far / ID_FROXEL_NEAR, float(k) / float(ID_FROXEL_SLICES - 1));
+}
 
 // rgb: in-scatter of the cloud mass in front of pos_eye, a: its transmittance. While the haze pass
 // is still to run it will fog this pixel again, so the in-scatter is pre-compensated the way the
@@ -400,8 +461,20 @@ vec4 idCloudsInFront(vec3 pos_eye, vec3 haze_add, float haze_atten)
     }
     vec4 cs = texelFetch(idCloudScene, ivec2(gl_FragCoord.xy), 0);
     float cd = texelFetch(idCloudDepth, ivec2(gl_FragCoord.xy), 0).r;
-    float behind = smoothstep(cd - 50.0, cd + 50.0, length(pos_eye));
+    float dist = length(pos_eye);
+    float behind = smoothstep(cd - 50.0, cd + 50.0, dist);
     vec3 S_f = cs.rgb * behind;  float T_f = mix(1.0, cs.a, behind);
+    // Up close the froxels give the cloud in front of this exact distance; they fade out into the
+    // per-pixel result over the last tenth of their range.
+    if (id_cloud_froxel_active != 0 && dist < id_froxel_far)
+    {
+        vec2 uv = gl_FragCoord.xy / vec2(textureSize(idCloudScene, 0));
+        float k = float(ID_FROXEL_SLICES - 1) * log(max(dist, ID_FROXEL_NEAR) / ID_FROXEL_NEAR) / log(id_froxel_far / ID_FROXEL_NEAR);
+        vec4 fr = textureLod(idCloudFroxel, vec3(uv, (k + 0.5) / float(ID_FROXEL_SLICES)), 0.0);
+        float w = 1.0 - smoothstep(0.9 * id_froxel_far, id_froxel_far, dist);
+        S_f = mix(S_f, fr.rgb, w);
+        T_f = mix(T_f, fr.a, w);
+    }
     if (id_haze_pending != 0 && T_f < 1.0)
     {
         S_f = clamp((S_f - (1.0 - T_f) * haze_add) / max(haze_atten, 0.02), vec3(-11.2), vec3(11.2));

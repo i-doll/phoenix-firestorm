@@ -35,7 +35,8 @@ namespace idcloudnoise
         Stratus,
         Stratocumulus,
         Altocumulus,
-        Cirrus
+        Cirrus,
+        Fog
     };
 
     struct WeatherLayer
@@ -341,6 +342,7 @@ namespace idcloudnoise
                 w.smooth = true;
                 return w;
             }
+            case Fog:           f = 6;  w.cells = 0.f;   w.warp = 0.02f;  w.smooth = true; break;
             default: break;
         }
         w.fu = f;
