@@ -3808,12 +3808,12 @@ O botão aparecerá se houver espaço suficiente.
 	<notification name="MeshUploadErrorDetails">
 		[LABEL] não foi possível fazer upload: [MESSAGE]
 
-[DETAILS] Consulte Firestorm.log para obter detalhes.
+[DETAILS] Consulte Idyll.log para obter detalhes.
 	</notification>
 	<notification name="MeshUploadError">
 		[LABEL] não foi possível fazer upload: [MESSAGE]
 
-Consulte Firestorm.log para obter detalhes.
+Consulte Idyll.log para obter detalhes.
 	</notification>
 	<notification name="MeshUploadPermError">
 		Falha ao solicitar permissões de upload na rede
@@ -5901,8 +5901,8 @@ Esta configuração deve ser usada quando a detecção de VRAM produz resultados
 	</notification>
 	<notification name="CurrencyURIOverrideReceived">
 Esta região optou por usar um portal monetário de terceiros.
-Observe que as compras de moeda no Firestorm Viewer são transações entre você (o usuário) e os fornecedores ou vendedores da moeda.
-Nem Firestorm Viewer, Phoenix Firestorm Viewer Project Inc. nem sua equipe serão responsáveis ​​por quaisquer custos ou danos decorrentes direta ou indiretamente de tais transações.
+Observe que as compras de moeda no Idyll Viewer são transações entre você (o usuário) e os fornecedores ou vendedores da moeda.
+Nem Idyll Viewer, Phoenix Firestorm Viewer Project Inc. nem sua equipe serão responsáveis ​​por quaisquer custos ou danos decorrentes direta ou indiretamente de tais transações.
 Se você não concordar com estes Termos de Uso, nenhuma transação financeira deverá ser realizada usando este visualizador.
 		<usetemplate ignoretext="Alerta quando uma região altera o URL do portal de moeda" name="okignore" yestext="OK"/>
 	</notification>
@@ -6231,8 +6231,8 @@ Gostaria de salvá-las primeiro?
 		<usetemplate name="okcancelbuttons" notext="Não" yestext="Sim"/>
 	</notification>
 	<notification name="FSAOScriptedNotification">
-		Firestorm Animation Overrider: [AO_MESSAGE]
-		<usetemplate ignoretext="Avisar quando o Firestorm Animation Overrider for acessado por um objeto com script" name="notifyignore"/>
+		Idyll Animation Overrider: [AO_MESSAGE]
+		<usetemplate ignoretext="Avisar quando o Idyll Animation Overrider for acessado por um objeto com script" name="notifyignore"/>
 	</notification>
 	<notification name="OmniFilterNewRuleSet">
 		Digite um nome para o novo conjunto de regras:

@@ -3570,7 +3570,7 @@ Il pulsante verrà visualizzato quando lo spazio sarà sufficiente.
 	<notification name="MeshUploadError">
 		[LABEL] non è stato caricato: [MESSAGE]
 
-Per informazioni dettagliate, vedi il file del registro firestorm.log
+Per informazioni dettagliate, vedi il file del registro Idyll.log
 	</notification>
 	<notification name="MeshUploadPermError">
 		Errore durante la richiesta di autorizzazione al caricamento della mesh.
@@ -5181,8 +5181,8 @@ Questa impostazione è destinata ai casi in cui il rilevamento VRAM riporta valo
 	</notification>
 	<notification name="CurrencyURIOverrideReceived">
 		Questa regione ha attivato un gestore di denaro esterno.
-Gli acquisti di valuta fatti attraverso Firestorm sono transazioni tra voi (l&apos;utente) e il fornitore/i fornitori o rivenditore/i della valuta.
-Né Firestorm Viewer, né Phoenix Firestorm Viewer Project Inc. o la sua squadra possono essere ritenuti responsabili di spese o danni legati direttamente o indirettamente a queste transazioni.
+Gli acquisti di valuta fatti attraverso Idyll sono transazioni tra voi (l&apos;utente) e il fornitore/i fornitori o rivenditore/i della valuta.
+Né Idyll Viewer, né Phoenix Firestorm Viewer Project Inc. o la sua squadra possono essere ritenuti responsabili di spese o danni legati direttamente o indirettamente a queste transazioni.
 Se non si ritiene di aderire a questi termini d&apos;uso, non effettuare transazioni usando questo viewer.
 		<usetemplate ignoretext="La regione attiva un nuovo portale per la valuta." name="okignore" />
 	</notification>
@@ -5360,8 +5360,8 @@ Tieni presente che non è possibile selezionare "Ambiente condiviso" o "Basato s
 		L'importazione in blocco delle Windlight è terminata.
 	</notification>
 	<notification name="FSAOScriptedNotification">
-		Firestorm Animation Overrider (AO): [AO_MESSAGE]
-		<usetemplate ignoretext="Avvisami quando un oggetto scriptato richiede l'accesso all'AO di Firestorm" name="notifyignore" />
+		Idyll Animation Overrider (AO): [AO_MESSAGE]
+		<usetemplate ignoretext="Avvisami quando un oggetto scriptato richiede l'accesso all'AO di Idyll" name="notifyignore" />
 	</notification>
 	<notification name="WarnForceLoginURL">
 		L'URL della schermata iniziale è stato sovrascritto a scopo di test.

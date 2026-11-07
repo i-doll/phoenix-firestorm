@@ -282,7 +282,7 @@
 		<menu_item_call label="Firestorm YouTube" name="Firestorm YouTube"/>
 		<menu_item_call label="Firestorm Twitter" name="Firestorm Twitter"/>
 		<menu_item_call label="Firestorm Plurk" name="Firestorm Plurk"/>
-		<menu_item_call label="Firestorm MoTD" name="Firestorm MoTD"/>
+		<menu_item_call label="Idyll MoTD" name="Firestorm MoTD"/>
 	</menu>
 	<!-- Help Menu -->
 	<menu label="Kömək" name="Help">

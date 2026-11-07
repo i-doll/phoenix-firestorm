@@ -3781,12 +3781,12 @@ URL: [AUDIOURL]
 	</notification>
 	<notification name="MeshUploadErrorDetails">
 		[LABEL] не удалось загрузить: [MESSAGE]
-[DETAILS] Смотри подробности в файле журнала Firestorm.log
+[DETAILS] Смотри подробности в файле журнала Idyll.log
 	</notification>
 	<notification name="MeshUploadError">
 		Не удалось загрузить [LABEL]: [MESSAGE]
 
-Подробности смотрите в файле журнала Firestorm.log.
+Подробности смотрите в файле журнала Idyll.log.
 	</notification>
 	<notification name="MeshUploadPermError">
 		Ошибка при запросе разрешений на загрузку меша.
@@ -5418,8 +5418,8 @@ https://wiki.firestormviewer.org/fs_voice
 	</notification>
 	<notification name="CurrencyURIOverrideReceived">
 Этот регион решил указать сторонний валютный портал.
-Обратите внимание, что покупки валюты, сделанные через Firestorm Viewer, являются транзакциями между вами (пользователем) и поставщиком (ами) или продавцом (ами) валюты.
-Ни Firestorm Viewer, ни Phoenix Firestorm Viewer Project Inc., ни его команда не несут ответственности за любые расходы или ущерб, возникшие прямо или косвенно в результате любой такой транзакции.
+Обратите внимание, что покупки валюты, сделанные через Idyll Viewer, являются транзакциями между вами (пользователем) и поставщиком (ами) или продавцом (ами) валюты.
+Ни Idyll Viewer, ни Phoenix Firestorm Viewer Project Inc., ни его команда не несут ответственности за любые расходы или ущерб, возникшие прямо или косвенно в результате любой такой транзакции.
 Если вы не согласны с этими условиями использования, никакие финансовые транзакции не должны проводиться с использованием этого средства просмотра.
 		<usetemplate ignoretext="Когда регион устанавливает новый валютный помощник." name="okignore" yestext="Да"/>
 	</notification>

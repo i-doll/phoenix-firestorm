@@ -78,7 +78,7 @@
 				<combo_box.item label="高" name="1" />
 				<combo_box.item label="超高" name="0" />
 			</combo_box>
-			<check_box label="全螢幕模式" name="Fullscreen Mode" tool_tip="以全螢幕模式運行Firestorm。更改模式需要重新啟動。" />
+			<check_box label="全螢幕模式" name="Fullscreen Mode" tool_tip="以全螢幕模式運行Idyll。更改模式需要重新啟動。" />
 			<slider label="顯示距離" name="DrawDistance" />
 			<text name="DrawDistanceMeterText2">米</text>
 			<slider label="最大粒子數量" name="MaxParticleCount" />
