@@ -1374,6 +1374,36 @@ bool LLTextureFetchWorker::doWork(S32 param)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("tfwdw - state > cache_post"); //<FS:Beq/> fix incorrect category
         //nowhere to get data, abort.
+        // <FS:Trish> Don't strand an HTTP slot or a waiter entry on a worker that gives up here.
+        // The worker stays in the request map after this abort; a slot it holds (or one that
+        // releaseHttpWaiters() later hands it while it still sits in the waiter set) was never
+        // given back, and getRequestFinished() re-adding the work only lands back here.
+        if (mHttpActive)
+        {
+            // The live request owns the slot. Let it complete, then give everything back below.
+            return false;
+        }
+        if (mState == WAIT_HTTP_RESOURCE2)
+        {
+            mFetcher->removeHttpWaiter(mID);
+        }
+        if (mHttpHasResource)
+        {
+            releaseHttpSemaphore();
+        }
+        if (mState >= WAIT_HTTP_RESOURCE && mState <= WAIT_HTTP_REQ)
+        {
+            // Same rewind as the low-priority abort: resuming mid-HTTP without a slot or a
+            // waiter entry would idle or oversubscribe.
+            if (mHttpBufferArray)
+            {
+                mHttpBufferArray->release();
+                mHttpBufferArray = NULL;
+            }
+            mLoaded = false;
+            setState(LOAD_FROM_NETWORK);
+        }
+        // </FS:Trish>
         LL_WARNS(LOG_TXT) << mID << " abort, nowhere to get data" << LL_ENDL;
         return true ;
     }
