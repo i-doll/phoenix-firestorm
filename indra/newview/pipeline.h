@@ -892,6 +892,7 @@ public:
 
     // <FS:Trish> Sun rays, bloom, colour grading and lens effects
     LLRenderTarget          mSunRayMap;
+    LLRenderTarget          mSpotVolumeMap;     // volumetric projector light: rgb light, a distance marched to
     static constexpr U32    FS_BLOOM_MAX_LEVELS = 8;
     LLRenderTarget          mBloomLevels[FS_BLOOM_MAX_LEVELS];
     U32                     mBloomLevelCount = 0;       // levels drawn this frame, 0 when bloom is off
@@ -909,6 +910,7 @@ public:
     } mLensDoF;
 
     void renderSunRays();
+    void renderSpotVolumetrics();
     void renderBloom();
     bool renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst);
     void bindColorGrading(LLGLSLShader* shader);

@@ -214,6 +214,8 @@ LLGLSLShader            gNoPostTonemapLegacyGammaCorrectProgram;
 // <FS:Trish> Sun rays, bloom and lens effects
 LLGLSLShader            gFSSunRaysProgram;
 LLGLSLShader            gFSSunRaysCompositeProgram;
+LLGLSLShader            gFSSpotVolumetricProgram;
+LLGLSLShader            gFSSpotVolumetricCompositeProgram;
 LLGLSLShader            gFSBloomPrefilterProgram;
 LLGLSLShader            gFSBloomDownProgram;
 LLGLSLShader            gFSBloomUpProgram;
@@ -1600,6 +1602,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // <FS:Trish> Sun rays, bloom and lens effects
         gFSSunRaysProgram.unload();
         gFSSunRaysCompositeProgram.unload();
+        gFSSpotVolumetricProgram.unload();
+        gFSSpotVolumetricCompositeProgram.unload();
         gFSBloomPrefilterProgram.unload();
         gFSBloomDownProgram.unload();
         gFSBloomUpProgram.unload();
@@ -3218,6 +3222,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         const FSPostShader fs_post_shaders[] = {
             { &gFSSunRaysProgram,          "FS Sun Rays",           "deferred/fsSunRaysF.glsl",          true },
             { &gFSSunRaysCompositeProgram, "FS Sun Rays Composite", "deferred/fsSunRaysCompositeF.glsl", true },
+            { &gFSSpotVolumetricProgram,   "FS Spot Volumetric",    "deferred/fsSpotVolumetricF.glsl",   true },
+            { &gFSSpotVolumetricCompositeProgram, "FS Spot Volumetric Composite", "deferred/fsSpotVolumetricCompositeF.glsl", true },
             { &gFSBloomPrefilterProgram,   "FS Bloom Prefilter",    "deferred/fsBloomPrefilterF.glsl",   false },
             { &gFSBloomDownProgram,        "FS Bloom Downsample",   "deferred/fsBloomDownF.glsl",        false },
             { &gFSBloomUpProgram,          "FS Bloom Upsample",     "deferred/fsBloomUpF.glsl",          false },

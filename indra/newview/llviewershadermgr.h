@@ -271,6 +271,8 @@ extern LLGLSLShader         gNoPostTonemapLegacyGammaCorrectProgram;
 // <FS:Trish> Sun rays, bloom and lens effects
 extern LLGLSLShader         gFSSunRaysProgram;
 extern LLGLSLShader         gFSSunRaysCompositeProgram;
+extern LLGLSLShader         gFSSpotVolumetricProgram;
+extern LLGLSLShader         gFSSpotVolumetricCompositeProgram;
 extern LLGLSLShader         gFSBloomPrefilterProgram;
 extern LLGLSLShader         gFSBloomDownProgram;
 extern LLGLSLShader         gFSBloomUpProgram;

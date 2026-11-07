@@ -10342,6 +10342,7 @@ void LLPipeline::renderFinalize()
         // <FS:Trish> Added into the HDR scene before exposure is measured, so the exposure accounts
         // for them. After the SSR copy, so reflections don't pick them up a second time.
         renderSunRays();
+        renderSpotVolumetrics();
         renderBloom();
         // </FS:Trish>
 
@@ -13547,6 +13548,7 @@ void LLPipeline::releaseFSPostTargets()
 {
     mSunRayMap.release();
     mLocalTonemapMap.release(); // <FS:Trish/> Local tone mapping
+    mSpotVolumeMap.release();
     for (LLRenderTarget& level : mBloomLevels)
     {
         level.release();
@@ -13699,6 +13701,260 @@ void LLPipeline::renderSunRays()
         gFSSunRaysCompositeProgram.uniform3fv(s_ray_color, 1, light.mV);
         fs_draw_screen_triangle(mScreenTriangleVB);
         gFSSunRaysCompositeProgram.unbind();
+
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        gGL.setColorMask(true, true);
+        mRT->screen.flush();
+    }
+}
+
+// Volumetric projector light: light cones in the air from the nearest projectors.
+// Each light is ray marched through its range at reduced resolution (fsSpotVolumetricF), its
+// shadow map (when it holds a shadow slot) darkening the air behind what blocks it and its
+// texture colouring the cone. The lights add up in mSpotVolumeMap, which is filtered up and added
+// to the HDR scene the way the sun rays are.
+void LLPipeline::renderSpotVolumetrics()
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderSpotVolumetric", false);
+    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderSpotVolumetricStrength", 1.f);
+    static LLCachedControl<F32> density(gSavedSettings, "FSRenderSpotVolumetricDensity", 0.05f);
+    static LLCachedControl<S32> max_lights(gSavedSettings, "FSRenderSpotVolumetricMaxLights", 4);
+    static LLCachedControl<F32> resolution(gSavedSettings, "FSRenderSpotVolumetricResolution", 0.5f);
+    static LLCachedControl<S32> steps(gSavedSettings, "FSRenderSpotVolumetricSteps", 24);
+    static LLCachedControl<bool> unshadowed(gSavedSettings, "FSRenderSpotVolumetricUnshadowed", false);
+    static LLCachedControl<F32> anisotropy(gSavedSettings, "FSRenderSpotVolumetricAnisotropy", 0.3f);
+
+    if (!enabled)
+    {
+        mSpotVolumeMap.release();
+        return;
+    }
+
+    if (strength <= 0.f || density <= 0.f || gSnapshotNoPost || sUnderWaterRender ||
+        !gFSSpotVolumetricProgram.isComplete() || !gFSSpotVolumetricCompositeProgram.isComplete())
+    {
+        return;
+    }
+
+    // The projectors to march, nearest first: those holding a shadow slot, then, if asked for,
+    // the other projectors near the camera
+    struct VolumeLight
+    {
+        LLDrawable* mDrawable;
+        F32 mDistance;
+        S32 mSlot;      // shadow slot, -1 for none
+    };
+    std::vector<VolumeLight> lights;
+
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+    const LLVector3 eye = camera->getOrigin();
+    auto usable = [&](LLDrawable* drawable) -> LLVOVolume*
+    {
+        LLVOVolume* volume = drawable ? drawable->getVOVolume() : nullptr;
+        if (!volume || !volume->isLightSpotlight() || (volume->isAttachment() && !sRenderAttachedLights))
+        {
+            return nullptr;
+        }
+        const F32 s = volume->getLightRadius() * 1.5f;
+        if (s <= 0.001f || volume->getLightLinearColor().magVecSquared() < 0.001f)
+        {
+            return nullptr;
+        }
+        LLVector4a center;
+        center.load3(drawable->getPositionAgent().mV);
+        LLVector4a radius;
+        radius.splat(s);
+        return camera->AABBInFrustumNoFarClip(center, radius) ? volume : nullptr;
+    };
+
+    const U32 shadow_slots = getProjectorShadowCount();
+    for (U32 slot = 0; slot < shadow_slots; slot++)
+    {
+        LLDrawable* drawable = mShadowSpotLight[slot];
+        if (usable(drawable) && mSpotShadow[slot].isComplete())
+        {
+            lights.push_back({ drawable, dist_vec(eye, drawable->getPositionAgent()), (S32)slot });
+        }
+    }
+    if (unshadowed)
+    {
+        for (const Light& light : mNearbyLights)
+        {
+            LLDrawable* drawable = light.drawable;
+            bool listed = false;
+            for (const VolumeLight& l : lights)
+            {
+                listed |= l.mDrawable == drawable;
+            }
+            if (!listed && usable(drawable))
+            {
+                lights.push_back({ drawable, dist_vec(eye, drawable->getPositionAgent()), -1 });
+            }
+        }
+    }
+    if (lights.empty())
+    {
+        return;
+    }
+    std::sort(lights.begin(), lights.end(), [](const VolumeLight& a, const VolumeLight& b) { return a.mDistance < b.mDistance; });
+    lights.resize(llmin(lights.size(), (size_t)llclamp((S32)max_lights, 1, 8)));
+
+    LL_PROFILE_GPU_ZONE("spot volumetrics");
+
+    const F32 scale = llclamp((F32)resolution, 0.25f, 1.f);
+    const U32 width = llmax((U32)(mRT->screen.getWidth() * scale), 1u);
+    const U32 height = llmax((U32)(mRT->screen.getHeight() * scale), 1u);
+    if (!fs_ensure_target(mSpotVolumeMap, width, height, GL_RGBA16F)) // scattered light, distance marched to
+    {
+        return;
+    }
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+
+    static LLStaticHashedString s_vol_shadow_matrix("vol_shadow_matrix");
+    static LLStaticHashedString s_vol_shadowed("vol_shadowed");
+    static LLStaticHashedString s_vol_shadow_fade("vol_shadow_fade");
+    static LLStaticHashedString s_vol_steps("vol_steps");
+    static LLStaticHashedString s_vol_density("vol_density");
+    static LLStaticHashedString s_vol_anisotropy("vol_anisotropy");
+    static LLStaticHashedString s_vol_strength("vol_strength");
+
+    const glm::mat4 modelview = get_current_modelview();
+    const glm::mat4 trans(0.5f, 0.0f, 0.0f, 0.0f,
+                          0.0f, 0.5f, 0.0f, 0.0f,
+                          0.0f, 0.0f, 0.5f, 0.0f,
+                          0.5f, 0.5f, 0.5f, 1.0f);
+
+    // March, one additive draw per light
+    {
+        LLGLSLShader& shader = gFSSpotVolumetricProgram;
+        mSpotVolumeMap.bindTarget();
+        glClearColor(0, 0, 0, 0);
+        mSpotVolumeMap.clear(GL_COLOR_BUFFER_BIT);
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ADD);
+
+        shader.bind();
+        shader.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+        shader.uniform1i(s_vol_steps, llclamp((S32)steps, 4, 64));
+        shader.uniform1f(s_vol_density, (F32)density);
+        shader.uniform1f(s_vol_anisotropy, llclamp((F32)anisotropy, 0.f, 0.9f));
+        shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_BIAS, RenderSpotShadowBias);
+        const S32 shadow_channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0);
+        const S32 proj_channel = shader.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+
+        bool first = true;
+        for (const VolumeLight& light : lights)
+        {
+            LLDrawable* drawablep = light.mDrawable;
+            LLVOVolume* volume = drawablep->getVOVolume();
+
+            // The projector's frustum and texture parameters, as setupSpotLight sets them (it
+            // can't be called here: it also ranks the lights for the shadow slots)
+            LLVector3 params = volume->getSpotLightParams();
+            F32 fov = params.mV[0];
+            F32 focus = params.mV[1];
+
+            LLVector3 pos = drawablep->getPositionAgent();
+            LLQuaternion quat = volume->getRenderRotation();
+            LLVector3 scale3 = volume->getScale();
+
+            LLVector3 at_axis(0, 0, -scale3.mV[2] * 0.5f);
+            at_axis *= quat;
+            LLVector3 np = pos + at_axis;
+            at_axis.normVec();
+            F32 dist = (scale3.mV[1] * 0.5f) / tanf(fov * 0.5f);
+            LLVector3 origin = np - at_axis * dist;
+
+            LLMatrix4 light_mat(quat, LLVector4(origin, 1.f));
+            glm::mat4 light_to_screen = modelview * glm::make_mat4((F32*)light_mat.mMatrix);
+            glm::mat4 screen_to_light = glm::inverse(light_to_screen);
+
+            F32 s = volume->getLightRadius() * 1.5f;
+            F32 near_clip = dist;
+            F32 far_clip = s + dist - scale3.mV[VZ];
+            F32 proj_range = far_clip - near_clip;
+
+            glm::vec3 p1 = mul_mat4_vec3(light_to_screen, glm::vec3(0, 0, -(near_clip + 0.01f)));
+            glm::vec3 p2 = mul_mat4_vec3(light_to_screen, glm::vec3(0, 0, -(near_clip + 1.f)));
+            glm::vec3 n = glm::normalize(p2 - p1);
+            glm::vec3 screen_origin = mul_mat4_vec3(light_to_screen, glm::vec3(0, 0, 0));
+            glm::vec3 center = mul_mat4_vec3(modelview, glm::vec3(pos.mV[0], pos.mV[1], pos.mV[2]));
+
+            screen_to_light = trans * glm::perspective(fov, scale3.mV[VX] / scale3.mV[VY], near_clip, far_clip) * screen_to_light;
+
+            shader.uniformMatrix4fv(LLShaderMgr::PROJECTOR_MATRIX, 1, false, glm::value_ptr(screen_to_light));
+            shader.uniform3fv(LLShaderMgr::PROJECTOR_N, 1, glm::value_ptr(n));
+            shader.uniform3fv(LLShaderMgr::PROJECTOR_ORIGIN, 1, glm::value_ptr(screen_origin));
+            shader.uniform1f(LLShaderMgr::PROJECTOR_RANGE, proj_range);
+            shader.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, glm::value_ptr(center));
+            shader.uniform1f(LLShaderMgr::LIGHT_SIZE, s);
+            shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
+            LLColor3 col = volume->getLightLinearColor();
+            shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
+
+            LLViewerTexture* img = volume->getLightTexture();
+            if (!img)
+            {
+                img = LLViewerFetchedTexture::sWhiteImagep;
+            }
+            if (proj_channel > -1 && img)
+            {
+                gGL.getTexUnit(proj_channel)->bind(img);
+                F32 lod_range = logf((F32)img->getWidth()) / logf(2.f);
+                shader.uniform1f(LLShaderMgr::PROJECTOR_FOCUS, focus);
+                shader.uniform1f(LLShaderMgr::PROJECTOR_LOD, lod_range);
+            }
+
+            // The shadow map of its slot, else the light passes through everything. A depth map
+            // stays bound either way, so the shadow sampler's unit never holds another kind.
+            LLRenderTarget* shadow_map = light.mSlot >= 0 ? &mSpotShadow[light.mSlot] : (mSpotShadow[0].isComplete() ? &mSpotShadow[0] : nullptr);
+            if (shadow_channel > -1)
+            {
+                if (shadow_map)
+                {
+                    gGL.getTexUnit(shadow_channel)->bind(shadow_map, true);
+                }
+                else
+                {
+                    gGL.getTexUnit(shadow_channel)->unbind(LLTexUnit::TT_TEXTURE);
+                }
+            }
+            shader.uniform1i(s_vol_shadowed, light.mSlot >= 0 && shadow_channel > -1 ? 1 : 0);
+            if (light.mSlot >= 0)
+            {
+                const glm::mat4& m = mSpotShadowMatrix[light.mSlot];
+                shader.uniformMatrix4fv(s_vol_shadow_matrix, 1, GL_FALSE, glm::value_ptr(m));
+                shader.uniform1f(s_vol_shadow_fade, 1.f - mSpotLightFade[light.mSlot]);
+            }
+
+            // The first light also writes the distances into alpha, the others add colour only
+            gGL.setColorMask(true, first);
+            first = false;
+            fs_draw_screen_triangle(mScreenTriangleVB);
+        }
+
+        shader.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+        shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0);
+        shader.unbind();
+        gGL.setColorMask(true, true);
+        mSpotVolumeMap.flush();
+    }
+
+    // Composite onto the HDR scene
+    {
+        mRT->screen.bindTarget();
+        gGL.setColorMask(true, false); // the screen's alpha is glow
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ADD);
+
+        gFSSpotVolumetricCompositeProgram.bind();
+        gFSSpotVolumetricCompositeProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mSpotVolumeMap, false, LLTexUnit::TFO_POINT);
+        gFSSpotVolumetricCompositeProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+        gFSSpotVolumetricCompositeProgram.uniform1f(s_vol_strength, (F32)strength);
+        fs_draw_screen_triangle(mScreenTriangleVB);
+        gFSSpotVolumetricCompositeProgram.unbind();
 
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         gGL.setColorMask(true, true);

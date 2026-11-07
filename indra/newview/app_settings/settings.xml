@@ -27127,15 +27127,93 @@ Change of this parameter will affect the layout of buttons in notification toast
       <integer>2</integer>
     </map>
     <key>FSRenderExposureSpeedToBright</key>
+    <key>FSRenderSpotVolumetric</key>
     <map>
       <key>Comment</key>
-      <string>Auto exposure: multiplier on the adaptation speed when the scene gets brighter (exposure going down). 1 is the stock speed. Eyes adapt to bright light faster than to dark, so values above 1 here with values below 1 for FSRenderExposureSpeedToDark feel natural. Applies live.</string>
+      <string>Volumetric projector light: light cones in the air from the nearest projectors, shadowed by their shadow maps and coloured by their textures.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderSpotVolumetricStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>Brightness of volumetric projector light.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
       <real>1.0</real>
+    </map>
+    <key>FSRenderSpotVolumetricDensity</key>
+    <map>
+      <key>Comment</key>
+      <string>How thick the air is for volumetric projector light: scattering per metre. 0.02 is a light haze, 0.2 a smoky club.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.05</real>
+    </map>
+    <key>FSRenderSpotVolumetricMaxLights</key>
+    <map>
+      <key>Comment</key>
+      <string>Most projectors that get a volumetric cone, nearest first, 1 to 8. Each costs one reduced resolution ray march.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>4</integer>
+    </map>
+    <key>FSRenderSpotVolumetricResolution</key>
+    <map>
+      <key>Comment</key>
+      <string>Resolution of the volumetric projector light march, as a fraction of the screen, 0.25 to 1.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>FSRenderSpotVolumetricSteps</key>
+    <map>
+      <key>Comment</key>
+      <string>Samples along each view ray through a projector's range, 4 to 64. More is smoother and slower.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>24</integer>
+    </map>
+    <key>FSRenderSpotVolumetricUnshadowed</key>
+    <map>
+      <key>Comment</key>
+      <string>Also give volumetric cones to projectors that have no shadow map (the light then passes through walls).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderSpotVolumetricAnisotropy</key>
+    <map>
+      <key>Comment</key>
+      <string>How much volumetric projector light scatters forward: 0 is even in every direction, toward 0.9 the cones glow mostly when looking into the light.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.3</real>
     </map>
     <key>FSRenderExposureSpeedToDark</key>
     <map>
