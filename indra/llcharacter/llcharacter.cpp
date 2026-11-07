@@ -237,26 +237,57 @@ void LLCharacter::dumpCharacter( LLJoint* joint )
 //-----------------------------------------------------------------------------
 // setAnimationData()
 //-----------------------------------------------------------------------------
-void LLCharacter::setAnimationData(std::string name, void *data)
+// <FS:Trish> Look up by string_view, only allocate a key when inserting
+//void LLCharacter::setAnimationData(std::string name, void *data)
+//{
+//    mAnimationData[name] = data;
+//}
+void LLCharacter::setAnimationData(std::string_view name, void *data)
 {
-    mAnimationData[name] = data;
+    animation_data_map_t::iterator it = mAnimationData.find(name);
+    if (it != mAnimationData.end())
+    {
+        it->second = data;
+    }
+    else
+    {
+        mAnimationData.emplace(std::string(name), data);
+    }
 }
+// </FS:Trish>
 
 //-----------------------------------------------------------------------------
 // getAnimationData()
 //-----------------------------------------------------------------------------
-void* LLCharacter::getAnimationData(std::string name)
+// <FS:Trish> Look up by string_view
+//void* LLCharacter::getAnimationData(std::string name)
+//{
+//    return get_if_there(mAnimationData, name, (void*)NULL);
+//}
+void* LLCharacter::getAnimationData(std::string_view name)
 {
-    return get_if_there(mAnimationData, name, (void*)NULL);
+    animation_data_map_t::const_iterator it = mAnimationData.find(name);
+    return it != mAnimationData.end() ? it->second : NULL;
 }
+// </FS:Trish>
 
 //-----------------------------------------------------------------------------
 // removeAnimationData()
 //-----------------------------------------------------------------------------
-void LLCharacter::removeAnimationData(std::string name)
+// <FS:Trish> Look up by string_view
+//void LLCharacter::removeAnimationData(std::string name)
+//{
+//    mAnimationData.erase(name);
+//}
+void LLCharacter::removeAnimationData(std::string_view name)
 {
-    mAnimationData.erase(name);
+    animation_data_map_t::iterator it = mAnimationData.find(name);
+    if (it != mAnimationData.end())
+    {
+        mAnimationData.erase(it);
+    }
 }
+// </FS:Trish>
 
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
