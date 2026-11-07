@@ -101,6 +101,7 @@ private:
     void updateAvailability();
     void updateEnabled();
     void editSelected(const std::function<void(IDCloudLayer&)>& edit);
+    void markModified();
     void showFailure(const std::string& reason_string);
 
     void onPresetPicked();

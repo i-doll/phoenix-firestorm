@@ -50,7 +50,7 @@ namespace
 
     bool validName(const std::string& name)
     {
-        return !name.empty() && name != "." && name != ".."
+        return !name.empty() && name.front() != '.'
             && name.find_first_of("/\\:*?\"<>|") == std::string::npos;
     }
 
@@ -295,6 +295,22 @@ void IDCloudState::initSingleton()
 void IDCloudState::setCurrent(const IDCloudPreset& p)
 {
     fromLLSD(toLLSD(p), mCurrent);
+    mWind.resize(mCurrent.mLayers.size(), LLVector2::zero);
+    gSavedSettings.setLLSD(SETTING_STATE, toLLSD(mCurrent));
+    mChanged();
+}
+
+void IDCloudState::removeLayer(U32 index)
+{
+    if (index >= mCurrent.mLayers.size())
+    {
+        return;
+    }
+    mCurrent.mLayers.erase(mCurrent.mLayers.begin() + index);
+    if (index < mWind.size())
+    {
+        mWind.erase(mWind.begin() + index);
+    }
     mWind.resize(mCurrent.mLayers.size(), LLVector2::zero);
     gSavedSettings.setLLSD(SETTING_STATE, toLLSD(mCurrent));
     mChanged();

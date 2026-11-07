@@ -14,6 +14,7 @@
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "llfilepicker.h"
+#include "llfloaterpreference.h"
 #include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llnotificationsutil.h"
@@ -25,13 +26,42 @@
 #include "llviewercontrol.h"
 #include "llviewermenufile.h"
 #include "llwindow.h"
-#include "rlvactions.h"
 
 #include <algorithm>
 #include <cmath>
 
 static LLDefaultChildRegistry::Register<IDCloudAltitudeColumn> r_id_cloud_altitude_column("id_cloud_altitude_column");
 static LLDefaultChildRegistry::Register<IDCloudCompassDial> r_id_cloud_compass_dial("id_cloud_compass_dial");
+
+// The Experimental preferences panel, so its cloud toggles grey out when the clouds cannot be changed.
+class IDPanelPreferenceExperimental : public LLPanelPreference
+{
+public:
+    bool postBuild() override
+    {
+        mCloudControls = { findChild<LLUICtrl>("volumetric_clouds_enabled"),
+                           findChild<LLUICtrl>("volumetric_clouds_full_quality") };
+        return LLPanelPreference::postBuild();
+    }
+
+    void draw() override
+    {
+        const bool can_edit = IDVolumetricClouds::canEdit();
+        for (LLUICtrl* ctrl : mCloudControls)
+        {
+            if (ctrl)
+            {
+                ctrl->setEnabled(can_edit);
+            }
+        }
+        LLPanelPreference::draw();
+    }
+
+private:
+    std::array<LLUICtrl*, 2> mCloudControls{};
+};
+
+static LLPanelInjector<IDPanelPreferenceExperimental> t_id_panel_preference_experimental("id_panel_preference_experimental");
 
 namespace
 {
@@ -211,6 +241,11 @@ bool IDCloudAltitudeColumn::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool IDCloudAltitudeColumn::handleHover(S32 x, S32 y, MASK mask)
 {
+    if (hasMouseCapture() && !getEnabled())
+    {
+        gFocusMgr.setMouseCapture(nullptr);
+    }
+
     Drag mode = mDrag;
     if (hasMouseCapture() && mDrag != Drag::None && mSelected >= 0 && mSelected < static_cast<S32>(mLayers.size()))
     {
@@ -365,7 +400,11 @@ bool IDCloudCompassDial::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool IDCloudCompassDial::handleHover(S32 x, S32 y, MASK mask)
 {
-    if (hasMouseCapture() && setFromPoint(x, y))
+    if (hasMouseCapture() && !getEnabled())
+    {
+        gFocusMgr.setMouseCapture(nullptr);
+    }
+    else if (hasMouseCapture() && setFromPoint(x, y))
     {
         onCommit();
     }
@@ -489,9 +528,9 @@ void IDFloaterVolumetricClouds::draw()
 
 void IDFloaterVolumetricClouds::updateAvailability()
 {
-    const Blocked blocked = !IDVolumetricClouds::isSupported() ? Blocked::Unsupported
-                          : !RlvActions::canChangeEnvironment() ? Blocked::Rlv
-                          : Blocked::None;
+    const Blocked blocked = IDVolumetricClouds::canEdit() ? Blocked::None
+                          : !IDVolumetricClouds::isSupported() ? Blocked::Unsupported
+                          : Blocked::Rlv;
     if (blocked == mBlocked)
     {
         return;
@@ -591,7 +630,14 @@ void IDFloaterVolumetricClouds::editSelected(const std::function<void(IDCloudLay
         return;
     }
     edit(p.mLayers[sel]);
+    markModified();
     IDCloudState::instance().setCurrent(p);
+}
+
+void IDFloaterVolumetricClouds::markModified()
+{
+    gSavedSettings.setString(SETTING_PRESET, std::string());
+    mPresetCombo->clear();
 }
 
 void IDFloaterVolumetricClouds::showFailure(const std::string& reason_string)
@@ -740,6 +786,7 @@ void IDFloaterVolumetricClouds::onColumnCommit()
 
     if (moved)
     {
+        markModified();
         IDCloudState::instance().setCurrent(p);
     }
     else
@@ -775,6 +822,7 @@ void IDFloaterVolumetricClouds::onAddLayer()
 
     p.mLayers.push_back(layer);
     const S32 index = static_cast<S32>(p.mLayers.size()) - 1;
+    markModified();
     IDCloudState::instance().setCurrent(p);
     mColumn->setSelected(index);
     refreshFromState();
@@ -782,14 +830,14 @@ void IDFloaterVolumetricClouds::onAddLayer()
 
 void IDFloaterVolumetricClouds::onDeleteLayer()
 {
-    IDCloudPreset p = IDCloudState::instance().current();
+    const S32 count = static_cast<S32>(IDCloudState::instance().current().mLayers.size());
     const S32 sel = mColumn->getSelected();
-    if (p.mLayers.size() <= 1 || sel < 0 || sel >= static_cast<S32>(p.mLayers.size()))
+    if (count <= 1 || sel < 0 || sel >= count)
     {
         return;
     }
-    p.mLayers.erase(p.mLayers.begin() + sel);
-    IDCloudState::instance().setCurrent(p);
+    markModified();
+    IDCloudState::instance().removeLayer(static_cast<U32>(sel));
 }
 
 void IDFloaterVolumetricClouds::onTypePicked(IDCloudType type)

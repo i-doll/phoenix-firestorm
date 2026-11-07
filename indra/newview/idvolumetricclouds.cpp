@@ -554,12 +554,17 @@ bool IDVolumetricClouds::isSupported()
 #endif
 }
 
+// static
+bool IDVolumetricClouds::canEdit()
+{
+    return isSupported() && RlvActions::canChangeEnvironment();
+}
+
 bool IDVolumetricClouds::prerequisitesMet() const
 {
     static LLCachedControl<bool> enabled(gSavedSettings, "IDVolumetricCloudsEnabled", false);
     return enabled
-        && isSupported()
-        && RlvActions::canChangeEnvironment()
+        && canEdit()
         && !IDCloudState::instance().current().mLayers.empty();
 }
 

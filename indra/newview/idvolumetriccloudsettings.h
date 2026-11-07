@@ -72,6 +72,7 @@ public:
 
     const IDCloudPreset& current() const { return mCurrent; }
     void setCurrent(const IDCloudPreset& p);
+    void removeLayer(U32 index);
     void advance(F32 dt_seconds);
     LLVector2 windOffsetM(U32 layer) const;
     void freezeWind() { ++mWindFrozen; }

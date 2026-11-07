@@ -28,6 +28,7 @@ class IDVolumetricClouds : public LLSingleton<IDVolumetricClouds>
 
 public:
     static bool isSupported();
+    static bool canEdit();
     bool isActive() const;
     void update();
     bool fullQuality() const;
