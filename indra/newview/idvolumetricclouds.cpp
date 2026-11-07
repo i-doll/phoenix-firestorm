@@ -889,6 +889,9 @@ void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src
     static LLStaticHashedString s_grid("id_march_grid");
     static LLStaticHashedString s_block("id_march_block");
     static LLStaticHashedString s_offset("id_march_offset");
+    static LLStaticHashedString s_fog_shadows("id_fog_shadows");
+    static LLStaticHashedString s_shadow_range("id_shadow_range");
+    static LLStaticHashedString s_clouds_active("id_clouds_active");
 
     LLGLSLShader& shader = gIDCloudsProgram;
     LLGLDisable blend(GL_BLEND);
@@ -906,6 +909,10 @@ void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src
     shader.uniform2f(s_grid, grid.x, grid.y);
     shader.uniform2f(s_block, (F32)block.x, (F32)block.y);
     shader.uniform2f(s_offset, (F32)offset.x, (F32)offset.y);
+    shader.uniform1i(s_fog_shadows, hasFogLayer() && LLPipeline::RenderShadowDetail > 0 ? 1 : 0);
+    shader.uniform1f(s_shadow_range, gPipeline.mSunClipPlanes.mV[VW]);
+    // The light march already dims the sun by cloud; the cloud shadow map would dim it twice.
+    shader.uniform1i(s_clouds_active, 0);
 
     LLEnvironment& environment = LLEnvironment::instance();
     shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);

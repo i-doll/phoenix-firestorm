@@ -2830,6 +2830,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
             shader->mShaderFiles.push_back(make_pair(file, GL_FRAGMENT_SHADER));
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            if (shader == &gIDCloudsProgram)
+            {
+                shader->mFeatures.hasShadows = use_sun_shadow;
+                if (use_sun_shadow)
+                {
+                    shader->addPermutation("HAS_SUN_SHADOW", "1");
+                }
+            }
             if (!shader->createShader())
             {
                 LL_WARNS("ShaderLoading") << file << " failed to build, volumetric clouds stay off" << LL_ENDL;

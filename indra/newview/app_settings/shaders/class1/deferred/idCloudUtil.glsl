@@ -22,6 +22,14 @@ uniform int   id_layer_type[4];
 uniform vec2  id_layer_wind[4];
 uniform vec2  id_layer_streak[4];
 
+uniform mat4  id_eye_to_world;
+
+// id_eye_to_world is a pure rotation, so its transpose takes a camera-relative world vector back to eye space.
+vec3 idEyeFromRel(vec3 rel)
+{
+    return transpose(mat3(id_eye_to_world)) * rel;
+}
+
 const float ID_WEATHER_TILE_M = 40960.0;
 const float ID_WEATHER_TEXEL_M = 80.0;
 const float ID_SIGMA_MAX = 0.04;

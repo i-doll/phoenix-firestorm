@@ -24,6 +24,7 @@ uniform vec3  id_camera_global;
 
 float idCloudDensityAll(vec3 world_pos, float footprint_m, bool cheap);
 float idCloudSigma(float density);
+vec3 idEyeFromRel(vec3 rel);
 
 // Altitude above sea level of a point given relative to the camera, on a planet whose centre is
 // straight below the camera. Written to keep float precision with a 6360 km radius.
@@ -54,12 +55,17 @@ uniform vec3  moon_dir;
 uniform int   sun_up_factor;
 uniform int   classic_mode;
 uniform float sky_hdr_scale;
+uniform int   id_fog_shadows;
+uniform float id_shadow_range;
 
 float getDepth(vec2 pos_screen);
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 additive, out vec3 atten);
 vec3 srgb_to_linear(vec3 c);
 vec3 clampHDRRange(vec3 color);
+#if defined(HAS_SUN_SHADOW)
+float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+#endif
 
 const float ID_MAX_DIST = 160000.0;
 const float ID_FADE_START = 100000.0;
@@ -277,7 +283,7 @@ float idHeightFraction(float alt)
     return 0.5;
 }
 
-void idMarch(vec3 dir, float scene_t, int steps, float jitter, float pixel_angle, vec3 light_w, vec3 sunlit, vec3 amblit,
+void idMarch(vec3 dir, vec2 tc, float scene_t, int steps, float jitter, float pixel_angle, vec3 light_w, vec3 light_eye, vec3 sunlit, vec3 amblit,
              out vec3 scatter, out float trans, out float w_sum, out float wd_sum)
 {
     scatter = vec3(0.0);
@@ -364,6 +370,13 @@ void idMarch(vec3 dir, float scene_t, int steps, float jitter, float pixel_angle
             float sigma = idCloudSigma(dens);
             float od = idLightOpticalDepth(rel, light_w, footprint);
             vec3 sun = sunlit * idSunScattering(od, cos_theta, sigma);
+#if defined(HAS_SUN_SHADOW)
+            if (id_fog_shadows == 1 && ts < id_shadow_range)
+            {
+                float shadow = sampleDirectionalShadow(idEyeFromRel(rel), light_eye, tc);
+                sun *= mix(shadow, 1.0, smoothstep(0.9 * id_shadow_range, id_shadow_range, ts));
+            }
+#endif
             float hf = idHeightFraction(alt);
             vec3 amb = amblit * mix(0.4, 1.0, hf) * mix(0.5, 1.0, idSkyVisibility(rel, footprint));
             // Sunlight bounced off the ground lifts the undersides out of a flat grey slab.
@@ -441,8 +454,8 @@ void main()
         float s_trans;
         float s_w;
         float s_wd;
-        idMarch(normalize(eye_to_world * dir_eye), scene_t, steps, fract(jitter + 0.25 * float(k)),
-                pixel_angle, light_w, sunlit, amblit, s_scatter, s_trans, s_w, s_wd);
+        idMarch(normalize(eye_to_world * dir_eye), stc, scene_t, steps, fract(jitter + 0.25 * float(k)),
+                pixel_angle, light_w, light_eye, sunlit, amblit, s_scatter, s_trans, s_w, s_wd);
         scatter += s_scatter;
         trans += s_trans;
         w_sum += s_w;
