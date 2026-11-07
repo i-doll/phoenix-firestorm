@@ -216,8 +216,29 @@ struct CompareProbeDistance
     }
 };
 
+// <FS:Trish> Importance-weighted update order (FSPerfProbeUpdatePriority), set once per update()
+static bool sImportancePriority = false;
+
+// How much a refresh of this probe is worth per second of age: probes the camera can see and
+// probes close to it go stale visibly, an off-screen probe 100 m away hardly at all. Age is a
+// factor, not a term, so a probe nobody looks at still climbs the queue and is never starved.
+static F32 update_importance(LLReflectionMap* p)
+{
+    constexpr F32 OFFSCREEN_WEIGHT = 0.25f;
+    constexpr F32 DISTANCE_FALLOFF = 32.f; // metres at which importance halves
+    F32 w = p->mInView ? 1.f : OFFSCREEN_WEIGHT;
+    return w / (1.f + llmax(p->mDistance, 0.f) / DISTANCE_FALLOFF);
+}
+// </FS:Trish>
+
 static F32 update_score(LLReflectionMap* p)
 {
+    // <FS:Trish>
+    if (sImportancePriority)
+    {
+        return (gFrameTimeSeconds - p->mLastUpdateTime) * update_importance(p);
+    }
+    // </FS:Trish>
     return gFrameTimeSeconds - p->mLastUpdateTime  - p->mDistance*0.1f;
 }
 
@@ -234,6 +255,12 @@ static bool check_priority(LLReflectionMap* a, LLReflectionMap* b)
     }
     else if (!a->mComplete && !b->mComplete)
     { //neither probe is complete, generate the placed one first, then use distance
+        // <FS:Trish> With importance ordering, a missing probe on screen is filled before one off screen
+        if (sImportancePriority && a->mInView != b->mInView)
+        {
+            return a->mInView;
+        }
+        // </FS:Trish>
         if (a->mPriority != b->mPriority)
         {
             return a->mPriority > b->mPriority;
@@ -413,6 +440,11 @@ void LLReflectionMapManager::update()
             sCullCounts.clear();
         }
     }
+    // </FS:Trish>
+
+    // <FS:Trish> Scheduling options
+    static LLCachedControl<bool> fs_update_priority(gSavedSettings, "FSPerfProbeUpdatePriority", false);
+    sImportancePriority = fs_update_priority;
     // </FS:Trish>
 
     bool did_update = false;
