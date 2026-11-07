@@ -27279,6 +27279,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSRenderColoredShadowsProjectors</key>
+    <map>
+      <key>Comment</key>
+      <string>Coloured projector shadows: with FSRenderColoredShadows also on, light from shadowed projectors through alpha-blended surfaces (stained glass, tinted windows) is tinted by their colour and opacity, as sunlight is. Every projector with a shadow slot (FSRenderSpotShadowCount) gets an extra RGBA8 map the size of its shadow map (16 MB each at the default 2048 cap), allocated only while this is on. For those projectors alpha-blended objects tint the light instead of casting through RenderAlphaBlendShadows. Uses FSRenderColoredShadowAbsorption. Needs projector shadows (RenderShadowDetail 2). Changing it rebuilds the shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

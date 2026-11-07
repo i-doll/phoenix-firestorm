@@ -366,6 +366,7 @@ public:
         // <FS:Trish> Coloured shadows: transmittance maps of sun cascades 0-1
         FS_COLORED_SHADOW_MAP0,             // "coloredShadowMap0"
         FS_COLORED_SHADOW_MAP1,             // "coloredShadowMap1"
+        FS_SPOT_COLORED_MAP,                // "fs_spot_colored_map"
         // </FS:Trish>
 
         TONY_MC_MAPFACE_LUT,                //  "tonyMcMapfaceLut"

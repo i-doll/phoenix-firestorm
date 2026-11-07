@@ -1611,6 +1611,7 @@ void LLPipeline::releaseSpotShadowTargets()
             mSpotShadow[i].release();
         }
         mSpotShadowAllocated = 0;
+        fsReleaseSpotColoredTargets(); // <FS:Trish/> they shared these depth buffers
     }
 }
 
@@ -5202,20 +5203,35 @@ bool LLPipeline::prepareColoredShadowCascade(U32 cascade)
 
 // Called by renderShadow after the opaque and alpha masked casters of a cascade that
 // prepareColoredShadowCascade accepted, with the cascade's matrices and render map in place.
+// Also by a projector's shadow pass that fsBeginSpotColoredShadow accepted (mFSSpotColoredSlot).
 void LLPipeline::renderColoredShadowCasters()
 {
+    if (mFSSpotColoredSlot >= 0 && mFSSpotColoredSlot < (S32)MAX_PROJECTOR_SHADOWS)
+    {
+        const U32 slot = (U32)mFSSpotColoredSlot;
+        mFSSpotColoredDrawn[slot] = drawColoredShadowCasters(mFSSpotColoredTarget[slot]);
+        return;
+    }
     if (mColoredShadowCascade < 0 || mColoredShadowCascade >= (S32)FS_COLORED_SHADOW_CASCADES)
     {
         return;
     }
     const U32 cascade = (U32)mColoredShadowCascade;
-    LLRenderTarget& target = mColoredShadowTarget[cascade];
+    if (drawColoredShadowCasters(mColoredShadowTarget[cascade]))
+    {
+        mColoredShadowFrame[cascade] = LLFrameTimer::getFrameCount();
+    }
+}
 
+// Draws the source-over alpha-blended casters of the current shadow pass into target, whose
+// depth is the pass's shadow depth. False when there are none (the map then reads as white).
+bool LLPipeline::drawColoredShadowCasters(LLRenderTarget& target)
+{
     auto* begin = beginRenderMap(LLRenderPass::PASS_ALPHA);
     auto* end = endRenderMap(LLRenderPass::PASS_ALPHA);
     if (begin == end || !target.isComplete())
-    {   // nothing translucent in this cascade: its map isn't marked as drawn, the soften pass reads white
-        return;
+    {   // nothing translucent in this pass: its map isn't marked as drawn and reads as white
+        return false;
     }
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -5319,8 +5335,8 @@ void LLPipeline::renderColoredShadowCasters()
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
 
-    target.flush(); // back to the cascade's shadow map
-    mColoredShadowFrame[cascade] = LLFrameTimer::getFrameCount();
+    target.flush(); // back to the cascade's or projector's shadow map
+    return true;
 }
 
 // From bindShadowMaps: the colour maps of programs built with FS_COLORED_SHADOW (the soften
@@ -11851,6 +11867,7 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     {
         shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, show_shadow_debug ? -100.f : 1.f);
     }
+    fsBindSpotColoredShadow(shader, s_idx); // <FS:Trish/> coloured projector shadows
 
     // a light already holding a target slot must not take a second one
     bool already_targeted = false;
@@ -12290,7 +12307,7 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
 
             // <FS:Trish> With coloured shadows they tint this cascade instead of blocking light
             //if (render_alpha_blend_shadows)
-            if (render_alpha_blend_shadows && mColoredShadowCascade < 0)
+            if (render_alpha_blend_shadows && mColoredShadowCascade < 0 && mFSSpotColoredSlot < 0)
             // </FS:Trish>
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha blend");
@@ -13163,6 +13180,124 @@ U32 LLPipeline::getProjectorShadowCount() const
     // limited by allocated targets so a raised setting waits for the shadow buffer resize
     return RenderShadowDetail > 1 ? llmin(RenderProjectorShadowCount, mSpotShadowAllocated) : 0;
 }
+
+// Coloured projector shadows (FSRenderColoredShadows and FSRenderColoredShadowsProjectors): light
+// from a projector through stained glass or tinted surfaces is tinted. Every shadow slot, the
+// stock two and the extra ones alike, gets an RGBA8 colour map that shares the slot's shadow
+// depth. renderShadow draws the pass's alpha-blended casters into it after the opaque ones, with
+// the sun cascades' caster programs and blending (drawColoredShadowCasters), and the projector's
+// own draw multiplies its light by the map (fsSpotColoredShadowF.glsl): projectors are lit one at
+// a time, so unlike the sun the tint needs no trip through the light map. A map stays valid while
+// its light keeps its slot and its shadow isn't re-rendered (FSRenderSpotShadowUpdateInterval).
+// The maps are allocated only while on, and only for slots that hold a light and have rendered
+// its shadow since: as many texels as the slot's depth map at 4 bytes each (16 MB at the default
+// 2048 square cap, RenderSpotShadowMaxResolution).
+
+bool LLPipeline::fsSpotColoredShadowsOn() const
+{
+    static LLCachedControl<bool> colored_shadows(gSavedSettings, "FSRenderColoredShadows", false);
+    static LLCachedControl<bool> colored_projectors(gSavedSettings, "FSRenderColoredShadowsProjectors", false);
+    return colored_shadows && colored_projectors && gFSColoredShadowShaders && sRenderDeferred && RenderShadowDetail > 1;
+}
+
+// Before the slot's shadow target is bound for a re-render: the colour target is (re)allocated
+// and (re)shares the depth when needed, and renderShadow is told to draw coloured casters.
+void LLPipeline::fsBeginSpotColoredShadow(U32 slot, const LLDrawable* light)
+{
+    mFSSpotColoredSlot = -1;
+    if (slot >= MAX_PROJECTOR_SHADOWS || gCubeSnapshot)
+    {
+        return;
+    }
+
+    mFSSpotColoredLight[slot] = light;
+    mFSSpotColoredDrawn[slot] = false;
+
+    LLRenderTarget& target = mFSSpotColoredTarget[slot];
+    if (!fsSpotColoredShadowsOn())
+    {
+        if (target.isComplete())
+        {
+            target.release();
+            mFSSpotColoredDepth[slot] = 0;
+        }
+        return;
+    }
+
+    LLRenderTarget& shadow = mSpotShadow[slot];
+    const U32 depth = shadow.getDepth();
+    if (!depth || shadow.isBoundInStack())
+    {
+        return;
+    }
+
+    if (!target.isComplete() || mFSSpotColoredDepth[slot] != depth ||
+        target.getWidth() != shadow.getWidth() || target.getHeight() != shadow.getHeight())
+    {
+        target.release();
+        mFSSpotColoredDepth[slot] = 0;
+        if (!target.allocate(shadow.getWidth(), shadow.getHeight(), GL_RGBA8))
+        {
+            LL_WARNS_ONCE("Rendering") << "Could not allocate the coloured projector shadow targets, projector shadows stay grey" << LL_ENDL;
+            target.release();
+            return;
+        }
+        // depth tested against the opaque casters of this projector, never written
+        shadow.shareDepthBuffer(target);
+        mFSSpotColoredDepth[slot] = depth;
+    }
+    mFSSpotColoredSlot = (S32)slot;
+}
+
+void LLPipeline::fsEndSpotColoredShadow()
+{
+    mFSSpotColoredSlot = -1;
+}
+
+// From setupSpotLight once the light's shadow slot is known (-1: unshadowed): its colour map, or
+// white. It shares the slot's proj_shadow_matrix.
+void LLPipeline::fsBindSpotColoredShadow(LLGLSLShader& shader, S32 slot)
+{
+    const S32 channel = shader.enableTexture(LLShaderMgr::FS_SPOT_COLORED_MAP);
+    if (channel < 0)
+    {
+        return;
+    }
+
+    static LLStaticHashedString s_spot_colored_valid("fs_spot_colored_valid");
+
+    const bool valid = slot >= 0 && slot < (S32)MAX_PROJECTOR_SHADOWS && !gCubeSnapshot && mRT == &mMainRT &&
+                       mFSSpotColoredDrawn[slot] && mFSSpotColoredTarget[slot].isComplete() &&
+                       mFSSpotColoredLight[slot] == mShadowSpotLight[slot].get() &&
+                       mFSSpotColoredDepth[slot] == mSpotShadow[slot].getDepth();
+    LLTexUnit* unit = gGL.getTexUnit(channel);
+    if (valid)
+    {
+        unit->bind(&mFSSpotColoredTarget[slot]);
+        unit->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+        unit->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+    }
+    else
+    {
+        unit->bindFast(LLViewerFetchedTexture::sWhiteImagep);
+    }
+    shader.uniform1f(s_spot_colored_valid, valid ? 1.f : 0.f);
+}
+
+void LLPipeline::fsReleaseSpotColoredTargets()
+{
+    for (U32 i = 0; i < MAX_PROJECTOR_SHADOWS; ++i)
+    {
+        if (mFSSpotColoredTarget[i].isComplete() || mFSSpotColoredDepth[i])
+        {
+            mFSSpotColoredTarget[i].release();
+        }
+        mFSSpotColoredDepth[i] = 0;
+        mFSSpotColoredDrawn[i] = false;
+        mFSSpotColoredLight[i] = nullptr;
+    }
+}
+// </FS:Trish>
 
 static LLTrace::BlockTimerStatHandle FTM_GEN_SUN_SHADOW("Gen Sun Shadow");
 static LLTrace::BlockTimerStatHandle FTM_GEN_SUN_SHADOW_SPOT_RENDER("Spot Shadow Render");
@@ -14982,6 +15117,12 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         }
         mColoredShadowCascade = -1; // <FS:Trish/> not for the projector shadows below
     }
+    // <FS:Trish> coloured projector shadows turned off: free the maps even while no shadow re-renders
+    if (!gCubeSnapshot && !fsSpotColoredShadowsOn())
+    {
+        fsReleaseSpotColoredTargets();
+    }
+    // </FS:Trish>
 
     const U32 shadow_count = getProjectorShadowCount();
 
@@ -15173,6 +15314,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
                 //
 
+                fsBeginSpotColoredShadow(i, drawable); // <FS:Trish/> coloured projector shadows, before the target is bound
                 mSpotShadow[i].bindTarget();
                 mSpotShadow[i].getViewport(gGLViewport);
                 mSpotShadow[i].clear();
@@ -15184,6 +15326,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 RenderSpotLight = drawable;
 
                 renderShadow(view[i + 4], proj[i + 4], shadow_cam, result[i], false);
+                fsEndSpotColoredShadow(); // <FS:Trish/>
 
                 RenderSpotLight = nullptr;
 

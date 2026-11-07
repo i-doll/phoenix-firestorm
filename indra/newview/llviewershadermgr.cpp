@@ -416,6 +416,20 @@ static void add_common_permutations(LLGLSLShader* shader)
     }
 }
 
+// <FS:Trish> Coloured projector shadows (FSRenderColoredShadows and FSRenderColoredShadowsProjectors) link
+// fsSpotColoredShadowF.glsl (FS_SPOT_COLORED_SHADOW). Off, nothing is added.
+static void fs_add_spot_colored_shadow(LLGLSLShader& shader)
+{
+    static LLCachedControl<bool> colored_shadows(gSavedSettings, "FSRenderColoredShadows", false);
+    static LLCachedControl<bool> colored_projectors(gSavedSettings, "FSRenderColoredShadowsProjectors", false);
+    if (gSavedSettings.getS32("RenderShadowDetail") > 1 && colored_shadows && colored_projectors)
+    {
+        shader.addPermutation("FS_SPOT_COLORED_SHADOW", "1");
+        shader.mShaderFiles.push_back(make_pair("deferred/fsSpotColoredShadowF.glsl", GL_FRAGMENT_SHADER));
+    }
+}
+// </FS:Trish>
+
 
 static bool make_gltf_variant(LLGLSLShader& shader, LLGLSLShader& variant, bool alpha_blend, bool rigged, bool unlit, bool multi_uv, bool use_sun_shadow)
 {
@@ -2043,6 +2057,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSpotLightProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
         add_common_permutations(&gDeferredSpotLightProgram);
+        fs_add_spot_colored_shadow(gDeferredSpotLightProgram); // <FS:Trish/>
 
         success = gDeferredSpotLightProgram.createShader();
         llassert(success);
@@ -2064,6 +2079,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredMultiSpotLightProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
         add_common_permutations(&gDeferredMultiSpotLightProgram);
+        fs_add_spot_colored_shadow(gDeferredMultiSpotLightProgram); // <FS:Trish/>
 
         success = gDeferredMultiSpotLightProgram.createShader();
         llassert(success);
