@@ -1243,6 +1243,7 @@ bool LLViewerShaderMgr::loadShadersWater()
     static LLCachedControl<bool> water_foam_setting(gSavedSettings, "FSRenderWaterFoam", false);
     const bool water_foam = water_foam_setting && LLPipeline::sRenderTransparentWater;
     // </FS:Trish>
+    static LLCachedControl<bool> water_glints(gSavedSettings, "FSRenderSunGlints", false); // <FS:Trish/> Sun glints
 
     if (mShaderLevel[SHADER_WATER] == 0)
     {
@@ -1281,6 +1282,14 @@ bool LLViewerShaderMgr::loadShadersWater()
         {
             gWaterProgram.mShaderFiles.push_back(make_pair("environment/fsWaterFoamF.glsl", GL_FRAGMENT_SHADER));
             gWaterProgram.addPermutation("FS_WATER_FOAM", "1");
+        }
+        // </FS:Trish>
+
+        // <FS:Trish> Sun glints
+        if (water_glints)
+        {
+            gWaterProgram.mShaderFiles.push_back(make_pair("environment/fsWaterGlintF.glsl", GL_FRAGMENT_SHADER));
+            gWaterProgram.addPermutation("FS_WATER_GLINTS", "1");
         }
         // </FS:Trish>
 
