@@ -158,6 +158,10 @@ LLSnapshotModel::ESnapshotLayerType LLFloaterSnapshot::Impl::getLayerType(LLFloa
     else if (id == "depth24")
         type = LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24;
     // </FS:Ansariel>
+    // <FS:Trish> Avatars only, everything else transparent
+    else if (id == "avatars_alpha")
+        type = LLSnapshotModel::SNAPSHOT_TYPE_AVATARS_ALPHA;
+    // </FS:Trish>
     return type;
 }
 
@@ -925,6 +929,14 @@ void LLFloaterSnapshot::Impl::onCommitLayerTypes(LLUICtrl* ctrl, void*data)
         {
             previewp->setSnapshotBufferType((LLSnapshotModel::ESnapshotLayerType)combobox->getCurrentIndex());
         }
+        // <FS:Trish> Avatars only snapshot: only PNG keeps the transparency
+        if (combobox->getCurrentIndex() == LLSnapshotModel::SNAPSHOT_TYPE_AVATARS_ALPHA &&
+            gSavedSettings.getS32("SnapshotFormat") != LLSnapshotModel::SNAPSHOT_FORMAT_PNG)
+        {
+            gSavedSettings.setS32("SnapshotFormat", LLSnapshotModel::SNAPSHOT_FORMAT_PNG);
+            view->impl->updateControls(view);
+        }
+        // </FS:Trish>
         view->impl->checkAutoSnapshot(previewp, true);
         previewp->updateSnapshot(true, true);
     }

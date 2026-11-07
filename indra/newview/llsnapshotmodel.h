@@ -51,7 +51,11 @@ public:
     {
         SNAPSHOT_TYPE_COLOR,
         SNAPSHOT_TYPE_DEPTH,
-        SNAPSHOT_TYPE_DEPTH24 // <FS:Ansariel> FIRE-15667: 24bit depth maps
+        // <FS:Trish> Avatars only, everything else transparent
+        //SNAPSHOT_TYPE_DEPTH24 // <FS:Ansariel> FIRE-15667: 24bit depth maps
+        SNAPSHOT_TYPE_DEPTH24, // <FS:Ansariel> FIRE-15667: 24bit depth maps
+        SNAPSHOT_TYPE_AVATARS_ALPHA // Must stay after DEPTH24, the snapshot floater's layer combo maps its index onto this enum
+        // </FS:Trish>
     } ESnapshotLayerType;
 };
 

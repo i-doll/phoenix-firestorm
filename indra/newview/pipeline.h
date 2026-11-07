@@ -977,6 +977,26 @@ public:
     void                    fsBindSpotColoredShadow(LLGLSLShader& shader, S32 slot);    // setupSpotLight, -1 for an unshadowed light
     void                    fsReleaseSpotColoredTargets();
     bool                    drawColoredShadowCasters(LLRenderTarget& target, LLDrawInfo** casters_begin = nullptr, LLDrawInfo** casters_end = nullptr);          // shared by sun cascades and projectors
+    // Avatars only snapshot. A snapshot renders each tile four times: the full scene (exposure,
+    // reflections, shadows and probes), the avatars over a black background, the avatars over a
+    // white one, then the coverage mask through the same final pass as the colour.
+    enum EAvatarOnlyPass : S32
+    {
+        AVATAR_ONLY_OFF = 0,
+        AVATAR_ONLY_BLACK,  // keep the linear HDR frame for the white pass to compare with
+        AVATAR_ONLY_WHITE,  // build the matte, then tone map the un-premultiplied colour
+        AVATAR_ONLY_ALPHA,  // present the coverage mask instead of the scene
+    };
+    static S32              sAvatarOnlyPass;
+    static bool             isAvatarOnlyRender();       // the main camera of an avatars only pass
+    static bool             canRenderAvatarOnly();
+    LLRenderTarget          mAvatarOnlyBlack;           // linear HDR, avatars over black
+    LLRenderTarget          mAvatarOnlyColor;           // linear HDR, un-premultiplied avatar colour
+    LLRenderTarget          mAvatarOnlyAlpha;           // coverage in rgb
+    void renderAvatarOnlyBackground();
+    bool renderAvatarOnlyMatte();
+    void presentAvatarOnlyAlpha();
+    void releaseAvatarOnlyTargets();
     // </FS:Trish>
 
     // exposure map for getting average color in scene

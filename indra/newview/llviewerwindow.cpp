@@ -6199,6 +6199,53 @@ bool LLViewerWindow::thumbnailSnapshot(LLImageRaw *raw, S32 preview_width, S32 p
 // Saves the image from the screen to a raw image
 // Since the required size might be bigger than the available screen, this method rerenders the scene in parts (called subimages) and copy
 // the results over to the final raw image.
+// <FS:Trish> Avatars only snapshot: raw holds the avatar colour (already un-premultiplied, RGB)
+// and alpha the coverage in its first channel. raw becomes RGBA.
+static bool fs_combine_avatar_matte(LLImageRaw* raw, const LLImageRaw* alpha)
+{
+    const S32 width = raw->getWidth();
+    const S32 height = raw->getHeight();
+    if (raw->getComponents() != 3 || alpha->getComponents() != 3 ||
+        alpha->getWidth() != width || alpha->getHeight() != height)
+    {
+        return false;
+    }
+
+    LLPointer<LLImageRaw> color = new LLImageRaw(raw->getData(), width, height, 3);
+    if (color->isBufferInvalid() || !raw->resize(width, height, 4)) // resize reallocates
+    {
+        return false;
+    }
+
+    const S32 pixels = width * height;
+    const U8* c = color->getData();
+    const U8* a = alpha->getData();
+    U8* out = raw->getData();
+    S32 clear = 0;
+    S32 solid = 0;
+    for (S32 i = 0; i < pixels; ++i, c += 3, a += 3, out += 4)
+    {
+        const U8 coverage = a[0];
+        clear += coverage == 0 ? 1 : 0;
+        solid += coverage == 255 ? 1 : 0;
+        if (coverage == 0)
+        {
+            out[0] = out[1] = out[2] = out[3] = 0;
+            continue;
+        }
+        out[0] = c[0];
+        out[1] = c[1];
+        out[2] = c[2];
+        out[3] = coverage;
+    }
+
+    LL_INFOS("Snapshot") << "Avatars only snapshot " << width << "x" << height << ": "
+                         << (100.f * clear / llmax(pixels, 1)) << "% transparent, "
+                         << (100.f * solid / llmax(pixels, 1)) << "% opaque, the rest partly covered" << LL_ENDL;
+    return true;
+}
+// </FS:Trish>
+
 bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height,
     bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size)
 {
@@ -6208,6 +6255,21 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     }
 
     FSDynamicResolution::SnapshotGuard dynamic_resolution_off; // <FS:Trish/> Snapshots render at full resolution
+    // <FS:Trish> Avatars only snapshot. The UI and HUDs would land in the colour of every pass but
+    // not in the matte, so they stay out.
+    bool avatars_only = false;
+    if (type == LLSnapshotModel::SNAPSHOT_TYPE_AVATARS_ALPHA)
+    {
+        avatars_only = LLPipeline::canRenderAvatarOnly();
+        if (!avatars_only)
+        {
+            LL_WARNS("Snapshot") << "Avatars only snapshot needs advanced lighting with HDR and no vision sphere, taking a plain one" << LL_ENDL;
+        }
+        type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
+        show_ui = false;
+        show_hud = false;
+    }
+    // </FS:Trish>
 
     //check if there is enough memory for the snapshot image
     if(image_width * image_height > (1 << 22)) //if snapshot image is larger than 2K by 2K
@@ -6417,6 +6479,21 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         return false;
     }
 
+    // <FS:Trish> Avatars only snapshot: the coverage, read back like the colour
+    LLPointer<LLImageRaw> avatar_alpha;
+    const S32 avatars_only_old_occlusion = LLPipeline::sUseOcclusion;
+    if (avatars_only)
+    {
+        avatar_alpha = new LLImageRaw(raw->getWidth(), raw->getHeight(), 3);
+        if (avatar_alpha->isBufferInvalid())
+        {
+            LL_WARNS("Snapshot") << "Not enough memory for an avatars only snapshot, taking a plain one" << LL_ENDL;
+            avatar_alpha = nullptr;
+            avatars_only = false;
+        }
+    }
+    // </FS:Trish>
+
     bool high_res = scale_factor >= 2.f; // Font scaling is slow, only do so if rez is much higher
     if (high_res && show_ui)
     {
@@ -6465,6 +6542,23 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             if (read_width && read_height)
             {
                 const U32 subfield = subimage_x+(subimage_y*llceil(scale_factor));
+                // <FS:Trish> Avatars only snapshot: the full scene first, for the exposure, the
+                // reflections, shadows and probes the avatar passes reuse, then the avatars over
+                // black. The display() below is the pass over white, whose colour is read as usual.
+                if (avatars_only)
+                {
+                    LLPipeline::sAvatarOnlyPass = LLPipeline::AVATAR_ONLY_OFF;
+                    LLPipeline::sUseOcclusion = avatars_only_old_occlusion;
+                    display(do_rebuild, scale_factor, subfield, true);
+
+                    // Occlusion results from an almost empty frame would leak into the next normal ones
+                    LLPipeline::sUseOcclusion = 0;
+                    LLPipeline::sAvatarOnlyPass = LLPipeline::AVATAR_ONLY_BLACK;
+                    display(do_rebuild, scale_factor, subfield, true);
+
+                    LLPipeline::sAvatarOnlyPass = LLPipeline::AVATAR_ONLY_WHITE;
+                }
+                // </FS:Trish>
                 display(do_rebuild, scale_factor, subfield, true);
 
                 if (!LLPipeline::sRenderDeferred)
@@ -6562,6 +6656,41 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                         }
                     }
                 }
+
+                // <FS:Trish> Avatars only snapshot: present the coverage the same way and read it
+                // into avatar_alpha at the same place
+                if (avatars_only)
+                {
+                    LLPipeline::sAvatarOnlyPass = LLPipeline::AVATAR_ONLY_ALPHA;
+                    display(do_rebuild, scale_factor, subfield, true);
+                    LLPipeline::sAvatarOnlyPass = LLPipeline::AVATAR_ONLY_OFF;
+                    LLPipeline::sUseOcclusion = avatars_only_old_occlusion;
+
+                    for (U32 out_y = 0; out_y < read_height; out_y++)
+                    {
+                        S32 output_buffer_offset = (
+                                                    (out_y * (avatar_alpha->getWidth()))
+                                                    + (window_width * subimage_x)
+                                                    + (avatar_alpha->getWidth() * window_height * subimage_y)
+                                                    - output_buffer_offset_x
+                                                    - (output_buffer_offset_y * (avatar_alpha->getWidth()))
+                                                    ) * avatar_alpha->getComponents();
+                        if (out_y % 100 == 0)
+                        {
+                            LLAppViewer::instance()->pingMainloopTimeout("LLViewerWindow::rawSnapshot");
+                        }
+                        if (!LLRender::sNsightDebugSupport)
+                        {
+                            glReadPixels(
+                                     subimage_x_offset, out_y + subimage_y_offset,
+                                     read_width, 1,
+                                     GL_RGB, GL_UNSIGNED_BYTE,
+                                     avatar_alpha->getData() + output_buffer_offset
+                                     );
+                        }
+                    }
+                }
+                // </FS:Trish>
             }
             output_buffer_offset_x += subimage_x_offset;
             stop_glerror();
@@ -6572,6 +6701,21 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     gDisplaySwapBuffers = false;
     gSnapshotNoPost = false;
     gDepthDirty = true;
+
+    // <FS:Trish> Avatars only snapshot
+    if (avatars_only)
+    {
+        LLPipeline::sAvatarOnlyPass = LLPipeline::AVATAR_ONLY_OFF;
+        LLPipeline::sUseOcclusion = avatars_only_old_occlusion;
+        gPipeline.releaseAvatarOnlyTargets();
+
+        if (!fs_combine_avatar_matte(raw, avatar_alpha))
+        {
+            LL_WARNS("Snapshot") << "Could not combine the avatars only matte, keeping the black background" << LL_ENDL;
+        }
+        avatar_alpha = nullptr;
+    }
+    // </FS:Trish>
 
     // POST SNAPSHOT
     if (!gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
@@ -6592,7 +6736,13 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     // Pre-pad image to number of pixels such that the line length is a multiple of 4 bytes (for BMP encoding)
     // Note: this formula depends on the number of components being 3.  Not obvious, but it's correct.
-    image_width += (image_width * 3) % 4;
+    // <FS:Trish> An avatars only snapshot is RGBA, whose rows are always a multiple of 4 bytes
+    //image_width += (image_width * 3) % 4;
+    if (raw->getComponents() == 3)
+    {
+        image_width += (image_width * 3) % 4;
+    }
+    // </FS:Trish>
 
     bool ret = true ;
     // Resize image

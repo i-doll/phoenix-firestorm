@@ -1104,7 +1104,30 @@ LLPointer<LLImageFormatted> LLSnapshotLivePreview::getFormattedImage()
                 mFormattedImage = new LLImageBMP();
                 break;
         }
-        if (mFormattedImage->encode(mPreviewImage, 0))
+        // <FS:Trish> An avatars only snapshot is RGBA, which JPEG and BMP can't hold: flatten it onto
+        // black, which is the same image as the avatars rendered over a black background
+        //if (mFormattedImage->encode(mPreviewImage, 0))
+        LLPointer<LLImageRaw> source = mPreviewImage;
+        if (format != LLSnapshotModel::SNAPSHOT_FORMAT_PNG && mPreviewImage->getComponents() == 4)
+        {
+            LLImageDataSharedLock lock(mPreviewImage);
+            source = new LLImageRaw(mPreviewImage->getWidth(), mPreviewImage->getHeight(), 3);
+            if (!source->isBufferInvalid())
+            {
+                const U8* src = mPreviewImage->getData();
+                U8* dst = source->getData();
+                const S32 pixels = mPreviewImage->getWidth() * mPreviewImage->getHeight();
+                for (S32 i = 0; i < pixels; ++i, src += 4, dst += 3)
+                {
+                    for (S32 c = 0; c < 3; ++c)
+                    {
+                        dst[c] = (U8)(((U32)src[c] * (U32)src[3] + 127) / 255);
+                    }
+                }
+            }
+        }
+        if (!source->isBufferInvalid() && mFormattedImage->encode(source, 0))
+        // </FS:Trish>
         {
             // We can update the data size precisely at that point
             mDataSize = mFormattedImage->getDataSize();

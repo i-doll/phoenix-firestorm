@@ -280,6 +280,7 @@ extern LLGLSLShader         gFSLensDirtProgram;
 extern LLGLSLShader         gFSLensEffectsProgram;
 extern LLGLSLShader         gFSDynResUpscaleProgram; // <FS:Trish/> Dynamic resolution
 extern LLGLSLShader         gFSNISUpscaleProgram; // <FS:Trish/> NVIDIA Image Scaling
+extern LLGLSLShader         gFSAvatarMatteProgram;
 // </FS:Trish>
 
 // <ID:VolumetricClouds>

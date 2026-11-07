@@ -234,6 +234,7 @@ LLGLSLShader            gIDCloudsFroxelAccumProgram;
 // </ID:VolumetricClouds>
 LLGLSLShader            gFSDynResUpscaleProgram; // <FS:Trish/> Dynamic resolution
 LLGLSLShader            gFSNISUpscaleProgram; // <FS:Trish/> NVIDIA Image Scaling
+LLGLSLShader            gFSAvatarMatteProgram;
 // </FS:Trish>
 LLGLSLShader            gFSLocalTonemapLumProgram; // <FS:Trish/> Local tone mapping
 LLGLSLShader            gFSSkinSSSProgram; // <FS:Trish/>
@@ -1633,6 +1634,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSLocalTonemapLumProgram.unload(); // <FS:Trish/> Local tone mapping
         gFSSkinSSSProgram.unload(); // <FS:Trish/>
         gFSGTAOHalfProgram.unload(); // <FS:Trish/> Half-resolution GTAO
+        gFSAvatarMatteProgram.unload();
         // </FS:Trish>
         // <ID:VolumetricClouds>
         gIDCloudsProgram.unload();
@@ -3265,6 +3267,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             { &gFSLensEffectsProgram,      "FS Lens Effects",       "deferred/fsLensEffectsF.glsl",      false },
             { &gFSLocalTonemapLumProgram,  "FS Local Tonemap Base", "deferred/fsLocalTonemapLumF.glsl",  false },
             { &gFSDynResUpscaleProgram,    "FS Dynamic Resolution Upscale", "deferred/fsDynResUpscaleF.glsl", false }, // <FS:Trish/>
+            { &gFSAvatarMatteProgram,      "FS Avatar Matte",       "deferred/fsAvatarMatteF.glsl",      false },
         };
         for (const FSPostShader& post : fs_post_shaders)
         {

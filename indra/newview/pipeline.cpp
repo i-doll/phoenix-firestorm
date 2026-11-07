@@ -398,6 +398,7 @@ bool    LLPipeline::sReflectionProbesEnabled = false;
 S32     LLPipeline::sReflectionProbeLevel = (S32)LLReflectionMap::ProbeLevel::NONE; // <FS:Beq/> [FIRE-35070] Address progressive FPS loss.
 S32     LLPipeline::sVisibleLightCount = 0;
 bool    LLPipeline::sRenderingHUDs;
+S32     LLPipeline::sAvatarOnlyPass = LLPipeline::AVATAR_ONLY_OFF; // <FS:Trish/>
 F32     LLPipeline::sDistortionWaterClipPlaneMargin = 1.0125f;
 LLVector3 LLPipeline::sLastFocusPoint={};// <FS:Beq/> FIRE-16728 focus point lock & free focus DoF 
 bool    LLPipeline::sDoFEnabled = false;
@@ -2925,6 +2926,8 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, bool hud_att
 
     sCull->clear();
 
+    const bool avatars_only = !hud_attachments && isAvatarOnlyRender(); // <FS:Trish/> Avatars only snapshot
+
     for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
             iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
     {
@@ -2932,6 +2935,16 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, bool hud_att
 
         for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
         {
+            // <FS:Trish> Avatars only snapshot: avatars, animesh, and the bridges attachments live in
+            // (LLSpatialBridge::setVisible drops the bridges that belong to neither)
+            if (avatars_only &&
+                i != LLViewerRegion::PARTITION_BRIDGE &&
+                i != LLViewerRegion::PARTITION_AVATAR &&
+                i != LLViewerRegion::PARTITION_CONTROL_AV)
+            {
+                continue;
+            }
+            // </FS:Trish>
             LLSpatialPartition* part = region->getSpatialPartition(i);
             if (part)
             {
@@ -2952,7 +2965,11 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, bool hud_att
         }
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
+    // <FS:Trish> Avatars only snapshot: no sky
+    //if (hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
+    if (!avatars_only &&
+        hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
+    // </FS:Trish>
         gSky.mVOSkyp.notNull() &&
         gSky.mVOSkyp->mDrawable.notNull())
     {
@@ -2962,7 +2979,11 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, bool hud_att
         stop_glerror();
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
+    // <FS:Trish> Avatars only snapshot: no sky
+    //if (hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
+    if (!avatars_only &&
+        hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
+    // </FS:Trish>
         gPipeline.canUseWindLightShaders() &&
         gSky.mVOWLSkyp.notNull() &&
         gSky.mVOWLSkyp->mDrawable.notNull())
@@ -4842,6 +4863,17 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
     gGL.setColorMask(true, false);
+
+    // <FS:Trish> Avatars only snapshot: the flat background goes in before any alpha is blended
+    // over it. No haze either: it would fog the background differently over black and over white,
+    // which the matte reads as coverage, and that is what left the old matte opaque.
+    if (isAvatarOnlyRender())
+    {
+        renderAvatarOnlyBackground();
+        done_atmospherics = true;
+        done_water_haze = true;
+    }
+    // </FS:Trish>
 
     pool_set_t::iterator iter1 = mPools.begin();
 
@@ -10340,9 +10372,51 @@ void LLPipeline::renderFinalize()
 
     mLensDoF.mActive = false; // <FS:Trish/> renderDoF sets it again when depth of field runs
 
+    // <FS:Trish> Avatars only snapshot. These passes reuse the exposure and the SSR history of the
+    // full scene render taken just before them, so the avatars are exposed and reflect as they do
+    // in the world. Effects that spread light across the frame (glow, bloom, sun rays, depth of
+    // field, anti-aliasing, lens effects, vignette) are skipped: they would smear the avatars into
+    // a background that is about to be removed.
+    const S32 avatar_pass = (hdr && isAvatarOnlyRender()) ? sAvatarOnlyPass : (S32)AVATAR_ONLY_OFF;
+    const bool avatars_only = avatar_pass != AVATAR_ONLY_OFF;
+    if (avatar_pass == AVATAR_ONLY_ALPHA)
+    {
+        presentAvatarOnlyAlpha();
+        return;
+    }
+    // </FS:Trish>
+
     if (hdr)
     {
+        // <FS:Trish> Avatars only snapshot
+        //copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
+        LLRenderTarget* tonemap_src = &mRT->screen;
+        if (avatars_only)
+        {
+            mBloomLevelCount = 0;
+            if (avatar_pass == AVATAR_ONLY_BLACK)
+            {
+                const U32 width = mRT->screen.getWidth();
+                const U32 height = mRT->screen.getHeight();
+                if (!mAvatarOnlyBlack.isComplete() || mAvatarOnlyBlack.getWidth() != width || mAvatarOnlyBlack.getHeight() != height)
+                {
+                    mAvatarOnlyBlack.release();
+                    mAvatarOnlyBlack.allocate(width, height, GL_RGBA16F);
+                }
+                if (mAvatarOnlyBlack.isComplete())
+                {
+                    mAvatarOnlyBlack.copyContents(mRT->screen, 0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                }
+            }
+            else if (renderAvatarOnlyMatte())
+            {
+                tonemap_src = &mAvatarOnlyColor;
+            }
+        }
+        else
+        {
         copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
+        // </FS:Trish>
 
         // <FS:Trish> Added into the HDR scene before exposure is measured, so the exposure accounts
         // for them. After the SSR copy, so reflections don't pick them up a second time.
@@ -10361,12 +10435,14 @@ void LLPipeline::renderFinalize()
         // </FS:Trish>
 
         generateExposure(&mLuminanceMap, &mExposureMap);
+        } // <FS:Trish/> Avatars only snapshot
 
         static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
-        bool apply_cas = cas_sharpness != 0.0f && gCASProgram.isComplete() && gCASLegacyGammaProgram.isComplete();
+        // <FS:Trish> Avatars only snapshot: sharpening would ring against the black background
+        bool apply_cas = !avatars_only && cas_sharpness != 0.0f && gCASProgram.isComplete() && gCASLegacyGammaProgram.isComplete();
         apply_cas = apply_cas && !FSDynamicResolution::upscalerReplacesCAS(&mRT->screen); // <FS:Trish/> NIS present sharpens instead
-
-        tonemap(&mRT->screen, apply_cas ? &mRT->deferredLight : &mPostPingMap, !apply_cas);
+        tonemap(tonemap_src, apply_cas ? &mRT->deferredLight : &mPostPingMap, !apply_cas);
+        // </FS:Trish>
 
         if (apply_cas)
         {
@@ -10381,7 +10457,13 @@ void LLPipeline::renderFinalize()
 
     LLVertexBuffer::unbind();
 
-    generateGlow(&mPostPingMap);
+    // <FS:Trish> Avatars only snapshot: no glow
+    //generateGlow(&mPostPingMap);
+    if (!avatars_only)
+    {
+        generateGlow(&mPostPingMap);
+    }
+    // </FS:Trish>
 
     LLRenderTarget* sourceBuffer = &mPostPingMap;
     LLRenderTarget* targetBuffer = &mPostPongMap;
@@ -10389,7 +10471,7 @@ void LLPipeline::renderFinalize()
     // <FS:Trish> With glow off this was a full screen copy adding a cleared buffer
     //combineGlow(sourceBuffer, targetBuffer);
     //std::swap(sourceBuffer, targetBuffer);
-    if (sRenderGlow)
+    if (sRenderGlow && !avatars_only) // <FS:Trish/> Avatars only snapshot: no glow
     {
         combineGlow(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10404,7 +10486,8 @@ void LLPipeline::renderFinalize()
 
     if((RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
         RenderDepthOfField &&
-        !gCubeSnapshot)
+        !gCubeSnapshot &&
+        !avatars_only) // <FS:Trish/> Avatars only snapshot
     {
         renderDoF(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10412,7 +10495,13 @@ void LLPipeline::renderFinalize()
 
     FSVRS::buildRateImage(sourceBuffer, &mRT->deferredScreen); // <FS:Trish/> Variable rate shading: next frame's rates
 
-     if (RenderFSAAType == 1)
+    // <FS:Trish> Avatars only snapshot: anti-aliasing would blend the edges with the black background
+    // if (RenderFSAAType == 1)
+    if (avatars_only)
+    {
+    }
+    else if (RenderFSAAType == 1)
+    // </FS:Trish>
     {
         applyFXAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10431,7 +10520,7 @@ void LLPipeline::renderFinalize()
     LLRenderTarget* auxTargetBuffer = RenderFSAAType ? &mRT->screen : (sourceBuffer == &mPostPingMap ? &mPostPongMap : &mPostPingMap);
     // </FS:Trish>
     // <FS:Trish> Lens effects, on the anti-aliased image so the aberration and grain stay crisp
-    if (renderLensEffects(auxActiveBuffer, auxTargetBuffer))
+    if (!avatars_only && renderLensEffects(auxActiveBuffer, auxTargetBuffer))
     {
         std::swap(auxActiveBuffer, auxTargetBuffer);
     }
@@ -10447,13 +10536,19 @@ void LLPipeline::renderFinalize()
     }
 // [/RLVa:KB]
 
-    if (renderVignette(auxActiveBuffer, auxTargetBuffer))
+    // <FS:Trish> Avatars only snapshot: a vignette would darken the avatars toward the corners
+    //if (renderVignette(auxActiveBuffer, auxTargetBuffer))
+    if (!avatars_only && renderVignette(auxActiveBuffer, auxTargetBuffer))
+    // </FS:Trish>
     {
         std::swap(auxActiveBuffer, auxTargetBuffer);
     };
     // </FS:Beq>
     // <FS:Beq> new shader for snapshot frame helper
-    if (renderSnapshotFrame(auxActiveBuffer, auxTargetBuffer))
+    // <FS:Trish> Avatars only snapshot
+    //if (renderSnapshotFrame(auxActiveBuffer, auxTargetBuffer))
+    if (!avatars_only && renderSnapshotFrame(auxActiveBuffer, auxTargetBuffer))
+    // </FS:Trish>
     {
         std::swap(auxActiveBuffer, auxTargetBuffer);
     };
@@ -10499,7 +10594,8 @@ void LLPipeline::renderFinalize()
     // <FS:Trish> Debanding dither: an 8 bit post chain was dithered when it was written, so the present
     // copies it unchanged; a 16 bit float one is dithered here, in place of the stock noise.
     // The dynamic resolution upscale resamples, so it always dithers.
-    LLGLSLShader& present_noise = (fs_deband_enabled() && fs_post_chain_8bit()) ? gDeferredPostNoDoFProgram : gDeferredPostNoDoFNoiseProgram;
+    // Avatars only snapshot: no dither noise, the colour has to line up with the matte
+    LLGLSLShader& present_noise = (avatars_only || (fs_deband_enabled() && fs_post_chain_8bit())) ? gDeferredPostNoDoFProgram : gDeferredPostNoDoFNoiseProgram;
     LLGLSLShader& present_shader = FSDynamicResolution::presentShader(present_noise, sourceBuffer); // <FS:Trish/> Dynamic resolution: sharpened upscale
     present_shader.bind(); // Add noise as part of final render to screen pass to avoid damaging other post effects
     FSDynamicResolution::setupPresent(present_shader); // <FS:Trish/> Dynamic resolution
@@ -13562,6 +13658,7 @@ public:
 
 void LLPipeline::releaseFSPostTargets()
 {
+    releaseAvatarOnlyTargets();
     mSunRayMap.release();
     mLocalTonemapMap.release(); // <FS:Trish/> Local tone mapping
     mSpotVolumeMap.release();
@@ -16990,5 +17087,169 @@ bool LLPipeline::isBeyondAvatarShadowDistance(const LLVOAvatar* avatar)
         return false;
     }
     return dist_vec_squared(avatar->getPositionAgent(), LLViewerCamera::getInstance()->getOrigin()) > max_dist * max_dist;
+}
+// </FS:Trish>
+
+// <FS:Trish> Avatars only snapshot.
+// LLViewerWindow::rawSnapshot renders each tile four times: the full scene, which sets the
+// exposure and the SSR history and keeps shadow maps and reflection probes up to date, then the
+// main camera with only avatars, their attachments and animesh, first over a black background,
+// then over a white one, and finally the coverage mask. Shadow maps, reflection probes, water
+// reflections and HUDs still see the whole scene, so the avatars keep the lighting they have in
+// the world.
+//
+// Coverage comes from comparing the two backgrounds in linear HDR, before exposure and tone
+// mapping: blending is linear there, so where the background shows through the two frames differ
+// by exactly the background difference, where the avatars are opaque they match, and over hair
+// and other blended edges the difference is the transparency.
+
+static constexpr F32 FS_AVATAR_ONLY_WHITE_LEVEL = 1.f;
+
+//static
+bool LLPipeline::isAvatarOnlyRender()
+{
+    return sAvatarOnlyPass != AVATAR_ONLY_OFF &&
+           LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD &&
+           !gCubeSnapshot &&
+           !sShadowRender &&
+           !sReflectionRender &&
+           !sRenderingHUDs;
+}
+
+//static
+bool LLPipeline::canRenderAvatarOnly()
+{
+    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
+    return sRenderDeferred &&
+           gGLManager.mGLVersion > 4.05f && has_hdr() &&
+           gFSAvatarMatteProgram.isComplete() &&
+           // The vision sphere is a restriction, a cut-out of the avatars would get around it
+           !RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE);
+}
+
+// Fill every pixel no geometry was drawn to with the background level. The point sits just in
+// front of the far plane, so GL_LESS passes only where the depth buffer still holds its clear
+// value, ahead of the alpha pools so blended edges mix with it. Only colour is written: the
+// screen's alpha is glow.
+void LLPipeline::renderAvatarOnlyBackground()
+{
+    LL_PROFILE_GPU_ZONE("avatar only background");
+
+    const F32 level = sAvatarOnlyPass == AVATAR_ONLY_WHITE ? FS_AVATAR_ONLY_WHITE_LEVEL : 0.f;
+
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+
+    gDebugProgram.bind();
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.setColorMask(true, false);
+    {
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_LESS);
+        LLGLDisable blend(GL_BLEND);
+        LLGLDisable cull(GL_CULL_FACE);
+
+        const F32 z = 0.99999f;
+        gGL.diffuseColor4f(level, level, level, 1.f);
+        gGL.begin(LLRender::TRIANGLES);
+        gGL.vertex3f(-1.f, -1.f, z);
+        gGL.vertex3f(3.f, -1.f, z);
+        gGL.vertex3f(-1.f, 3.f, z);
+        gGL.end();
+        gGL.flush();
+    }
+    gDebugProgram.unbind();
+
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.popMatrix();
+    gGLLastMatrix = NULL;
+    gGL.loadMatrix(gGLModelView);
+}
+
+// White pass: compare with the black frame kept by the black pass. Writes the coverage to
+// mAvatarOnlyAlpha and the un-premultiplied avatar colour to mAvatarOnlyColor, which is then tone
+// mapped in place of the screen.
+bool LLPipeline::renderAvatarOnlyMatte()
+{
+    const U32 width = mRT->screen.getWidth();
+    const U32 height = mRT->screen.getHeight();
+    if (!gFSAvatarMatteProgram.isComplete() || !mAvatarOnlyBlack.isComplete() ||
+        mAvatarOnlyBlack.getWidth() != width || mAvatarOnlyBlack.getHeight() != height)
+    {
+        LL_WARNS("Snapshot") << "Avatars only snapshot: no black pass to compare with" << LL_ENDL;
+        return false;
+    }
+    if (!fs_ensure_target(mAvatarOnlyColor, width, height, GL_RGBA16F) ||
+        !fs_ensure_target(mAvatarOnlyAlpha, width, height, GL_RGBA8))
+    {
+        LL_WARNS("Snapshot") << "Avatars only snapshot: could not allocate the matte targets" << LL_ENDL;
+        return false;
+    }
+
+    LL_PROFILE_GPU_ZONE("avatar only matte");
+
+    static LLStaticHashedString s_output_alpha("output_alpha");
+    static LLStaticHashedString s_bg_level("bg_level");
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable blend(GL_BLEND);
+
+    for (S32 output_alpha = 0; output_alpha < 2; ++output_alpha)
+    {
+        LLRenderTarget& dst = output_alpha ? mAvatarOnlyAlpha : mAvatarOnlyColor;
+        dst.bindTarget();
+        gFSAvatarMatteProgram.bind();
+        gFSAvatarMatteProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mAvatarOnlyBlack, false, LLTexUnit::TFO_POINT);
+        gFSAvatarMatteProgram.bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, &mRT->screen, false, LLTexUnit::TFO_POINT);
+        gFSAvatarMatteProgram.uniform1f(s_bg_level, FS_AVATAR_ONLY_WHITE_LEVEL);
+        gFSAvatarMatteProgram.uniform1i(s_output_alpha, output_alpha);
+        fs_draw_screen_triangle(mScreenTriangleVB);
+        gFSAvatarMatteProgram.unbind();
+        dst.flush();
+    }
+
+    return true;
+}
+
+// Alpha pass: present the coverage through the same final pass and viewport as the colour, so the
+// two read back pixel for pixel alike, tiled, single-pass high resolution and supersampled.
+void LLPipeline::presentAvatarOnlyAlpha()
+{
+    if (!mAvatarOnlyAlpha.isComplete())
+    {
+        LL_WARNS("Snapshot") << "Avatars only snapshot: no matte to present" << LL_ENDL;
+        return;
+    }
+
+    gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
+    gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
+    gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
+    gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
+    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+
+    gDeferredPostNoDoFProgram.bind();
+    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mAvatarOnlyAlpha);
+    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+    gDeferredPostNoDoFProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mAvatarOnlyAlpha.getWidth(), (GLfloat)mAvatarOnlyAlpha.getHeight());
+    {
+        LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
+        fs_draw_screen_triangle(mScreenTriangleVB);
+    }
+    gDeferredPostNoDoFProgram.unbind();
+
+    LLVertexBuffer::unbind();
+    LLGLState::checkStates();
+}
+
+void LLPipeline::releaseAvatarOnlyTargets()
+{
+    mAvatarOnlyBlack.release();
+    mAvatarOnlyColor.release();
+    mAvatarOnlyAlpha.release();
 }
 // </FS:Trish>
