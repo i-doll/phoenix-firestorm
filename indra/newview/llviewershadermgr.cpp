@@ -960,6 +960,13 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     {
         attribs["SUN_SHADOW"] = "1";
 
+        // <FS:Trish> Fewer shadow lookups away from shadow edges
+        if (gSavedSettings.getBOOL("FSRenderShadowFastFilter"))
+        {
+            attribs["FS_SHADOW_FAST_PCF"] = "1";
+        }
+        // </FS:Trish>
+
         if (shadow_detail >= 2)
         {
             attribs["SPOT_SHADOW"] = "1";

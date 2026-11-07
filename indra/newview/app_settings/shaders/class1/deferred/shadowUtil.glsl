@@ -158,9 +158,18 @@ float pcfShadow(sampler2DShadow shadowMap, vec3 norm, vec4 stc, float bias_mul, 
     stc.x = floor(stc.x*res.x + fract(pos_screen.y*res.y))/res.x; // add some chaotic jitter to X sample pos according to Y to disguise the snapping going on here
     float cs = texture(shadowMap, stc.xyz);
     float shadow = cs * 4.0;
-    shadow += texture(shadowMap, stc.xyz+vec3( 1.5/res.x,  0.5/res.y, 0.0));
+    float a = texture(shadowMap, stc.xyz+vec3( 1.5/res.x,  0.5/res.y, 0.0));
+    float b = texture(shadowMap, stc.xyz+vec3(-1.5/res.x, -0.5/res.y, 0.0));
+#ifdef FS_SHADOW_FAST_PCF
+    // Two opposite taps agree with the centre and it is fully lit or fully shadowed: the other
+    // two taps would agree too, so skip them. Only shadow edges pay for all five.
+    if ((cs < 0.001 || cs > 0.999) && abs(a - cs) + abs(b - cs) < 0.002)
+    {
+        return cs;
+    }
+#endif
+    shadow += a + b;
     shadow += texture(shadowMap, stc.xyz+vec3( 0.5/res.x, -1.5/res.y, 0.0));
-    shadow += texture(shadowMap, stc.xyz+vec3(-1.5/res.x, -0.5/res.y, 0.0));
     shadow += texture(shadowMap, stc.xyz+vec3(-0.5/res.x,  1.5/res.y, 0.0));
     return clamp(shadow * 0.125, 0.0, 1.0);
 #else

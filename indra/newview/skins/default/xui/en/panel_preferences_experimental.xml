@@ -53,7 +53,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="1066"
+                 height="1092"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -673,6 +673,17 @@
                      tool_tip="EXPERIMENTAL. While a projector light and its settings stay unchanged, re-render its shadow only every this many frames. Things moving in its light update with that delay. 1 renders every frame."
                      top_delta="-2"
                      width="100" />
+                    <check_box
+                     control_name="FSRenderShadowFastFilter"
+                     follows="left|top"
+                     height="20"
+                     label="Faster sun shadow filtering away from shadow edges"
+                     layout="topleft"
+                     left="15"
+                     name="shadow_fast_filter"
+                     tool_tip="EXPERIMENTAL. Sample sun shadows with 3 lookups instead of 5 where the area is clearly fully lit or fully shadowed, and only do all 5 near shadow edges. Rebuilds shaders when changed."
+                     top_pad="6"
+                     width="475" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
