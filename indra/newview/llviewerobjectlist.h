@@ -238,6 +238,10 @@ protected:
     // uuid_set_t   mDeadObjects;
     uuid_multiset_t   mDeadObjects;
     // </FS:Beq>
+    // <FS:Trish> Objects waiting for cleanDeadObjects, so it doesn't have to scan mObjects
+    std::vector<LLPointer<LLViewerObject> > mDeadObjectList;
+    void addToObjectList(LLViewerObject* objectp);
+    // </FS:Trish>
 
     std::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
 

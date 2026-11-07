@@ -815,6 +815,10 @@ public:
     // index into LLViewerObjectList::mActiveObjects or -1 if not in list
     S32             mListIndex;
 
+    // <FS:Trish> index into LLViewerObjectList::mObjects or -1 if not in list
+    S32             mObjectListIndex = -1;
+    // </FS:Trish>
+
     // last index data for mIndexAndLocalIDToUUID
     U32             mRegionIndex;
 
