@@ -30,6 +30,7 @@ public:
     static bool isSupported();
     static bool canEdit();
     bool isActive() const;
+    bool hasFogLayer() const;
     void update();
     bool fullQuality() const;
     void release();

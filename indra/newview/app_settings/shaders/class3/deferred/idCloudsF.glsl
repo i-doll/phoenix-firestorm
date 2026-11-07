@@ -15,6 +15,8 @@ out vec4 frag_data[2];
 in vec2 vary_fragcoord;
 
 uniform int   id_layer_count;
+uniform float id_min_step;
+uniform float id_probe_min;
 uniform float id_layer_base[4];
 uniform float id_layer_top[4];
 uniform float id_planet_radius;
@@ -316,13 +318,13 @@ void idMarch(vec3 dir, float scene_t, int steps, float jitter, float pixel_angle
         {
             ++iter;
             float grow = exp2(max(0.0, float(iter - budget * 3 / 4) / float(max(budget / 16, 1))));
-            float fine = max(8.0, t * pixel_angle * step_scale) * grow;
+            float fine = max(id_min_step, t * pixel_angle * step_scale) * grow;
 
             if (!inside)
             {
                 // Probes grow with distance, so crossing kilometres of clear sky does not use up the
                 // step budget before the ray reaches distant cloud.
-                float coarse = min(max(fine * 4.0, 50.0 + 0.03 * t), t_end - t);
+                float coarse = min(max(fine * 4.0, id_probe_min + 0.03 * t), t_end - t);
                 float tp = t + coarse * jitter;
                 vec3 prel = dir * tp;
                 vec3 pwp = vec3(id_camera_global.xy + prel.xy, idAltitude(prel));

@@ -215,6 +215,18 @@ bool IDVolumetricClouds::prerequisitesMet() const
         && !IDCloudState::instance().current().mLayers.empty();
 }
 
+bool IDVolumetricClouds::hasFogLayer() const
+{
+    for (const IDCloudLayer& l : IDCloudState::instance().current().mLayers)
+    {
+        if (l.mType == IDCloudType::Fog)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool IDVolumetricClouds::isActive() const
 {
     return prerequisitesMet() && mNoiseBase && mNoiseDetail && mWeather
@@ -780,6 +792,8 @@ void IDVolumetricClouds::setDensityInputs(LLGLSLShader& shader)
     static LLStaticHashedString s_layer_wind("id_layer_wind");
     static LLStaticHashedString s_layer_streak("id_layer_streak");
     static LLStaticHashedString s_planet_radius("id_planet_radius");
+    static LLStaticHashedString s_min_step("id_min_step");
+    static LLStaticHashedString s_probe_min("id_probe_min");
     static LLStaticHashedString s_camera_global("id_camera_global");
 
     constexpr U32 MAX = IDCloudPreset::MAX_LAYERS;
@@ -824,6 +838,9 @@ void IDVolumetricClouds::setDensityInputs(LLGLSLShader& shader)
     shader.uniform2fv(s_layer_wind, MAX, wind);
     shader.uniform2fv(s_layer_streak, MAX, streak);
     shader.uniform1f(s_planet_radius, PLANET_RADIUS_M);
+    const bool fog = hasFogLayer();
+    shader.uniform1f(s_min_step, fog ? 1.f : 8.f);
+    shader.uniform1f(s_probe_min, fog ? 10.f : 50.f);
 
     const F64 wrap = (F64)IDCloudState::WIND_WRAP_M;
     const LLVector3d cam = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin());
