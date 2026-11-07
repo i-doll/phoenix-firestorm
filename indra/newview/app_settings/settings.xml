@@ -12177,7 +12177,7 @@ Change of this parameter will affect the layout of buttons in notification toast
   <key>RenderShadowBiasError</key>
   <map>
     <key>Comment</key>
-    <string>Error scale for shadow bias (based on altitude).</string>
+    <string>Unused: the sun shadow bias no longer grows with altitude (the receiver-plane bias of the shadow filter covers slanted surfaces at every altitude). Was: error scale for shadow bias (based on altitude).</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
