@@ -56,6 +56,7 @@
 #include "fsssrhiz.h" // <FS:Trish/>
 #include "fsskinonce.h" // <FS:Trish/>
 #include "fsshadowsinglepass.h" // <FS:Trish/>
+#include "llviewercamera.h" // <FS:Trish/> height fog: far clip for the sky
 
 static LLStaticHashedString sTexture0("texture0");
 static LLStaticHashedString sTexture1("texture1");
@@ -1250,6 +1251,16 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     // </FS:Trish>
 
     FSSkinOnce::configureShaders(attribs); // <FS:Trish/> FSPerfSkinOncePerFrame: FS_SKIN_ONCE and the draw hook
+    // <FS:Trish> Exponential height fog (fsHeightFogF.glsl), attached next to waterFogF.glsl
+    // (LLShaderMgr::attachShaderFeatures) so the haze pass and forward alpha share it. Its values
+    // are uniforms (fs_upload_height_fog_uniforms).
+    static LLCachedControl<bool> fs_height_fog(gSavedSettings, "FSRenderHeightFog", false);
+    if (fs_height_fog)
+    {
+        attribs["FS_HEIGHT_FOG"] = "1";
+    }
+    // </FS:Trish>
+
     LLGLSLShader::sGlobalDefines = attribs;
     sRiggedLocalOrigin = attribs.count("RIGGED_LOCAL_ORIGIN") != 0; // <FS:Trish/>
 
@@ -1284,6 +1295,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "windlight/atmosphericsF.glsl",          mShaderLevel[SHADER_WINDLIGHT] ) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "environment/waterFogF.glsl",                mShaderLevel[SHADER_WATER] ) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "environment/srgbF.glsl",                    mShaderLevel[SHADER_ENVIRONMENT] ) );
+    // <FS:Trish> Height fog, attached next to waterFogF.glsl (LLShaderMgr::attachShaderFeatures)
+    if (attribs.count("FS_HEIGHT_FOG"))
+    {
+        index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/fsHeightFogF.glsl",                1) );
+    }
+    // </FS:Trish>
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/deferredUtil.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/gbufferUtil.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/globalF.glsl",                          1));
@@ -2766,6 +2783,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHazeProgram.mShaderFiles.push_back(make_pair("deferred/hazeF.glsl", GL_FRAGMENT_SHADER));
 
         add_common_permutations(&gHazeProgram);
+        // <FS:Trish> Height fog over opaque pixels and the sky (fsHeightFogF.glsl, linked by the global define)
+        if (LLGLSLShader::sGlobalDefines.count("FS_HEIGHT_FOG"))
+        {
+            gHazeProgram.addPermutation("FS_HEIGHT_FOG", "1");
+        }
+        // </FS:Trish>
 
         gHazeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
@@ -4375,6 +4398,57 @@ static void fs_upload_shading_occlusion(LLGLSLShader& shader)
 }
 // </FS:Trish>
 
+// <FS:Trish> Exponential height fog (FSRenderHeightFog, fsHeightFogF.glsl). Every value is a
+// uniform, so dragging a spinner does not rebuild the shaders; only the switch itself does. Reaches
+// the haze program through LLPipeline::bindDeferredShader and the forward alpha programs through
+// updateShaderUniforms. Conventions follow the sun rays: density per meter (optionally following
+// the sky's haze, sqrt, half to twice), anisotropy 0-0.95, falloff per meter of height.
+static void fs_upload_height_fog_uniforms(LLGLSLShader& shader)
+{
+    if (!LLGLSLShader::sGlobalDefines.count("FS_HEIGHT_FOG"))
+    {
+        return;
+    }
+
+    static LLCachedControl<F32> density(gSavedSettings, "FSRenderHeightFogDensity", 0.003f);
+    static LLCachedControl<F32> falloff(gSavedSettings, "FSRenderHeightFogFalloff", 0.02f);
+    static LLCachedControl<F32> base_height(gSavedSettings, "FSRenderHeightFogBaseHeight", 0.f);
+    static LLCachedControl<bool> base_absolute(gSavedSettings, "FSRenderHeightFogBaseAbsolute", false);
+    static LLCachedControl<F32> max_opacity(gSavedSettings, "FSRenderHeightFogMaxOpacity", 0.85f);
+    static LLCachedControl<F32> anisotropy(gSavedSettings, "FSRenderHeightFogAnisotropy", 0.6f);
+    static LLCachedControl<bool> sky_color(gSavedSettings, "FSRenderHeightFogSkyColor", true);
+    static LLCachedControl<LLColor3> tint(gSavedSettings, "FSRenderHeightFogTint", LLColor3::white);
+    static LLCachedControl<bool> sky_haze(gSavedSettings, "FSRenderHeightFogSkyHaze", true);
+    static LLStaticHashedString sHeightFog("fs_height_fog");
+    static LLStaticHashedString sHeightFogColor("fs_height_fog_color");
+    static LLStaticHashedString sHeightFogScatter("fs_height_fog_scatter");
+
+    LLEnvironment& environment = LLEnvironment::instance();
+
+    F32 fog_density = llclamp((F32)density, 0.f, 0.1f);
+    LLSettingsSky::ptr_t psky = environment.getCurrentSky();
+    if (sky_haze && psky)
+    {
+        fog_density *= llclamp(sqrtf(llmax(psky->getHazeDensity(), 0.f) / 0.7f), 0.5f, 2.f);
+    }
+
+    // The shader measures heights from the water (waterPlane)
+    F32 base = llclamp((F32)base_height, -4096.f, 8192.f);
+    if (base_absolute)
+    {
+        base -= environment.getWaterHeight();
+    }
+
+    const LLColor3 tint_color = tint;
+    const LLColor3 tint_linear = linearColor3(tint_color);
+    const F32 sky_dist = llmax(LLViewerCamera::getInstance()->getFar(), 64.f);
+
+    shader.uniform4f(sHeightFog, fog_density, llclamp((F32)falloff, 0.f, 1.f), base, llclamp((F32)max_opacity, 0.f, 1.f));
+    shader.uniform4f(sHeightFogColor, tint_linear.mV[VRED], tint_linear.mV[VGREEN], tint_linear.mV[VBLUE], sky_color ? 1.f : 0.f);
+    shader.uniform2f(sHeightFogScatter, llclamp((F32)anisotropy, 0.f, 0.95f), sky_dist);
+}
+// </FS:Trish>
+
 // <FS:Trish> Setting values the shared shader objects read as uniforms rather than global
 // defines, so that changing one does not change every program's binary cache key. Called from
 // updateShaderUniforms, which reaches the listed programs and their rigged variants (materials,
@@ -4393,6 +4467,8 @@ void LLViewerShaderMgr::uploadValueUniforms(LLGLSLShader& shader)
     shader.uniform1f(sSpecularExponent, (F32)ll_round((F32)specular_exponent * 10.f) / 10.f);
     shader.uniform1f(sTriplanarFactor, (F32)ll_round((F32)triplanar_factor * 100.f) / 100.f);
     fs_upload_shading_occlusion(shader);
+
+    fs_upload_height_fog_uniforms(shader);
 }
 // </FS:Trish>
 

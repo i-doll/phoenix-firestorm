@@ -27711,15 +27711,119 @@ Change of this parameter will affect the layout of buttons in notification toast
       <integer>0</integer>
     </map>
     <key>FSPerfSkinOncePerFrame</key>
+    <key>FSRenderHeightFog</key>
     <map>
       <key>Comment</key>
-      <string>Skin rigged meshes (mesh bodies, clothing, hair, animesh) once per frame by transform feedback and let every pass (G-buffer, alpha, glow, sun and projector shadows, probe and mirror captures) read the captured skin blends, instead of blending the joint palette again in each pass. Ranges whose vertices and palette did not change are not recaptured (best with FSPerfRiggedPaletteCache). Changing it reloads the shaders.</string>
+      <string>EXPERIMENTAL. Exponential height fog: fog that is thickest low down and thins with altitude, so valleys, the sea and the distance get haze. Lit by the current sky (horizon and ambient colour) with a forward-scattering glow toward the sun or moon. Applied to opaque surfaces, the sky and forward-rendered alpha above the water; off while the camera is under water. Changing it rebuilds the shaders.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
       <integer>0</integer>
+    </map>
+    <key>FSRenderHeightFogDensity</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: density per meter at and below the base height, 0 to 0.1. 0.003 hides about 95% of what is 1 km away along the base height.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.003</real>
+    </map>
+    <key>FSRenderHeightFogFalloff</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: how fast the fog thins above the base height, per meter, 0 to 1. At 0.02 it is a third as dense 50 m up. 0 gives even fog at every height.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.02</real>
+    </map>
+    <key>FSRenderHeightFogBaseHeight</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: height in meters where the fog is at full density, below it the fog is even. Relative to the water level unless FSRenderHeightFogBaseAbsolute is on.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSRenderHeightFogBaseAbsolute</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: FSRenderHeightFogBaseHeight is an absolute region height instead of a height above the water.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderHeightFogMaxOpacity</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: the most the fog may hide, 0 to 1, so distant land and the horizon never vanish completely.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.85</real>
+    </map>
+    <key>FSRenderHeightFogAnisotropy</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: sun scattering (Henyey-Greenstein anisotropy), 0 to 0.95. 0 lights the fog evenly, higher values make it glow brighter toward the sun or moon. Same scale as FSRenderSunRaysAnisotropy.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.6</real>
+    </map>
+    <key>FSRenderHeightFogSkyColor</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: take the fog's colour from the current sky, multiplied by FSRenderHeightFogTint. Off uses the tint's own colour at the sky's brightness.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSRenderHeightFogTint</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: colour multiplied into the fog, or the fog's colour when FSRenderHeightFogSkyColor is off. White leaves the sky colour unchanged.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Color3</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>1.0</real>
+      </array>
+    </map>
+    <key>FSRenderHeightFogSkyHaze</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: density follows the sky's haze density, gently (half to twice FSRenderHeightFogDensity), as the sun rays do with FSRenderSunRaysSkyHaze.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
     </map>
     <key>FSRenderUpscaler</key>
     <map>

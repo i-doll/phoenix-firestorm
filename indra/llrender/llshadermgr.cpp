@@ -325,6 +325,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         {
             return false;
         }
+
+        // <FS:Trish> Height fog, used by applySkyAndWaterFog and the haze pass, compiled with the
+        // basic shaders while the global define is set (LLViewerShaderMgr::loadBasicShaders)
+        if (LLGLSLShader::sGlobalDefines.count("FS_HEIGHT_FOG") && !shader->attachFragmentObject("deferred/fsHeightFogF.glsl"))
+        {
+            return false;
+        }
+        // </FS:Trish>
     }
 
     if (features->hasLighting)

@@ -35,6 +35,10 @@ vec3 linear_to_srgb(vec3 col);
 
 vec3 atmosFragLighting(vec3 light, vec3 additive, vec3 atten);
 
+#ifdef FS_HEIGHT_FOG
+vec3 fsApplyHeightFog(vec3 pos, vec3 color); // fsHeightFogF.glsl
+#endif
+
 // get a water fog color that will apply the appropriate haze to a color given
 // a blend function of (ONE, SOURCE_ALPHA)
 vec4 getWaterFogViewNoClip(vec3 pos)
@@ -126,6 +130,9 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color)
         else
         {
             color.rgb = atmosFragLighting(color.rgb, additive, atten);
+#ifdef FS_HEIGHT_FOG
+            color.rgb = fsApplyHeightFog(pos, color.rgb); // the haze pass's height fog, for alpha
+#endif
         }
     }
     else

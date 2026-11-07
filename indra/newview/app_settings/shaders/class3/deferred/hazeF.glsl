@@ -46,6 +46,10 @@ uniform int cube_snapshot;
 
 uniform float sky_hdr_scale;
 
+#ifdef FS_HEIGHT_FOG
+vec4 fsHeightFog(vec3 pos, bool sky); // fsHeightFogF.glsl
+#endif
+
 void main()
 {
     vec2  tc           = vary_fragcoord.xy;
@@ -79,7 +83,19 @@ void main()
     if (depth >= 1.0)
     {
         //should only be true of sky, clouds, sun/moon, and stars
+#ifdef FS_HEIGHT_FOG
+        // Height fog over the sky: the far plane may be at infinity, so take the direction from
+        // a point in front of it. Blended as (ONE, SRC_ALPHA) over the sky.
+        vec4 sky_fog = fsHeightFog(getPositionWithDepth(tc, 0.5).xyz, true);
+        if (sky_fog.a <= 0.0)
+        {
+            discard;
+        }
+        frag_color = vec4(sky_fog.rgb * sky_fog.a, 1.0 - sky_fog.a);
+        return;
+#else
         discard;
+#endif
     }
 
    float alpha = 0.0;
@@ -95,6 +111,13 @@ void main()
         color = vec3(0,0,0);
         alpha = 1.0;
     }
+
+#ifdef FS_HEIGHT_FOG
+    // Height fog after the haze: (scene * alpha + color) * (1 - fog) + fog colour * fog
+    vec4 fog = fsHeightFog(pos.xyz, false);
+    color = color * (1.0 - fog.a) + fog.rgb * fog.a;
+    alpha *= 1.0 - fog.a;
+#endif
 
     frag_color = max(vec4(color.rgb, alpha), vec4(0)); //output linear since local lights will be added to this shader's results
 
