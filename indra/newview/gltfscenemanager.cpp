@@ -659,7 +659,10 @@ void GLTFSceneManager::render(Asset& asset, U8 variant)
 
         if (batches.empty())
         {
-            return;
+            // <FS:Trish> An empty single sided pass must not skip the double sided one
+            //return;
+            continue;
+            // </FS:Trish>
         }
 
         LLGLDisable cull_face(ds == 1 ? GL_CULL_FACE : 0);
