@@ -1215,6 +1215,125 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     imagep->processTextureStats();
 }
 
+// <FS:Trish> FSPerfTextureUploadBudgetMB / FSPerfTextureUploadPBO
+namespace
+{
+    // Bytes a texture's GL upload moves: the decoded level, plus a third for its mip chain.
+    S64 fs_estimate_upload_bytes(LLViewerFetchedTexture* imagep)
+    {
+        const LLImageRaw* raw = imagep->getRawImage();
+        if (!raw)
+        {
+            return 0;
+        }
+        S64 bytes = (S64)raw->getWidth() * (S64)raw->getHeight() * (S64)raw->getComponents();
+        if (imagep->getUseMipMaps())
+        {
+            bytes += bytes / 3;
+        }
+        return bytes;
+    }
+
+    // Puts the textures the user is most likely looking at first: boosted ones (own avatar,
+    // HUD, UI, selection), then by on-screen size. Stable, so equal ones keep arrival order.
+    void fs_sort_create_queue(LLViewerTextureList::image_queue_t& queue)
+    {
+        if (queue.size() < 2)
+        {
+            return;
+        }
+        struct Entry
+        {
+            bool mBoost;
+            F32 mSize;
+            LLPointer<LLViewerFetchedTexture> mImage;
+        };
+        std::vector<Entry> items;
+        items.reserve(queue.size());
+        while (!queue.empty())
+        {
+            LLPointer<LLViewerFetchedTexture> imagep = queue.front();
+            queue.pop();
+            const bool boost = imagep.notNull() && imagep->getBoostLevel() > LLGLTexture::BOOST_NONE;
+            const F32 size = imagep.notNull() ? imagep->getMaxVirtualSize() : -1.f;
+            items.push_back({ boost, size, imagep });
+        }
+        std::stable_sort(items.begin(), items.end(),
+            [](const Entry& a, const Entry& b)
+            {
+                if (a.mBoost != b.mBoost)
+                {
+                    return a.mBoost;
+                }
+                return a.mSize > b.mSize;
+            });
+        for (auto& item : items)
+        {
+            queue.push(item.mImage);
+        }
+    }
+
+    // Per-frame upload bytes and time, logged every 5 seconds while any upload happened.
+    void fs_record_upload_frame(S64 bytes, F32 seconds, size_t queue_left, S64 budget_bytes)
+    {
+        static LLFrameTimer log_timer;
+        static S64 total_bytes = 0;
+        static S64 max_frame_bytes = 0;
+        static F32 max_frame_seconds = 0.f;
+        static U32 frames = 0;
+        static U32 upload_frames = 0;
+        static U32 budget_limited_frames = 0;
+        static size_t max_queue_left = 0;
+
+        ++frames;
+        if (bytes > 0)
+        {
+            ++upload_frames;
+            total_bytes += bytes;
+            max_frame_bytes = llmax(max_frame_bytes, bytes);
+            max_frame_seconds = llmax(max_frame_seconds, seconds);
+        }
+        if (budget_bytes > 0 && bytes >= budget_bytes && queue_left > 0)
+        {
+            ++budget_limited_frames;
+        }
+        max_queue_left = llmax(max_queue_left, queue_left);
+
+        if (log_timer.getElapsedTimeF32() < 5.f)
+        {
+            return;
+        }
+        const FSTextureUpload::Stats pbo = FSTextureUpload::takeStats();
+        if (upload_frames > 0)
+        {
+            constexpr F64 MB = 1024.0 * 1024.0;
+            LL_INFOS("Texture") << "Texture uploads (5s): frames=" << frames
+                                << " upload_frames=" << upload_frames
+                                << " total_mb=" << (F64)total_bytes / MB
+                                << " avg_mb_per_upload_frame=" << (F64)total_bytes / MB / upload_frames
+                                << " max_frame_mb=" << (F64)max_frame_bytes / MB
+                                << " max_frame_ms=" << max_frame_seconds * 1000.f
+                                << " budget_mb=" << (F64)budget_bytes / MB
+                                << " budget_limited_frames=" << budget_limited_frames
+                                << " max_queue_left=" << max_queue_left
+                                << " pbo=" << (FSTextureUpload::isPBOEnabled() ? 1 : 0)
+                                << " pbo_mb=" << (F64)pbo.mPBOBytes / MB
+                                << " pbo_levels=" << pbo.mPBOUploads
+                                << " pbo_ring_full=" << pbo.mRingFull
+                                << LL_ENDL;
+        }
+        log_timer.reset();
+        total_bytes = 0;
+        max_frame_bytes = 0;
+        max_frame_seconds = 0.f;
+        frames = 0;
+        upload_frames = 0;
+        budget_limited_frames = 0;
+        max_queue_left = 0;
+    }
+}
+// </FS:Trish>
+
 F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -1227,9 +1346,19 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 
     LLTimer create_timer;
 
-    // <FS:Trish> FSPerfTextureUploadPBO
+    // <FS:Trish> FSPerfTextureUploadPBO / FSPerfTextureUploadBudgetMB
     static LLCachedControl<bool> fs_upload_pbo(gSavedSettings, "FSPerfTextureUploadPBO", false);
+    static LLCachedControl<F32> fs_upload_budget_mb(gSavedSettings, "FSPerfTextureUploadBudgetMB", 0.f);
+    static LLCachedControl<bool> fs_upload_diagnostics(gSavedSettings, "TextureFetchPipelineDiagnostics", false);
     FSTextureUpload::setPBOEnabled(fs_upload_pbo);
+    // No budget on the teleport screen: nothing is drawn there, so a long frame costs nothing
+    const S64 fs_budget_bytes = (fs_upload_budget_mb > 0.f && !gTeleportDisplay) ? (S64)(fs_upload_budget_mb * 1048576.f) : 0;
+    const bool fs_track_uploads = fs_upload_pbo || fs_upload_budget_mb > 0.f || fs_upload_diagnostics;
+    S64 fs_upload_bytes = 0;
+    if (fs_budget_bytes > 0)
+    {
+        fs_sort_create_queue(mCreateTextureList);
+    }
     // </FS:Trish>
 
     while (!mCreateTextureList.empty())
@@ -1271,6 +1400,12 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 
         if (!redundant_load && !unwanted_load)
         {
+           // <FS:Trish> FSPerfTextureUploadBudgetMB
+           if (fs_track_uploads)
+           {
+               fs_upload_bytes += fs_estimate_upload_bytes(imagep);
+           }
+           // </FS:Trish>
            imagep->createTexture();
         }
 
@@ -1295,7 +1430,21 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
         {
             break;
         }
+
+        // <FS:Trish> FSPerfTextureUploadBudgetMB: the rest wait for the next frame
+        if (fs_budget_bytes > 0 && fs_upload_bytes >= fs_budget_bytes)
+        {
+            break;
+        }
+        // </FS:Trish>
     }
+
+    // <FS:Trish> FSPerfTextureUploadBudgetMB / FSPerfTextureUploadPBO
+    if (fs_track_uploads)
+    {
+        fs_record_upload_frame(fs_upload_bytes, create_timer.getElapsedTimeF32(), mCreateTextureList.size(), fs_budget_bytes);
+    }
+    // </FS:Trish>
 
     // <FS:Trish> Downscale only under memory pressure
     // Entries queued while memory was tight can outlive the pressure. Once VRAM is back under
