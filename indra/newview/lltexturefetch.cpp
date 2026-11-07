@@ -3219,6 +3219,7 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
     mHttpHighWater = HTTP_NONPIPE_REQUESTS_HIGH_WATER;
     mHttpLowWater = HTTP_NONPIPE_REQUESTS_LOW_WATER;
     mHttpSemaphore = 0;
+    mSelfHealEnabled = false; // <FS:Trish/>
 
     // If that test log has ben requested but not yet created, create it
     if (LLMetricPerformanceTesterBasic::isMetricLogRequested(sTesterName) && !LLMetricPerformanceTesterBasic::getTester(sTesterName))
@@ -3791,6 +3792,9 @@ void LLTextureFetch::commonUpdate()
     }
 
     // <FS:Trish>
+    // Take back slots stranded on workers that no longer use them (FSTextureFetchSelfHeal)
+    reconcileHttpSlots();
+
     // Release waiters
     releaseHttpWaiters();
     // </FS:Trish>
@@ -3817,6 +3821,11 @@ size_t LLTextureFetch::update(F32 max_time_ms)
 
         mNetworkQueueMutex.unlock();                                    // -Mfnq
     }
+
+    // <FS:Trish> Settings are read on the main thread; the fetch thread only sees the flag
+    static LLCachedControl<bool> self_heal(gSavedSettings, "FSTextureFetchSelfHeal", false);
+    mSelfHealEnabled = (bool)self_heal;
+    // </FS:Trish>
 
     size_t res = LLWorkerThread::update(max_time_ms);
 
@@ -4567,7 +4576,10 @@ bool LLTextureFetch::isHttpWaiter(const LLUUID & tid)
 //
 // Threads:  Ttf
 // Locks:  -Mw (must not hold any worker when called)
-void LLTextureFetch::releaseHttpWaiters()
+// <FS:Trish> force skips the refill batching
+//void LLTextureFetch::releaseHttpWaiters()
+void LLTextureFetch::releaseHttpWaiters(bool force)
+// </FS:Trish>
 {
     LL_PROFILE_ZONE_SCOPED;
     // Use mHttpSemaphore rather than mHTTPTextureQueue.size()
@@ -4579,7 +4591,10 @@ void LLTextureFetch::releaseHttpWaiters()
     // frames are slow. A small batch threshold still keeps the sort below from running for one
     // slot at a time.
     const S32 refill_batch = llmax(4, mHttpHighWater / 8);
-    if (mHttpHighWater - mHttpSemaphore < refill_batch)
+    // <FS:Trish> The self-heal may free fewer slots than a batch, with nothing in flight to free more
+    //if (mHttpHighWater - mHttpSemaphore < refill_batch)
+    if (!force && mHttpHighWater - mHttpSemaphore < refill_batch)
+    // </FS:Trish>
         return;
     S32 needed(mHttpHighWater - mHttpSemaphore);
     if (needed <= 0)
@@ -4814,6 +4829,142 @@ void LLTextureFetch::logPipelineDiagnostics()
     // </FS:Trish>
 }
 
+
+// <FS:Trish> FSTextureFetchSelfHeal
+// Threads: Ttf
+// Locks:  -Mw, -Mfq, -Mfnq
+//
+// mHttpSemaphore is the number of workers with mHttpHasResource set, so the count itself cannot
+// drift; what leaks is a worker that keeps its slot after it stopped using it. Such a slot is only
+// returned by that worker's destructor, so the counter must never be adjusted directly (the
+// destructor would then drive it negative). Instead release the slot through the worker that
+// holds it, which clears mHttpHasResource and keeps every later release balanced.
+void LLTextureFetch::reconcileHttpSlots()
+{
+    static const F32 CHECK_INTERVAL = 1.0f;
+    // How long waiters must have been starved, and how long a worker must have sat in the same
+    // state holding an unused slot, before anything is taken back.
+    static const F32 STUCK_SECONDS = 5.0f;
+
+    if (!mSelfHealEnabled)
+    {
+        mSelfHealStuckTimer.reset();
+        return;
+    }
+    if (mSelfHealCheckTimer.getElapsedTimeF32() < CHECK_INTERVAL)
+    {
+        return;
+    }
+    mSelfHealCheckTimer.reset();
+
+    // Requests really outstanding in LLCore: added when the GET is issued, removed in onCompleted().
+    S32 in_flight = 0;
+    {
+        LLMutexLock lock(&mHttpActiveMutex);
+        in_flight = static_cast<S32>(mHttpActiveWorkers.size());
+    }
+    const S32 waiters = getHttpWaitersCount();
+    const S32 semaphore_before = mHttpSemaphore;
+    if (waiters <= 0 || semaphore_before <= in_flight)
+    {
+        mSelfHealStuckTimer.reset();
+        return;
+    }
+    if (mSelfHealStuckTimer.getElapsedTimeF32() < STUCK_SECONDS)
+    {
+        return;
+    }
+
+    S32 holders = 0;
+    S32 unprocessed = 0;
+    S32 released = 0;
+    F32 oldest_wait = 0.f;
+    std::ostringstream released_states;
+    {
+        // Holding the request-map lock keeps every worker in the map alive (removal needs this
+        // lock and deletion follows removal). Mfq -> Mw is the order logPipelineDiagnostics() uses.
+        LLMutexLock lock(&mQueueMutex);                                 // +Mfq
+        std::vector<LLTextureFetchWorker*> candidates;
+        for (map_t::const_iterator iter = mRequestMap.begin(); iter != mRequestMap.end(); ++iter)
+        {
+            LLTextureFetchWorker* worker = iter->second;
+            if (!worker)
+            {
+                continue;
+            }
+            worker->lockWorkMutex();                                    // +Mw
+            const F32 in_state = worker->mStateTimer.getElapsedTimeF32();
+            if (worker->mState == LLTextureFetchWorker::WAIT_HTTP_RESOURCE2)
+            {
+                oldest_wait = llmax(oldest_wait, in_state);
+            }
+            if (worker->mHttpHasResource)
+            {
+                ++holders;
+                if (!worker->mHttpActive && in_state >= STUCK_SECONDS)
+                {
+                    if (worker->mState == LLTextureFetchWorker::WAIT_HTTP_REQ)
+                    {
+                        // A completion nobody processed. Its own release path would run again on
+                        // resume, so leave it alone and only report it.
+                        ++unprocessed;
+                    }
+                    else
+                    {
+                        candidates.push_back(worker);
+                    }
+                }
+            }
+            worker->unlockWorkMutex();                                  // -Mw
+        }
+
+        if (oldest_wait >= STUCK_SECONDS)
+        {
+            for (LLTextureFetchWorker* worker : candidates)
+            {
+                worker->lockWorkMutex();                                // +Mw
+                const LLTextureFetchWorker::e_state state = worker->mState;
+                // WAIT_HTTP_RESOURCE and SEND_HTTP_REQ legitimately hold a slot on their way to
+                // sending; there it is only stranded if the worker has no work left to get there.
+                // In any other state (and in the waiter set) the slot is never used.
+                const bool sending = state == LLTextureFetchWorker::WAIT_HTTP_RESOURCE ||
+                                     state == LLTextureFetchWorker::SEND_HTTP_REQ;
+                if (worker->mHttpHasResource && !worker->mHttpActive &&
+                    state != LLTextureFetchWorker::WAIT_HTTP_REQ &&
+                    worker->mStateTimer.getElapsedTimeF32() >= STUCK_SECONDS &&
+                    (!sending || !worker->haveWork()))
+                {
+                    // Every state that might later release again checks mHttpHasResource first
+                    // (SEND_HTTP_REQ re-queues, WAIT_HTTP_RESOURCE re-acquires, the destructor and
+                    // aborts are guarded), so this cannot be given back twice.
+                    worker->releaseHttpSemaphore();
+                    if (++released <= 8)
+                    {
+                        released_states << " " << worker->mID << "=" << e_state_name[state];
+                    }
+                }
+                worker->unlockWorkMutex();                              // -Mw
+            }
+        }
+    }                                                                   // -Mfq
+
+    if (released > 0)
+    {
+        LL_WARNS(LOG_TXT) << "Texture fetch self-heal: released " << released
+                          << " stranded HTTP slot(s); slots " << semaphore_before << " -> " << (S32)mHttpSemaphore
+                          << "/" << mHttpHighWater
+                          << ", in_flight=" << in_flight
+                          << " holders=" << holders
+                          << " unprocessed_completions=" << unprocessed
+                          << " waiters=" << waiters
+                          << " oldest_wait=" << oldest_wait << "s"
+                          << " |" << released_states.str()
+                          << LL_ENDL;
+        mSelfHealStuckTimer.reset();
+        releaseHttpWaiters(true);
+    }
+}
+// </FS:Trish>
 
 // Threads:  T*
 void LLTextureFetch::updateStateStats(U32 cache_read, U32 cache_write, U32 res_wait)

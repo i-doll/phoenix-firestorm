@@ -238,7 +238,10 @@ public:
     //
     // Threads:  T*
     // Locks:  -Mw (must not hold any worker when called)
-    void releaseHttpWaiters();
+    // <FS:Trish> force skips the refill batching, for the self-heal
+    //void releaseHttpWaiters();
+    void releaseHttpWaiters(bool force = false);
+    // </FS:Trish>
 
     // Threads:  T*
     void cancelHttpWaiters();
@@ -249,6 +252,14 @@ public:
     // Emits a periodic, opt-in snapshot of the HTTP texture pipeline.
     // Threads: Ttf
     void logPipelineDiagnostics();
+
+    // <FS:Trish> FSTextureFetchSelfHeal: about once a second, if requests have sat in
+    // WAIT_HTTP_RESOURCE2 for a while and the slot count exceeds the requests really in
+    // flight, take back slots from workers that hold one without using it and wake the waiters.
+    // Threads: Ttf
+    // Locks:  -Mw, -Mfq, -Mfnq
+    void reconcileHttpSlots();
+    // </FS:Trish>
     // ----------------------------------
     // Stats management
 
@@ -442,6 +453,11 @@ private:
     S32                                 mHttpHighWater;                 // Ttf
     S32                                 mHttpLowWater;                  // Ttf
     LLFrameTimer                        mPipelineDiagnosticsTimer;      // Ttf
+    // <FS:Trish> FSTextureFetchSelfHeal
+    LLAtomicBool                        mSelfHealEnabled;               // written Tmain, read Ttf
+    LLFrameTimer                        mSelfHealCheckTimer;            // Ttf
+    LLFrameTimer                        mSelfHealStuckTimer;            // Ttf
+    // </FS:Trish>
 
     // We use a resource semaphore to keep HTTP requests in
     // WAIT_HTTP_RESOURCE2 if there aren't sufficient slots in the
