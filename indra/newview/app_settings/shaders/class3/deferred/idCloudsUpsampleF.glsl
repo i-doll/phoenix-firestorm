@@ -15,6 +15,8 @@ in vec2 vary_fragcoord;
 // Half resolution: [0] in-scatter and transmittance, [1] r cloud distance, g scene distance.
 uniform sampler2D idCloudScene;
 uniform sampler2D idCloudDepth;
+// Half of the full-resolution size, so half-resolution texel centres line up with odd sizes too.
+uniform vec2 id_march_grid;
 
 float getDepth(vec2 pos_screen);
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
@@ -28,7 +30,7 @@ void main()
     float scene_t = depth >= 1.0 ? ID_MAX_DIST : length(getPositionWithDepth(tc, depth).xyz);
 
     ivec2 size = textureSize(idCloudScene, 0);
-    vec2 f = tc * vec2(size) - 0.5;
+    vec2 f = tc * id_march_grid - 0.5;
     ivec2 base = ivec2(floor(f));
     vec2 w = f - vec2(base);
 

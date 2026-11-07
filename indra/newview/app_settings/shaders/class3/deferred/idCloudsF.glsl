@@ -36,8 +36,9 @@ float idAltitude(vec3 rel)
 uniform mat4  id_eye_to_world;
 uniform int   id_steps;
 uniform int   id_samples;
-// The pixels being marched belong to a grid of id_march_grid size. Each fragment marches the grid
-// pixel at its own coordinate times id_march_block plus id_march_offset.
+// The pixels being marched belong to a grid of id_march_grid size (half the screen size, possibly
+// fractional, at half resolution). Each fragment marches the grid pixel at its own coordinate times
+// id_march_block plus id_march_offset.
 uniform vec2  id_march_grid;
 uniform vec2  id_march_block;
 uniform vec2  id_march_offset;

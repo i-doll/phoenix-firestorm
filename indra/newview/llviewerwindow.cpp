@@ -235,7 +235,11 @@
 #include "llnetmap.h"
 #include "lggcontactsets.h"
 #include "fspanellogin.h"
-#include "idvolumetriccloudsettings.h" // <ID:VolumetricClouds/>
+// <ID:VolumetricClouds>
+#include "idvolumetricclouds.h"
+#include "idvolumetriccloudsettings.h"
+#include <optional>
+// </ID:VolumetricClouds>
 
 #include "lltracerecording.h"
 
@@ -6377,7 +6381,11 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     F32 depth_conversion_factor_2 = (LLViewerCamera::getInstance()->getFar() - LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
 
     // <ID:VolumetricClouds>
-    IDCloudWindFreeze cloud_wind_freeze;
+    std::optional<IDCloudWindFreeze> cloud_wind_freeze;
+    if (IDVolumetricClouds::instance().isActive())
+    {
+        cloud_wind_freeze.emplace();
+    }
     // </ID:VolumetricClouds>
 
     // Subimages are in fact partial rendering of the final view. This happens when the final view is bigger than the screen.
