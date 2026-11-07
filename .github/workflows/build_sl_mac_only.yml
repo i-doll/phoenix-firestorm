@@ -482,7 +482,7 @@ jobs:
           version: ${{ steps.version.outputs.viewer_version }}.${{ steps.version.outputs.viewer_build }}
           # llwebrtc stages its PDB/dSYM below symbols/Release/<channel>.
           # Upload full PDBs; pdbcopy's *-public.pdb files omit source lines.
-          files: ${{ runner.os == 'Windows' && '**/{Release/*.{exe,dll},{Release,symbols/Release/**}/!(*-public).pdb}' || runner.os == 'macOS' && '**/{Release/{Firestorm,*.dSYM},symbols/Release/**/*.dSYM}' || '**/{do-not-run-directly-firestorm-bin,*.sym}' }}
+          files: ${{ runner.os == 'Windows' && '**/{Release/*.{exe,dll},{Release,symbols/Release/**}/!(*-public).pdb}' || runner.os == 'macOS' && '**/{Release/{Idyll,*.dSYM},symbols/Release/**/*.dSYM}' || '**/{do-not-directly-run-idyll-bin,*.sym}' }}
           directory: "build-*"
           node-version: "24"
           dumpSyms: false

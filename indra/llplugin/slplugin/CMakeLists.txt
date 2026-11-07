@@ -54,7 +54,7 @@ elseif (DARWIN)
     INSTALL_RPATH "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
     # <FS:TJ> [FIRE-36985] Fix multiple Firestorm dock icons in macOS 27.2+
-    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.firestormviewer.firestorm.slplugin"
+    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.idyllviewer.idyll.slplugin"
     # </FS:TJ>
     XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
   )

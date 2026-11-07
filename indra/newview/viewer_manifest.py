@@ -328,7 +328,7 @@ class ViewerManifest(LLManifest,FSViewerManifest):
         global CHANNEL_VENDOR_BASE
         # a standard map of strings for replacing in the templates
         #<FS:TS> tag "OS" after CHANNEL_VENDOR_BASE and before any suffix
-        channel_base = "Phoenix-" + CHANNEL_VENDOR_BASE
+        channel_base = CHANNEL_VENDOR_BASE
         if self.fs_is_opensim():
             channel_base = channel_base + "OS"
         #</FS:TS>
@@ -632,8 +632,8 @@ class Windows_x86_64_Manifest(ViewerManifest):
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
         if self.is_packaging_viewer():
-            # Find firestorm-bin.exe in the 'configuration' dir, then rename it to the result of final_exe.
-            self.path(src='%s/firestorm-bin.exe' % self.args['configuration'], dst=self.final_exe())
+            # Find idyll-bin.exe in the 'configuration' dir, then rename it to the result of final_exe.
+            self.path(src='%s/idyll-bin.exe' % self.args['configuration'], dst=self.final_exe())
 
             # <FS:Ansariel> Undo Github-Build stuff - I don't think we need this
             # GITHUB_OUTPUT = os.getenv('GITHUB_OUTPUT')
@@ -1003,7 +1003,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
         #installer_base = self.installer_base_name()
         #exclude_pattern = r'.*\.pdb|.*\.map|.*\.bat|.*\.exp|.*\.lib|.*\.nsi|.*\.tar\.xz|secondlife-bin\..*|.*_Setup\.exe|.*-Setup\.exe'
         installer_base = self.fs_installer_basename()
-        exclude_pattern = r'.*\.pdb|.*\.map|.*\.bat|.*\.exp|.*\.lib|.*\.nsi|.*\.tar\.xz|firestorm-bin\..*|.*_Setup\.exe|.*-Setup\.exe'
+        exclude_pattern = r'.*\.pdb|.*\.map|.*\.bat|.*\.exp|.*\.lib|.*\.nsi|.*\.tar\.xz|idyll-bin\..*|.*_Setup\.exe|.*-Setup\.exe'
         # </FS:TJ>
 
         # Channel-specific icon for the Velopack installer.
@@ -1122,7 +1122,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
 
         substitution_strings = self.fs_splice_grid_substitution_strings( substitution_strings ) #<FS:ND/> Add grid args
 
-        # <FS:ND> Properly name OS version, also add Phoenix- in front of installer name
+        # <FS:ND> Properly name OS version
         #installer_file = self.installer_base_name() + '_Setup.exe'
         installer_file = self.fs_installer_basename() + "_Setup.exe"
         # </FS:ND>
@@ -1473,7 +1473,7 @@ class Darwin_x86_64_Manifest(ViewerManifest):
         # copy over the build result (this is a no-op if run within the xcode
         # script)
         #self.path(os.path.join(self.args['configuration'], self.channel() + ".app"), dst="")
-        self.path(os.path.join(self.args['configuration'], "Firestorm.app"), dst="")
+        self.path(os.path.join(self.args['configuration'], "Idyll.app"), dst="")
 
         pkgdir = os.path.join(self.args['build'], os.pardir, 'packages')
         relpkgdir = os.path.join(pkgdir, "lib", "release")
@@ -1485,7 +1485,7 @@ class Darwin_x86_64_Manifest(ViewerManifest):
 
         with self.prefix(src="", dst="Contents"):  # everything goes in Contents
             with self.prefix(dst="MacOS"):
-                executable = self.dst_path_of("Firestorm") # locate the executable within the bundle.
+                executable = self.dst_path_of("Idyll") # locate the executable within the bundle.
 
             bugsplat_db = self.args.get('bugsplat')
             print(f"debug: bugsplat_db={bugsplat_db}")
@@ -1759,7 +1759,7 @@ class Darwin_x86_64_Manifest(ViewerManifest):
         if ("package" in self.args['actions'] or 
             "unpacked" in self.args['actions']):
             self.run_command_shell('strip -S %(viewer_binary)r' %
-                            { 'viewer_binary' : self.dst_path_of('Contents/MacOS/Firestorm')})
+                            { 'viewer_binary' : self.dst_path_of('Contents/MacOS/Idyll')})
 # </FS:Ansariel> construct method VMP trampoline crazy VMP launcher juggling shamelessly replaced with old version
 
     def package_finish(self):
@@ -2164,10 +2164,10 @@ class LinuxManifest(ViewerManifest):
         self.path("res/firestorm_icon.png","firestorm_icon.png")
         with self.prefix("linux_tools"):
             self.path("client-readme.txt","README-linux.txt")
-            self.path("FIRESTORM_DESKTOPINSTALL.txt","FIRESTORM_DESKTOPINSTALL.txt")
+            self.path("IDYLL_DESKTOPINSTALL.txt","IDYLL_DESKTOPINSTALL.txt")
             self.path("client-readme-voice.txt","README-linux-voice.txt")
             self.path("client-readme-joystick.txt","README-linux-joystick.txt")
-            self.path("wrapper.sh","firestorm")
+            self.path("wrapper.sh","idyll")
             with self.prefix(dst="etc"):
                 self.path("handle_secondlifeprotocol.sh")
                 self.path("register_secondlifeprotocol.sh")
@@ -2177,7 +2177,7 @@ class LinuxManifest(ViewerManifest):
 
         with self.prefix(dst="bin"):
             self.path( os.path.join(os.pardir,'build_data.json'), "build_data.json" )
-            self.path("firestorm-bin","do-not-directly-run-firestorm-bin")
+            self.path("idyll-bin","do-not-directly-run-idyll-bin")
             self.path("../linux_crash_logger/linux-crash-logger","linux-crash-logger.bin")
             self.path2basename("../llplugin/slplugin", "SLPlugin")
             #this copies over the python wrapper script, associated utilities and required libraries, see SL-321, SL-322 and SL-323

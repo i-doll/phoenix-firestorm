@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
+  <title>Idyll — Green reach, polished mountain fjord, C6</title>
+  <defs><clipPath id="tile"><rect x="1" y="1" width="62" height="62" rx="14"/></clipPath></defs>
+  <g clip-path="url(#tile)">
+    <path fill="#E4E9D5" d="M0 0h64v64H0z"/>
+    <!-- Continuous far ridge: the closed fjord head and its original summit. -->
+    <path fill="#A4C4B0" d="M0 30L17 28L27 18L32 23L36 22L44 29L53 25L64 30V38H0Z"/>
+    <path fill="#66B9B5" d="M0 31h64v33H0z"/>
+    <!-- A quiet depth wedge with an uneven near edge, tucked behind the banks. -->
+    <path fill="#285548" fill-opacity=".08" d="M23 31H44L48 38Q40 36.5 34 37.5Q29 38 26 38Z"/>
+    <!-- Unbroken left slope and softened lower shoreline transition. -->
+    <path fill="#547E68" d="M-2 22L10 10L16.5 14L20 18.5L23 23L25 30L28 34L31 38L24 41L18 43L13 44C11.5 47.5 10.5 49.8 8.8 51.4C6.6 53.5 2.2 55.6-2 58Z"/>
+    <path fill="#285548" d="M-2 22L10 10L13 22L12 34L18 43L13 44C11.5 47.5 10.5 49.8 8.8 51.4C6.6 53.5 2.2 55.6-2 58Z"/>
+    <!-- The banks overlap the far ridge diagonally; the right fold leans toward shore. -->
+    <path fill="#285548" d="M66 22L56 18L51 21L48 24L45 25L43 28L41.5 34L47 39L48 44L55 48L66 54Z"/>
+    <path fill="#547E68" d="M56 18L51 21L48 24L45 25L43 28L41.5 34L47 39L48 44L53.25 47Z"/>
+  </g>
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="none" stroke="#749185" stroke-width="2"/>
+</svg>

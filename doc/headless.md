@@ -6,15 +6,15 @@ Linux only. Runs the viewer with no window, software GL and no audio, so an agen
 
 Desktop, with a login saved in your normal viewer:
 
-    firestorm --headless --mcp-port 33801 --login-name "name"
+    idyll --headless --mcp-port 33801 --login-name "name"
 
 Server, with no saved login. Set the credentials in the environment and leave out `--login-name`:
 
-    IDHEADLESS_USERNAME=name IDHEADLESS_PASSWORD=secret firestorm --headless --mcp-port 33801
+    IDHEADLESS_USERNAME=name IDHEADLESS_PASSWORD=secret idyll --headless --mcp-port 33801
 
-The password is never accepted on the command line and is not saved. `--login-name` is `name` or `name@grid`; a bare name uses the current grid. Saved logins are read from `~/.firestorm_x64/user_settings/bin_conf.dat` (or `$FIRESTORM_X64_USER_DIR`), read-only.
+The password is never accepted on the command line and is not saved. `--login-name` is `name` or `name@grid`; a bare name uses the current grid. Saved logins are read from `~/.idyll_x64/user_settings/bin_conf.dat` (or `$IDYLL_X64_USER_DIR`), read-only.
 
-Run `firestorm` (the wrapper script) for normal use. It passes the viewer's exit code through. Running `do-not-directly-run-firestorm-bin` skips the wrapper's library setup.
+Run `idyll` (the wrapper script) for normal use. It passes the viewer's exit code through. Running `do-not-directly-run-idyll-bin` skips the wrapper's library setup.
 
 ## Flags
 
@@ -30,7 +30,7 @@ Run `firestorm` (the wrapper script) for normal use. It passes the viewer's exit
 
 ## Status file
 
-JSON, rewritten at each step. Default path: `~/.firestorm_x64_headless/<port>/headless-status.json`.
+JSON, rewritten at each step. Default path: `~/.idyll_x64_headless/<port>/headless-status.json`.
 
 | Field | Meaning |
 |---|---|
@@ -65,8 +65,8 @@ JSON, rewritten at each step. Default path: `~/.firestorm_x64_headless/<port>/he
 
 ## Folders
 
-- `~/.firestorm_x64_headless/<port>/`: the viewer's user dir for that port (settings, cache, logs).
-- `~/.firestorm_x64_headless/avatars/<avatar>/`: per avatar. `lock` stops a second headless viewer for the same avatar; `ledger.jsonl` lists the objects this avatar rezzed and has not cleaned up. It is shared across ports, so a later launch cleans up after a crash.
+- `~/.idyll_x64_headless/<port>/`: the viewer's user dir for that port (settings, cache, logs).
+- `~/.idyll_x64_headless/avatars/<avatar>/`: per avatar. `lock` stops a second headless viewer for the same avatar; `ledger.jsonl` lists the objects this avatar rezzed and has not cleaned up. It is shared across ports, so a later launch cleans up after a crash.
 - Inventory: `Headless Tests/<run>/` and `#RLV/Headless Tests/<run>/`. New inventory items, uploads and copies go to the run folder by default. A destination outside these two folders is refused.
 
 ## Cleanup
