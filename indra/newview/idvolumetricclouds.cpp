@@ -586,6 +586,14 @@ void IDVolumetricClouds::update()
         {
             mWasActive = active;
             gPipeline.mReflectionMapManager.reset();
+            if (!active)
+            {
+                for (U32 slot = 0; slot < 2; ++slot)
+                {
+                    mProbeMarchRT[slot].release();
+                    mProbeSceneRT[slot].release();
+                }
+            }
         }
     }
 
@@ -918,10 +926,14 @@ void IDVolumetricClouds::onHazeApplied()
     }
 }
 
-// Probe faces leave the live history and the main view's scene alone, so alpha surfaces in probes
-// are drawn without clouds in front of them.
+// Never touches the live history or mSceneRT.
 void IDVolumetricClouds::renderProbe(LLRenderTarget* screen, LLRenderTarget* depth_src)
 {
+    // Like the flat clouds, kept out of irradiance maps so moving clouds don't make ambient light pop.
+    if (!gPipeline.mHeroProbeManager.isMirrorPass() && !gPipeline.mReflectionMapManager.isRadiancePass())
+    {
+        return;
+    }
     if (!screen || !depth_src || !isActive())
     {
         return;
