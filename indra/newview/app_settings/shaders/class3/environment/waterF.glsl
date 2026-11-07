@@ -115,6 +115,26 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 
 vec3 getPositionWithNDC(vec3 ndc);
 
+// <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+vec4 idCloudsInFront(vec3 pos_eye, vec3 haze_add, float haze_atten);
+vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
+uniform int id_cloud_scene_active;
+
+// fb, the refracted screen copy, already has the clouds in it; only the rest of the colour gets them here.
+vec3 idWaterClouds(vec3 color, vec3 fb, float fb_weight, vec3 pos, vec3 additive, vec3 atten)
+{
+    vec4 cloud = idCloudsInFront(pos, atmosFragLightingLinear(vec3(0.0), additive, atten), atten.r);
+    if (cloud.a >= 1.0)
+    {
+        return color;
+    }
+    vec3 rest = color - fb_weight * fb;
+    return fb_weight * fb + rest * cloud.a + (1.0 - fb_weight) * cloud.rgb;
+}
+#endif
+// </ID:VolumetricClouds>
+
 void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
 {
     // Generate all of our wave normals.
@@ -331,8 +351,27 @@ void main()
     fade = min(1, fade);
     color = mix(fb.rgb, color, fade);
 
+    // <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+#ifdef TRANSPARENT_WATER
+    float fb_weight = 1.0 - fade * min(1, df2.x);
+#else
+    float fb_weight = 0.0;
+#endif
+    color = idWaterClouds(color, fb.rgb, fb_weight, pos.xyz, additive, atten);
+    // Pre-compensated in-scatter may be negative until the haze pass; same bound as the composite.
+    float floor_c = (id_cloud_scene_active != 0) ? -11.2 : 0.0;
+#endif
+    // </ID:VolumetricClouds>
+
     float spec = min(max(max(punctual.r, punctual.g), punctual.b), 0);
 
     // Keep HDR highlights for the exposure/tone-map pass and bound half-float output.
+    // <ID:VolumetricClouds>
+#ifdef ID_VOLUMETRIC_CLOUDS
+    frag_color = vec4(clamp(color.rgb, vec3(floor_c), vec3(65504)), clamp(spec * water_mask, 0.0, 1.0));
+#else
     frag_color = vec4(clamp(color.rgb, vec3(0), vec3(65504)), clamp(spec * water_mask, 0.0, 1.0));
+#endif
+    // </ID:VolumetricClouds>
 }

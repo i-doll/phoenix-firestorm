@@ -133,6 +133,7 @@
 #include "SMAAAreaTex.h"
 #include "SMAASearchTex.h"
 #include "llerror.h"
+#include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -1484,6 +1485,13 @@ void LLPipeline::releaseGLBuffers()
 
     gBumpImageList.destroyGL();
     LLVOAvatar::resetImpostors();
+
+    // <ID:VolumetricClouds>
+    if (IDVolumetricClouds::instanceExists())
+    {
+        IDVolumetricClouds::instance().release();
+    }
+    // </ID:VolumetricClouds>
 }
 
 void LLPipeline::releaseLUTBuffers()
@@ -9745,6 +9753,10 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     {
         gGL.getTexUnit(channel)->bind(getSpotShadowTarget(0), true);
     }
+
+    // <ID:VolumetricClouds> Here so the fast bind path rebinds it too
+    IDVolumetricClouds::instance().bindForSampling(shader);
+    // </ID:VolumetricClouds>
 }
 
 void LLPipeline::applyCommonOITUniforms(LLGLSLShader& shader)
@@ -10037,6 +10049,9 @@ void LLPipeline::renderDeferredLighting()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderDeferredLighting");
+
+    IDVolumetricClouds::instance().update(); // <ID:VolumetricClouds/>
+
     if (!sCull)
     {
         return;
@@ -10486,6 +10501,14 @@ void LLPipeline::renderDeferredLighting()
         gGL.setColorMask(true, true);
     }
 
+    // <ID:VolumetricClouds>
+    if (IDVolumetricClouds::instance().isActive())
+    {
+        LL_PROFILE_GPU_ZONE("volumetric clouds");
+        IDVolumetricClouds::instance().render(screen_target, &mRT->deferredScreen);
+    }
+    // </ID:VolumetricClouds>
+
     static LLCachedControl<bool> rlv_sphere_opaque_depth(gSavedSettings, "RLVaDebugSphereUseOpaqueDepth", false);
     if (rlv_sphere_opaque_depth() && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
     {
@@ -10640,6 +10663,8 @@ void LLPipeline::doAtmospherics()
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
         unbindDeferredShader(haze_shader);
+
+        IDVolumetricClouds::instance().onHazeApplied(); // <ID:VolumetricClouds/>
 
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
@@ -10965,6 +10990,12 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     }
 
     unbindReflectionProbes(shader);
+
+    // <ID:VolumetricClouds>
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_SHADOW);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_SCENE);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_DEPTH);
+    // </ID:VolumetricClouds>
 
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.getTexUnit(0)->activate();

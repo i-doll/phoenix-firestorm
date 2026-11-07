@@ -31,6 +31,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 #include "llviewercontrol.h"
@@ -211,6 +212,13 @@ LLGLSLShader            gFSBloomPrefilterProgram;
 LLGLSLShader            gFSBloomDownProgram;
 LLGLSLShader            gFSBloomUpProgram;
 LLGLSLShader            gFSLensEffectsProgram;
+// <ID:VolumetricClouds>
+LLGLSLShader            gIDCloudsProgram;
+LLGLSLShader            gIDCloudsCompositeProgram;
+LLGLSLShader            gIDCloudShadowProgram;
+LLGLSLShader            gIDCloudsReprojectProgram;
+LLGLSLShader            gIDCloudsUpsampleProgram;
+// </ID:VolumetricClouds>
 // </FS:Trish>
 LLGLSLShader            gDeferredPostGammaCorrectProgram;
 LLGLSLShader            gLegacyPostGammaCorrectProgram;
@@ -472,6 +480,13 @@ void LLViewerShaderMgr::finalizeShaderList()
     mShaderList.push_back(&gDeferredDiffuseProgram);
     mShaderList.push_back(&gDeferredBumpProgram);
     mShaderList.push_back(&gDeferredPBROpaqueProgram);
+    // <ID:VolumetricClouds>
+    if (IDVolumetricClouds::isSupported())
+    {
+        mShaderList.push_back(&gIDCloudsProgram);
+        mShaderList.push_back(&gIDCloudsCompositeProgram);
+    }
+    // </ID:VolumetricClouds>
 
     if (gSavedSettings.getBOOL("GLTFEnabled"))
     {
@@ -952,6 +967,15 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["SSR"] = "1";
     }
 
+    // <ID:VolumetricClouds> without it no shader declares a cloud sampler, so other platforms keep their texture units
+#if LL_LINUX
+    if (IDVolumetricClouds::isSupported())
+    {
+        attribs["ID_VOLUMETRIC_CLOUDS"] = "1";
+    }
+#endif
+    // </ID:VolumetricClouds>
+
     if (has_reflection_probes)
     {
         attribs["REFMAP_LEVEL"] = std::to_string(probe_level);
@@ -1010,6 +1034,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/gbufferUtil.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/globalF.glsl",                          1));
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
+    index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/idCloudUtil.glsl",                     1) ); // <ID:VolumetricClouds/>
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/pbrterrainUtilF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/tonemapUtilF.glsl",                    1) );
@@ -1286,6 +1311,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSBloomUpProgram.unload();
         gFSLensEffectsProgram.unload();
         // </FS:Trish>
+        // <ID:VolumetricClouds>
+        gIDCloudsProgram.unload();
+        gIDCloudsCompositeProgram.unload();
+        gIDCloudShadowProgram.unload();
+        gIDCloudsReprojectProgram.unload();
+        gIDCloudsUpsampleProgram.unload();
+        // </ID:VolumetricClouds>
 
         for (auto i = 0; i < 4; ++i)
         {
@@ -2778,6 +2810,34 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
     }
     // </FS:Trish>
+
+    // <ID:VolumetricClouds> Optional like the post shaders above: if one fails to build, the clouds stay off.
+    if (success && IDVolumetricClouds::isSupported())
+    {
+        const std::pair<LLGLSLShader*, const char*> cloud_shaders[] = {
+            { &gIDCloudsProgram,          "deferred/idCloudsF.glsl" },
+            { &gIDCloudsCompositeProgram, "deferred/idCloudsCompositeF.glsl" },
+            { &gIDCloudShadowProgram,     "deferred/idCloudShadowF.glsl" },
+            { &gIDCloudsReprojectProgram, "deferred/idCloudsReprojectF.glsl" },
+            { &gIDCloudsUpsampleProgram,  "deferred/idCloudsUpsampleF.glsl" },
+        };
+        for (const auto& [shader, file] : cloud_shaders)
+        {
+            shader->mName = file;
+            shader->mFeatures.isDeferred = true;
+            shader->mShaderFiles.clear();
+            shader->clearPermutations();
+            shader->mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair(file, GL_FRAGMENT_SHADER));
+            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            if (!shader->createShader())
+            {
+                LL_WARNS("ShaderLoading") << file << " failed to build, volumetric clouds stay off" << LL_ENDL;
+                shader->unload();
+            }
+        }
+    }
+    // </ID:VolumetricClouds>
 
     if (success && gGLManager.mGLVersion > 3.9f)
     {

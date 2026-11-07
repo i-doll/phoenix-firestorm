@@ -366,6 +366,17 @@ public:
 
         TONY_MC_MAPFACE_LUT,                //  "tonyMcMapfaceLut"
 
+        // <ID:VolumetricClouds>
+        ID_CLOUD_NOISE_BASE,                //  "idCloudNoiseBase"
+        ID_CLOUD_NOISE_DETAIL,              //  "idCloudNoiseDetail"
+        ID_CLOUD_WEATHER,                   //  "idCloudWeather"
+        ID_CLOUD_SHADOW,                    //  "idCloudShadow"
+        ID_CLOUD_SCENE,                     //  "idCloudScene"
+        ID_CLOUD_DEPTH,                     //  "idCloudDepth"
+        ID_CLOUD_HISTORY,                   //  "idCloudHistory"
+        ID_CLOUD_HISTORY_DEPTH,             //  "idCloudHistoryDepth"
+        // </ID:VolumetricClouds>
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on

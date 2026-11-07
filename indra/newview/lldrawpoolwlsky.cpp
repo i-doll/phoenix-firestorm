@@ -28,6 +28,8 @@
 
 #include "lldrawpoolwlsky.h"
 
+#include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
+
 #include "llerror.h"
 #include "llface.h"
 #include "llimage.h"
@@ -492,7 +494,8 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
             renderStarsDeferred(origin);
         }
 
-        if (!gCubeSnapshot || gPipeline.mReflectionMapManager.isRadiancePass()) // don't draw clouds in irradiance maps to avoid popping
+        if ((!gCubeSnapshot || gPipeline.mReflectionMapManager.isRadiancePass()) // don't draw clouds in irradiance maps to avoid popping
+            && !IDVolumetricClouds::instance().isActive()) // <ID:VolumetricClouds/>
         {
             renderSkyCloudsDeferred(origin, camHeightLocal, cloud_shader);
         }

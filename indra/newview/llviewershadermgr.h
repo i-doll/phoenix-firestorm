@@ -271,6 +271,14 @@ extern LLGLSLShader         gFSBloomDownProgram;
 extern LLGLSLShader         gFSBloomUpProgram;
 extern LLGLSLShader         gFSLensEffectsProgram;
 // </FS:Trish>
+
+// <ID:VolumetricClouds>
+extern LLGLSLShader         gIDCloudsProgram;
+extern LLGLSLShader         gIDCloudsCompositeProgram;
+extern LLGLSLShader         gIDCloudShadowProgram;
+extern LLGLSLShader         gIDCloudsReprojectProgram;
+extern LLGLSLShader         gIDCloudsUpsampleProgram;
+// </ID:VolumetricClouds>
 extern LLGLSLShader         gExposureProgram;
 extern LLGLSLShader         gExposureProgramNoFade;
 extern LLGLSLShader         gLuminanceProgram;
