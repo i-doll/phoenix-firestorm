@@ -1478,6 +1478,19 @@ PFNGLSHADINGRATEIMAGEPALETTENVPROC fs_glShadingRateImagePaletteNV = nullptr;
 PFNGLSHADINGRATEIMAGEBARRIERNVPROC fs_glShadingRateImageBarrierNV = nullptr;
 // </FS:Trish>
 
+// <FS:Trish> Parallel shader compile
+static PFNGLMAXSHADERCOMPILERTHREADSKHRPROC fs_glMaxShaderCompilerThreads = nullptr;
+
+void LLGLManager::fsSetMaxShaderCompilerThreads()
+{
+    if (mHasParallelShaderCompile && fs_glMaxShaderCompilerThreads)
+    {
+        // 0xFFFFFFFF asks for the implementation's maximum
+        fs_glMaxShaderCompilerThreads(0xFFFFFFFFu);
+    }
+}
+// </FS:Trish>
+
 void LLGLManager::initExtensions()
 {
 // <FS:Zi> Linux support
@@ -1543,6 +1556,22 @@ void LLGLManager::initExtensions()
 #endif
     mHasNVShadingRateImage = fs_glBindShadingRateImageNV && fs_glShadingRateImagePaletteNV && fs_glShadingRateImageBarrierNV;
     LL_INFOS("RenderInit") << "NV shading rate image available: " << mHasNVShadingRateImage << LL_ENDL;
+    // </FS:Trish>
+
+    // <FS:Trish> Parallel shader compile (FSPerfParallelShaderCompile)
+    fs_glMaxShaderCompilerThreads = nullptr;
+#if LL_WINDOWS || LL_SDL
+    if (id_gl_extension_supported("GL_KHR_parallel_shader_compile"))
+    {
+        fs_glMaxShaderCompilerThreads = (PFNGLMAXSHADERCOMPILERTHREADSKHRPROC)GLH_EXT_GET_PROC_ADDRESS("glMaxShaderCompilerThreadsKHR");
+    }
+    if (!fs_glMaxShaderCompilerThreads && id_gl_extension_supported("GL_ARB_parallel_shader_compile"))
+    {
+        fs_glMaxShaderCompilerThreads = (PFNGLMAXSHADERCOMPILERTHREADSKHRPROC)GLH_EXT_GET_PROC_ADDRESS("glMaxShaderCompilerThreadsARB");
+    }
+#endif
+    mHasParallelShaderCompile = fs_glMaxShaderCompilerThreads != nullptr;
+    LL_INFOS("RenderInit") << "Parallel shader compile available: " << mHasParallelShaderCompile << LL_ENDL;
     // </FS:Trish>
 
     mInited = true;

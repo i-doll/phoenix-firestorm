@@ -29,6 +29,7 @@
 
 #include "llgl.h"
 #include "llglslshader.h"
+#include <functional> // <FS:Trish/>
 
 class LLShaderMgr
 {
@@ -413,6 +414,25 @@ public:
     bool loadCachedProgramBinary(LLGLSLShader* shader);
     bool saveCachedProgramBinary(LLGLSLShader* shader);
 
+    // <FS:Trish> Parallel shader compile (FSPerfParallelShaderCompile).
+    // fsRunBatched() runs one load phase with every compile and link submitted to the driver
+    // up front (GL_KHR_parallel_shader_compile), and reads the results once at the end.
+    // If anything in the batch fails, the phase's programs are unloaded and the phase runs
+    // again the classic way, so the fallback and error logging are the original ones.
+    bool fsRunBatched(const std::function<bool()>& load_phase);
+    bool fsIsBatching() const { return mFSBatching; }
+    // Called by LLGLSLShader while a batch is open
+    void fsAddPendingProgram(LLGLSLShader* shader);
+    void fsForgetPendingProgram(LLGLSLShader* shader);
+    bool fsResolvePendingProgram(LLGLSLShader* shader);
+    void fsNoteProgramCreated(LLGLSLShader* shader, bool from_cache);
+    bool fsCheckLinkStatus(GLuint program);
+    // Load timing: call fsBeginLoadStats() at the start of a full shader load and
+    // fsEndLoadStats() at the end; the end call writes one log line.
+    void fsBeginLoadStats(bool parallel_requested);
+    void fsEndLoadStats();
+    // </FS:Trish>
+
 public:
     // Map of shader names to compiled
     std::map<std::string, GLuint> mVertexShaderObjects;
@@ -433,6 +453,21 @@ public:
     LLUUID mShaderCacheVersion;
     bool mShaderCacheEnabled = false;
     std::string mShaderCacheDir;
+
+    // <FS:Trish> Parallel shader compile state
+    bool mFSParallelRequested = false;          // FSPerfParallelShaderCompile, set per load
+    bool mFSBatching = false;                   // a batch is open: compiles are not checked yet
+    bool mFSBatchFailed = false;
+    std::vector<GLuint> mFSPendingObjects;      // shared objects (loadBasicShaders) to check
+    std::vector<LLGLSLShader*> mFSPendingPrograms; // linked, not yet resolved
+    std::vector<LLGLSLShader*> mFSBatchPrograms;   // every program created in the batch
+    U32 mFSProgramsCompiled = 0;
+    U32 mFSProgramsCached = 0;
+    U32 mFSObjectsCompiled = 0;
+    U32 mFSBatchRetries = 0;
+    F64 mFSLoadStart = 0.0;
+    std::map<std::string, std::string> mFSLastGlobalDefines;
+    // </FS:Trish>
 
 protected:
 

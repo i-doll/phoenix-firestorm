@@ -101,6 +101,7 @@ public:
     bool mHasDSA = false;
     bool mHasNVRepresentativeFragmentTest = false; // <FS:Trish/> GL_NV_representative_fragment_test (FSPerfRepresentativeFragmentTest)
     bool mHasNVShadingRateImage = false; // <FS:Trish/> GL_NV_shading_rate_image (FSRenderVRS)
+    bool mHasParallelShaderCompile = false; // <FS:Trish/> GL_KHR/ARB_parallel_shader_compile
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
@@ -143,6 +144,9 @@ public:
     void getGLInfo(LLSD& info);
 
     void asLLSD(LLSD& info);
+    // <FS:Trish> Parallel shader compile: let the driver use all its compiler threads
+    void fsSetMaxShaderCompilerThreads();
+    // </FS:Trish>
 
     // In ALL CAPS
     std::string mGLVendor;

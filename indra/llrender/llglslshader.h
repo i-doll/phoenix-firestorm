@@ -193,6 +193,11 @@ public:
     bool readProfileQuery(bool for_runtime = false, bool force_read = false);
 
     bool createShader();
+    // <FS:Trish> Parallel shader compile (LLShaderMgr::fsRunBatched): createShader() inside a
+    // batch submits the compile and link and returns; fsResolveShader() finishes the program
+    // once the driver is done.
+    bool fsResolveShader();
+    // </FS:Trish>
     bool attachFragmentObject(std::string object);
     bool attachVertexObject(std::string object);
     void attachObject(GLuint object);
@@ -368,6 +373,13 @@ public:
 
 private:
     void unloadInternal();
+    // <FS:Trish> Parallel shader compile
+    bool fsSubmitShader();
+    bool fsCreateShaderSync();
+    bool fsFinishCreateShader(bool success);
+    bool mFSPending = false;    // linked inside a batch, not resolved yet
+    bool mFSLinked = false;     // link already submitted and checked; mapAttributes must not relink
+    // </FS:Trish>
     // This must be static because finishProfile() is called at least once
     // within a __try block. If we default its stats parameter to a temporary
     // json::value, that temporary must be destroyed when the stack is
