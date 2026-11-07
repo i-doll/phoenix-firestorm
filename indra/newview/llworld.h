@@ -80,6 +80,10 @@ public:
     void            removeRegion(const LLHost &host);
 
     void    disconnectRegions(); // Send quit messages to all child regions
+    // <FS:Trish> FSExperimentalReleaseNonAdjacentRegions
+    void    releaseNonAdjacentRegionExperimental();
+    void    noteRegionOffered(U64 handle, bool accepted);
+    // </FS:Trish>
 
     LLViewerRegion*         getRegion(const LLHost &host);
     LLViewerRegion*         getRegionFromPosGlobal(const LLVector3d &pos);
@@ -256,6 +260,15 @@ private:
     region_list_t   mCulledRegionList;
 
     region_remove_signal_t mRegionRemovedSignal;
+
+    // <FS:Trish> FSExperimentalReleaseNonAdjacentRegions
+    std::map<U64, F64> mNonAdjacentSince;   // when each connected region was first seen non-adjacent
+    std::map<U64, F64> mReleasedRegions;    // regions released by the experiment, and when
+    std::map<U64, F64> mRecentAgentRegions; // regions the agent recently left (by crossing or teleport), and when
+    U64 mLastAgentRegionHandle = 0;
+    F64 mLastTeleportTime = 0.0;            // last time a teleport was seen in progress
+    LLFrameTimer mNonAdjacentCheckTimer;
+    // </FS:Trish>
 
     // Number of points on edge
 // <FS:CR> Aurora Sim

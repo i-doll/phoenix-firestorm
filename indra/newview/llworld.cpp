@@ -1139,6 +1139,8 @@ void LLWorld::updateRegions(F32 max_update_time)
     LLTimer update_timer;
     mNumOfActiveCachedObjects = 0;
 
+    releaseNonAdjacentRegionExperimental(); // <FS:Trish/> FSExperimentalReleaseNonAdjacentRegions
+
     if(LLViewerCamera::getInstance()->isChanged())
     {
         LLViewerRegion::sLastCameraUpdated = LLViewerOctreeEntryData::getCurrentFrame() + 1;
@@ -1577,6 +1579,144 @@ void LLWorld::getInfo(LLSD& info)
     }
 }
 
+// <FS:Trish> FSExperimentalReleaseNonAdjacentRegions
+void LLWorld::releaseNonAdjacentRegionExperimental()
+{
+    static constexpr F32 CHECK_INTERVAL_SECONDS = 2.f;
+    static constexpr F64 RELEASE_AFTER_SECONDS = 5.0;
+    // A region the agent has just left -- by crossing, or the departure region of a teleport -- is still
+    // being handed off by the server. Releasing it from under that breaks teleports, so leave it to the
+    // server for a while; it normally disables such regions itself.
+    static constexpr F64 RECENT_REGION_GRACE_SECONDS = 120.0;
+    // Likewise give the connections a teleport set up time to settle before releasing anything.
+    static constexpr F64 AFTER_TELEPORT_GRACE_SECONDS = 60.0;
+
+    static LLCachedControl<bool> experiment(gSavedSettings, "FSExperimentalReleaseNonAdjacentRegions", false);
+    static LLCachedControl<bool> adjacent_only(gSavedSettings, "FSRenderNeighborAdjacentOnly", false);
+    if (!experiment || !adjacent_only)
+    {
+        mNonAdjacentSince.clear();
+        return;
+    }
+    if (mNonAdjacentCheckTimer.getElapsedTimeF32() < CHECK_INTERVAL_SECONDS)
+    {
+        return;
+    }
+    mNonAdjacentCheckTimer.reset();
+
+    LLViewerRegion* current_region = gAgent.getRegion();
+    const F64 now = LLFrameTimer::getTotalSeconds();
+
+    // Remember the region the agent leaves, however it leaves it. Done before the teleport check so a
+    // teleport's departure region is recorded too.
+    if (current_region && current_region->getHandle() != mLastAgentRegionHandle)
+    {
+        if (mLastAgentRegionHandle != 0)
+        {
+            mRecentAgentRegions[mLastAgentRegionHandle] = now;
+        }
+        mLastAgentRegionHandle = current_region->getHandle();
+        mRecentAgentRegions.erase(mLastAgentRegionHandle); // back in it: no longer "left"
+    }
+    for (auto it = mRecentAgentRegions.begin(); it != mRecentAgentRegions.end(); )
+    {
+        it = (now - it->second >= RECENT_REGION_GRACE_SECONDS) ? mRecentAgentRegions.erase(it) : std::next(it);
+    }
+
+    if (!current_region || gAgent.getTeleportState() != LLAgent::TELEPORT_NONE)
+    {
+        mLastTeleportTime = now;
+        mNonAdjacentSince.clear();
+        return;
+    }
+    if (now - mLastTeleportTime < AFTER_TELEPORT_GRACE_SECONDS)
+    {
+        mNonAdjacentSince.clear();
+        return;
+    }
+
+    F32 cur_x = 0.f;
+    F32 cur_y = 0.f;
+    from_region_handle(current_region->getHandle(), &cur_x, &cur_y);
+    const F32 width = current_region->getWidth();
+
+    LLViewerRegion* release = nullptr;
+    std::map<U64, F64> still_non_adjacent;
+    for (LLViewerRegion* regionp : mRegionList)
+    {
+        if (!regionp || regionp == current_region)
+        {
+            continue;
+        }
+
+        // Same adjacency test as the connection filter in process_enable_simulator.
+        F32 tgt_x = 0.f;
+        F32 tgt_y = 0.f;
+        from_region_handle(regionp->getHandle(), &tgt_x, &tgt_y);
+        if (llabs(tgt_x - cur_x) <= width && llabs(tgt_y - cur_y) <= width)
+        {
+            continue;
+        }
+
+        const U64 handle = regionp->getHandle();
+        if (mRecentAgentRegions.count(handle))
+        {
+            continue; // recently the agent's own region; the countdown starts once the grace is over
+        }
+        auto found = mNonAdjacentSince.find(handle);
+        const F64 since = (found != mNonAdjacentSince.end()) ? found->second : now;
+        if (!release && now - since >= RELEASE_AFTER_SECONDS)
+        {
+            release = regionp; // one per check
+        }
+        else
+        {
+            still_non_adjacent[handle] = since;
+        }
+    }
+    mNonAdjacentSince.swap(still_non_adjacent);
+
+    if (!release)
+    {
+        return;
+    }
+
+    const LLHost host = release->getHost();
+    const U64 handle = release->getHandle();
+    const std::string name = release->getName();
+
+    LL_INFOS("FSRegionRelease") << "Releasing non-adjacent region " << name << " " << host
+                                << " (" << mRegionList.size() << " regions connected): sending CloseCircuit" << LL_ENDL;
+
+    LLMessageSystem* msg = gMessageSystem;
+    msg->newMessageFast(_PREHASH_CloseCircuit);
+    msg->sendMessage(host);
+
+    // Then forget it locally exactly as process_disable_simulator does.
+    removeRegion(host);
+    msg->disableCircuit(host);
+    mReleasedRegions[handle] = now;
+
+    LL_INFOS("FSRegionRelease") << "Released " << name << "; " << mRegionList.size() << " regions remain connected" << LL_ENDL;
+}
+
+void LLWorld::noteRegionOffered(U64 handle, bool accepted)
+{
+    auto found = mReleasedRegions.find(handle);
+    if (found == mReleasedRegions.end())
+    {
+        return;
+    }
+    LL_INFOS("FSRegionRelease") << "Released region " << handle << " offered again "
+                                << (LLFrameTimer::getTotalSeconds() - found->second) << "s after release; "
+                                << (accepted ? "accepted (adjacent now)" : "ignored (still non-adjacent)") << LL_ENDL;
+    if (accepted)
+    {
+        mReleasedRegions.erase(found);
+    }
+}
+// </FS:Trish>
+
 void LLWorld::disconnectRegions()
 {
     LLMessageSystem* msg = gMessageSystem;
@@ -1654,6 +1794,9 @@ void process_enable_simulator(LLMessageSystem *msg, void **user_data)
             const F32 dy = llabs(tgt_y - cur_y);
 
             const bool is_adjacent = (dx <= width && dy <= width);
+            // <FS:Trish> FSExperimentalReleaseNonAdjacentRegions: record re-offers of released regions
+            LLWorld::getInstance()->noteRegionOffered(handle, is_adjacent || gAgent.getTeleportState() != LLAgent::TELEPORT_NONE);
+            // </FS:Trish>
             if (!is_adjacent)
             {
                 if (gAgent.getTeleportState() == LLAgent::TELEPORT_NONE)
