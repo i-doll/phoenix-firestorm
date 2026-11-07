@@ -216,6 +216,18 @@ private:
     S32 mRealtimeCubeIndex = -1;
     U32 mRealtimeFace = 0;
     bool mRealtimeUpdating = false;            // updateProbeFace is rendering the realtime probe
+
+    // Unchanged-probe skipping (FSPerfProbeSkipUnchanged)
+    void updateEnvironmentVersion(F32 angle_threshold_deg);
+    bool isProbeUnchanged(LLReflectionMap* probe, F32 max_stale);
+    U32 mEnvVersion = 1;                       // bumped when sun, moon or sky light drift past a threshold
+    bool mEnvValid = false;
+    LLVector3 mEnvSunDir;
+    LLVector3 mEnvMoonDir;
+    LLVector3 mEnvSunColor;
+    LLVector3 mEnvAmbient;
+    bool mTexturesPending = false;
+    U32 mSceneChecksThisFrame = 0;
     // </FS:Trish>
 
     // update the neighbors of the given probe

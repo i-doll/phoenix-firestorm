@@ -176,5 +176,12 @@ public:
     LLVector4a mGroupCenter;
     // </FS:Trish>
 
+    // <FS:Trish> Unchanged-probe skipping (FSPerfProbeSkipUnchanged)
+    F32 mFSUpdateStart = -1.f;     // frame time the last full update started
+    U32 mFSEnvVersion = 0;         // manager environment version when it started
+    F32 mFSSceneCheckTime = -1.f;  // when the surroundings were last checked
+    bool mFSSceneDirty = true;     // geometry near the probe rebuilt since mFSUpdateStart
+    // </FS:Trish>
+
     ProbeType mType;
 };
