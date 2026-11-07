@@ -12265,13 +12265,6 @@ bool LLPipeline::renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst)
     static LLCachedControl<F32> grain_size(gSavedSettings, "FSRenderFilmGrainSize", 1.5f);
 
     if (gSnapshotNoPost || !gFSLensEffectsProgram.isComplete())
-
-// <FS:Trish> Only plain prims are skipped: terrain, trees, avatars and anything inside an
-// attachment or animesh always cast. Object bounds are center and half size.
-//static
-bool LLPipeline::isShadowCasterTooSmall(LLSpatialGroup* group, F32 min_size)
-{
-    if (min_size <= 0.f)
     {
         return false;
     }
@@ -12319,9 +12312,6 @@ bool LLPipeline::isShadowCasterTooSmall(LLSpatialGroup* group, F32 min_size)
     }
 
     if (ca <= 0.f && flare <= 0.f && grain <= 0.f)
-
-    LLSpatialPartition* part = group->getSpatialPartition();
-    if (!part || part->mPartitionType != LLViewerRegion::PARTITION_VOLUME || part->isBridge())
     {
         return false;
     }
@@ -12370,7 +12360,21 @@ bool LLPipeline::isShadowCasterTooSmall(LLSpatialGroup* group, F32 min_size)
 }
 // </FS:Trish>
 
+// <FS:Trish> Only plain prims are skipped: terrain, trees, avatars and anything inside an
+// attachment or animesh always cast. Object bounds are center and half size.
+//static
+bool LLPipeline::isShadowCasterTooSmall(LLSpatialGroup* group, F32 min_size)
+{
+    if (min_size <= 0.f)
+    {
+        return false;
+    }
 
+    LLSpatialPartition* part = group->getSpatialPartition();
+    if (!part || part->mPartitionType != LLViewerRegion::PARTITION_VOLUME || part->isBridge())
+    {
+        return false;
+    }
 
     const LLVector4a& half_size = group->getObjectBounds()[1];
     F32 largest = llmax(half_size[0], llmax(half_size[1], half_size[2])) * 2.f;
