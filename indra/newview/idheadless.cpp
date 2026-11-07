@@ -373,10 +373,16 @@ int earlyInit(int argc, char** argv)
     }
     user_dir_var += "_X64_USER_DIR";
     const char* incoming = getenv(user_dir_var.c_str());
-    const std::string normal_dir = incoming && *incoming ? std::string(incoming) : home + "/.firestorm_x64";
+    std::string dot_dir = APP_NAME;
+    for (char& c : dot_dir)
+    {
+        c = (char)tolower((unsigned char)c);
+    }
+    dot_dir = home + "/." + dot_dir + "_x64";
+    const std::string normal_dir = incoming && *incoming ? std::string(incoming) : dot_dir;
     s_credential_file = normal_dir + "/user_settings/bin_conf.dat";
 
-    s_base_dir = home + "/.firestorm_x64_headless";
+    s_base_dir = dot_dir + "_headless";
     const std::string run_dir = s_base_dir + "/" + std::to_string(port);
     mkdirP(s_base_dir);
     mkdirP(run_dir);
