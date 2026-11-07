@@ -228,6 +228,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
 
     U32 tex;
     LLImageGL::generateTextures(1, &tex, LLTexUnit::getInternalType(mUsage));
+    LLTexUnit::registerFilterCacheTexture(tex); // <FS:Trish/> let bindTexture skip redundant filter changes
     gGL.getTexUnit(0)->bindManual(mUsage, tex);
 
     stop_glerror();
@@ -388,6 +389,7 @@ void LLRenderTarget::release()
         {
             sBytesAllocated -= mResX*mResY*4;
             glFramebufferTexture2D(GL_FRAMEBUFFER, static_cast<GLenum>(GL_COLOR_ATTACHMENT0+z), LLTexUnit::getInternalType(mUsage), 0, 0);
+            LLTexUnit::unregisterFilterCacheTexture(mTex[z]); // <FS:Trish/>
             LLImageGL::deleteTextures(1, &mTex[z]);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
@@ -408,6 +410,7 @@ void LLRenderTarget::release()
     if (mTex.size() > 0)
     {
         sBytesAllocated -= mResX*mResY*4;
+        LLTexUnit::unregisterFilterCacheTexture(mTex[0]); // <FS:Trish/>
         LLImageGL::deleteTextures(1, &mTex[0]);
     }
 
@@ -497,7 +500,14 @@ U32 LLRenderTarget::getNumTextures() const
 void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options)
 {
     gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index), filter_options == LLTexUnit::TFO_TRILINEAR || filter_options == LLTexUnit::TFO_ANISOTROPIC);
-    gGL.getTexUnit(channel)->setTextureFilteringOption(filter_options);
+    // <FS:Trish> Skip the glTexParameter calls when the texture already has this filtering
+    //gGL.getTexUnit(channel)->setTextureFilteringOption(filter_options);
+    LLTexUnit* unit = gGL.getTexUnit(channel);
+    if (!unit->isFilteringOptionCached(filter_options))
+    {
+        unit->setTextureFilteringOption(filter_options);
+    }
+    // </FS:Trish>
 }
 
 void LLRenderTarget::flush()

@@ -220,6 +220,15 @@ public:
     // MUST already be active and bound
     void setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type);
 
+    // <FS:Trish> Filter state cache for render target textures (per GL thread).
+    // Registered texture names get their filtering state recorded whenever it is set through
+    // LLTexUnit, so LLRenderTarget::bindTexture can skip redundant glTexParameter calls.
+    static void registerFilterCacheTexture(U32 tex);
+    static void unregisterFilterCacheTexture(U32 tex);
+    // True when setTextureFilteringOption(option) on this unit would not change any GL state
+    bool isFilteringOptionCached(eTextureFilterOptions option) const;
+    // </FS:Trish>
+
     static U32 getInternalType(eTextureType type);
 
     U32 getCurrTexture(void) { return mCurrTexture; }

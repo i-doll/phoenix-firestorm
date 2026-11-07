@@ -51,6 +51,17 @@ extern void APIENTRY gl_debug_callback(GLenum source,
 
 thread_local LLRender gGL;
 
+// <FS:Trish> Filter state of registered render target textures, keyed by GL name.
+// Value 0 means unknown; otherwise FILTER_CACHE_VALID | (has mips ? FILTER_CACHE_MIPS : 0) | option.
+// thread_local like gGL, since each GL thread has its own LLTexUnit tracking.
+namespace
+{
+    constexpr U32 FILTER_CACHE_VALID = 0x100;
+    constexpr U32 FILTER_CACHE_MIPS = 0x200;
+    thread_local std::unordered_map<U32, U32> sFilterCacheState;
+}
+// </FS:Trish>
+
 // Handy copies of last good GL matrices
 F32 gGLModelView[16];
 F32 gGLLastModelView[16];
@@ -537,6 +548,30 @@ void LLTexUnit::setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions o
             glTexParameterf(sGLTextureType[tex_type], GL_TEXTURE_MAX_ANISOTROPY, 1.f);
         }
     }
+
+    // <FS:Trish> Record what was just applied for the texture bound to the active unit
+    if (!sFilterCacheState.empty())
+    {
+        // glTexParameter acts on the active unit, which is not necessarily this one
+        const LLTexUnit* active = gGL.getTexUnit(gGL.getCurrentTexUnitIndex());
+        if (active && active->mCurrTexType == tex_type && active->mCurrTexture != 0)
+        {
+            auto it = sFilterCacheState.find(active->mCurrTexture);
+            if (it != sFilterCacheState.end())
+            {
+                // anisotropic level is a global that can change, never cache it
+                it->second = (option == TFO_ANISOTROPIC) ? 0 : (FILTER_CACHE_VALID | (mHasMipMaps ? FILTER_CACHE_MIPS : 0) | (U32)option);
+            }
+        }
+        else
+        { // can't tell which texture was affected, forget everything
+            for (auto& entry : sFilterCacheState)
+            {
+                entry.second = 0;
+            }
+        }
+    }
+    // </FS:Trish>
 }
 
 GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
@@ -614,6 +649,38 @@ GLint LLTexUnit::getTextureSourceType(eTextureBlendSrc src, bool isAlpha)
             return (isAlpha) ? GL_SRC_ALPHA: GL_SRC_COLOR;
     }
 }
+
+// <FS:Trish> Render target filter state cache
+//static
+void LLTexUnit::registerFilterCacheTexture(U32 tex)
+{
+    if (tex)
+    {
+        sFilterCacheState[tex] = 0;
+    }
+}
+
+//static
+void LLTexUnit::unregisterFilterCacheTexture(U32 tex)
+{
+    sFilterCacheState.erase(tex);
+}
+
+bool LLTexUnit::isFilteringOptionCached(eTextureFilterOptions option) const
+{
+    // Only valid when this unit is the active one, since that's where setTextureFilteringOption's
+    // glTexParameter calls would land
+    if (mIndex < 0 || mCurrTexture == 0 || option == TFO_ANISOTROPIC || gGL.mDirty
+        || (S32)gGL.getCurrentTexUnitIndex() != mIndex)
+    {
+        return false;
+    }
+
+    auto it = sFilterCacheState.find(mCurrTexture);
+    return it != sFilterCacheState.end()
+        && it->second == (FILTER_CACHE_VALID | (mHasMipMaps ? FILTER_CACHE_MIPS : 0) | (U32)option);
+}
+// </FS:Trish>
 
 // Useful for debugging that you've manually assigned a texture operation to the correct
 // texture unit based on the currently set active texture in opengl.
