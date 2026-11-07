@@ -12808,6 +12808,65 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         mSunClipPlanes.mV[3] *= 1.5f;
     }
 
+    // <FS:Trish> Far cascade throttle. Cascade 2 renders every N frames and cascade 3 every 2N,
+    // on different frames. A skipped cascade keeps its map and the light space projection and
+    // split range it was rendered for; only its eye space matrix follows the camera. Moving or
+    // turning the camera, or the sun moving, renders them all at once.
+    bool skip_cascade[4] = { false, false, false, false };
+    if (!gCubeSnapshot)
+    {
+        static LLCachedControl<U32> far_cascade_interval(gSavedSettings, "FSRenderShadowFarCascadeInterval", 1);
+        const U32 interval = llclamp((U32)far_cascade_interval, 1U, 16U);
+        ++mShadowFrame;
+
+        bool force = interval <= 1 ||
+                     dist_vec(camera.getOrigin(), mFarCascadeEye) > llmax(mSunClipPlanes.mV[3], 1.f) * 0.02f ||
+                     camera.getAtAxis() * mFarCascadeAt < 0.9986f ||    // about 3 degrees
+                     lightDir * mFarCascadeLight < 0.99999f;            // about a quarter of a degree
+        if (force)
+        {
+            mFarCascadeEye = camera.getOrigin();
+            mFarCascadeAt = camera.getAtAxis();
+            mFarCascadeLight = lightDir;
+        }
+        else
+        {
+            for (U32 j = 2; j < 4; ++j)
+            {
+                const U32 period = j == 2 ? interval : interval * 2;
+                const U32 phase = j == 2 ? 0 : 1;
+                const bool due = (mShadowFrame % period) == phase;
+                skip_cascade[j] = !due && (S32)j <= RenderShadowSplits && mFarCascadeValid[j] &&
+                                  mFarCascadeTex[j] == mRT->shadow[j].getDepth();
+            }
+        }
+
+        LLVector4 clip = mSunClipPlanes;
+        if (skip_cascade[2])
+        {
+            clip.mV[1] = mFarCascadeClip[1];
+            clip.mV[2] = mFarCascadeClip[2];
+        }
+        if (skip_cascade[3])
+        {
+            clip.mV[2] = mFarCascadeClip[2];
+            clip.mV[3] = mFarCascadeClip[3];
+        }
+        if (clip.mV[0] < clip.mV[1] && clip.mV[1] < clip.mV[2] && clip.mV[2] < clip.mV[3])
+        {
+            mSunClipPlanes = clip;
+        }
+        else
+        {   // the near splits outgrew the frozen ones, render everything this frame
+            skip_cascade[2] = skip_cascade[3] = false;
+        }
+        for (U32 i = 0; i < 4; ++i)
+        {
+            mFarCascadeClip[i] = mSunClipPlanes.mV[i];
+        }
+    }
+    // </FS:Trish>
+
 
     // convenience array of 4 near clip plane distances
     F32 dist[] = { near_clip, mSunClipPlanes.mV[0], mSunClipPlanes.mV[1], mSunClipPlanes.mV[2], mSunClipPlanes.mV[3] };
@@ -12923,6 +12982,22 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         //for (S32 j = 0; j < (gCubeSnapshot ? 2 : 4); j++)
         for (S32 j = 0; !probe_shadow_done && j < (gCubeSnapshot ? 2 : 4); j++) // <FS:Trish/>
         {
+            // <FS:Trish> Far cascade throttle: keep the map, re-base its matrix on this frame's camera
+            if (skip_cascade[j])
+            {
+                static const glm::mat4 to_texture(0.5f, 0.0f, 0.0f, 0.0f,
+                                                  0.0f, 0.5f, 0.0f, 0.0f,
+                                                  0.0f, 0.0f, 0.5f, 0.0f,
+                                                  0.5f, 0.5f, 0.5f, 1.0f);
+                mSunShadowMatrix[j] = to_texture * mShadowProjection[j] * mShadowModelview[j] * inv_view;
+                continue;
+            }
+            if (!gCubeSnapshot)
+            {
+                mFarCascadeValid[j] = true;
+                mFarCascadeTex[j] = mRT->shadow[j].getDepth();
+            }
+            // </FS:Trish>
             if (!hasRenderDebugMask(RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
             {
                 mShadowFrustPoints[j].clear();

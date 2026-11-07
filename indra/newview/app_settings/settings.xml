@@ -26652,6 +26652,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>10.0</real>
     </map>
+    <key>FSRenderShadowFarCascadeInterval</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Render the two far sun shadow maps every this many frames instead of every frame (the furthest every twice this). Moving the camera, turning it or the sun moving re-renders them at once. 1 renders every frame.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>FSRenderShadowMaxDistance</key>
     <map>
       <key>Comment</key>

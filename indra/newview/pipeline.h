@@ -828,6 +828,15 @@ public:
     void bindColorGrading(LLGLSLShader* shader);
     void loadColorGradeLUT(const std::string& name);
     void releaseFSPostTargets();
+
+    // Shadow performance
+    U32                     mShadowFrame = 0;               // main view shadow updates so far
+    bool                    mFarCascadeValid[4] = {};       // the map holds a render the throttle can reuse
+    U32                     mFarCascadeTex[4] = {};         // ...in this depth texture
+    F32                     mFarCascadeClip[4] = {};        // split distances the far maps were rendered for
+    LLVector3               mFarCascadeEye;                 // camera and sun at the last forced update
+    LLVector3               mFarCascadeAt;
+    LLVector3               mFarCascadeLight;
     // </FS:Trish>
 
     // exposure map for getting average color in scene

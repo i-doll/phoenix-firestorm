@@ -53,7 +53,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="936"
+                 height="962"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -546,6 +546,31 @@
                      min_val="0"
                      name="shadow_min_caster_texels"
                      tool_tip="EXPERIMENTAL. Objects smaller than this many shadow map pixels are not drawn into that sun shadow map. Measured against the map's most detailed pixels, so their shadow could not show anyway. Avatars, attachments, trees and terrain always cast. 0 draws everything."
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_far_cascade_interval_label"
+                     tool_tip="EXPERIMENTAL. Render the two far sun shadow maps every this many frames instead of every frame (the furthest every twice this). Moving the camera, turning it or the sun moving re-renders them at once. 1 renders every frame."
+                     top_pad="6"
+                     width="285">
+                        Update far sun shadows every N frames
+                    </text>
+                    <spinner
+                     control_name="FSRenderShadowFarCascadeInterval"
+                     decimal_digits="0"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="1"
+                     name="shadow_far_cascade_interval"
+                     tool_tip="EXPERIMENTAL. Render the two far sun shadow maps every this many frames instead of every frame (the furthest every twice this). Moving the camera, turning it or the sun moving re-renders them at once. 1 renders every frame."
                      top_delta="-2"
                      width="100" />
                     <text
