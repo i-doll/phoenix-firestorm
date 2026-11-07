@@ -499,7 +499,7 @@ void LLThread::setCurrentThreadBackground(bool background)
 #elif LL_LINUX
     // Per thread nice value. Going back down to 0 needs privileges, so turning
     // this off may only apply after a restart.
-    if (setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), background ? 10 : 0) != 0)
+    if (setpriority(PRIO_PROCESS, (::id_t)syscall(SYS_gettid), background ? 10 : 0) != 0)
     {
         LL_WARNS_ONCE("THREAD") << "setpriority failed: " << errno << LL_ENDL;
     }
