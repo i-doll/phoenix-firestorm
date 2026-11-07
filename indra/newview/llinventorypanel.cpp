@@ -994,6 +994,25 @@ struct DirtyFilterFunctor : public LLFolderViewFunctor
 void LLInventoryPanel::idle(void* user_data)
 {
     LLInventoryPanel* panel = (LLInventoryPanel*)user_data;
+
+    // <FS:Trish> Hidden panels with nothing to build and no unfinished filter run at about
+    // 2 Hz instead of every frame. Background filtering of new items still completes, slower.
+    static LLCachedControl<bool> idle_throttle(gSavedSettings, "FSPerfInventoryIdleThrottle", false);
+    if (idle_throttle
+        && panel->mBuildRootQueue.empty()
+        && panel->mBuildViewsQueue.empty()
+        && panel->mViewsInitialized != VIEWS_BUILDING
+        && !panel->getFilter().isModified()
+        && !panel->isInVisibleChain())
+    {
+        if (!panel->mIdleThrottleTimer.hasExpired())
+        {
+            return;
+        }
+        panel->mIdleThrottleTimer.resetWithExpiry(0.5f);
+    }
+    // </FS:Trish>
+
     // Nudge the filter if the clipboard state changed
     if (panel->mClipboardState != LLClipboard::instance().getGeneration())
     {
