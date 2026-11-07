@@ -1337,6 +1337,27 @@ void LLGLManager::getGLInfo(LLSD& info)
 #endif
 }
 
+// <FS:Trish>
+S32 LLGLManager::getAvailableVRAMMegabytes() const
+{
+    if (mHasNVXGpuMemoryInfo)
+    {
+        GLint available_kb = 0;
+        glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &available_kb);
+        return available_kb > 0 ? available_kb / 1024 : -1;
+    }
+    if (mHasATIMemInfo)
+    {
+        // Free memory in the texture pool first, then the largest free block and the same for
+        // shared memory. Only the first one matters here.
+        GLint texture_free_kb[4] = {};
+        glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, texture_free_kb);
+        return texture_free_kb[0] > 0 ? texture_free_kb[0] / 1024 : -1;
+    }
+    return -1;
+}
+// </FS:Trish>
+
 std::string LLGLManager::getGLInfoString()
 {
     std::string info_str;

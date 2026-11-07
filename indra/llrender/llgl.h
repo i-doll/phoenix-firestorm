@@ -132,6 +132,10 @@ public:
 
     U32 mVRAM; // VRAM in MB
     S32 mVRAMDetected; // <FS:Beq/> The amount detected/reported by the OS/Drivers. If different to mVRAM there is an override in place.
+    // <FS:Trish> Video memory free on the GPU right now in MB, counting every process using it,
+    // or -1 when the driver can't tell. Main thread, needs the GL context.
+    S32 getAvailableVRAMMegabytes() const;
+    // </FS:Trish>
     std::string getGLInfoString();
     void printGLInfoString();
     void getGLInfo(LLSD& info);

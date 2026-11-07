@@ -540,6 +540,58 @@ void LLViewerTexture::updateClass()
     // can negatively impact performance, so leave 20% of a breathing room for
     // 'bias' calculation to kick in.
     F32 target = llmax(llmin(budget - 512.f, budget * 0.8f), MIN_VRAM_BUDGET);
+
+    // <FS:Trish> When the driver reports free video memory, use that instead of the estimate
+    // above. The tracked bytes miss render targets, shadow and reflection maps, driver overhead
+    // and other programs on the GPU, and how much they miss changes with the scene, window size
+    // and settings, so no fixed bias or divisor fits. Here the target is what we hold plus what
+    // is actually free, minus a reserve, so going over means the GPU itself is running out.
+    // A manually set budget (FSLimitTextureVRAMUsage) still wins.
+    //
+    // The free figure can only be trusted while the GPU isn't under pressure: once it fills up,
+    // the driver moves allocations out to system memory to keep some free, so the figure stays
+    // above the reserve while the viewer keeps loading and everything starts paging. So while
+    // there is clearly room, also measure how much of the GPU is taken by things we don't track,
+    // and under pressure take the last measurement as what is still taken. That part mostly
+    // doesn't grow with our textures, so it is kept as an amount rather than a ratio, which
+    // would shrink the target by the same factor and leave too little room after a teleport.
+    static LLCachedControl<bool> use_live_vram(gSavedSettings, "FSTextureUseLiveVRAM", false);
+    static LLCachedControl<U32> live_vram_reserve(gSavedSettings, "FSTextureVRAMReserveMB", 2048);
+    static LLFrameTimer live_vram_timer;
+    static S32 live_vram_free = -1;
+    static F32 live_vram_untracked = -1.f; // GPU MB in use outside of what we track, measured without pressure
+    if (use_live_vram && !max_vram_budget_enabled)
+    {
+        // The query is cheap, but the answer only needs to keep up with the bias ramp
+        if (live_vram_free < 0 || live_vram_timer.getElapsedTimeF32() > 1.f)
+        {
+            live_vram_free = gGLManager.getAvailableVRAMMegabytes();
+            live_vram_timer.reset();
+        }
+        if (live_vram_free >= 0)
+        {
+            used = (F32)ll_round((LLImageGL::getTextureBytesAllocated() + LLVertexBuffer::getBytesAllocated()) / 1024.0 / 1024.0);
+            const F32 reserve = (F32)live_vram_reserve();
+            const F32 total = (F32)(gGLManager.mVRAMDetected > 0 ? gGLManager.mVRAMDetected : (S32)gGLManager.mVRAM);
+            if ((F32)live_vram_free > 2.f * reserve && total > (F32)live_vram_free)
+            {
+                live_vram_untracked = llmax(total - (F32)live_vram_free - used, 0.f);
+            }
+            target = used + (F32)live_vram_free - reserve;
+            if (live_vram_untracked >= 0.f)
+            {
+                target = llmin(target, total - reserve - live_vram_untracked);
+            }
+            target = llmax(target, MIN_VRAM_BUDGET);
+        }
+    }
+    else
+    {
+        live_vram_free = -1;
+        live_vram_untracked = -1.f;
+    }
+    // </FS:Trish>
+
     sFreeVRAMMegabytes = llmax(target - used, 0.f);
 
     F32 over_pct = (used - target) / target;
@@ -593,11 +645,35 @@ void LLViewerTexture::updateClass()
         // <FS:Beq> Improve windows memory recovery detection
         // Lower discard bias when VRAM has room and system memory has recovered.
         // // lower discard bias over time when at least 10% of budget is free
-        constexpr F32 FREE_PERCENTAGE_TRESHOLD = -0.1f;
+        // <FS:Trish> Lowering threshold is now a variable, kept below the soft zone further down
+        //constexpr F32 FREE_PERCENTAGE_TRESHOLD = -0.1f;
+        F32 FREE_PERCENTAGE_TRESHOLD = -0.1f;
+        // </FS:Trish>
         // constexpr U32 FREE_SYS_MEM_TRESHOLD = 100;
         // static LLCachedControl<U32> min_free_main_memory(gSavedSettings, "RenderMinFreeMainMemoryThreshold", 512);
         // const S32Megabytes MIN_FREE_MAIN_MEMORY(min_free_main_memory() + FREE_SYS_MEM_TRESHOLD);
         // </FS:Beq>
+
+        // <FS:Trish> Soft zone. Waiting for usage to cross the target means the bias jumps to 1.5
+        // in one go and thousands of textures get downscaled at once, which hitches. Close to the
+        // target, start raising the bias slowly instead, faster the closer usage gets, so it levels
+        // off just under the target and the overflow path is rarely reached. The bias only comes
+        // back down once usage is a little below the zone, otherwise it would rise and fall at its
+        // edge and textures would keep switching resolution.
+        static LLCachedControl<F32> soft_zone_setting(gSavedSettings, "FSTextureBiasSoftZone", 0.1f);
+        const F32 soft_zone = llclamp(soft_zone_setting(), 0.f, 0.5f);
+        if (soft_zone > 0.f)
+        {
+            FREE_PERCENTAGE_TRESHOLD = llmin(FREE_PERCENTAGE_TRESHOLD, -soft_zone - 0.05f);
+        }
+        if (soft_zone > 0.f && over_pct > -soft_zone)
+        {
+            static LLCachedControl<F32> soft_discard_increment(gSavedSettings, "RenderLowMemMinDiscardIncrement", .1f);
+            const F32 depth = (over_pct + soft_zone) / soft_zone; // 0 at the edge of the zone, 1 at the target
+            sDesiredDiscardBias += soft_discard_increment * depth * gFrameIntervalSeconds;
+        }
+        else
+        // </FS:Trish>
         if (sDesiredDiscardBias > 1.f
             && over_pct < FREE_PERCENTAGE_TRESHOLD
             // <FS:Beq> Improve windows memory recovery detection
