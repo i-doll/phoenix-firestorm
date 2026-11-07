@@ -367,6 +367,12 @@ public:
     F32 mPixelArea;
     F32 mRadius;
 
+    // <FS:Trish> Frame and camera of the last alpha distance update, so the second identical update per frame is skipped
+    U32 mAlphaDistanceFrame = 0;
+    LLVector3 mAlphaDistanceOrigin;
+    LLVector3 mAlphaDistanceAt;
+    // </FS:Trish>
+
     //used by LLVOAVatar to set render order in alpha draw pool to preserve legacy render order behavior
     LLVOAvatar* mAvatarp = nullptr;
     U32 mRenderOrder = 0;

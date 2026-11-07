@@ -646,10 +646,29 @@ void LLSpatialGroup::updateDistance(LLCamera &camera)
 #endif
     if (!isEmpty())
     {
+        // <FS:Trish> Alpha groups get their distance updated in markNotCulled and again in postSort with the
+        // same camera. Skip the second one, unless the camera changed in between (e.g. impostor renders)
+        // or the group had no blended alpha (no depth) when it was culled.
+        const bool has_alpha = mDrawMap.find(LLRenderPass::PASS_ALPHA) != mDrawMap.end();
+        const LLVector3& origin = camera.getOrigin();
+        const LLVector3 at = camera.getAtAxis();
+        if (has_alpha && mAlphaDistanceFrame == gFrameCount && mAlphaDistanceOrigin == origin && mAlphaDistanceAt == at)
+        {
+            return;
+        }
+        // </FS:Trish>
         mRadius = getSpatialPartition()->mRenderByGroup ? mObjectBounds[1].getLength3().getF32() :
                         (F32) mOctreeNode->getSize().getLength3().getF32();
         mDistance = getSpatialPartition()->calcDistance(this, camera);
         mPixelArea = getSpatialPartition()->calcPixelArea(this, camera);
+        // <FS:Trish>
+        if (has_alpha)
+        {
+            mAlphaDistanceFrame = gFrameCount;
+            mAlphaDistanceOrigin = origin;
+            mAlphaDistanceAt = at;
+        }
+        // </FS:Trish>
     }
 }
 
