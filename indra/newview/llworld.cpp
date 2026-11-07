@@ -1702,6 +1702,42 @@ U64MicrosecondsImplicit LLWorld::getSpaceTimeUSec() const
 
 void LLWorld::requestCacheMisses()
 {
+    // <FS:Trish> Called every frame. Sending whatever missed each frame produced lots of small
+    // RequestMultipleObjects packets per region during login and region entry. Collect misses for
+    // up to CACHE_MISS_BATCH_SEC from the first one instead, or send at once when a region has a
+    // full packet (255 blocks) waiting.
+    constexpr F64 CACHE_MISS_BATCH_SEC = 0.1;
+    constexpr size_t CACHE_MISS_FULL_PACKET = 255;
+    static F64 pending_since = -1.0;
+
+    bool pending = false;
+    bool full = false;
+    for (LLViewerRegion* regionp : mRegionList)
+    {
+        const size_t count = regionp->getCacheMissCount();
+        pending |= count > 0;
+        full |= count >= CACHE_MISS_FULL_PACKET;
+    }
+
+    if (!pending)
+    {
+        pending_since = -1.0;
+        return;
+    }
+
+    const F64 now = LLFrameTimer::getElapsedSeconds();
+    if (pending_since < 0.0)
+    {
+        pending_since = now;
+    }
+
+    if (!full && now - pending_since < CACHE_MISS_BATCH_SEC)
+    {
+        return;
+    }
+    pending_since = -1.0;
+    // </FS:Trish>
+
     for (region_list_t::iterator iter = mRegionList.begin();
          iter != mRegionList.end(); ++iter)
     {

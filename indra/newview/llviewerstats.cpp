@@ -464,6 +464,31 @@ U32Bytes            gTotalTextureBytesPerBoostLevel[LLViewerTexture::MAX_GL_IMAG
 extern U32  gVisCompared;
 extern U32  gVisTested;
 
+// <FS:Trish> LLFloaterReg::instanceVisible() does string keyed map lookups; update_statistics
+// asks every frame. Keep a handle to the instance and only look it up again (at most twice a
+// second) while it doesn't exist.
+static bool cached_floater_visible(LLHandle<LLFloater>& handle, F64& next_lookup, std::string_view name)
+{
+    LLFloater* instance = handle.get();
+    if (!instance)
+    {
+        const F64 now = LLFrameTimer::getElapsedSeconds();
+        if (now < next_lookup)
+        {
+            return false;
+        }
+        next_lookup = now + 0.5;
+        instance = LLFloaterReg::findInstance(name);
+        if (!instance)
+        {
+            return false;
+        }
+        handle = instance->getHandle();
+    }
+    return LLFloater::isVisible(instance);
+}
+// </FS:Trish>
+
 void update_statistics()
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -471,6 +496,8 @@ void update_statistics()
     gTotalWorldData += gVLManager.getTotalBytes();
     gTotalObjectData += gObjectData;
 
+    static LLHandle<LLFloater> build_handle; // <FS:Trish/>
+    static F64 build_lookup = 0.0; // <FS:Trish/>
     // make sure we have a valid time delta for this frame
     if (gFrameIntervalSeconds > 0.f)
     {
@@ -482,7 +509,10 @@ void update_statistics()
         {
             record(LLStatViewer::AVATAR_EDIT_TIME, gFrameIntervalSeconds);
         }
-        else if (LLFloaterReg::instanceVisible("build"))
+        // <FS:Trish> Cached instance handle
+        //else if (LLFloaterReg::instanceVisible("build"))
+        else if (cached_floater_visible(build_handle, build_lookup, "build"))
+        // </FS:Trish>
         {
             record(LLStatViewer::TOOLBOX_TIME, gFrameIntervalSeconds);
         }
@@ -506,7 +536,11 @@ void update_statistics()
 
     typedef LLTrace::StatType<LLTrace::TimeBlockAccumulator>::instance_tracker_t stat_type_t;
 
-    record(LLStatViewer::FRAME_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Frame")));
+    // <FS:Trish> Look the "Frame" timer up once; it is a static that lives for the whole session
+    //record(LLStatViewer::FRAME_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Frame")));
+    static const auto frame_stat = stat_type_t::getInstance("Frame");
+    record(LLStatViewer::FRAME_STACKTIME, last_frame_recording.getSum(*frame_stat));
+    // </FS:Trish>
 
     if (gAgent.getRegion() && isAgentAvatarValid())
     {
@@ -559,7 +593,12 @@ void update_statistics()
         }
     }
 
-    if (LLFloaterReg::instanceVisible("scene_load_stats"))
+    // <FS:Trish> Cached instance handle
+    //if (LLFloaterReg::instanceVisible("scene_load_stats"))
+    static LLHandle<LLFloater> scene_load_stats_handle;
+    static F64 scene_load_stats_lookup = 0.0;
+    if (cached_floater_visible(scene_load_stats_handle, scene_load_stats_lookup, "scene_load_stats"))
+    // </FS:Trish>
     {
         static const F32 perf_stats_freq = 1;
         static LLFrameTimer perf_stats_timer;

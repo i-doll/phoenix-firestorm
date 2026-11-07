@@ -412,6 +412,7 @@ public:
     U64 getRegionCacheHitCount() { return mRegionCacheHitCount; }
     U64 getRegionCacheMissCount() { return mRegionCacheMissCount; }
     void requestCacheMisses();
+    size_t getCacheMissCount() const { return mCacheMissList.size(); } // <FS:Trish/> lets LLWorld batch requests
     void addCacheMissFull(const U32 local_id);
     //update object cache if the object receives a full-update or terse update
     LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp);
