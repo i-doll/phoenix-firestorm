@@ -66,6 +66,7 @@
 #include "llprogressview.h"
 #include "llviewertextureanim.h" // <FS:Trish/> animated texture resolution
 #include "llvovolume.h" // <FS:Trish/> animated texture resolution
+#include "fstextureupload.h" // <FS:Trish/> FSPerfTextureUploadPBO
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -1225,6 +1226,11 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
     //
 
     LLTimer create_timer;
+
+    // <FS:Trish> FSPerfTextureUploadPBO
+    static LLCachedControl<bool> fs_upload_pbo(gSavedSettings, "FSPerfTextureUploadPBO", false);
+    FSTextureUpload::setPBOEnabled(fs_upload_pbo);
+    // </FS:Trish>
 
     while (!mCreateTextureList.empty())
     {

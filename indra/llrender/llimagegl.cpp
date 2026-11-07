@@ -41,6 +41,7 @@
 #include "llrender.h"
 #include "llwindow.h"
 #include "llframetimer.h"
+#include "fstextureupload.h" // <FS:Trish/> FSPerfTextureUploadPBO
 #include <unordered_set>
 
 extern LL_COMMON_API bool on_main_thread();
@@ -330,6 +331,7 @@ void LLImageGL::cleanupClass()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LLImageGLThread::deleteSingleton();
+    FSTextureUpload::releaseGL(); // <FS:Trish/> FSPerfTextureUploadPBO
     if (sScratchPBO != 0)
     {
         glDeleteBuffers(1, &sScratchPBO);
@@ -462,6 +464,7 @@ void LLImageGL::updateStats(F32 current_time)
 //static
 void LLImageGL::destroyGL()
 {
+    FSTextureUpload::releaseGL(); // <FS:Trish/> FSPerfTextureUploadPBO: the ring dies with the context
     for (S32 stage = 0; stage < gGLManager.mNumTextureImageUnits; stage++)
     {
         gGL.getTexUnit(stage)->unbind(LLTexUnit::TT_TEXTURE);
@@ -794,6 +797,7 @@ void LLImageGL::setImage(const LLImageRaw* imageraw)
 bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32 usename /* = 0 */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    FSTextureUpload::UploadScope pbo_upload_scope; // <FS:Trish/> FSPerfTextureUploadPBO: levels below may stream through the upload ring
 
     const bool is_compressed = isCompressed();
 
@@ -1548,7 +1552,13 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         }
         // </FS:Trish>
         const bool use_sub_image = should_stagger_image_set(compress);
-        if (!use_sub_image)
+        // <FS:Trish> FSPerfTextureUploadPBO: copy into the upload ring and let the driver DMA it
+        //if (!use_sub_image)
+        if (!compress && FSTextureUpload::texImage2D(target, miplevel, intformat, width, height, pixformat, pixtype, pixels))
+        {
+        }
+        else if (!use_sub_image)
+        // </FS:Trish>
         {
             LL_PROFILE_ZONE_NAMED("glTexImage2D alloc + copy");
             glTexImage2D(target, miplevel, intformat, width, height, 0, pixformat, pixtype, pixels);

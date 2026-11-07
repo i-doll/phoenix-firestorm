@@ -10,6 +10,7 @@ include(LLImage)
 include(LLWindow)
 
 set(llrender_SOURCE_FILES
+    fstextureupload.cpp # <FS:Trish/> FSPerfTextureUploadPBO
     llcubemap.cpp
     llcubemaparray.cpp
     llfontbitmapcache.cpp
@@ -37,6 +38,7 @@ set(llrender_SOURCE_FILES
     )
     
 set(llrender_HEADER_FILES
+    fstextureupload.h # <FS:Trish/> FSPerfTextureUploadPBO
     CMakeLists.txt
 
     llcubemap.h

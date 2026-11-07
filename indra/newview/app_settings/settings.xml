@@ -27169,6 +27169,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.1</real>
     </map>
+    <key>FSPerfTextureUploadPBO</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Stream main-thread texture uploads through a 32 MB persistently mapped pixel buffer ring (OpenGL 4.4) so the driver copies them asynchronously instead of inside the frame. Only affects uploads made on the main thread (threaded texture creation off: AMD, Intel, or NVIDIA with RenderGLMultiThreadedTexturesNVIDIA off). Falls back to normal uploads when the ring is busy.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
