@@ -30,6 +30,8 @@
 #include "llsingleton.h"
 
 #include "fsradarentry.h"
+#include <functional>
+#include <map>
 #include <unordered_map>
 
 class LLAvatarName;
@@ -79,7 +81,8 @@ public:
     static void onRadarReportToClicked(const LLSD& userdata);
     static bool radarReportToCheck(const LLSD& userdata);
 
-    void getCurrentData(std::vector<LLSD>& entries, LLSD& stats) const { entries = mRadarEntriesData; stats = mAvatarStats; }
+    // Rebuilds the presentation data first if it was skipped because no consumer was visible
+    void getCurrentData(std::vector<LLSD>& entries, LLSD& stats);
     std::shared_ptr<FSRadarEntry> getEntry(const LLUUID& avatar_id);
 
     // internals
@@ -107,6 +110,12 @@ public:
     {
         return mUpdateSignal.connect(cb);
     }
+
+    // Consumers of the update signal register a visibility check. The presentation
+    // rows are only built while at least one of them is visible.
+    using presentation_check_t = std::function<bool()>;
+    void addPresentationCheck(const void* consumer, const presentation_check_t& check) { mPresentationChecks[consumer] = check; }
+    void removePresentationCheck(const void* consumer) { mPresentationChecks.erase(consumer); }
 
 protected:
     void initSingleton() override;
@@ -147,6 +156,11 @@ private:
     LLSD                    mAvatarStats;
 
     radar_update_callback_t mUpdateSignal;
+
+    bool isPresentationWanted() const;
+    std::map<const void*, presentation_check_t> mPresentationChecks;
+    bool                    mPresentationStale{ false };
+    bool                    mForcePresentation{ false };
 
     boost::signals2::connection mShowUsernamesCallbackConnection;
     boost::signals2::connection mNameFormatCallbackConnection;

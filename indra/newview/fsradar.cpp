@@ -175,6 +175,35 @@ void FSRadar::radarAlertMsg(const LLUUID& agent_id, const LLAvatarName& av_name,
     } // </FS:CR>
 }
 
+bool FSRadar::isPresentationWanted() const
+{
+    // A consumer that registered no check could be visible; always build for it
+    if (mUpdateSignal.num_slots() > mPresentationChecks.size())
+    {
+        return true;
+    }
+    for (const auto& [consumer, check] : mPresentationChecks)
+    {
+        if (check && check())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void FSRadar::getCurrentData(std::vector<LLSD>& entries, LLSD& stats)
+{
+    if (mPresentationStale)
+    {
+        mForcePresentation = true;
+        updateRadarList();
+        mForcePresentation = false;
+    }
+    entries = mRadarEntriesData;
+    stats = mAvatarStats;
+}
+
 void FSRadar::updateRadarList()
 {
     //Configuration
@@ -220,6 +249,15 @@ void FSRadar::updateRadarList()
     static LLCachedControl<bool> sFSRadarShowMutedAndDerendered(gSavedSettings, "FSRadarShowMutedAndDerendered");
     static LLCachedControl<bool> sFSRadarEnhanceByBridge(gSavedSettings, "FSRadarEnhanceByBridge");
     bool sUseLSLBridge = bridge.canUseBridge();
+
+    static const LLUIColor sAgeAlertColor = colortable.getColor("AvatarListItemAgeAlert", LLColor4::red);
+    static const LLUIColor sChatRangeColor = colortable.getColor("AvatarListItemChatRange", LLColor4::red);
+    static const LLUIColor sShoutRangeColor = colortable.getColor("AvatarListItemShoutRange", LLColor4::white);
+    static const LLUIColor sBeyondShoutRangeColor = colortable.getColor("AvatarListItemBeyondShoutRange", LLColor4::white);
+    static const LLUIColor sNameDefaultColor = colortable.getColor("AvatarListItemIconDefaultColor", LLColor4::white);
+
+    // Alerts and the model always update; the presentation rows only when someone shows them
+    const bool build_presentation = mForcePresentation || isPresentationWanted();
 
     F32 drawRadius(sRenderFarClip);
     const LLVector3d& posSelf = gAgent.getPositionGlobal();
@@ -338,7 +376,6 @@ void FSRadar::updateRadarList()
         const S32 hours = (S32)(seentime / 3600);
         const S32 mins = (S32)((seentime - hours * 3600) / 60);
         const S32 secs = (S32)((seentime - hours * 3600 - mins * 60));
-        const std::string avSeenStr = llformat("%d:%02d:%02d", hours, mins, secs);
         const S32& avStatusFlags     = ent->mStatus;
         ERadarPaymentInfoFlag avFlag = FSRADAR_PAYMENT_INFO_NONE;
         if (avStatusFlags & AVATAR_TRANSACTED)
@@ -512,6 +549,29 @@ void FSRadar::updateRadarList()
         {
             ++inSameRegion;
         }
+        if (avRange > AVATAR_UNKNOWN_RANGE && avRange <= chat_range_say)
+        {
+            ++inChatRange;
+        }
+
+        // Age alert is model logic and runs whether or not the rows are built
+        if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES) && ent->hasAlertAge())
+        {
+            if (sRadarAvatarAgeAlert && !ent->hasAgeAlertPerformed())
+            {
+                make_ui_sound("UISndRadarAgeAlert");
+                LLStringUtil::format_map_t args;
+                args["AGE"] = llformat("%d", avAge);
+                std::string message = FSCommon::format_string(str_avatar_age_alert, args);
+                LLAvatarNameCache::get(avId, boost::bind(&FSRadar::radarAlertMsg, this, _1, _2, message));
+            }
+            ent->mAgeAlertPerformed = true;
+        }
+
+        if (!build_presentation)
+        {
+            continue;
+        }
 
         LLSD entry;
         LLSD entry_options;
@@ -521,7 +581,7 @@ void FSRadar::updateRadarList()
         entry["in_region"] = isInSameRegion;
         entry["on_parcel"] = isOnSameParcel;
         entry["flags"] = avFlag;
-        entry["seen"] = avSeenStr;
+        entry["seen"] = llformat("%d:%02d:%02d", hours, mins, secs);
         entry["range"] = (avRange > AVATAR_UNKNOWN_RANGE ? llformat("%3.2f", avRange) : llformat(">%3.2f", drawRadius));
         entry["typing"] = (avVo && avVo->isTyping());
         entry["sitting"] = (avVo && (avVo->getParent() || avVo->isMotionActive(ANIM_AGENT_SIT_GROUND) || avVo->isMotionActive(ANIM_AGENT_SIT_GROUND_CONSTRAINED)));
@@ -537,17 +597,7 @@ void FSRadar::updateRadarList()
                 entry["age"] = "";
             if (ent->hasAlertAge())
             {
-                entry_options["age_color"] = colortable.getColor("AvatarListItemAgeAlert", LLColor4::red).get().getValue();
-
-                if (sRadarAvatarAgeAlert && !ent->hasAgeAlertPerformed())
-                {
-                    make_ui_sound("UISndRadarAgeAlert");
-                    LLStringUtil::format_map_t args;
-                    args["AGE"] = llformat("%d", avAge);
-                    std::string message = FSCommon::format_string(str_avatar_age_alert, args);
-                    LLAvatarNameCache::get(avId, boost::bind(&FSRadar::radarAlertMsg, this, _1, _2, message));
-                }
-                ent->mAgeAlertPerformed = true;
+                entry_options["age_color"] = sAgeAlertColor.get().getValue();
             }
         }
         else
@@ -562,21 +612,20 @@ void FSRadar::updateRadarList()
         {
             if (avRange <= chat_range_say)
             {
-                range_color = colortable.getColor("AvatarListItemChatRange", LLColor4::red);
-                inChatRange++;
+                range_color = sChatRangeColor;
             }
             else if (avRange <= chat_range_shout)
             {
-                range_color = colortable.getColor("AvatarListItemShoutRange", LLColor4::white);
+                range_color = sShoutRangeColor;
             }
             else
             {
-                range_color = colortable.getColor("AvatarListItemBeyondShoutRange", LLColor4::white);
+                range_color = sBeyondShoutRangeColor;
             }
         }
         else
         {
-            range_color = colortable.getColor("AvatarListItemBeyondShoutRange", LLColor4::white);
+            range_color = sBeyondShoutRangeColor;
         }
         entry_options["range_color"] = range_color.get().getValue();
 
@@ -603,7 +652,7 @@ void FSRadar::updateRadarList()
         }
         entry_options["name_style"] = nameCellStyle;
 
-        LLColor4 name_color = colortable.getColor("AvatarListItemIconDefaultColor", LLColor4::white).get();
+        LLColor4 name_color = sNameDefaultColor.get();
         name_color = contactsets->colorize(avId, (sFSRadarColorNamesByDistance ? range_color.get() : name_color), ContactSetType::RADAR);
 
         contactsets->hasFriendColorThatShouldShow(avId, ContactSetType::RADAR, name_color);
@@ -824,8 +873,10 @@ void FSRadar::updateRadarList()
 
     checkTracking();
 
-    // Inform our subscribers about updates
-    if (!mUpdateSignal.empty())
+    // Inform our subscribers about updates. Skipped while no consumer is visible; they
+    // fetch fresh data through getCurrentData() when they become visible.
+    mPresentationStale = !build_presentation;
+    if (build_presentation && !mForcePresentation && !mUpdateSignal.empty())
     {
         mUpdateSignal(mRadarEntriesData, mAvatarStats);
     }

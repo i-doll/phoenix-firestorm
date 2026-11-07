@@ -111,6 +111,11 @@ FSPanelRadar::~FSPanelRadar()
         mUpdateSignalConnection.disconnect();
     }
 
+    if (FSRadar::instanceExists())
+    {
+        FSRadar::getInstance()->removePresentationCheck(this);
+    }
+
     if (mFSRadarColumnConfigConnection.connected())
     {
         mFSRadarColumnConfigConnection.disconnect();
@@ -161,6 +166,8 @@ bool FSPanelRadar::postBuild()
 
     // Register for radar updates
     mUpdateSignalConnection = FSRadar::getInstance()->setUpdateCallback(boost::bind(&FSPanelRadar::updateList, this, _1, _2));
+    // Without a visible check function (People panel), visibility is the visible chain
+    FSRadar::getInstance()->addPresentationCheck(this, [this]() { return mVisibleCheckFunction ? mVisibleCheckFunction() : isInVisibleChain(); });
 
     // call this method in case some list is empty and buttons can be in inconsistent state
     updateButtons();
@@ -285,6 +292,18 @@ void FSPanelRadar::onGearButtonClicked(LLUICtrl* btn)
     getCurrentItemIDs(selected_uuids);
     // Spawn at bottom left corner of the button.
     FSFloaterRadarMenu::gFSRadarMenu.show(btn, selected_uuids, 0, 0);
+}
+
+void FSPanelRadar::onVisibilityChange(bool new_visibility)
+{
+    LLPanel::onVisibilityChange(new_visibility);
+
+    // FSRadar does not send updates while no radar is visible. The floater refreshes
+    // in onOpen(); the People panel refreshes here when it becomes visible.
+    if (new_visibility && mRadarList && !mVisibleCheckFunction && isInVisibleChain())
+    {
+        requestUpdate();
+    }
 }
 
 void FSPanelRadar::requestUpdate()

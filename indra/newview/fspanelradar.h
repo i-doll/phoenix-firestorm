@@ -48,6 +48,7 @@ public:
     virtual ~FSPanelRadar();
 
     bool postBuild() override;
+    void onVisibilityChange(bool new_visibility) override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool hasAccelerators() const override { return true; }
 
