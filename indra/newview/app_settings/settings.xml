@@ -27902,6 +27902,50 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>5.0</real>
     </map>
+    <key>FSPerfSkinOncePerFrame</key>
+    <map>
+      <key>Comment</key>
+      <string>Skin rigged meshes (mesh bodies, clothing, hair, animesh) once per frame by transform feedback and let every pass (G-buffer, alpha, glow, sun and projector shadows, probe and mirror captures) read the captured skin blends, instead of blending the joint palette again in each pass. Ranges whose vertices and palette did not change are not recaptured (best with FSPerfRiggedPaletteCache). Changing it reloads the shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderHeightFogInteriors</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog: keep the fog out of rooms around the camera. A few times per second short rays are cast from the camera against nearby opaque prims and meshes; while it is enclosed (a ceiling and walls around), the fog starts at the walls, so windows and doors still show the fog outside. Fog under a roof or porch gets only the sky and sun light that reaches it. Main view only. No shader rebuild.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderHeightFogInteriorRange</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog interiors: length in meters of the rays cast around the camera, 5 to 64 (the rays toward the sun reach twice as far). Rooms wider than this count as open air. Longer rays cost more CPU.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>30.0</real>
+    </map>
+    <key>FSRenderHeightFogInteriorStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Height fog interiors: how strongly rooms and roofs hold back the fog and its light, 0 to 1. 1 keeps closed rooms clear and fully shades the fog under a roof.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

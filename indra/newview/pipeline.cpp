@@ -140,6 +140,7 @@
 #include "fsdynamicresolution.h" // <FS:Trish/> Dynamic resolution
 #include "fsrepresentativefragment.h" // <FS:Trish/> Representative fragment test for occlusion queries
 #include "fsvrs.h" // <FS:Trish/> Variable rate shading
+#include "fsfoginterior.h" // <FS:Trish/> height fog kept out of interiors
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -11857,6 +11858,7 @@ void LLPipeline::doAtmospherics()
         haze_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
+        FSFogInterior::uploadUniforms(haze_shader); // <FS:Trish/> height fog kept out of the rooms around the main camera
 
         LLGLDepthTest depth(GL_FALSE);
 

@@ -41,6 +41,12 @@ uniform vec4 fs_height_fog;         // density per meter at the base height, hei
 uniform vec4 fs_height_fog_color;   // linear tint, then 1 to take the hue from the sky or 0 for the tint's own
 uniform vec2 fs_height_fog_scatter; // anisotropy (0 even, toward 1 around the light), distance for the sky (m)
 
+// Rooms around the camera (FSRenderHeightFogInteriors, fsfoginterior.cpp), main view only:
+// distance along the ray where the fog starts (the room's radius while indoors), distance where
+// the sheltered air around the camera ends, and the share of the ambient and of the sun or moon
+// light that sheltered air does not get. All zero: the plain fog.
+uniform vec4 fs_height_fog_interior;
+
 uniform vec4 waterPlane;
 uniform vec3 sun_dir;   // view space, toward the light
 uniform vec3 moon_dir;
@@ -102,8 +108,9 @@ float fsHeightFogPhase(float cos_theta, float g)
     return (1.0 - g2) / (denom * sqrt(denom));
 }
 
-// Linear HDR colour of the light the fog scatters toward the camera along view_dir
-vec3 fsHeightFogColor(vec3 view_dir)
+// Linear HDR colour of the light the fog scatters toward the camera along view_dir. amb_scale and
+// sun_scale (0-1) dim the ambient and the sun or moon light, for air under a roof.
+vec3 fsHeightFogColor(vec3 view_dir, float amb_scale, float sun_scale)
 {
     // The sun or moon light through the atmosphere, as calcAtmosphericVars has it
     vec3 sunlight = (sun_up_factor == 1) ? sunlight_color : moonlight_color;
@@ -116,6 +123,8 @@ vec3 fsHeightFogColor(vec3 view_dir)
 
     vec3 amb = ambient_color + (vec3(1.0) - ambient_color) * cloud_shadow * 0.5;
     vec3 cs = sunlight * (1.0 - cloud_shadow);
+    amb *= clamp(amb_scale, 0.0, 1.0);
+    cs *= clamp(sun_scale, 0.0, 1.0);
 
     vec3 light_dir = (sun_up_factor == 1) ? sun_dir : moon_dir;
     float g = clamp(fs_height_fog_scatter.x, 0.0, 0.95);
@@ -150,10 +159,38 @@ vec4 fsHeightFog(vec3 pos, bool sky)
     float dist = sky ? fs_height_fog_scatter.y : len;
 
     float h0 = eye_height - fs_height_fog.z;
-    float h1 = h0 + dot(view_dir, waterPlane.xyz) * dist;
+    float rise = dot(view_dir, waterPlane.xyz);
+
+    if (fs_height_fog_interior.y > 0.0)
+    {
+        // Indoors the fog starts at d0, so the room stays clear while windows and doors still
+        // show the fog outside. Between d0 and d1 the air is under the roof: it gets only part
+        // of the sky's and the sun's light. Beyond d1 it is lit as usual.
+        float d0 = clamp(fs_height_fog_interior.x, 0.0, dist);
+        float d1 = clamp(fs_height_fog_interior.y, d0, dist);
+        float ha = h0 + rise * d0;
+        float hb = h0 + rise * d1;
+        float near_opacity = fsHeightFogOpacity(ha, hb, d1 - d0);
+        float far_opacity = fsHeightFogOpacity(hb, h0 + rise * dist, dist - d1);
+
+        vec3 near_color = fsHeightFogColor(view_dir, 1.0 - fs_height_fog_interior.z, 1.0 - fs_height_fog_interior.w);
+        vec3 far_color = fsHeightFogColor(view_dir, 1.0, 1.0);
+
+        // Near stretch over the far one, premultiplied, then held to the maximum opacity
+        vec3 premul = near_color * near_opacity + far_color * far_opacity * (1.0 - near_opacity);
+        float total = 1.0 - (1.0 - near_opacity) * (1.0 - far_opacity);
+        float capped = min(total, fs_height_fog.w);
+        if (capped <= 0.0)
+        {
+            return vec4(0.0);
+        }
+        return vec4(premul / total, capped);
+    }
+
+    float h1 = h0 + rise * dist;
     float opacity = fsHeightFogOpacity(h0, h1, dist);
 
-    return vec4(fsHeightFogColor(view_dir), opacity);
+    return vec4(fsHeightFogColor(view_dir, 1.0, 1.0), opacity);
 }
 
 // Forward rendered colour at view space position pos, seen through the fog

@@ -53,6 +53,7 @@
 
 #include "llenvironment.h"
 #include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
+#include "fsfoginterior.h" // <FS:Trish/> height fog kept out of interiors
 
 bool LLDrawPoolAlpha::sShowDebugAlpha = false;
 bool LLDrawPoolAlpha::sShowDebugAlphaRigged = false;
@@ -165,6 +166,7 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
         shader->uniform1f(waterSign, water_sign);
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
     }
+    FSFogInterior::uploadUniforms(*shader); // <FS:Trish/> height fog kept out of the rooms around the main camera
 
     if (LLPipeline::sImpostorRender)
     {
