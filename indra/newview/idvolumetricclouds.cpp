@@ -598,6 +598,14 @@ void IDVolumetricClouds::update()
                     mProbeMarchRT[slot].release();
                     mProbeSceneRT[slot].release();
                 }
+                mSceneRT.release();
+                mSceneFrame = U32_MAX;
+                mMarchRT.release();
+                mHistoryRT[0].release();
+                mHistoryRT[1].release();
+                mHistoryValid = false;
+                mShadowRT.release();
+                mShadowReady = false;
             }
         }
     }

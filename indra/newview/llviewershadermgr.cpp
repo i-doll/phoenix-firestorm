@@ -481,8 +481,11 @@ void LLViewerShaderMgr::finalizeShaderList()
     mShaderList.push_back(&gDeferredBumpProgram);
     mShaderList.push_back(&gDeferredPBROpaqueProgram);
     // <ID:VolumetricClouds>
-    mShaderList.push_back(&gIDCloudsProgram);
-    mShaderList.push_back(&gIDCloudsCompositeProgram);
+    if (IDVolumetricClouds::isSupported())
+    {
+        mShaderList.push_back(&gIDCloudsProgram);
+        mShaderList.push_back(&gIDCloudsCompositeProgram);
+    }
     // </ID:VolumetricClouds>
 
     if (gSavedSettings.getBOOL("GLTFEnabled"))

@@ -310,13 +310,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 #endif
     // </ID:VolumetricClouds>
 #else
-    // <ID:VolumetricClouds>
-#ifdef ID_VOLUMETRIC_CLOUDS
-    return idSampleCloudShadow(pos);
-#else
     return 1.0;
-#endif
-    // </ID:VolumetricClouds>
 #endif
 }
 
