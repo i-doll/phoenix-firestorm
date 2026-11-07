@@ -2853,7 +2853,9 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             }
             if (!shader->createShader())
             {
-                LL_WARNS("ShaderLoading") << file << " failed to build, volumetric clouds stay off" << LL_ENDL;
+                const bool froxel = shader == &gIDCloudsFroxelProgram || shader == &gIDCloudsFroxelAccumProgram;
+                LL_WARNS("ShaderLoading") << shader->mName << " failed to build, "
+                                          << (froxel ? "the fog fade on see-through surfaces stays off" : "volumetric clouds stay off") << LL_ENDL;
                 shader->unload();
             }
         }

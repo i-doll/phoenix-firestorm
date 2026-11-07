@@ -197,6 +197,20 @@ namespace
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
         return tex;
     }
+
+    // The alpha passes bind the froxels without a matching unbind. A unit left recording a
+    // deleted name would skip glBindTexture once GL hands that name out again.
+    void unbindFromAllUnits(U32 tex)
+    {
+        for (U32 i = 0; i < LL_NUM_TEXTURE_LAYERS; ++i)
+        {
+            LLTexUnit* unit = gGL.getTexUnit(i);
+            if (unit && unit->getCurrTexture() == tex)
+            {
+                unit->disable();
+            }
+        }
+    }
 }
 
 IDVolumetricClouds::IDVolumetricClouds()
@@ -1091,11 +1105,13 @@ void IDVolumetricClouds::releaseFroxels()
     }
     if (mFroxelSegments)
     {
+        unbindFromAllUnits(mFroxelSegments);
         LLImageGL::deleteTextures(1, &mFroxelSegments);
         mFroxelSegments = 0;
     }
     if (mFroxelVolume)
     {
+        unbindFromAllUnits(mFroxelVolume);
         LLImageGL::deleteTextures(1, &mFroxelVolume);
         mFroxelVolume = 0;
     }

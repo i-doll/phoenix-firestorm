@@ -10995,6 +10995,12 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     shader.disableTexture(LLShaderMgr::ID_CLOUD_SHADOW);
     shader.disableTexture(LLShaderMgr::ID_CLOUD_SCENE);
     shader.disableTexture(LLShaderMgr::ID_CLOUD_DEPTH);
+    // Only bound while a fog layer is present; otherwise the unit may hold another pass's 2D texture.
+    const S32 froxel_channel = shader.getTextureChannel(LLShaderMgr::ID_CLOUD_FROXEL);
+    if (froxel_channel > -1 && gGL.getTexUnit(froxel_channel)->getCurrType() == LLTexUnit::TT_TEXTURE_3D)
+    {
+        shader.disableTexture(LLShaderMgr::ID_CLOUD_FROXEL, LLTexUnit::TT_TEXTURE_3D);
+    }
     // </ID:VolumetricClouds>
 
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
