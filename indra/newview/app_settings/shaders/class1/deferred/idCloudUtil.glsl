@@ -109,6 +109,7 @@ float idCloudTypeExtinction(int type)
     if (type == 3) return 0.8;
     if (type == 4) return 1.4;
     if (type == 5) return 0.6;
+    if (type == 6) return 10.0;
     return 1.0;
 }
 
@@ -186,6 +187,36 @@ float idCloudDensity(vec3 world_pos, int layer, float footprint_m, bool cheap)
     if ((type == 0 || type == 3 || type == 4) ? (reach <= -0.5 && overcast <= 0.0) : (type != 1 && x <= 0.0))
     {
         return 0.0;
+    }
+
+    if (type == 6)
+    {
+        // Feature sizes follow the layer's thickness, so a thin layer is never a flat slab.
+        float thick = clamp(top - base, 10.0, 1000.0);
+        float period = ID_WEATHER_TILE_M / max(1.0, round(ID_WEATHER_TILE_M / (4.0 * thick)));
+        vec3 fp = vec3(xy, world_pos.z) / period;
+        float fog_lod = log2(max(footprint_m / (period / 128.0), 1.0));
+        vec4 fn = fog_lod < 1.0 ? idTextureBSpline3D(idCloudNoiseBase, fp, 0.0) : textureLod(idCloudNoiseBase, fp, fog_lod);
+
+        float fdetail = 0.5;
+        if (!cheap)
+        {
+            float fd_lod = log2(max(footprint_m / (period / 256.0), 1.0));
+            vec3 fdn = textureLod(idCloudNoiseDetail, fp * 8.0, fd_lod).rgb;
+            fdetail = fdn.r * 0.625 + fdn.g * 0.25 + fdn.b * 0.125;
+        }
+
+        float xraw = clamp((idWeatherChannel(idWeatherSample(wuv, weather_lod), layer) + c - 1.0) * inv_c, 0.0, 1.0);
+        float fpatch = mix(smoothstep(0.0, 0.5, xraw), mix(0.5, 1.0, xraw), overcast);
+
+        float fbase = clamp(idRemap(fn.g * 0.625 + fn.b * 0.25 + fn.a * 0.125, 0.3, 0.67, 0.0, 1.0), 0.0, 1.0);
+        // The blanket sinks towards the ground at the edge of a clear patch instead of ending in a wall.
+        float surface = (0.55 + 0.35 * (fbase - 0.5) * 2.0) * mix(smoothstep(0.0, 0.6, xraw), 1.0, overcast);
+        float body = 1.0 - smoothstep(surface - 0.075, surface + 0.075, h);
+        float wisp = smoothstep(0.5, 0.62, fdetail) * (1.0 - smoothstep(surface - 0.1, 1.0, h)) * id_layer_detail[layer];
+        float fd = max(body, wisp * 0.3);
+
+        return fd * fpatch * id_layer_density[layer] * idCloudTypeExtinction(type);
     }
 
     // Stratus and cirrus noise is stretched along the streak direction. streak is an integer
