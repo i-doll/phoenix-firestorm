@@ -1429,7 +1429,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="470"
+                 height="580"
                  layout="topleft"
                  left="0"
                  name="experimental_five_settings"
@@ -1681,6 +1681,53 @@
                      tool_tip="The agent cannot send more than this in one payment."
                      top_delta="-2"
                      width="100" />
+                    <!-- <ID:VolumetricClouds> -->
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="five_clouds_heading"
+                     top_pad="14"
+                     width="475">
+                        Volumetric clouds
+                    </text>
+                    <check_box
+                     control_name="IDVolumetricCloudsEnabled"
+                     follows="left|top"
+                     height="20"
+                     label="Enable volumetric clouds"
+                     layout="topleft"
+                     left="15"
+                     name="volumetric_clouds_enabled"
+                     top_pad="4"
+                     width="475" />
+                    <check_box
+                     control_name="IDVolumetricCloudsFullQualityLive"
+                     follows="left|top"
+                     height="20"
+                     label="Full quality live"
+                     layout="topleft"
+                     left="15"
+                     name="volumetric_clouds_full_quality"
+                     tool_tip="Shows the clouds as sharp as in snapshots, at a lower frame rate."
+                     top_pad="4"
+                     width="475" />
+                    <button
+                     follows="left|top"
+                     height="23"
+                     label="Open cloud editor…"
+                     layout="topleft"
+                     left="15"
+                     name="volumetric_clouds_editor"
+                     top_pad="6"
+                     width="160">
+                        <button.commit_callback
+                         function="Floater.Show"
+                         parameter="id_volumetric_clouds" />
+                    </button>
+                    <!-- </ID:VolumetricClouds> -->
                 </panel>
             </scroll_container>
         </panel>

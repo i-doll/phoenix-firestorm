@@ -60,6 +60,7 @@ public:
     static bool remove(const std::string& name);
     static bool importFile(const std::string& path, std::string& name_out);
     static bool exportFile(const std::string& name, const std::string& path);
+    static bool exportPreset(const IDCloudPreset& p, const std::string& path);
 };
 
 class IDCloudState : public LLSingleton<IDCloudState>

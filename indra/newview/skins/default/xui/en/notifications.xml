@@ -7056,6 +7056,43 @@ Reload the world around you?
   </notification>
   <!-- </ID> -->
 
+  <!-- <ID:VolumetricClouds> -->
+  <notification
+   icon="alertmodal.tga"
+   label="Save Cloud Preset"
+   name="IDCloudPresetSaveAs"
+   type="alertmodal">
+    <unique/>
+    Save these clouds as a preset named:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="message" type="text" default="true">
+        [NAME]
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="IDCloudPresetFailed"
+   type="alertmodal">
+    [REASON]
+    <tag>fail</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+  <!-- </ID:VolumetricClouds> -->
+
   <notification
    icon="alertmodal.tga"
    name="PurgeSelectedItems"

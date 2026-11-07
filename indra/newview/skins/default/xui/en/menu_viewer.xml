@@ -1657,6 +1657,15 @@
 					function="Floater.Toggle"
 					parameter="phototools" />
 				</menu_item_call>
+				<!-- <ID:VolumetricClouds> -->
+				<menu_item_call
+				label="Volumetric Clouds…"
+				name="id_volumetric_clouds_item_call">
+					<menu_item_call.on_click
+					function="Floater.Toggle"
+					parameter="id_volumetric_clouds" />
+				</menu_item_call>
+				<!-- </ID:VolumetricClouds> -->
 				<menu_item_call
 				label="Cameratools"
 				name="cameratools_item_call"

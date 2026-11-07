@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_close="true"
+ can_minimize="true"
+ can_resize="false"
+ save_rect="true"
+ height="490"
+ width="540"
+ name="floater_id_volumetric_clouds"
+ title="Volumetric Clouds">
+    <floater.string name="reason_unsupported">Not available on this platform.</floater.string>
+    <floater.string name="reason_rlv">An object is controlling your environment.</floater.string>
+    <floater.string name="load_failed">That preset could not be opened.</floater.string>
+    <floater.string name="save_failed">The preset could not be saved. Try a name without / \ : * ? " &lt; &gt; or |.</floater.string>
+    <floater.string name="import_failed">That file is not a cloud preset.</floater.string>
+    <floater.string name="export_failed">The preset could not be written to that file.</floater.string>
+
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left="10"
+     name="preset_combo"
+     top="24"
+     width="180" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Save"
+     layout="topleft"
+     left_pad="6"
+     name="save_btn"
+     top_delta="0"
+     width="70" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Import…"
+     layout="topleft"
+     left_pad="6"
+     name="import_btn"
+     top_delta="0"
+     width="80" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Export…"
+     layout="topleft"
+     left_pad="6"
+     name="export_btn"
+     top_delta="0"
+     width="80" />
+
+    <check_box
+     control_name="IDVolumetricCloudsEnabled"
+     follows="left|top"
+     height="18"
+     label="Enabled"
+     layout="topleft"
+     left="10"
+     name="enabled_check"
+     top="52"
+     width="120" />
+    <check_box
+     control_name="IDVolumetricCloudsFullQualityLive"
+     follows="left|top"
+     height="18"
+     label="Full quality live"
+     layout="topleft"
+     left_pad="10"
+     name="full_quality_check"
+     tool_tip="Shows the clouds as sharp as in snapshots, at a lower frame rate."
+     top_delta="0"
+     width="200" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="10"
+     name="reason_text"
+     text_color="EmphasisColor"
+     top="72"
+     visible="false"
+     width="520" />
+
+    <id_cloud_altitude_column
+     follows="left|top"
+     height="330"
+     layout="topleft"
+     left="10"
+     name="altitude_column"
+     tool_tip="Drag a layer to move it, or drag its top or bottom edge to change its thickness."
+     top="94"
+     width="120" />
+    <button
+     follows="left|top"
+     height="22"
+     label="+ Add layer"
+     layout="topleft"
+     left="10"
+     name="add_layer_btn"
+     top_pad="6"
+     width="120" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Delete layer"
+     layout="topleft"
+     left="10"
+     name="delete_layer_btn"
+     top_pad="4"
+     width="120" />
+
+    <text
+     follows="left|top"
+     font="SansSerifBold"
+     height="16"
+     layout="topleft"
+     left="145"
+     name="type_label"
+     top="94"
+     width="385">
+        Cloud type
+    </text>
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Cumulus"
+     layout="topleft"
+     left="145"
+     name="type_cumulus"
+     top_pad="4"
+     width="124" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Cumulonimbus"
+     layout="topleft"
+     left_pad="6"
+     name="type_cumulonimbus"
+     top_delta="0"
+     width="124" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Stratus"
+     layout="topleft"
+     left_pad="6"
+     name="type_stratus"
+     top_delta="0"
+     width="124" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Stratocumulus"
+     layout="topleft"
+     left="145"
+     name="type_stratocumulus"
+     top_pad="4"
+     width="124" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Altocumulus"
+     layout="topleft"
+     left_pad="6"
+     name="type_altocumulus"
+     top_delta="0"
+     width="124" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Cirrus"
+     layout="topleft"
+     left_pad="6"
+     name="type_cirrus"
+     top_delta="0"
+     width="124" />
+
+    <slider
+     can_edit_text="true"
+     decimal_digits="0"
+     follows="left|top"
+     height="18"
+     increment="10"
+     label="Base (m)"
+     label_width="90"
+     layout="topleft"
+     left="145"
+     max_val="10000"
+     min_val="0"
+     name="base_slider"
+     top_pad="14"
+     width="385" />
+    <slider
+     can_edit_text="true"
+     decimal_digits="0"
+     follows="left|top"
+     height="18"
+     increment="10"
+     label="Top (m)"
+     label_width="90"
+     layout="topleft"
+     left="145"
+     max_val="10000"
+     min_val="0"
+     name="top_slider"
+     top_pad="6"
+     width="385" />
+    <slider
+     can_edit_text="true"
+     decimal_digits="2"
+     follows="left|top"
+     height="18"
+     increment="0.01"
+     label="Coverage"
+     label_width="90"
+     layout="topleft"
+     left="145"
+     max_val="1"
+     min_val="0"
+     name="coverage_slider"
+     top_pad="6"
+     width="385" />
+    <slider
+     can_edit_text="true"
+     decimal_digits="2"
+     follows="left|top"
+     height="18"
+     increment="0.01"
+     label="Density"
+     label_width="90"
+     layout="topleft"
+     left="145"
+     max_val="1"
+     min_val="0"
+     name="density_slider"
+     top_pad="6"
+     width="385" />
+    <slider
+     can_edit_text="true"
+     decimal_digits="2"
+     follows="left|top"
+     height="18"
+     increment="0.01"
+     label="Detail"
+     label_width="90"
+     layout="topleft"
+     left="145"
+     max_val="1"
+     min_val="0"
+     name="detail_slider"
+     tool_tip="Higher values break the cloud edges into finer wisps."
+     top_pad="6"
+     width="385" />
+
+    <text
+     follows="left|top"
+     font="SansSerifBold"
+     height="16"
+     layout="topleft"
+     left="145"
+     name="wind_label"
+     top_pad="14"
+     width="385">
+        Wind
+    </text>
+    <text
+     follows="left|top"
+     halign="center"
+     height="14"
+     layout="topleft"
+     left="145"
+     name="wind_north_label"
+     top_pad="2"
+     width="80">
+        N
+    </text>
+    <id_cloud_compass_dial
+     follows="left|top"
+     height="80"
+     layout="topleft"
+     left="145"
+     name="wind_dial"
+     tool_tip="Drag to set which way the wind blows the clouds."
+     top_pad="0"
+     width="80" />
+    <slider
+     can_edit_text="true"
+     decimal_digits="1"
+     follows="left|top"
+     height="18"
+     increment="0.5"
+     label="Speed (m/s)"
+     label_width="90"
+     layout="topleft"
+     left_pad="12"
+     max_val="60"
+     min_val="0"
+     name="wind_speed_slider"
+     top_delta="31"
+     width="293" />
+</floater>

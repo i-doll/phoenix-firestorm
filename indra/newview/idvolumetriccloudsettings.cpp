@@ -270,6 +270,11 @@ bool IDCloudPresets::exportFile(const std::string& name, const std::string& path
     return load(name, p) && writeFile(path, p);
 }
 
+bool IDCloudPresets::exportPreset(const IDCloudPreset& p, const std::string& path)
+{
+    return writeFile(path, p);
+}
+
 IDCloudState::IDCloudState()
 {
 }
@@ -289,7 +294,7 @@ void IDCloudState::initSingleton()
 
 void IDCloudState::setCurrent(const IDCloudPreset& p)
 {
-    mCurrent = p;
+    fromLLSD(toLLSD(p), mCurrent);
     mWind.resize(mCurrent.mLayers.size(), LLVector2::zero);
     gSavedSettings.setLLSD(SETTING_STATE, toLLSD(mCurrent));
     mChanged();
