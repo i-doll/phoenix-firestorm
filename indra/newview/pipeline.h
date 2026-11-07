@@ -843,6 +843,7 @@ public:
     LLVector3               mShadowExtents[4][2];
     glm::mat4               mSunShadowMatrix[4];
     glm::mat4               mSpotShadowMatrix[MAX_PROJECTOR_SHADOWS];
+    glm::vec2               mSpotShadowPenumbraScale[MAX_PROJECTOR_SHADOWS]; // <ID:PCSS/> penumbra uv per unit of shadow map depth gap, for a light the size of the prim
     // sun shadow matrices followed by spot shadow matrices
     glm::mat4               mShadowModelview[4 + MAX_PROJECTOR_SHADOWS];
     glm::mat4               mShadowProjection[4 + MAX_PROJECTOR_SHADOWS];

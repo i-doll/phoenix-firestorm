@@ -50,7 +50,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="560"
+                 height="640"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -226,6 +226,81 @@
                      min_val="16"
                      name="shadow_max_distance"
                      tool_tip="EXPERIMENTAL. How far sun and moon shadows reach. The shadow maps are spread over this distance, so a shorter one makes nearby shadows much sharper, at the cost of no shadows further away. Reflection probes keep the full distance."
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="projector_shadow_softness_label"
+                     tool_tip="EXPERIMENTAL. Shadows from projector lights get softer the further the object casting them is from the surface. 1 treats the light as the size of its prim, 0 keeps the old sharp edge."
+                     top_pad="6"
+                     width="285">
+                        Projector shadow softness
+                    </text>
+                    <spinner
+                     control_name="IDRenderProjectorShadowSoftness"
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="0"
+                     name="projector_shadow_softness"
+                     tool_tip="EXPERIMENTAL. Shadows from projector lights get softer the further the object casting them is from the surface. 1 treats the light as the size of its prim, 0 keeps the old sharp edge."
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_shadow_softness_label"
+                     tool_tip="EXPERIMENTAL. Sun and moon shadows get softer the further the object casting them is from the surface. 1 is the size of the real sun, 0 keeps the old sharp edge."
+                     top_pad="6"
+                     width="285">
+                        Sun shadow softness
+                    </text>
+                    <spinner
+                     control_name="IDRenderSunShadowSoftness"
+                     decimal_digits="1"
+                     follows="left|top"
+                     height="20"
+                     increment="0.5"
+                     layout="topleft"
+                     left="330"
+                     max_val="20"
+                     min_val="0"
+                     name="sun_shadow_softness"
+                     tool_tip="EXPERIMENTAL. Sun and moon shadows get softer the further the object casting them is from the surface. 1 is the size of the real sun, 0 keeps the old sharp edge."
+                     top_delta="-2"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_max_penumbra_label"
+                     tool_tip="EXPERIMENTAL. Limits how soft a shadow edge can get. Larger values look smoother over long distances but cost more."
+                     top_pad="6"
+                     width="285">
+                        Widest soft shadow edge
+                    </text>
+                    <spinner
+                     control_name="IDRenderShadowMaxPenumbra"
+                     decimal_digits="0"
+                     follows="left|top"
+                     height="20"
+                     increment="8"
+                     layout="topleft"
+                     left="330"
+                     max_val="256"
+                     min_val="4"
+                     name="shadow_max_penumbra"
+                     tool_tip="EXPERIMENTAL. Limits how soft a shadow edge can get. Larger values look smoother over long distances but cost more."
                      top_delta="-2"
                      width="100" />
                     <text

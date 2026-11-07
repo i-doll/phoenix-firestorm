@@ -10039,6 +10039,18 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_OFFSET, RenderSpotShadowOffset);
     shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_BIAS, RenderSpotShadowBias);
 
+    // <ID:PCSS> Off by default, the sun pass and spot lights switch it on for themselves
+    {
+        static LLCachedControl<F32> max_penumbra(gSavedSettings, "IDRenderShadowMaxPenumbra", 64.f);
+        static LLStaticHashedString s_sun_shadow_softness("sun_shadow_softness");
+        static LLStaticHashedString s_proj_shadow_softness("proj_shadow_softness");
+        static LLStaticHashedString s_shadow_max_penumbra("shadow_max_penumbra");
+        shader.uniform1f(s_sun_shadow_softness, 0.f);
+        shader.uniform2f(s_proj_shadow_softness, 0.f, 0.f);
+        shader.uniform1f(s_shadow_max_penumbra, llclamp((F32)max_penumbra, 1.5f, 256.f));
+    }
+    // </ID:PCSS>
+
     shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
     shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mTransformedMoonDir.mV);
     shader.uniform2f(LLShaderMgr::DEFERRED_SHADOW_RES, (GLfloat)mRT->shadow[0].getWidth(), (GLfloat)mRT->shadow[0].getHeight());
@@ -10151,6 +10163,15 @@ void LLPipeline::renderDeferredLighting()
 
                 LLGLSLShader& sun_shader = gCubeSnapshot ? gDeferredSunProbeProgram : gDeferredSunProgram;
                 bindDeferredShader(sun_shader, deferred_light_target);
+                // <ID:PCSS> Soft sun shadows only in this full screen pass, alpha and water keep the
+                // fixed filter. The filter radius is half the penumbra: tan(0.265 deg) per meter for the real sun.
+                if (!gCubeSnapshot)
+                {
+                    static LLCachedControl<F32> sun_softness(gSavedSettings, "IDRenderSunShadowSoftness", 1.f);
+                    static LLStaticHashedString s_sun_shadow_softness("sun_shadow_softness");
+                    sun_shader.uniform1f(s_sun_shadow_softness, 0.004625f * llmax((F32)sun_softness, 0.f));
+                }
+                // </ID:PCSS>
                 mScreenTriangleVB->setBuffer();
                 glClearColor(1, 1, 1, 1);
                 deferred_light_target->clear(GL_COLOR_BUFFER_BIT);
@@ -10881,6 +10902,13 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     {
         shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, show_shadow_debug ? -100.f : 1.f-mSpotLightFade[s_idx]);
         shader.uniformMatrix4fv(LLShaderMgr::PROJECTOR_SHADOW_MATRIX, 1, false, glm::value_ptr(mSpotShadowMatrix[s_idx]));
+
+        // <ID:PCSS>
+        static LLCachedControl<F32> proj_softness(gSavedSettings, "IDRenderProjectorShadowSoftness", 1.f);
+        static LLStaticHashedString s_proj_shadow_softness("proj_shadow_softness");
+        const glm::vec2 softness = mSpotShadowPenumbraScale[s_idx] * llmax((F32)proj_softness, 0.f);
+        shader.uniform2f(s_proj_shadow_softness, softness.x, softness.y);
+        // </ID:PCSS>
 
         S32 shadow_channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW4);
         if (shadow_channel > -1)
@@ -13049,6 +13077,15 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             set_current_projection(proj[i + 4]);
 
             mSpotShadowMatrix[i] = trans * proj[i + 4] * view[i + 4] * inv_view;
+
+            // <ID:PCSS> The shadow map stores depth linear in 1/distance, so for a light as wide as
+            // the prim the penumbra radius in uv is 0.5 * (far - near) / far per unit of depth gap
+            // between caster and receiver. uv across is stretched by the aspect ratio.
+            {
+                const F32 depth_scale = 0.5f * (far_clip - near_clip) / far_clip;
+                mSpotShadowPenumbraScale[i] = glm::vec2(depth_scale / llmax(aspect, 0.01f), depth_scale);
+            }
+            // </ID:PCSS>
 
             set_last_modelview(mShadowModelview[i + 4]);
             set_last_projection(mShadowProjection[i + 4]);

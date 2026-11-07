@@ -58,6 +58,39 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
+  <key>IDRenderProjectorShadowSoftness</key>
+  <map>
+    <key>Comment</key>
+    <string>Size of projector lights for soft shadows, as a multiple of the projector prim. Shadows soften the further the caster is from the surface it falls on. 0 uses the old fixed edge.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>1.0</real>
+  </map>
+  <key>IDRenderSunShadowSoftness</key>
+  <map>
+    <key>Comment</key>
+    <string>Size of the sun and moon for soft shadows, as a multiple of the real sun. Shadows soften the further the caster is from the surface it falls on. 0 uses the old fixed edge.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>1.0</real>
+  </map>
+  <key>IDRenderShadowMaxPenumbra</key>
+  <map>
+    <key>Comment</key>
+    <string>Widest soft shadow edge, in shadow map texels.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>64.0</real>
+  </map>
   <!-- </ID> -->
   <key>FSTrishMouseLookFix</key>
   <map>
