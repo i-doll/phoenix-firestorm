@@ -14,8 +14,8 @@
 // Filament constants (sigma^2 0.15, kappa 0.25). This one:
 //
 // - takes sigma^2 (the screen-space pixel filter variance, FSRenderSpecularAAStrength) and
-//   kappa (the ceiling, FSRenderSpecularAAThreshold) from the settings, compiled in as
-//   constants so the material shaders need no extra uniform;
+//   kappa (the ceiling, FSRenderSpecularAAThreshold) from the settings, as uniforms set when the
+//   program is bound (LLViewerShaderMgr::updateShaderUniforms);
 //
 // - adds the variance a minified normal map has already averaged away inside one texel of its
 //   mip chain (Toksvig 2005). Screen-space derivatives only see how the filtered normal varies
@@ -27,13 +27,9 @@
 //   Encoded normal maps are lossy and 8-bit, so a unit texel decodes up to a few percent short;
 //   that much is ignored rather than turned into a roughness floor on every mirror.
 
-#ifndef FS_SPECULAR_AA_VARIANCE
-#define FS_SPECULAR_AA_VARIANCE 0.25
-#endif
-
-#ifndef FS_SPECULAR_AA_THRESHOLD
-#define FS_SPECULAR_AA_THRESHOLD 0.18
-#endif
+// Unset, both read 0 and the filter adds nothing
+uniform float fs_specular_aa_variance;  // sigma^2
+uniform float fs_specular_aa_threshold; // kappa
 
 // Shortening of a decoded normal-map texel that is codec and quantization error, not variance.
 #define FS_SPECULAR_AA_TOKSVIG_DEADZONE 0.03
@@ -47,12 +43,12 @@ float fsSpecularAARoughness(float perceptualRoughness, vec3 n, vec3 mapNormal)
 {
     vec3 du = dFdx(n);
     vec3 dv = dFdy(n);
-    float variance = FS_SPECULAR_AA_VARIANCE * (dot(du, du) + dot(dv, dv));
+    float variance = fs_specular_aa_variance * (dot(du, du) + dot(dv, dv));
 
     float len = clamp(length(mapNormal), 0.05, 1.0);
     variance += max(1.0 - len - FS_SPECULAR_AA_TOKSVIG_DEADZONE, 0.0) / len;
 
-    float kernel = min(2.0 * variance, FS_SPECULAR_AA_THRESHOLD);
+    float kernel = min(2.0 * variance, fs_specular_aa_threshold);
 
     float alpha = perceptualRoughness * perceptualRoughness;
     return sqrt(sqrt(clamp(alpha * alpha + kernel, 0.0, 1.0)));

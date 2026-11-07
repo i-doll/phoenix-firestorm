@@ -365,20 +365,15 @@ static void add_sun_shadow_extras(LLGLSLShader& shader)
 // </FS:Trish>
 
 // <FS:Trish> Specular AA: the tunable roughness filter (fsSpecularAAF.glsl) for the G-buffer
-// writers. Strength and threshold are compiled in as constants, written as integer ratios so
-// the decimal separator of the user's locale cannot reach the GLSL. Call before
+// writers. Strength and threshold are uniforms, uploaded in updateShaderUniforms. Call before
 // make_rigged_variant so the skinned copy gets the define and the file too.
 static void add_specular_aa(LLGLSLShader* shader)
 {
     static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderSpecularAA", false);
-    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderSpecularAAStrength", 0.25f);
-    static LLCachedControl<F32> threshold(gSavedSettings, "FSRenderSpecularAAThreshold", 0.18f);
 
     if (enabled)
     {
         shader->addPermutation("FS_SPECULAR_AA", "1");
-        shader->addPermutation("FS_SPECULAR_AA_VARIANCE", llformat("(%d.0/10000.0)", ll_round(llclamp((F32)strength, 0.f, 1.f) * 10000.f)));
-        shader->addPermutation("FS_SPECULAR_AA_THRESHOLD", llformat("(%d.0/10000.0)", ll_round(llclamp((F32)threshold, 0.f, 1.f) * 10000.f)));
         shader->mShaderFiles.push_back(make_pair("deferred/fsSpecularAAF.glsl", GL_FRAGMENT_SHADER));
     }
 }
@@ -4035,6 +4030,20 @@ std::string LLViewerShaderMgr::getShaderDirPrefix(void)
 void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
 {
     LLEnvironment::instance().updateShaderUniforms(shader);
+
+    // <FS:Trish> Specular AA strength and threshold. LLEnvironment marks every listed program and
+    // its rigged variant dirty each frame, so a slider change reaches the next bind without a
+    // shader rebuild.
+    if (shader->mDefines.count("FS_SPECULAR_AA"))
+    {
+        static LLCachedControl<F32> strength(gSavedSettings, "FSRenderSpecularAAStrength", 0.25f);
+        static LLCachedControl<F32> threshold(gSavedSettings, "FSRenderSpecularAAThreshold", 0.18f);
+        static LLStaticHashedString sVariance("fs_specular_aa_variance");
+        static LLStaticHashedString sThreshold("fs_specular_aa_threshold");
+        shader->uniform1f(sVariance, llclamp((F32)strength, 0.f, 1.f));
+        shader->uniform1f(sThreshold, llclamp((F32)threshold, 0.f, 1.f));
+    }
+    // </FS:Trish>
 }
 
 LLViewerShaderMgr::shader_iter LLViewerShaderMgr::beginShaders() const
