@@ -653,6 +653,88 @@ void LLSpatialGroup::updateDistance(LLCamera &camera)
     }
 }
 
+// <FS:Trish> Check whether a distance re-sort of the group's blended alpha faces would keep the current
+// draw order. rebuildGeom sorts the alpha faces by LLFace::mDistance (farthest first) and lays them out in
+// that order in the alpha vertex buffers, and the alpha pool draws the PASS_ALPHA draw infos in vector
+// order. So the current draw order is (buffer order in PASS_ALPHA, geometry index in the buffer), and a
+// rebuild would only reproduce it if the current face distances are already non-increasing in that order.
+static bool fs_alpha_sort_order_unchanged(LLSpatialGroup* group)
+{
+    LLSpatialGroup::draw_map_t::const_iterator alpha_it = group->mDrawMap.find(LLRenderPass::PASS_ALPHA);
+    if (alpha_it == group->mDrawMap.end())
+    {
+        return true;
+    }
+
+    // vertex buffers used by blended alpha draw infos, with their draw order
+    std::vector<std::pair<LLVertexBuffer*, U32> > buffers;
+    for (const LLPointer<LLDrawInfo>& info : alpha_it->second)
+    {
+        LLVertexBuffer* vb = info->mVertexBuffer.get();
+        bool found = false;
+        for (const auto& entry : buffers)
+        {
+            if (entry.first == vb)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            buffers.emplace_back(vb, (U32)buffers.size());
+        }
+    }
+    std::sort(buffers.begin(), buffers.end());
+
+    struct FaceOrder
+    {
+        U32 mBuffer;
+        U32 mGeomIndex;
+        F32 mDistance;
+        bool operator<(const FaceOrder& rhs) const
+        {
+            return mBuffer != rhs.mBuffer ? mBuffer < rhs.mBuffer : mGeomIndex < rhs.mGeomIndex;
+        }
+    };
+    std::vector<FaceOrder> faces;
+
+    for (LLSpatialGroup::element_iter it = group->getDataBegin(); it != group->getDataEnd(); ++it)
+    {
+        LLDrawable* drawablep = (LLDrawable*)(*it)->getDrawable();
+        if (!drawablep || drawablep->isDead())
+        {
+            continue;
+        }
+        for (S32 i = 0; i < drawablep->getNumFaces(); ++i)
+        {
+            LLFace* facep = drawablep->getFace(i);
+            if (!facep || !facep->getVertexBuffer() || facep->isState(LLFace::RIGGED))
+            {
+                continue;
+            }
+            std::vector<std::pair<LLVertexBuffer*, U32> >::const_iterator buf_it =
+                std::lower_bound(buffers.begin(), buffers.end(), std::make_pair(facep->getVertexBuffer(), (U32)0));
+            if (buf_it == buffers.end() || buf_it->first != facep->getVertexBuffer())
+            {
+                continue;
+            }
+            faces.push_back({ buf_it->second, facep->getGeomIndex(), facep->mDistance });
+        }
+    }
+
+    std::sort(faces.begin(), faces.end());
+    for (size_t i = 1; i < faces.size(); ++i)
+    {
+        if (faces[i].mDistance > faces[i - 1].mDistance)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+// </FS:Trish>
+
 F32 LLSpatialPartition::calcDistance(LLSpatialGroup* group, LLCamera& camera)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SPATIAL;
@@ -688,8 +770,16 @@ F32 LLSpatialPartition::calcDistance(LLSpatialGroup* group, LLCamera& camera)
                     //for occasional alpha sorting within the group
                     //NOTE: If there is a trivial way to detect that alpha sorting here would not change the render order,
                     //not setting this node to dirty would be a very good thing
-                    group->setState(LLSpatialGroup::ALPHA_DIRTY);
-                    gPipeline.markRebuild(group);
+                    // <FS:Trish> Only rebuild when the distance sort would actually change the alpha draw order
+                    //group->setState(LLSpatialGroup::ALPHA_DIRTY);
+                    //gPipeline.markRebuild(group);
+                    static LLCachedControl<bool> alpha_resort_only(gSavedSettings, "FSPerfAlphaResortOnly", false);
+                    if (!alpha_resort_only || !fs_alpha_sort_order_unchanged(group))
+                    {
+                        group->setState(LLSpatialGroup::ALPHA_DIRTY);
+                        gPipeline.markRebuild(group);
+                    }
+                    // </FS:Trish>
                 }
             }
         }
