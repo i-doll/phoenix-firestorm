@@ -128,6 +128,26 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
     }
 }
 
+// <FS:Trish> Shoreline foam: uniforms for fsWaterFoamF.glsl, linked into the water shaders only
+// when it is enabled
+static void fs_bind_water_foam(LLGLSLShader* shader)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderWaterFoam", false);
+    static LLCachedControl<F32> width(gSavedSettings, "FSRenderWaterFoamWidth", 0.6f);
+    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderWaterFoamStrength", 0.8f);
+    static LLStaticHashedString s_params("fs_foam_params");
+
+    if (!enabled || shader->getUniformLocation(s_params) < 0)
+    {
+        return;
+    }
+
+    // Wrapped so the phase keeps its precision; the pattern jumps once an hour
+    const F32 phase = (F32)fmod(LLFrameTimer::getElapsedSeconds(), 3600.0);
+    shader->uniform4f(s_params, llclamp((F32)strength, 0.f, 1.f), llclamp((F32)width, 0.05f, 5.f), phase, 0.f);
+}
+// </FS:Trish>
+
 void LLDrawPoolWater::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
@@ -321,6 +341,8 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     {
         shader->uniform1f(LLShaderMgr::WATER_REFSCALE, pwater->getScaleAbove());
     }
+
+    fs_bind_water_foam(shader); // <FS:Trish/>
 
     LLGLDisable cullface(GL_CULL_FACE);
 

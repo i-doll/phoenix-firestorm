@@ -135,6 +135,10 @@ vec3 idWaterClouds(vec3 color, vec3 fb, float fb_weight, vec3 pos, vec3 additive
 #endif
 // </ID:VolumetricClouds>
 
+#ifdef FS_WATER_FOAM
+float fsWaterFoam(vec2 screen_tc, vec3 pos, vec3 up, vec2 view_offset);
+#endif
+
 void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
 {
     // Generate all of our wave normals.
@@ -351,12 +355,26 @@ void main()
     fade = min(1, fade);
     color = mix(fb.rgb, color, fade);
 
+#ifdef FS_WATER_FOAM
+    // Shoreline foam on top of everything else (fsWaterFoamF.glsl): rough and white, so it
+    // takes diffuse sun and sky light and hides the refraction and reflection beneath it
+    float foam = fsWaterFoam(distort, pos.xyz, up, view.xy) * water_mask;
+    if (foam > 0.0)
+    {
+        vec3 foam_light = sunlit_linear * shadow * max(dot(up, normalize(light_dir)), 0.0) + amblit;
+        color = mix(color, foam_light * 0.85, foam);
+    }
+#endif
+
     // <ID:VolumetricClouds>
 #ifdef ID_VOLUMETRIC_CLOUDS
 #ifdef TRANSPARENT_WATER
     float fb_weight = 1.0 - fade * min(1, df2.x);
 #else
     float fb_weight = 0.0;
+#endif
+#ifdef FS_WATER_FOAM
+    fb_weight *= 1.0 - foam;
 #endif
     color = idWaterClouds(color, fb.rgb, fb_weight, pos.xyz, additive, atten);
     // Pre-compensated in-scatter may be negative until the haze pass; same bound as the composite.

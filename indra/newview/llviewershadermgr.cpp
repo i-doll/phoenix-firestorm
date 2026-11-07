@@ -1079,6 +1079,11 @@ bool LLViewerShaderMgr::loadShadersWater()
     bool use_sun_shadow = mShaderLevel[SHADER_DEFERRED] > 1 &&
         gSavedSettings.getS32("RenderShadowDetail") > 0;
 
+    // <FS:Trish> Shoreline foam needs the scene depth behind the water, so transparent water
+    static LLCachedControl<bool> water_foam_setting(gSavedSettings, "FSRenderWaterFoam", false);
+    const bool water_foam = water_foam_setting && LLPipeline::sRenderTransparentWater;
+    // </FS:Trish>
+
     if (mShaderLevel[SHADER_WATER] == 0)
     {
         gWaterProgram.unload();
@@ -1111,6 +1116,14 @@ bool LLViewerShaderMgr::loadShadersWater()
             gWaterProgram.addPermutation("HAS_SUN_SHADOW", "1");
         }
 
+        // <FS:Trish> Shoreline foam
+        if (water_foam)
+        {
+            gWaterProgram.mShaderFiles.push_back(make_pair("environment/fsWaterFoamF.glsl", GL_FRAGMENT_SHADER));
+            gWaterProgram.addPermutation("FS_WATER_FOAM", "1");
+        }
+        // </FS:Trish>
+
         gWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
         gWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
         success = gWaterProgram.createShader();
@@ -1133,6 +1146,13 @@ bool LLViewerShaderMgr::loadShadersWater()
         {
             gUnderWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
         }
+        // <FS:Trish> Shoreline foam
+        if (water_foam)
+        {
+            gUnderWaterProgram.mShaderFiles.push_back(make_pair("environment/fsWaterFoamF.glsl", GL_FRAGMENT_SHADER));
+            gUnderWaterProgram.addPermutation("FS_WATER_FOAM", "1");
+        }
+        // </FS:Trish>
         success = gUnderWaterProgram.createShader();
         llassert(success);
     }

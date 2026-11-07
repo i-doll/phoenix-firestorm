@@ -54,6 +54,11 @@ in vec4 littleWave;
 in vec4 view;
 in vec3 vary_position;
 
+#ifdef FS_WATER_FOAM
+in vec3 vary_normal;
+float fsWaterFoam(vec2 screen_tc, vec3 pos, vec3 up, vec2 view_offset);
+#endif
+
 vec4 applyWaterFogViewLinearNoClip(vec3 pos, vec4 color);
 void mirrorClip(vec3 position);
 
@@ -79,6 +84,17 @@ void main()
     vec4 fb = texture(screenTex, distort);
 #else
     vec4 fb = vec4(waterFogColorLinear, 0.0);
+#endif
+
+#ifdef FS_WATER_FOAM
+    // Shoreline foam seen from below (fsWaterFoamF.glsl): it scatters the light coming down
+    // through it, so it shows as a pale, washed out patch on the underside of the surface
+    float foam = fsWaterFoam(screen_tc, vary_position, normalize(vary_normal), view.xy) * water_mask;
+    if (foam > 0.0)
+    {
+        float luma = dot(fb.rgb, vec3(0.2126, 0.7152, 0.0722));
+        fb.rgb = mix(fb.rgb, vec3(luma * 1.4 + 0.02), foam * 0.7);
+    }
 #endif
 
     fb = applyWaterFogViewLinearNoClip(vary_position, fb);

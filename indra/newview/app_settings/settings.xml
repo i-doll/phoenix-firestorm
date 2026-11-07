@@ -26828,6 +26828,39 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSRenderWaterFoam</key>
+    <map>
+      <key>Comment</key>
+      <string>Soft animated foam where the water surface meets land or objects. Needs transparent water. Rebuilds the water shaders when changed.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderWaterFoamWidth</key>
+    <map>
+      <key>Comment</key>
+      <string>Width of the shoreline foam band, as the water depth in metres at which the foam ends (0.05 to 5).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.6</real>
+    </map>
+    <key>FSRenderWaterFoamStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>Opacity of the shoreline foam (0 to 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.8</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
