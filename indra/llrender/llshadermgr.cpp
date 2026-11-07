@@ -682,6 +682,19 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         }
     }
 
+    // <FS:Trish> Skin SSS (FSRenderSkinSSS): avatar g-buffer writers, the rigged variants
+    // (HAS_SKIN) and the system avatar (AVATAR_CLOTH is only defined for it), bias their flag by
+    // 0.05 so fsSkinSSSF.glsl can find avatar pixels. GET_GBUFFER_FLAG's 0.1 tolerance still
+    // matches, so every other reader is unaffected.
+    if (type == GL_FRAGMENT_SHADER && LLGLSLShader::sGlobalDefines.count("FS_SKIN_SSS"))
+    {
+        extra_code_text[extra_code_count++] = strdup("#if defined(HAS_SKIN) || defined(AVATAR_CLOTH)\n"
+                                                     "#undef GBUFFER_FLAG_HAS_ATMOS\n#define GBUFFER_FLAG_HAS_ATMOS 0.39\n"
+                                                     "#undef GBUFFER_FLAG_HAS_PBR\n#define GBUFFER_FLAG_HAS_PBR 0.72\n"
+                                                     "#endif\n");
+    }
+    // </FS:Trish>
+
     if( gGLManager.mIsAMD )
     {
         extra_code_text[extra_code_count++] = strdup( "#define IS_AMD_CARD 1\n" );

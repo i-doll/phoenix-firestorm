@@ -1404,6 +1404,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "FSRenderSpecularAA", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "FSRenderGTAO", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "FSRenderGTAOSlices", handleSetShaderChanged); // <FS:Trish/>
+    setting_setup_signal_listener(gSavedSettings, "FSRenderSkinSSS", handleSetShaderChanged); // <FS:Trish/>
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatConsoleFontSize", handleChatFontSizeChanged);

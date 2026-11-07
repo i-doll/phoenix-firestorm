@@ -27213,6 +27213,72 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.9</real>
     </map>
+    <key>FSRenderSkinSSS</key>
+    <map>
+      <key>Comment</key>
+      <string>Screen-space subsurface scattering on avatar skin: the light (not the skin texture) is diffused with a measured skin profile, so light bleeds softly, with a reddish falloff, past shadow edges, while pores, makeup and highlights stay sharp. Rigged and system avatar surfaces are marked in the g-buffer (rebuilds shaders), a skin-tone weight keeps it off most clothing. Needs HDR (RenderHDREnabled).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderSkinSSSStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>Skin subsurface scattering: how much of the diffused light replaces the lit skin (0-1). Skin texture and highlights are kept either way; 1 is the physical look.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSRenderSkinSSSRadius</key>
+    <map>
+      <key>Comment</key>
+      <string>Skin subsurface scattering: scale of the skin diffusion profile (0.25-4). 1 is measured human skin (red light reaches about 6 mm, green and blue under half a millimetre); larger looks softer and waxier.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.5</real>
+    </map>
+    <key>FSRenderSkinSSSTint</key>
+    <map>
+      <key>Comment</key>
+      <string>Skin subsurface scattering: how much further red scatters than green and blue (0: neutral grey blur, 1: human skin).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>FSRenderSkinSSSToneMatch</key>
+    <map>
+      <key>Comment</key>
+      <string>Skin subsurface scattering: 0 applies it to every avatar surface, 1 only to surfaces whose colour looks like skin.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.8</real>
+    </map>
+    <key>FSRenderSkinSSSTranslucency</key>
+    <map>
+      <key>Comment</key>
+      <string>Skin subsurface scattering: strength of sunlight shining through thin skin lit from behind, such as ears, fingers and nostrils, with the reddish colour of real skin (0 off, 0-4, 1 physical). Thickness is measured in the sun shadow map, so it needs sun shadows; costs a few shadow map reads per skin pixel.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

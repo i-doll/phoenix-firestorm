@@ -10888,6 +10888,131 @@ static void fs_bind_sun_shadow_extras(LLGLSLShader& shader, const glm::mat4& mod
 }
 // </FS:Trish>
 
+// <FS:Trish> Skin subsurface scattering (FSRenderSkinSSS). A separable, depth-aware blur of the
+// light falling on avatar skin, with the d'Eon/Jimenez skin profile (red widest), so light bleeds
+// softly past shadow edges and around ears and fingers. The shader divides the lit colour by the
+// g-buffer albedo, blurs that irradiance and multiplies the albedo back, so skin texture stays
+// sharp; irradiance above what diffuse light can reach is held out of the blur, so highlights
+// stay crisp (see fsSkinSSSF.glsl). Avatar pixels carry a biased g-buffer flag while the setting
+// is on (see LLShaderMgr::loadShaderFile); a skin-tone weight on the albedo keeps it off most
+// clothing. Horizontal pass into the scratch mRT->deferredLight (free between the light passes
+// and renderFinalize), vertical pass blended back over the screen. Runs after the local lights
+// and before alpha, with the screen target bound, and leaves it bound.
+// FSRenderSkinSSSTranslucency adds sunlight transmitted through thin backlit skin in the
+// vertical pass, measuring thickness in sun cascades 0 and 1 read as raw depth through the PCSS
+// depth-fetch sampler (GL 3.3), so it needs sun shadows.
+static void fs_render_skin_sss(LLRenderTarget* screen)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderSkinSSS", false);
+    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderSkinSSSStrength", 1.0f);
+    static LLCachedControl<F32> radius(gSavedSettings, "FSRenderSkinSSSRadius", 1.5f);
+    static LLCachedControl<F32> tint(gSavedSettings, "FSRenderSkinSSSTint", 1.0f);
+    static LLCachedControl<F32> tone_match(gSavedSettings, "FSRenderSkinSSSToneMatch", 0.8f);
+    static LLCachedControl<F32> translucency(gSavedSettings, "FSRenderSkinSSSTranslucency", 1.0f);
+    static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
+
+    // The flag needs the 16 bit normal attachment; the 2 bit alpha of the non-HDR one drops it
+    if (!enabled || gCubeSnapshot || !gFSSkinSSSProgram.isComplete() || !LLRender::sGBufferNormHDR || radius <= 0.f)
+    {
+        return;
+    }
+
+    const bool scatter = strength > 0.f;
+    const bool translucent = translucency > 0.f && LLPipeline::RenderShadowDetail > 0 &&
+                             gGLManager.mGLVersion >= 3.29f && gPipeline.getSunShadowTarget(0)->isComplete() &&
+                             gPipeline.getSunShadowTarget(1)->isComplete();
+    if (!scatter && !translucent)
+    {
+        return;
+    }
+
+    LLRenderTarget* gbuffer = &gPipeline.mRT->deferredScreen;
+    LLRenderTarget* scratch = &gPipeline.mRT->deferredLight;
+    if (!scratch->isComplete() || scratch->getWidth() != screen->getWidth() || scratch->getHeight() != screen->getHeight())
+    {
+        return;
+    }
+
+    LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - skin sss");
+    LL_PROFILE_GPU_ZONE("skin sss");
+
+    static LLStaticHashedString s_pass("sss_pass");
+    static LLStaticHashedString s_strength("sss_strength");
+    static LLStaticHashedString s_radius("sss_radius");
+    static LLStaticHashedString s_tint("sss_tint");
+    static LLStaticHashedString s_tone_match("sss_tone_match");
+    static LLStaticHashedString s_max_px("sss_max_px");
+    static LLStaticHashedString s_exposure("exposure");
+    static LLStaticHashedString s_translucency("sss_translucency");
+
+    // Cap on the kernel reach, so a face right against the camera costs no more than a close-up
+    const F32 max_px = llclamp(screen->getHeight() * 0.1f, 16.f, 256.f);
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+
+    LLGLSLShader& shader = gFSSkinSSSProgram;
+    shader.bind(); // also uploads the sky uniforms the diffuse ceiling reads (it is in mShaderList)
+    shader.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, gbuffer, false, LLTexUnit::TFO_POINT, 0);
+    shader.bindTexture(LLShaderMgr::NORMAL_MAP, gbuffer, false, LLTexUnit::TFO_POINT, 2);
+    shader.bindTexture(LLShaderMgr::DEFERRED_DEPTH, gbuffer, true, LLTexUnit::TFO_POINT);
+    shader.bindTexture(LLShaderMgr::EXPOSURE_MAP, &gPipeline.mExposureMap);
+    shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)screen->getWidth(), (GLfloat)screen->getHeight());
+    shader.uniform1f(s_strength, llclamp((F32)strength, 0.f, 1.f));
+    shader.uniform1f(s_radius, llclamp((F32)radius, 0.f, 4.f));
+    shader.uniform1f(s_tint, llclamp((F32)tint, 0.f, 1.f));
+    shader.uniform1f(s_tone_match, llclamp((F32)tone_match, 0.f, 1.f));
+    shader.uniform1f(s_max_px, max_px);
+    shader.uniform1f(s_exposure, llclamp((F32)exposure, 0.5f, 4.f)); // as the tone mapper clamps it
+    shader.uniform1f(s_translucency, translucent ? llclamp((F32)translucency, 0.f, 4.f) : 0.f);
+    if (translucent)
+    {
+        // As bindDeferredShader sets them for the sun pass
+        F32 mat[16 * 4];
+        for (U32 i = 0; i < 4; i++)
+        {
+            memcpy(mat + 16 * i, glm::value_ptr(gPipeline.mSunShadowMatrix[i]), sizeof(F32) * 16);
+        }
+        shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 4, false, mat);
+        shader.uniform4fv(LLShaderMgr::DEFERRED_SHADOW_CLIP, 1, gPipeline.mSunClipPlanes.mV);
+        shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, gPipeline.mTransformedSunDir.mV);
+        shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, gPipeline.mTransformedMoonDir.mV);
+    }
+
+    // Horizontal: screen -> scratch, every pixel written (not needed for translucency alone)
+    if (scatter)
+    {
+        LLGLDisable blend(GL_BLEND);
+        scratch->bindTarget();
+        shader.bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, screen, false, LLTexUnit::TFO_POINT);
+        shader.uniform1i(s_pass, 0);
+        gPipeline.mScreenTriangleVB->setBuffer();
+        gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        scratch->flush();
+    }
+
+    // Vertical: scratch -> screen, premultiplied (the shader's alpha already holds the weight
+    // and the highlight share it leaves alone); the screen's alpha is glow and stays
+    {
+        gGL.setColorMask(true, false);
+        LLGLEnable blend(GL_BLEND);
+        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
+        shader.bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, scratch, false, LLTexUnit::TFO_POINT);
+        shader.uniform1i(s_pass, 1);
+        if (translucent)
+        {
+            gPipeline.bindShadowMaps(shader); // <ID/> shadowMap0/1, read with comparison taps
+        }
+        gPipeline.mScreenTriangleVB->setBuffer();
+        gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        gGL.setColorMask(true, true);
+    }
+
+    shader.unbind();
+}
+// </FS:Trish>
+
 void LLPipeline::renderDeferredLighting()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -11377,6 +11502,7 @@ void LLPipeline::renderDeferredLighting()
         gGL.setColorMask(true, true);
     }
 
+    fs_render_skin_sss(screen_target); // <FS:Trish/>
     // <ID:VolumetricClouds>
     if (IDVolumetricClouds::instance().isActive())
     {
