@@ -173,6 +173,8 @@ if (LINUX)
    add_definitions(-D_FORTIFY_SOURCE=2)
   endif()
 
+  add_compile_definitions($<$<CONFIG:RelWithDebInfo>:_GLIBCXX_NO_ASSERTIONS>)
+
   # gcc 4.3 and above don't like the LL boost and also
   # cause warnings due to our use of deprecated headers
 
