@@ -230,6 +230,7 @@ LLGLSLShader            gFSDynResUpscaleProgram; // <FS:Trish/> Dynamic resoluti
 // </FS:Trish>
 LLGLSLShader            gFSLocalTonemapLumProgram; // <FS:Trish/> Local tone mapping
 LLGLSLShader            gFSSkinSSSProgram; // <FS:Trish/>
+LLGLSLShader            gFSGTAOHalfProgram; // <FS:Trish/> Half-resolution GTAO
 LLGLSLShader            gDeferredPostGammaCorrectProgram;
 LLGLSLShader            gLegacyPostGammaCorrectProgram;
 LLGLSLShader            gExposureProgram;
@@ -367,6 +368,39 @@ static void add_sun_shadow_extras(LLGLSLShader& shader)
     {
         shader.addPermutation("FS_CONTACT_SHADOWS", "1");
     }
+}
+// </FS:Trish>
+
+// <FS:Trish> Half-resolution GTAO (FSRenderGTAOHalfRes): builds the pass that evaluates GTAO
+// once per 2x2 pixels (fsGTAOHalfF.glsl with the unchanged fsGTAOF.glsl) and returns the file
+// the sun program links for its FS_GTAO term: the joint bilateral upsample of that pass, or the
+// full-resolution GTAO when the setting is off or the pass did not build.
+static std::string fs_load_gtao_half(S32 shader_level, S32 slices)
+{
+    static LLCachedControl<bool> half_res(gSavedSettings, "FSRenderGTAOHalfRes", false);
+
+    gFSGTAOHalfProgram.unload();
+    if (!half_res)
+    {
+        return "deferred/fsGTAOF.glsl";
+    }
+
+    gFSGTAOHalfProgram.mName = "FS GTAO Half Resolution";
+    gFSGTAOHalfProgram.mFeatures.isDeferred = true;
+    gFSGTAOHalfProgram.mShaderFiles.clear();
+    gFSGTAOHalfProgram.clearPermutations();
+    gFSGTAOHalfProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+    gFSGTAOHalfProgram.mShaderFiles.push_back(make_pair("deferred/fsGTAOHalfF.glsl", GL_FRAGMENT_SHADER));
+    gFSGTAOHalfProgram.mShaderFiles.push_back(make_pair("deferred/fsGTAOF.glsl", GL_FRAGMENT_SHADER));
+    gFSGTAOHalfProgram.addPermutation("FS_GTAO_SLICES", llformat("%d", slices));
+    gFSGTAOHalfProgram.mShaderLevel = shader_level;
+    if (!gFSGTAOHalfProgram.createShader())
+    {
+        LL_WARNS("ShaderLoading") << "FS GTAO half resolution failed to build, GTAO stays full resolution" << LL_ENDL;
+        gFSGTAOHalfProgram.unload();
+        return "deferred/fsGTAOF.glsl";
+    }
+    return "deferred/fsGTAOUpsampleF.glsl";
 }
 // </FS:Trish>
 
@@ -1468,6 +1502,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSpotLightProgram.unload();
         gDeferredMultiSpotLightProgram.unload();
         gDeferredSunProgram.unload();
+        gFSGTAOHalfProgram.unload(); // <FS:Trish/> Half-resolution GTAO
         gDeferredBlurLightProgram.unload();
         gDeferredSoftenProgram.unload();
         gDeferredShadowProgram.unload();
@@ -1521,6 +1556,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSDynResUpscaleProgram.unload(); // <FS:Trish/> Dynamic resolution
         gFSLocalTonemapLumProgram.unload(); // <FS:Trish/> Local tone mapping
         gFSSkinSSSProgram.unload(); // <FS:Trish/>
+        gFSGTAOHalfProgram.unload(); // <FS:Trish/> Half-resolution GTAO
         // </FS:Trish>
         // <ID:VolumetricClouds>
         gIDCloudsProgram.unload();
@@ -2180,7 +2216,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         {
             gDeferredSunProgram.addPermutation("FS_GTAO", "1");
             gDeferredSunProgram.addPermutation("FS_GTAO_SLICES", llformat("%d", llclamp((S32)fs_gtao_slices, 1, 4)));
-            gDeferredSunProgram.mShaderFiles.push_back(make_pair("deferred/fsGTAOF.glsl", GL_FRAGMENT_SHADER));
+            // the full-resolution GTAO, or the upsample of the half-resolution pass
+            //gDeferredSunProgram.mShaderFiles.push_back(make_pair("deferred/fsGTAOF.glsl", GL_FRAGMENT_SHADER));
+            gDeferredSunProgram.mShaderFiles.push_back(make_pair(fs_load_gtao_half(mShaderLevel[SHADER_DEFERRED], llclamp((S32)fs_gtao_slices, 1, 4)), GL_FRAGMENT_SHADER));
+        }
+        else
+        {
+            gFSGTAOHalfProgram.unload();
         }
         // </FS:Trish>
 

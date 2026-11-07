@@ -27587,6 +27587,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSRenderGTAOHalfRes</key>
+    <map>
+      <key>Comment</key>
+      <string>Compute ground-truth ambient occlusion (FSRenderGTAO) at half resolution, once per 2x2 pixels, and upsample it with a depth and normal aware filter. Roughly a quarter of the GTAO cost, slightly softer contact detail. Only used with FSRenderGTAO and RenderDeferredSSAO on. Rebuilds the sun light shader.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

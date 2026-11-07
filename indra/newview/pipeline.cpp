@@ -1585,6 +1585,7 @@ void LLPipeline::releaseScreenBuffers()
     mRT->deferredScreen.release();
     mRT->deferredLight.release();
     mRT->lightMap.release(); // <FS:Trish/>
+    mMainRT.fsGTAOHalf.release(); // <FS:Trish/> Half-resolution GTAO
     mRlvSphereDepth.release();
 
     mAuxillaryRT.screen.release();
@@ -11097,6 +11098,79 @@ static void fs_render_skin_sss(LLRenderTarget* screen)
 }
 // </FS:Trish>
 
+// <FS:Trish> Half-resolution GTAO (FSRenderGTAOHalfRes). Evaluates GTAO once per 2x2 pixels of
+// the light map into mMainRT.fsGTAOHalf (fsGTAOHalfF.glsl: visibility, view depth, geometric
+// normal), for the sun program's joint bilateral upsample (fsGTAOUpsampleF.glsl) to read. Call
+// with the light map bound, right before the sun program is bound: the pass nests its own target
+// and returns to the light map. Returns the target to read, or null when the sun program has the
+// full-resolution GTAO linked (setting off, or the half pass did not build).
+static LLRenderTarget* fs_render_gtao_half(LLRenderTarget* light_map)
+{
+    LLRenderTarget& target = gPipeline.mMainRT.fsGTAOHalf;
+    if (!gFSGTAOHalfProgram.isComplete())
+    {
+        if (target.isComplete())
+        {
+            target.release();
+        }
+        return nullptr;
+    }
+
+    // Rounded up, so an odd last row or column still has a texel; fsGTAOHalfF.glsl clamps the
+    // block to the full size
+    const U32 res_x = (light_map->getWidth() + 1) / 2;
+    const U32 res_y = (light_map->getHeight() + 1) / 2;
+    if (!target.isComplete() || target.getWidth() != res_x || target.getHeight() != res_y)
+    {
+        if (!target.allocate(res_x, res_y, GL_RGBA16F))
+        {
+            target.release();
+            return nullptr;
+        }
+    }
+
+    LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - gtao half");
+    LL_PROFILE_GPU_ZONE("gtao half");
+
+    static LLCachedControl<F32> radius(gSavedSettings, "FSRenderGTAORadius", 1.f);
+    static LLCachedControl<F32> intensity(gSavedSettings, "FSRenderGTAOIntensity", 1.5f);
+    static LLStaticHashedString s_radius("fs_gtao_radius");
+    static LLStaticHashedString s_intensity("fs_gtao_intensity");
+
+    LLGLSLShader& shader = gFSGTAOHalfProgram;
+    target.bindTarget();
+    gPipeline.bindDeferredShader(shader);
+    // GTAO's radius and pixel ceiling stay in full-resolution terms; bindDeferredShader set
+    // screen_res to the g-buffer size, which the light map shares
+    shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)light_map->getWidth(), (GLfloat)light_map->getHeight());
+    shader.uniform1f(s_radius, llclamp((F32)radius, 0.05f, 10.f));
+    shader.uniform1f(s_intensity, llclamp((F32)intensity, 0.1f, 8.f));
+    {
+        LLGLDisable blend(GL_BLEND);
+        LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+        gPipeline.mScreenTriangleVB->setBuffer();
+        gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+    }
+    gPipeline.unbindDeferredShader(shader);
+    target.flush();
+    return &target;
+}
+
+// The sun program's upsample reads the half-resolution GTAO as occlusionMap
+static void fs_bind_gtao_half(LLGLSLShader& sun_shader, LLRenderTarget* gtao_half)
+{
+    if (gtao_half)
+    {
+        sun_shader.bindTexture(LLShaderMgr::OCCLUSION_MAP, gtao_half, false, LLTexUnit::TFO_POINT);
+    }
+    else if (sun_shader.getTextureChannel(LLShaderMgr::OCCLUSION_MAP) > -1)
+    {
+        // Built with the upsample but the pass could not run: read as unoccluded
+        gGL.getTexUnit(sun_shader.getTextureChannel(LLShaderMgr::OCCLUSION_MAP))->bindFast(LLViewerFetchedTexture::sWhiteImagep);
+    }
+}
+// </FS:Trish>
+
 void LLPipeline::renderDeferredLighting()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -11164,6 +11238,7 @@ void LLPipeline::renderDeferredLighting()
                 // adding a per-fragment branch to the normal SSAO shader.
                 const bool skip_ssao = gCubeSnapshot || (RenderDeferredSSAO && RenderSSAOFactor == 0.f);
                 LLGLSLShader& sun_shader = skip_ssao ? gDeferredSunProbeProgram : gDeferredSunProgram;
+                LLRenderTarget* fs_gtao_half = skip_ssao ? nullptr : fs_render_gtao_half(deferred_light_target); // <FS:Trish/> Half-resolution GTAO
                 bindDeferredShader(sun_shader, deferred_light_target);
                 // <ID:PCSS> Soft sun shadows only in this full screen pass, alpha and water keep the
                 // fixed filter. The filter radius is half the penumbra: tan(0.265 deg) per meter for the real sun.
@@ -11187,6 +11262,7 @@ void LLPipeline::renderDeferredLighting()
                     static LLStaticHashedString sGTAOIntensity("fs_gtao_intensity");
                     sun_shader.uniform1f(sGTAORadius, llclamp((F32)fs_gtao_radius, 0.05f, 10.f));
                     sun_shader.uniform1f(sGTAOIntensity, llclamp((F32)fs_gtao_intensity, 0.1f, 8.f));
+                    fs_bind_gtao_half(sun_shader, fs_gtao_half);
                 }
                 // </FS:Trish>
 
