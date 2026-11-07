@@ -26883,6 +26883,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSPerfShadowMergedBatches</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Draw the opaque shadow casters of every shadow pass (sun cascades, projectors, reflection probes) from one list sorted by vertex buffer, sending neighbouring batches of the same object group as one draw call. Shadows are the same; only the number of draw calls changes.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfShadowBatchStats</key>
+    <map>
+      <key>Comment</key>
+      <string>Debug. Every 10 seconds, write to the log how many opaque shadow batches were drawn in how many draw calls, and how often the far sun cascade static cache was reused or re-rendered. Works with the options on or off, to compare.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

@@ -273,6 +273,11 @@ public:
     std::vector<LLVector4a> mShadowReceiverBounds;  // per group: object bounds center, size, extents min, max
     bool mUseShadowReceiverBounds = false;
     // </FS:Trish>
+    // <FS:Trish> FSPerfShadowMergedBatches: the untextured opaque shadow batches of every pass type in one
+    // list, sorted by model matrix and vertex buffer, contiguous index ranges drawn with one call
+    bool fsRenderShadowOpaqueBatches(const U32* types, U32 type_count);
+    void fsCountShadowDraws(U32 batches, U32 draws);
+    // </FS:Trish>
 
     // Populate given LLCullResult with results of a frustum cull of the entire scene against the given LLCamera
     void updateCull(LLCamera& camera, LLCullResult& result, bool hud_attachments = false);

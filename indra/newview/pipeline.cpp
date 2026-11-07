@@ -11662,10 +11662,19 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
         LL_PROFILE_GPU_ZONE("shadow simple");
         gGL.getTexUnit(0)->disable();
 
-        for (U32 type : types)
+        // <FS:Trish> FSPerfShadowMergedBatches: all static opaque pass types in one merged list
+        //for (U32 type : types)
+        //{
+        //    renderObjects(type, false, false, rigged);
+        //}
+        if (rigged || !fsRenderShadowOpaqueBatches(types, LL_ARRAY_SIZE(types)))
         {
-            renderObjects(type, false, false, rigged);
+            for (U32 type : types)
+            {
+                renderObjects(type, false, false, rigged);
+            }
         }
+        // </FS:Trish>
 
         renderGLTFObjects(LLRenderPass::PASS_GLTF_PBR, false, rigged);
 
@@ -11782,6 +11791,150 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
     sUseOcclusion = saved_occlusion;
     LLPipeline::sShadowRender = false;
 }
+
+// <FS:Trish> FSPerfShadowMergedBatches
+// The untextured opaque shadow batches are drawn by the depth only gDeferredShadowProgram, which takes
+// nothing per batch but the model matrix. A spatial group puts the faces of all its pass types in one
+// vertex buffer, with index ranges laid out one after another, so once the pass types are pooled and
+// sorted by model matrix, vertex buffer and index offset, neighbouring batches usually continue each
+// other's index range and can go out as one glDrawRangeElements. The draw order changes, which a depth
+// only pass (GL_LESS, colour writes off) doesn't see: the map ends up with the nearest depth either way.
+// A batch that lies entirely inside the range just drawn (the same LLDrawInfo in two pass maps) is
+// dropped, as drawing it again can't change the depth.
+// Returns false when the per pass type path should run instead (option off).
+bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    static LLCachedControl<bool> merged_batches(gSavedSettings, "FSPerfShadowMergedBatches", false);
+    static LLCachedControl<bool> batch_stats(gSavedSettings, "FSPerfShadowBatchStats", false);
+
+    if (!merged_batches)
+    {
+        if (batch_stats)
+        {   // count what the per pass type path is about to draw: one call per non-empty batch
+            U32 batches = 0;
+            for (U32 t = 0; t < type_count; ++t)
+            {
+                for (LLCullResult::drawinfo_iterator i = beginRenderMap(types[t]), end = endRenderMap(types[t]); i != end; ++i)
+                {
+                    batches += (*i && (*i)->mCount) ? 1 : 0;
+                }
+            }
+            fsCountShadowDraws(batches, batches);
+        }
+        return false;
+    }
+
+    static std::vector<LLDrawInfo*> batches;
+    batches.clear();
+    for (U32 t = 0; t < type_count; ++t)
+    {
+        LLCullResult::drawinfo_iterator end = endRenderMap(types[t]);
+        for (LLCullResult::drawinfo_iterator i = beginRenderMap(types[t]); i != end; )
+        {
+            LLDrawInfo* params = *i;
+            LLCullResult::increment_iterator(i, end);
+            if (params && params->mCount && params->mVertexBuffer.notNull())
+            {
+                batches.push_back(params);
+            }
+        }
+    }
+
+    std::sort(batches.begin(), batches.end(), [](const LLDrawInfo* lhs, const LLDrawInfo* rhs)
+    {
+        if (lhs->mModelMatrix != rhs->mModelMatrix)
+        {
+            return lhs->mModelMatrix < rhs->mModelMatrix;
+        }
+        if (lhs->mVertexBuffer.get() != rhs->mVertexBuffer.get())
+        {
+            return lhs->mVertexBuffer.get() < rhs->mVertexBuffer.get();
+        }
+        if (lhs->mOffset != rhs->mOffset)
+        {
+            return lhs->mOffset < rhs->mOffset;
+        }
+        return lhs->mCount > rhs->mCount; // the longer of two ranges at one offset first
+    });
+
+    gGL.loadMatrix(gGLModelView);
+    gGLLastMatrix = NULL;
+
+    U32 draws = 0;
+    const size_t count = batches.size();
+    size_t i = 0;
+    while (i < count)
+    {
+        const LLDrawInfo* first = batches[i];
+        LLVertexBuffer* buffer = first->mVertexBuffer.get();
+        U32 start = first->mStart;
+        U32 end = first->mEnd;
+        const U32 offset = first->mOffset;
+        U32 index_end = offset + first->mCount;
+
+        size_t next = i + 1;
+        for (; next < count; ++next)
+        {
+            const LLDrawInfo* params = batches[next];
+            if (params->mModelMatrix != first->mModelMatrix || params->mVertexBuffer.get() != buffer)
+            {
+                break;
+            }
+            if (params->mOffset + params->mCount <= index_end)
+            {   // already drawn in this range
+                continue;
+            }
+            if (params->mOffset != index_end)
+            {   // gap or partial overlap
+                break;
+            }
+            index_end += params->mCount;
+            start = llmin(start, (U32)params->mStart);
+            end = llmax(end, (U32)params->mEnd);
+        }
+
+        LLRenderPass::applyModelMatrix(first->mModelMatrix);
+        buffer->setBuffer();
+        buffer->drawRange(LLRender::TRIANGLES, start, end, index_end - offset, offset);
+        ++draws;
+        i = next;
+    }
+
+    gGL.loadMatrix(gGLModelView);
+    gGLLastMatrix = NULL;
+
+    if (batch_stats)
+    {
+        fsCountShadowDraws((U32)count, draws);
+    }
+    return true;
+}
+
+// Debug log of the shadow opaque batches and the draw calls they took, every 10 seconds (FSPerfShadowBatchStats)
+void LLPipeline::fsCountShadowDraws(U32 batches, U32 draws)
+{
+    static U64 total_batches = 0;
+    static U64 total_draws = 0;
+    static U32 passes = 0;
+    static LLFrameTimer timer;
+
+    total_batches += batches;
+    total_draws += draws;
+    ++passes;
+
+    if (timer.getElapsedTimeF32() >= 10.f)
+    {
+        LL_INFOS("FSShadowBatches") << "Shadow opaque batches: " << total_batches << " batches in " << total_draws
+                                    << " draw calls over " << passes << " shadow passes ("
+                                    << (passes ? total_draws / passes : 0) << " draws per pass)" << LL_ENDL;
+        total_batches = 0;
+        total_draws = 0;
+        passes = 0;
+        timer.reset();
+    }
+}
+// </FS:Trish>
 
 // <FS:Trish> FSPerfShadowPointCloudFromCull
 // The camera cull that runs just before generateSunShadow already holds every non-empty group in view.
