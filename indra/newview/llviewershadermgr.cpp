@@ -971,7 +971,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     }
 
     // <ID:VolumetricClouds> without it no shader declares a cloud sampler, so other platforms keep their texture units
-#if LL_LINUX
+#if LL_LINUX || LL_WINDOWS
     if (IDVolumetricClouds::isSupported())
     {
         attribs["ID_VOLUMETRIC_CLOUDS"] = "1";

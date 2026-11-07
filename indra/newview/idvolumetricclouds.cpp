@@ -233,8 +233,9 @@ void IDVolumetricClouds::cleanupSingleton()
 // static
 bool IDVolumetricClouds::isSupported()
 {
-#if LL_LINUX
-    return gGLManager.mGLVersion >= 4.09f;
+#if LL_LINUX || LL_WINDOWS
+    // With the clouds compiled in, alpha, water and glTF shaders bind up to 19 samplers.
+    return gGLManager.mGLVersion >= 4.09f && gGLManager.mNumTextureImageUnits >= 32;
 #else
     return false;
 #endif
