@@ -113,6 +113,7 @@ vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float 
 vec3 clampRadiance(vec3 c);
 vec3 clampHDRRange(vec3 color);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
+vec3 idApplyClouds(vec3 color, vec3 pos_eye); // <ID:VolumetricClouds/>
 
 vec3 pbrBaseLight(vec3 diffuseColor,
                   vec3 specularColor,
@@ -292,6 +293,7 @@ void main()
     // runs the same unbounded punctual lobe the opaque one does, so it can produce the same
     // values -- and whatever it writes goes on to the bloom pyramid.
     vec4 out_color = max(vec4(clampHDRRange(color.rgb * final_scale), a), vec4(0));
+    out_color.rgb = idApplyClouds(out_color.rgb, pos.xyz); // <ID:VolumetricClouds/>
     if (uOITPass == OIT_PASS_ACCUM)
     {
         float alpha = clamp(out_color.a, 0.0, OIT_ALPHA_MAX);

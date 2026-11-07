@@ -56,6 +56,12 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 
 void mirrorClip(vec3 pos);
 
+// <ID:VolumetricClouds>
+#if defined(IS_ALPHA) && !defined(IS_HUD)
+vec3 idApplyClouds(vec3 color, vec3 pos_eye);
+#endif
+// </ID:VolumetricClouds>
+
 void main()
 {
     mirrorClip(vary_position);
@@ -100,6 +106,12 @@ void main()
 #endif
 
     vec4 out_color = max(color, vec4(0));
+
+    // <ID:VolumetricClouds>
+#if defined(IS_ALPHA) && !defined(IS_HUD)
+    out_color.rgb = idApplyClouds(out_color.rgb, pos);
+#endif
+    // </ID:VolumetricClouds>
 
     if (uOITPass == OIT_PASS_ACCUM)
     {

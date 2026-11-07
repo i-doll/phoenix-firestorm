@@ -183,3 +183,35 @@ float idSampleCloudShadow(vec3 pos_eye)
     vec2 edge = abs(s.xy - 0.5);
     return mix(shadow, 1.0, smoothstep(0.45, 0.5, max(edge.x, edge.y)));
 }
+
+// ---- Alpha composition ----
+
+uniform sampler2D idCloudScene;
+uniform sampler2D idCloudDepth;
+uniform int id_cloud_scene_active;
+
+// rgb: in-scatter of the cloud mass in front of pos_eye, a: its transmittance.
+vec4 idCloudsInFront(vec3 pos_eye)
+{
+    if (id_cloud_scene_active == 0)
+    {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    vec4 cs = texelFetch(idCloudScene, ivec2(gl_FragCoord.xy), 0);
+    float cd = texelFetch(idCloudDepth, ivec2(gl_FragCoord.xy), 0).r;
+    float behind = smoothstep(cd - 50.0, cd + 50.0, length(pos_eye));
+    vec3 S_f = cs.rgb * behind;  float T_f = mix(1.0, cs.a, behind);
+    return vec4(S_f, T_f);
+}
+
+// The destination already holds the clouds over the opaque scene. Blended with the fragment's
+// own alpha a, the result is S_f + T_f*(a*c + (1-a)*behind_scene).
+vec3 idApplyClouds(vec3 color, vec3 pos_eye)
+{
+    if (id_cloud_scene_active == 0)
+    {
+        return color;
+    }
+    vec4 cloud = idCloudsInFront(pos_eye);
+    return color * cloud.a + cloud.rgb;
+}

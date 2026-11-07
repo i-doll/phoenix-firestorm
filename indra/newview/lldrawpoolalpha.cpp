@@ -52,6 +52,7 @@
 #include "gltfscenemanager.h"
 
 #include "llenvironment.h"
+#include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
 
 bool LLDrawPoolAlpha::sShowDebugAlpha = false;
 bool LLDrawPoolAlpha::sShowDebugAlphaRigged = false;
@@ -1144,6 +1145,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     if (lastShader && rebind)
                     {
                         lastShader->bind();
+                        // <ID:VolumetricClouds> the emissive draws may have reused the cloud texture units
+                        IDVolumetricClouds::instance().bindForSampling(*lastShader);
+                        // </ID:VolumetricClouds>
                     }
                 }
             }

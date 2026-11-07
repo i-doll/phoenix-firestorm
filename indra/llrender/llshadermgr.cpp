@@ -239,8 +239,9 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
-    // <ID:VolumetricClouds> shadowUtil.glsl and the deferred passes sample the cloud shadow
-    if (features->hasShadows || features->isDeferred)
+    // <ID:VolumetricClouds> shadowUtil.glsl and the deferred passes sample the cloud shadow; forward
+    // shaders with reflection probes (alpha, materials, water) composite against the clouds even without shadows
+    if (features->hasShadows || features->isDeferred || features->hasReflectionProbes)
     {
         if (!shader->attachFragmentObject("deferred/idCloudUtil.glsl"))
         {

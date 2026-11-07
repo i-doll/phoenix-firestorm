@@ -72,6 +72,7 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
         vec2 tc, vec3 pos, vec3 norm, float glossiness, float envIntensity, bool transparent, vec3 amblit_linear);
 void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 norm);
 void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity);
+vec3 idApplyClouds(vec3 color, vec3 pos_eye); // <ID:VolumetricClouds/>
 
 uniform samplerCube environmentMap;
 
@@ -435,6 +436,7 @@ void main()
         final_scale = 1.1;
 
     vec4 out_color = max(vec4(color * final_scale, al), vec4(0));
+    out_color.rgb = idApplyClouds(out_color.rgb, pos.xyz); // <ID:VolumetricClouds/>
 
     if (uOITPass == OIT_PASS_ACCUM)
     {

@@ -83,6 +83,8 @@ float getAmbientClamp();
 
 void mirrorClip(vec3 pos);
 
+vec3 idApplyClouds(vec3 color, vec3 pos_eye); // <ID:VolumetricClouds/>
+
 void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
         vec2 tc, vec3 pos, vec3 norm, float glossiness, float envIntensity, bool transparent, vec3 amblit_linear);
 
@@ -251,6 +253,12 @@ void main()
 
     color.rgb *= final_scale;
     vec4 out_color = max(color, vec4(0));
+
+    // <ID:VolumetricClouds>
+#if !defined(FOR_IMPOSTOR) && !defined(IS_HUD)
+    out_color.rgb = idApplyClouds(out_color.rgb, pos.xyz);
+#endif
+    // </ID:VolumetricClouds>
 
     if (uOITPass == OIT_PASS_ACCUM)
     {

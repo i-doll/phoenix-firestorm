@@ -45,6 +45,7 @@ private:
     void clearDensityInputs(LLGLSLShader& shader);
     void march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples);
     void composite(LLRenderTarget* depth_src);
+    bool sceneMatchesTarget() const;
 
     U32 mNoiseBase   = 0;
     U32 mNoiseDetail = 0;
@@ -52,6 +53,7 @@ private:
 
     // Attachment 0: RGBA16F fogged in-scatter + transmittance. Attachment 1: R32F mean cloud distance.
     LLRenderTarget mSceneRT;
+    U32 mSceneFrame = U32_MAX;
 
     // R16F sunlight transmittance through all layers, top-down around the camera.
     LLRenderTarget mShadowRT;

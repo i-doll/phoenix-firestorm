@@ -748,6 +748,7 @@ void IDVolumetricClouds::release()
         mWeather = 0;
     }
     mSceneRT.release();
+    mSceneFrame = U32_MAX;
     mShadowRT.release();
     mShadowReady = false;
     mWeatherKey.clear();
@@ -841,6 +842,7 @@ void IDVolumetricClouds::renderShadowMap()
 
 void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_src)
 {
+    mSceneFrame = U32_MAX;
     if (!screen || !depth_src || !isActive())
     {
         return;
@@ -858,6 +860,7 @@ void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_sr
     const bool full = fullQuality();
     march(mSceneRT, depth_src, full ? FULL_STEPS : LIVE_STEPS, full ? FULL_SAMPLES : 1);
     composite(depth_src);
+    mSceneFrame = LLFrameTimer::getFrameCount();
 }
 
 bool IDVolumetricClouds::ensureSceneTarget(U32 width, U32 height)
@@ -1034,25 +1037,56 @@ void IDVolumetricClouds::composite(LLRenderTarget* depth_src)
     gPipeline.unbindDeferredShader(shader);
 }
 
+// The cloud scene belongs to this frame's main view; probes, impostors, previews and any other
+// target of a different size must not read it.
+bool IDVolumetricClouds::sceneMatchesTarget() const
+{
+    if (gCubeSnapshot || LLPipeline::sImpostorRender || mSceneFrame != LLFrameTimer::getFrameCount() || !mSceneRT.isComplete())
+    {
+        return false;
+    }
+    const LLRenderTarget* target = LLRenderTarget::getCurrentBoundTarget();
+    return target && target->getWidth() == mSceneRT.getWidth() && target->getHeight() == mSceneRT.getHeight();
+}
+
 void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
 {
     static LLStaticHashedString s_active("id_clouds_active");
     static LLStaticHashedString s_matrix("id_cloud_shadow_matrix");
+    static LLStaticHashedString s_scene_active("id_cloud_scene_active");
+    static LLStaticHashedString s_haze_compensate("id_haze_compensate");
 
-    if (!mShadowReady || LLPipeline::sRenderingHUDs || !isActive())
+    if (LLPipeline::sRenderingHUDs || !isActive())
     {
         shader.uniform1i(s_active, 0);
+        shader.uniform1i(s_scene_active, 0);
         return;
     }
 
-    S32 channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_SHADOW);
-    if (channel > -1)
+    S32 channel = -1;
+    if (mShadowReady)
     {
-        mShadowRT.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
-        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-    }
+        channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_SHADOW);
+        if (channel > -1)
+        {
+            mShadowRT.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+            gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 
-    const glm::mat4 eye_to_uv = mShadowWorldToUV * glm::inverse(get_current_modelview());
-    shader.uniformMatrix4fv(s_matrix, 1, GL_FALSE, glm::value_ptr(eye_to_uv));
+            const glm::mat4 eye_to_uv = mShadowWorldToUV * glm::inverse(get_current_modelview());
+            shader.uniformMatrix4fv(s_matrix, 1, GL_FALSE, glm::value_ptr(eye_to_uv));
+        }
+    }
     shader.uniform1i(s_active, channel > -1 ? 1 : 0);
+
+    bool scene = false;
+    if (shader.getTextureChannel(LLShaderMgr::ID_CLOUD_SCENE) > -1
+        && shader.getTextureChannel(LLShaderMgr::ID_CLOUD_DEPTH) > -1
+        && sceneMatchesTarget())
+    {
+        shader.bindTexture(LLShaderMgr::ID_CLOUD_SCENE, &mSceneRT, false, LLTexUnit::TFO_POINT, 0);
+        shader.bindTexture(LLShaderMgr::ID_CLOUD_DEPTH, &mSceneRT, false, LLTexUnit::TFO_POINT, 1);
+        shader.uniform1i(s_haze_compensate, LLPipeline::RenderDeferredAtmospheric ? 1 : 0);
+        scene = true;
+    }
+    shader.uniform1i(s_scene_active, scene ? 1 : 0);
 }

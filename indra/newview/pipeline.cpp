@@ -10989,6 +10989,12 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 
     unbindReflectionProbes(shader);
 
+    // <ID:VolumetricClouds>
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_SHADOW);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_SCENE);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_DEPTH);
+    // </ID:VolumetricClouds>
+
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.getTexUnit(0)->activate();
     shader.unbind();
