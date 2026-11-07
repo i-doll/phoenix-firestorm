@@ -4202,6 +4202,19 @@ void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
     uploadValueUniforms(*shader); // <FS:Trish/>
 }
 
+// <FS:Trish> Specular occlusion strength for deferredUtil.glsl (fsSpecularOcclusion). 0 is
+// off, and at 0 the helper returns its input unchanged, so the image is exactly as before. A
+// uniform, so the strength spinner never rebuilds shaders.
+static void fs_upload_shading_occlusion(LLGLSLShader& shader)
+{
+    static LLCachedControl<bool> spec_occ(gSavedSettings, "FSRenderSpecularOcclusion", false);
+    static LLCachedControl<F32> spec_occ_strength(gSavedSettings, "FSRenderSpecularOcclusionStrength", 1.f);
+    static LLStaticHashedString sSpecularOcclusion("fs_specular_occlusion");
+
+    shader.uniform1f(sSpecularOcclusion, spec_occ ? llclamp((F32)spec_occ_strength, 0.f, 1.f) : 0.f);
+}
+// </FS:Trish>
+
 // <FS:Trish> Setting values the shared shader objects read as uniforms rather than global
 // defines, so that changing one does not change every program's binary cache key. Called from
 // updateShaderUniforms, which reaches the listed programs and their rigged variants (materials,
@@ -4219,6 +4232,7 @@ void LLViewerShaderMgr::uploadValueUniforms(LLGLSLShader& shader)
 
     shader.uniform1f(sSpecularExponent, (F32)ll_round((F32)specular_exponent * 10.f) / 10.f);
     shader.uniform1f(sTriplanarFactor, (F32)ll_round((F32)triplanar_factor * 100.f) / 100.f);
+    fs_upload_shading_occlusion(shader);
 }
 // </FS:Trish>
 

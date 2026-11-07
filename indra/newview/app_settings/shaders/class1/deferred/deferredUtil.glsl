@@ -583,6 +583,34 @@ float sunDiscRoughness(float perceptualRoughness)
     return sqrt(clamp(alpha + SUN_ANGULAR_RADIUS, 0.0, 1.0));
 }
 
+// Firestorm shading occlusion terms. The strength is a uniform (LLViewerShaderMgr::
+// uploadValueUniforms), 0 when its setting is off -- and a program nobody uploads it to reads
+// 0 too. At 0 the helper returns its "off" value exactly, so the image is unchanged.
+uniform float fs_specular_occlusion; // FSRenderSpecularOcclusion ? FSRenderSpecularOcclusionStrength : 0
+
+// Specular occlusion from ambient visibility (Lagarde and de Rousiers 2014, "Moving Frostbite to
+// PBR", listing 26).
+//
+// The ambient visibility is a cosine-weighted average over the whole hemisphere, which is the
+// right weight for the diffuse lobe but not for a specular one. A glossy lobe looking straight
+// out of a crease sees the open sky the crease faces and is barely occluded; the same lobe at a
+// grazing view skims along the surface into the walls and is occluded more than the average
+// says. A rough lobe is wide enough that the plain visibility is right, and the expression
+// collapses to it. ao = 1 gives 1 for every view and roughness.
+//
+// Returns the visibility to multiply the environment specular by: ao itself when off.
+float fsSpecularOcclusion(float ao, float nv, float perceptualRoughness)
+{
+    if (fs_specular_occlusion <= 0.0)
+    {
+        return ao;
+    }
+
+    float alpha = perceptualRoughness * perceptualRoughness;
+    float so = clamp(pow(clamp(nv, 0.0, 1.0) + ao, exp2(-16.0 * alpha - 1.0)) - 1.0 + ao, 0.0, 1.0);
+    return mix(ao, so, min(fs_specular_occlusion, 1.0));
+}
+
 // set colorDiffuse and colorSpec to the results of GLTF PBR style IBL
 void pbrIbl(vec3 diffuseColor,
             vec3 specularColor,
@@ -600,7 +628,7 @@ void pbrIbl(vec3 diffuseColor,
     // compensation raised rough reflective materials enough to look self-lit under probes.
     vec2 brdf = BRDF(clamp(nv, 0.0, 1.0), 1.0-perceptualRough);
     diffuseOut = irradiance * diffuseColor * ao;
-    specularOut = radiance * (specularColor * brdf.x + brdf.y) * ao;
+    specularOut = radiance * (specularColor * brdf.x + brdf.y) * fsSpecularOcclusion(ao, nv, perceptualRough);
 }
 
 

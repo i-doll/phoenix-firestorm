@@ -113,6 +113,7 @@ vec3 pbrBaseLight(vec3 diffuseColor,
 
 GBufferInfo getGBuffer(vec2 screenpos);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
+float fsSpecularOcclusion(float ao, float nv, float perceptualRoughness); // deferredUtil.glsl
 vec3 clampHDRRange(vec3 color);
 
 void adjustIrradiance(inout vec3 irradiance, float ambocc)
@@ -301,8 +302,11 @@ void main()
         // reads as contact. On the response curve the settings describe, not the raw buffer;
         // see ssaoVisibility.
         float envVisibility = ssaoVisibility(ambocc);
-        glossenv *= envVisibility;
-        legacyenv *= envVisibility;
+        // Specular occlusion (see fsSpecularOcclusion): envVisibility itself when off. glossenv
+        // is filtered by (1 - glossiness), legacyenv is the mirror lookup.
+        float fs_nv = dot(gb.normal, -normalize(pos.xyz));
+        glossenv *= fsSpecularOcclusion(envVisibility, fs_nv, 1.0 - spec.a);
+        legacyenv *= fsSpecularOcclusion(envVisibility, fs_nv, 0.0);
 
         // apply lambertian IBL only (see pbrIbl)
         color.rgb = irradiance;
