@@ -37,6 +37,9 @@ bool isFarDepth(float d);
 vec4 getNorm(vec2 pos_screen);
 
 float sampleDirectionalShadow(vec3 shadow_pos, vec3 norm, vec2 pos_screen);
+#if defined(FS_CLOUD_SHADOWS) || defined(FS_CONTACT_SHADOWS)
+float fsSunShadowExtras(float shadow, vec3 pos, vec3 norm); // fsShadowExtrasF.glsl
+#endif
 float calcAmbientOcclusion(vec4 pos, vec3 norm, vec2 pos_screen);
 vec3 getGeoNorm(vec2 pos_screen);
 
@@ -59,6 +62,9 @@ void main()
 
     vec4 col;
     col.r = sampleDirectionalShadow(pos.xyz, norm.xyz, pos_screen);
+#if defined(FS_CLOUD_SHADOWS) || defined(FS_CONTACT_SHADOWS)
+    col.r = fsSunShadowExtras(col.r, pos.xyz, norm.xyz);
+#endif
     // Geometric normal, not the shading one. The occlusion test compares neighbouring depths
     // against this plane, and depth knows nothing about normal-mapped detail -- testing against a
     // perturbed normal makes a flat wall occlude itself wherever its map has texture.

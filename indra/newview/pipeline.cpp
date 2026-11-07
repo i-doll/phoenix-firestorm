@@ -10691,6 +10691,93 @@ static void fs_bind_water_caustics(LLGLSLShader& shader)
 }
 // </FS:Trish>
 
+// <FS:Trish> Per frame uniforms of the extra sun shadow terms (fsShadowExtrasF.glsl, shadowUtil.glsl).
+// Programs built without a feature have no such uniforms, and setting them is then a no-op.
+static void fs_bind_sun_shadow_extras(LLGLSLShader& shader, const glm::mat4& modelview)
+{
+    static LLCachedControl<bool> cloud_shadows(gSavedSettings, "FSRenderCloudShadows", false);
+    static LLCachedControl<F32> cloud_strength(gSavedSettings, "FSRenderCloudShadowStrength", 0.6f);
+    static LLCachedControl<F32> cloud_softness(gSavedSettings, "FSRenderCloudShadowSoftness", 0.3f);
+
+    if (gCubeSnapshot)
+    {
+        return; // the shaders leave probe captures alone
+    }
+
+    if (cloud_shadows)
+    {
+        // The sky's cloud layer (cloudsV/cloudsF.glsl and LLDrawPoolWLSky::renderSkyCloudsDeferred),
+        // anchored to the world at the sky's max_y above the camera
+        static const LLStaticHashedString sCloudShadow("fs_cloud_shadow");
+        static const LLStaticHashedString sCloudMap("fs_cloud_map");
+        static const LLStaticHashedString sCloudPosDensity1("fs_cloud_pos_density1");
+        static const LLStaticHashedString sCloudPosDensity2("fs_cloud_pos_density2");
+        static const LLStaticHashedString sCloudParams("fs_cloud_params");
+        static const LLStaticHashedString sCloudLightOffset("fs_cloud_light_offset");
+        static const LLStaticHashedString sCloudViewToWorld("fs_cloud_view_to_world");
+
+        LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+        LLViewerTexture* noise = gSky.mVOSkyp ? gSky.mVOSkyp->getCloudNoiseTex() : nullptr;
+        LLViewerTexture* noise_next = gSky.mVOSkyp ? gSky.mVOSkyp->getCloudNoiseTexNext() : nullptr;
+        F32 strength = llclamp((F32)cloud_strength, 0.f, 1.f);
+        if (!psky || (!noise && !noise_next) || !gPipeline.canUseWindLightShaders() ||
+            !gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_CLOUDS) ||
+            IDVolumetricClouds::instance().isActive()) // <ID:VolumetricClouds/> they replace this layer and shadow the sun themselves
+        {
+            strength = 0.f; // no clouds in the sky, none on the ground
+        }
+        shader.uniform2f(sCloudShadow, strength, llclamp((F32)cloud_softness, 0.f, 1.f));
+
+        if (strength > 0.f)
+        {
+            F32 blend_factor = (F32)psky->getBlendFactor();
+            if (psky->getCloudScrollRate().isExactlyZero())
+            {
+                blend_factor = 0.f;
+            }
+            if (noise && (!noise_next || noise == noise_next))
+            {
+                shader.bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, noise, LLTexUnit::TT_TEXTURE);
+                blend_factor = 0.f;
+            }
+            else if (!noise)
+            {
+                shader.bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, noise_next, LLTexUnit::TT_TEXTURE);
+                blend_factor = 0.f;
+            }
+            else
+            {
+                shader.bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, noise, LLTexUnit::TT_TEXTURE);
+                shader.bindTexture(LLShaderMgr::CLOUD_NOISE_MAP_NEXT, noise_next, LLTexUnit::TT_TEXTURE);
+            }
+
+            const F32 cloud_scale = llmax(psky->getCloudScale(), 0.001f);
+            const F32 height = llclamp(psky->getMaxY(), 500.f, 10000.f);
+            // the sky dome's planar uv: a direction d maps to (d.east / 2 - 1, -d.north / 2) / cloud_scale + 0.5,
+            // so a layer at height H takes 1 / (2 H cloud_scale) uv per metre. The noise repeats every 16
+            // units of this uv, so the camera's global position is wrapped by that in double precision.
+            const F64 uv_per_m = 1.0 / (2.0 * (F64)height * (F64)cloud_scale);
+            const LLVector3d cam = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin());
+            const F64 u = fmod(cam.mdV[VX] * uv_per_m + 0.5 - 1.0 / (F64)cloud_scale, 16.0);
+            const F64 v = fmod(-cam.mdV[VY] * uv_per_m + 0.5, 16.0);
+            shader.uniform4f(sCloudMap, (F32)u, (F32)v, (F32)uv_per_m, height);
+
+            // the scroll as LLSettingsVOSky::applySpecial adds it (x flipped)
+            const LLColor3 d1 = psky->getCloudPosDensity1();
+            const LLVector2 scroll = LLEnvironment::instance().getCloudScrollDelta();
+            shader.uniform3f(sCloudPosDensity1, d1.mV[0] - scroll.mV[0], d1.mV[1] + scroll.mV[1], d1.mV[2]);
+            const LLColor3 d2 = psky->getCloudPosDensity2();
+            shader.uniform3f(sCloudPosDensity2, d2.mV[0], d2.mV[1], d2.mV[2]);
+            shader.uniform4f(sCloudParams, cloud_scale, psky->getCloudVariance(), psky->getCloudShadow(), blend_factor);
+            const LLVector4 light_norm = LLEnvironment::instance().getClampedLightNorm();
+            shader.uniform2f(sCloudLightOffset, light_norm.mV[0] * 0.0125f, light_norm.mV[2] * 0.0125f);
+            const glm::mat4 view_to_world = glm::inverse(modelview);
+            shader.uniformMatrix4fv(sCloudViewToWorld, 1, GL_FALSE, glm::value_ptr(view_to_world));
+        }
+    }
+}
+// </FS:Trish>
+
 void LLPipeline::renderDeferredLighting()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -10768,6 +10855,8 @@ void LLPipeline::renderDeferredLighting()
                     sun_shader.uniform1f(s_sun_shadow_softness, gCubeSnapshot ? 0.f : 0.004625f * llmax((F32)sun_softness, 0.f));
                 }
                 // </ID:PCSS>
+
+                fs_bind_sun_shadow_extras(sun_shader, mat); // <FS:Trish/> cloud and contact shadows
                 mScreenTriangleVB->setBuffer();
                 // <FS:Trish> The sun shaders write every pixel of the full screen triangle (blend off, depth always)
                 //glClearColor(1, 1, 1, 1);

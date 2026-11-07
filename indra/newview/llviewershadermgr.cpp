@@ -342,6 +342,28 @@ static bool load_fs_colored_shadow_casters(S32 shader_level)
 }
 // </FS:Trish>
 
+// <FS:Trish> Cloud and contact shadows: extra terms of the deferred sun shadow, in
+// fsShadowExtrasF.glsl, which joins the sun programs only while one of them is on
+static void add_sun_shadow_extras(LLGLSLShader& shader)
+{
+    static LLCachedControl<bool> cloud_shadows(gSavedSettings, "FSRenderCloudShadows", false);
+    static LLCachedControl<bool> contact_shadows(gSavedSettings, "FSRenderContactShadows", false);
+    if (gSavedSettings.getS32("RenderShadowDetail") <= 0 || (!cloud_shadows && !contact_shadows))
+    {
+        return; // the light map's sun channel is only read with sun shadows on
+    }
+    shader.mShaderFiles.push_back(make_pair("deferred/fsShadowExtrasF.glsl", GL_FRAGMENT_SHADER));
+    if (cloud_shadows)
+    {
+        shader.addPermutation("FS_CLOUD_SHADOWS", "1");
+    }
+    if (contact_shadows)
+    {
+        shader.addPermutation("FS_CONTACT_SHADOWS", "1");
+    }
+}
+// </FS:Trish>
+
 static void add_common_permutations(LLGLSLShader* shader)
 {
     static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
@@ -2004,6 +2026,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSunProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
         add_common_permutations(&gDeferredSunProgram);
+        add_sun_shadow_extras(gDeferredSunProgram); // <FS:Trish/> cloud and contact shadows
 
         success = gDeferredSunProgram.createShader();
         llassert(success);
@@ -2021,6 +2044,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSunProbeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
         add_common_permutations(&gDeferredSunProbeProgram);
+        add_sun_shadow_extras(gDeferredSunProbeProgram); // <FS:Trish/> cloud and contact shadows
 
         success = gDeferredSunProbeProgram.createShader();
         llassert(success);

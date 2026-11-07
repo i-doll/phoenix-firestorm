@@ -41,6 +41,9 @@ float getDepth(vec2 pos_screen);
 bool isFarDepth(float d);
 
 float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+#if defined(FS_CLOUD_SHADOWS) || defined(FS_CONTACT_SHADOWS)
+float fsSunShadowExtras(float shadow, vec3 pos, vec3 norm); // fsShadowExtrasF.glsl
+#endif
 
 void main()
 {
@@ -60,6 +63,9 @@ void main()
 
     vec4 col;
     col.r = sampleDirectionalShadow(pos.xyz, norm.xyz, pos_screen);
+#if defined(FS_CLOUD_SHADOWS) || defined(FS_CONTACT_SHADOWS)
+    col.r = fsSunShadowExtras(col.r, pos.xyz, norm.xyz);
+#endif
     col.g = 1.0f;
     col.b = 1.0f; // projector shadows are sampled per light in spotLightF
     col.a = 1.0f;

@@ -26949,6 +26949,50 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.25</real>
     </map>
+    <key>FSRenderCloudShadows</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. The sky's clouds cast moving shadows on the ground, objects and avatars (needs sun shadows). Changing it rebuilds the shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderCloudShadowStrength</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. How much of the sun or moon light a full cloud takes away (0 to 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.6</real>
+    </map>
+    <key>FSRenderCloudShadowSoftness</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Softness of the cloud shadow edges (0 sharp to 1 soft).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.3</real>
+    </map>
+    <key>FSRenderContactShadows</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Screen-space contact shadows: a short depth buffer ray march towards the sun adds the small shadows the shadow maps miss (feet on the ground, folds, small props). Needs sun shadows. Changing it rebuilds the shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
