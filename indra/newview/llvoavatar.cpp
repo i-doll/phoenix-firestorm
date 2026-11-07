@@ -3474,6 +3474,32 @@ static void override_bbox(LLDrawable* drawable, LLVector4a* extents)
     drawable->movePartition();
 }
 
+// <FS:Trish> True if override_bbox() would leave the drawable exactly as it is: same extents, same
+// position group, same bin radius and already in the right partition.
+static bool override_bbox_unchanged(LLDrawable* drawable, const LLVector4a* extents)
+{
+    LLSpatialGroup* group = drawable->getSpatialGroup();
+    if (!group || group->getSpatialPartition() != drawable->getSpatialPartition())
+    {
+        return false;
+    }
+
+    const LLVector4a* cur = drawable->getSpatialExtents();
+    const LLVector4a& pos = drawable->getPositionGroup();
+    for (S32 i = 0; i < 3; ++i)
+    {
+        if (cur[0][i] != extents[0][i] || cur[1][i] != extents[1][i] || pos[i] != 0.f)
+        {
+            return false;
+        }
+    }
+
+    F32 old_radius = drawable->getBinRadius();
+    drawable->updateBinRadius();
+    return drawable->getBinRadius() == old_radius;
+}
+// </FS:Trish>
+
 void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
@@ -3526,7 +3552,14 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
                         if (attached_object->mDrawable->isState(LLDrawable::RIGGED | LLDrawable::RIGGED_CHILD))
                         {
                             rigged = true;
-                            override_bbox(attached_object->mDrawable, extents);
+                            // <FS:Trish> Skip the octree update when the box did not change
+                            //override_bbox(attached_object->mDrawable, extents);
+                            static LLCachedControl<bool> attachment_extents_cache(gSavedSettings, "FSPerfAttachmentExtentsCache", false);
+                            if (!attachment_extents_cache || !override_bbox_unchanged(attached_object->mDrawable, extents))
+                            {
+                                override_bbox(attached_object->mDrawable, extents);
+                            }
+                            // </FS:Trish>
                         }
                     }
 
