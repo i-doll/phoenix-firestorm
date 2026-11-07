@@ -886,7 +886,6 @@ void IDVolumetricClouds::clearDensityInputs(LLGLSLShader& shader)
 void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples)
 {
     static LLStaticHashedString s_eye_to_world("id_eye_to_world");
-    static LLStaticHashedString s_pixel_angle("id_pixel_angle");
     static LLStaticHashedString s_steps("id_steps");
     static LLStaticHashedString s_samples("id_samples");
 
@@ -899,8 +898,6 @@ void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src
 
     const glm::mat4 eye_to_world(glm::mat3(glm::inverse(get_current_modelview())));
     shader.uniformMatrix4fv(s_eye_to_world, 1, GL_FALSE, glm::value_ptr(eye_to_world));
-    const F32 fov = LLViewerCamera::getInstance()->getView();
-    shader.uniform1f(s_pixel_angle, 2.f * std::tan(fov * 0.5f) / (F32)llmax(target.getHeight(), 1u));
     shader.uniform1i(s_steps, steps);
     shader.uniform1i(s_samples, samples);
 

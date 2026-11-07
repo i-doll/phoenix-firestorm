@@ -175,7 +175,6 @@ float idAltitude(vec3 rel)
 // ---- Ray march ----
 
 uniform mat4  id_eye_to_world;
-uniform float id_pixel_angle;
 uniform int   id_steps;
 uniform int   id_samples;
 
@@ -378,7 +377,7 @@ float idHeightFraction(float alt)
     return 0.5;
 }
 
-void idMarch(vec3 dir, float scene_t, int steps, float jitter, vec3 light_w, vec3 sunlit, vec3 amblit,
+void idMarch(vec3 dir, float scene_t, int steps, float jitter, float pixel_angle, vec3 light_w, vec3 sunlit, vec3 amblit,
              out vec3 scatter, out float trans, out float w_sum, out float wd_sum)
 {
     scatter = vec3(0.0);
@@ -424,7 +423,7 @@ void idMarch(vec3 dir, float scene_t, int steps, float jitter, vec3 light_w, vec
         vec3 rel = dir * t;
         float alt = idAltitude(rel);
         vec3 wp = vec3(id_camera_global.xy + rel.xy, alt);
-        float footprint = max(t * id_pixel_angle, 1.0);
+        float footprint = max(t * pixel_angle, 1.0);
 
         float dens = idCloudDensityAll(wp, footprint, false) * (1.0 - smoothstep(ID_FADE_START, ID_MAX_DIST, t));
         if (dens <= 0.0)
@@ -474,6 +473,7 @@ void main()
     vec3 light_w = normalize(eye_to_world * light_eye);
     vec3 up_eye = vec3(eye_to_world[0].z, eye_to_world[1].z, eye_to_world[2].z);
     vec3 center_dir = normalize(getPositionWithDepth(tc, 0.5).xyz);
+    float pixel_angle = max(length(dFdx(center_dir)), length(dFdy(center_dir)));
 
     vec3 sunlit;
     vec3 amblit;
@@ -505,7 +505,7 @@ void main()
         float s_w;
         float s_wd;
         idMarch(normalize(eye_to_world * dir_eye), scene_t, steps, fract(jitter + 0.25 * float(k)),
-                light_w, sunlit, amblit, s_scatter, s_trans, s_w, s_wd);
+                pixel_angle, light_w, sunlit, amblit, s_scatter, s_trans, s_w, s_wd);
         scatter += s_scatter;
         trans += s_trans;
         w_sum += s_w;
