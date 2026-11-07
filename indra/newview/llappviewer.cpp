@@ -175,6 +175,10 @@
 #include <boost/regex.hpp>
 #include <boost/throw_exception.hpp>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include "fsyspath.h"
 
 #if LL_WINDOWS
 #   include <share.h> // For _SH_DENYWR in processMarkerFiles
@@ -763,6 +767,235 @@ std::string getRuntime()
     return llformat("%.4f", (F32)LLTimer::getElapsedSeconds().value());
 }
 
+namespace
+{
+std::string sIdyllMigrationInfo;
+std::string sIdyllMigrationWarn;
+
+bool idHoldsFiles(const std::filesystem::path& dir)
+{
+    std::error_code ec;
+    std::filesystem::recursive_directory_iterator it(dir, ec);
+    for (; !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec))
+    {
+        if (!it->is_directory(ec))
+        {
+            return true;
+        }
+    }
+    return (bool)ec;
+}
+
+bool idSkipWhenMigrating(const std::filesystem::path& rel)
+{
+    auto top = rel.begin();
+    if (top == rel.end())
+    {
+        return false;
+    }
+    if (*top == "cache")
+    {
+        return std::next(top) == rel.end();
+    }
+    return *top == "logs" && rel.filename().u8string().ends_with(u8"_marker");
+}
+
+void idRepointSettingsFile(const std::filesystem::path& file, const std::string& from, const std::string& to)
+{
+    std::string text;
+    {
+        std::ifstream in(file, std::ios::binary);
+        if (!in)
+        {
+            return;
+        }
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    const std::string needle = "<string>" + LLSDXMLFormatter::escapeString(from);
+    const std::string replacement = "<string>" + LLSDXMLFormatter::escapeString(to);
+    bool changed = false;
+    for (size_t pos = text.find(needle); pos != std::string::npos; pos = text.find(needle, pos))
+    {
+        const size_t after = pos + needle.size();
+        const char next = after < text.size() ? text[after] : '\0';
+        if (next == '<' || next == '/' || next == '\\')
+        {
+            text.replace(pos, needle.size(), replacement);
+            pos += replacement.size();
+            changed = true;
+        }
+        else
+        {
+            pos = after;
+        }
+    }
+    if (changed)
+    {
+        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        out << text;
+        if (!out)
+        {
+            sIdyllMigrationWarn += "Could not update saved paths in " + fsyspath(file).string() + "\n";
+        }
+    }
+}
+
+bool idMigrateFirestormUserData(const std::string& idyll_dir, const std::string& firestorm_dir)
+{
+    namespace fs = std::filesystem;
+    if (idyll_dir.empty() || firestorm_dir.empty())
+    {
+        return false;
+    }
+    std::error_code ec;
+    const fsyspath src(firestorm_dir);
+    const fsyspath dst(idyll_dir);
+    if (!fs::is_directory(src, ec))
+    {
+        return false;
+    }
+    const fs::file_status dst_status = fs::symlink_status(dst, ec);
+    if (fs::exists(dst_status) && (!fs::is_directory(dst_status) || idHoldsFiles(dst)))
+    {
+        return false;
+    }
+
+    fs::path tmp = dst;
+    tmp += ".migrating";
+    fs::remove_all(tmp, ec);
+    ec.clear();
+    if (!fs::create_directories(tmp, ec))
+    {
+        sIdyllMigrationWarn += "Could not create " + fsyspath(tmp).string() + ": " + ec.message() + "\n";
+        return false;
+    }
+
+    bool ok = true;
+    size_t copied = 0;
+    size_t failed = 0;
+    fs::recursive_directory_iterator it(src, fs::directory_options::skip_permission_denied, ec);
+    for (; ok && !ec && it != fs::recursive_directory_iterator(); it.increment(ec))
+    {
+        const fs::path rel = it->path().lexically_relative(src);
+        std::error_code op_ec;
+        const fs::file_status status = it->symlink_status(op_ec);
+        if (idSkipWhenMigrating(rel))
+        {
+            if (fs::is_directory(status))
+            {
+                it.disable_recursion_pending();
+            }
+            continue;
+        }
+        const fs::path target = tmp / rel;
+        if (fs::is_symlink(status))
+        {
+            fs::copy_symlink(it->path(), target, op_ec);
+        }
+        else if (fs::is_directory(status))
+        {
+            fs::create_directory(target, op_ec);
+            ok = !op_ec;
+        }
+        else if (fs::is_regular_file(status))
+        {
+            fs::copy_file(it->path(), target, op_ec);
+        }
+        if (op_ec)
+        {
+            ++failed;
+            sIdyllMigrationWarn += "Could not copy " + fsyspath(it->path()).string() + ": " + op_ec.message() + "\n";
+        }
+        else
+        {
+            ++copied;
+        }
+    }
+    if (ec)
+    {
+        sIdyllMigrationWarn += "Stopped reading " + firestorm_dir + ": " + ec.message() + "\n";
+        ok = false;
+    }
+
+    if (ok)
+    {
+        idRepointSettingsFile(tmp / "user_settings" / "settings.xml", firestorm_dir, idyll_dir);
+        fs::directory_iterator account(tmp, ec);
+        for (; !ec && account != fs::directory_iterator(); account.increment(ec))
+        {
+            std::error_code type_ec;
+            if (account->is_directory(type_ec))
+            {
+                idRepointSettingsFile(account->path() / "settings_per_account.xml", firestorm_dir, idyll_dir);
+            }
+        }
+        ec.clear();
+
+        const fs::file_status final_status = fs::symlink_status(dst, ec);
+        if (fs::exists(final_status))
+        {
+            ok = fs::is_directory(final_status) && !idHoldsFiles(dst);
+            if (ok)
+            {
+                fs::remove_all(dst, ec);
+                ok = !ec;
+            }
+        }
+        if (ok)
+        {
+            ec.clear();
+            fs::rename(tmp, dst, ec);
+            ok = !ec;
+        }
+        if (!ok)
+        {
+            sIdyllMigrationWarn += "Could not move " + fsyspath(tmp).string() + " to " + idyll_dir + (ec ? ": " + ec.message() : "") + "\n";
+        }
+    }
+
+    if (!ok)
+    {
+        fs::remove_all(tmp, ec);
+        return false;
+    }
+    sIdyllMigrationInfo = "Copied Firestorm user data from " + firestorm_dir + " to " + idyll_dir + ": "
+        + std::to_string(copied) + " entries, " + std::to_string(failed) + " failed. Skipped the cache folder and crash markers.";
+    return true;
+}
+
+std::string idUserDataDir(const std::string& folder_name)
+{
+#if LL_WINDOWS
+    return gDirUtilp->add(gDirUtilp->getOSUserDir(), folder_name);
+#elif LL_DARWIN
+    return fsyspath(fsyspath(gDirUtilp->getOSUserDir()).parent_path() / fsyspath(folder_name)).string();
+#else
+    std::string upper_name(folder_name);
+    LLStringUtil::toUpper(upper_name);
+    if (auto env_dir = LLStringUtil::getoptenv(upper_name + "_USER_DIR"))
+    {
+        return *env_dir;
+    }
+    std::string lower_name(folder_name);
+    LLStringUtil::toLower(lower_name);
+    return gDirUtilp->getOSUserDir() + "/." + lower_name;
+#endif
+}
+
+void idMigrateUserDataOnce(const std::string& suffix)
+{
+    if (gIDHeadless || gDirUtilp->getOSUserDir().empty())
+    {
+        return;
+    }
+#if LL_DARWIN
+    idMigrateFirestormUserData(gDirUtilp->getOSUserDir(), idUserDataDir("Firestorm"));
+#else
+    idMigrateFirestormUserData(idUserDataDir(APP_NAME + suffix), idUserDataDir("Firestorm" + suffix));
+#endif
+}
+}
+
 LLAppViewer::LLAppViewer()
 :   mMarkerFile(),
     mLogoutMarkerFile(),
@@ -801,8 +1034,10 @@ LLAppViewer::LLAppViewer()
     // <FS:ND> Init our custom directories, not from SecondLife
     // gDirUtilp->initAppDirs("SecondLife");
 #if ADDRESS_SIZE == 64
+    idMigrateUserDataOnce("_x64");
     gDirUtilp->initAppDirs(APP_NAME + "_x64");
 #else
+    idMigrateUserDataOnce("");
     gDirUtilp->initAppDirs(APP_NAME);
 #endif
     // </FS:ND>
@@ -820,6 +1055,15 @@ LLAppViewer::LLAppViewer()
     //
     // OK to write stuff to logs now, we've now crash reported if necessary
     //
+
+    if (!sIdyllMigrationInfo.empty())
+    {
+        LL_INFOS("Idyll") << sIdyllMigrationInfo << LL_ENDL;
+    }
+    if (!sIdyllMigrationWarn.empty())
+    {
+        LL_WARNS("Idyll") << "Firestorm user data migration problems:\n" << sIdyllMigrationWarn << LL_ENDL;
+    }
 
     LLLoginInstance::instance().setPlatformInfo(gPlatform, LLOSInfo::instance().getOSVersionString(), LLOSInfo::instance().getOSStringSimple());
 
