@@ -314,7 +314,9 @@ void LLNetMap::draw()
         return;
     }
     LL_PROFILE_ZONE_SCOPED;
-    static LLFrameTimer map_timer;
+    // <FS:Trish> Per instance now, see mObjectImageTimer
+    //static LLFrameTimer map_timer;
+    // </FS:Trish>
 
     // <FS:Ansariel>: Synchronize netmap scale throughout instances
     if (mScale != sScale)
@@ -547,9 +549,29 @@ void LLNetMap::draw()
         LLVector3d posCenterGlobal = viewPosToGlobal(llfloor(posCenter.mV[VX]), llfloor(posCenter.mV[VY]));
 
         static LLCachedControl<bool> s_fShowObjects(gSavedSettings, "MiniMapObjects") ;
-        if ( (s_fShowObjects) && ((mUpdateObjectImage) || (map_timer.getElapsedTimeF32() > 0.5f)) )
+        // <FS:Trish> Keep the 0.5 s cadence, but only when something changed: the centre moved
+        // by an object map pixel or more, the map object set changed, or the agent changed
+        // height (vertical filter). Otherwise refresh every 2 s for moving or edited objects.
+        // Zoom and resize already set mUpdateObjectImage; rotation is applied when drawing.
+        //if ( (s_fShowObjects) && ((mUpdateObjectImage) || (map_timer.getElapsedTimeF32() > 0.5f)) )
+        const U32 map_objects_generation = gObjectList.getMapObjectsGeneration();
+        const S32 agent_z = ll_round((F32)gAgent.getPositionGlobal().mdV[VZ]);
+        const F64 pixel_meters = (mObjectMapTPM > 0.f) ? 1.0 / mObjectMapTPM : 0.0;
+        const F32 object_image_age = mObjectImageTimer.getElapsedTimeF32();
+        const bool object_image_dirty = mUpdateObjectImage
+            || object_image_age > 2.f
+            || (object_image_age > 0.5f
+                && (map_objects_generation != mObjectImageGeneration
+                    || agent_z != mObjectImageAgentZ
+                    || dist_vec_squared2D(mObjectImageCenterGlobal, posCenterGlobal) >= pixel_meters * pixel_meters));
+        if ( (s_fShowObjects) && object_image_dirty )
+        // </FS:Trish>
         {
             mUpdateObjectImage = false;
+            // <FS:Trish>
+            mObjectImageGeneration = map_objects_generation;
+            mObjectImageAgentZ = agent_z;
+            // </FS:Trish>
 // [/SL:KB]
 
 //          // Locate the centre of the object layer, accounting for panning
@@ -572,7 +594,10 @@ void LLNetMap::draw()
 
             mObjectImagep->setSubImage(mObjectRawImagep, 0, 0, mObjectImagep->getWidth(), mObjectImagep->getHeight());
 
-            map_timer.reset();
+            // <FS:Trish>
+            //map_timer.reset();
+            mObjectImageTimer.reset();
+            // </FS:Trish>
         }
 
 // [SL:KB] - Patch: World-MinimapOverlay | Checked: 2012-06-20 (Catznip-3.3)

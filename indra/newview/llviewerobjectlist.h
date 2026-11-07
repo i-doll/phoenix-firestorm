@@ -142,6 +142,7 @@ public:
 
     void addToMap(LLViewerObject *objectp);
     void removeFromMap(LLViewerObject *objectp);
+    U32 getMapObjectsGeneration() const { return mMapObjectsGeneration; } // <FS:Trish/> Lets the minimap skip unchanged redraws
 
     void clearDebugText();
 
@@ -233,6 +234,7 @@ protected:
     std::vector<LLPointer<LLViewerObject> > mActiveObjects;
 
     vobj_list_t mMapObjects;
+    U32 mMapObjectsGeneration = 0; // <FS:Trish/> Bumped whenever mMapObjects gains or loses an object
 
     // <FS:Beq> deadobject cleanup
     // uuid_set_t   mDeadObjects;
@@ -354,6 +356,7 @@ inline LLViewerObject *LLViewerObjectList::getObject(const S32 index)
 inline void LLViewerObjectList::addToMap(LLViewerObject *objectp)
 {
     mMapObjects.push_back(objectp);
+    ++mMapObjectsGeneration; // <FS:Trish/>
 }
 
 inline void LLViewerObjectList::removeFromMap(LLViewerObject *objectp)
@@ -362,6 +365,7 @@ inline void LLViewerObjectList::removeFromMap(LLViewerObject *objectp)
     if (iter != mMapObjects.end())
     {
         mMapObjects.erase(iter);
+        ++mMapObjectsGeneration; // <FS:Trish/>
     }
 }
 

@@ -205,6 +205,12 @@ private:
     LLFrameTimer    mAvatarColorCacheTimer;
     // </FS:Trish>
 
+    // <FS:Trish> Per-instance object layer redraw state (was a function-static timer)
+    LLFrameTimer    mObjectImageTimer;
+    U32             mObjectImageGeneration = 0;
+    S32             mObjectImageAgentZ = 0;
+    // </FS:Trish>
+
 public:
     void            setSelected(uuid_vec_t uuids) { gmSelected=uuids; };
 // <FS:CR> Minimap improvements
