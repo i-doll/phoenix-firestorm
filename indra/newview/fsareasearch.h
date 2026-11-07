@@ -83,6 +83,7 @@ struct FSObjectProperties
     LLPermissions permissions;
     uuid_vec_t texture_ids;
     bool name_requested{ false };
+    U32 rejected_generation{ 0 }; // filter generation the text filters rejected this object at, 0 if none
     U32 local_id{ 0 };
     U64 region_handle{ 0 };
 
@@ -197,6 +198,7 @@ private:
     bool regexTest(std::string_view text);
     void findObjects();
     void processRequestQueue();
+    void updateFilterGeneration();
 
     boost::signals2::connection mRlvBehaviorCallbackConnection{};
     void updateRlvRestrictions(ERlvBehaviour behavior);
@@ -226,6 +228,13 @@ private:
 
     LLFrameTimer mLastUpdateTimer;
     LLFrameTimer mLastPropertiesReceivedTimer;
+
+    // Text filter rejections are remembered per object until this changes, see updateFilterGeneration()
+    U32 mFilterGeneration{ 1 };
+    std::string mGenerationSearchText[6];
+    bool mGenerationRegexSearch{ false };
+    U32 mGenerationNameFlags{ 0 };
+    LLFrameTimer mFilterGenerationTimer;
 
     uuid_set_t mNamesRequested;
 

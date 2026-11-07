@@ -83,6 +83,10 @@ constexpr F32 MIN_DISTANCE_MOVED = 1.0f;
 // timeout to resend object properties request again
 constexpr F32 REQUEST_TIMEOUT = 30.0f;
 
+// objects rejected by the text filters are matched again at least this often,
+// to pick up name changes in the name caches
+constexpr F32 FILTER_GENERATION_MAX_AGE = 30.0f;
+
 static std::string RLVa_hideNameIfRestricted(std::string_view name)
 {
     if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES))
@@ -544,7 +548,47 @@ void FSAreaSearch::refreshList(bool cache_clear)
     mPanelList->setAgentLastPosition(gAgent.getPositionGlobal());
     mNamesRequested.clear();
     mRefresh = true;
+    // Match every object again, including ones the text filters rejected before.
+    if (++mFilterGeneration == 0)
+    {
+        mFilterGeneration = 1;
+    }
+    mFilterGenerationTimer.reset();
     findObjects();
+}
+
+void FSAreaSearch::updateFilterGeneration()
+{
+    // Start a new generation when anything the text filters in matchObject() depend on changed,
+    // so objects they rejected before get matched again.
+    const std::string* search_text[] = { &mSearchName, &mSearchDescription, &mSearchOwner, &mSearchGroup, &mSearchCreator, &mSearchLastOwner };
+    bool changed = false;
+    for (size_t i = 0; i < std::size(search_text); ++i)
+    {
+        if (*search_text[i] != mGenerationSearchText[i])
+        {
+            mGenerationSearchText[i] = *search_text[i];
+            changed = true;
+        }
+    }
+
+    const U32 name_flags = (LLAvatarName::useDisplayNames() ? 1 : 0)
+        | (LLAvatarName::useUsernames() ? 2 : 0)
+        | (LLAvatarName::useLegacyFormat() ? 4 : 0)
+        | (LLAvatarName::trimResidentSurname() ? 8 : 0)
+        | (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES) ? 16 : 0);
+
+    if (changed || mRegexSearch != mGenerationRegexSearch || name_flags != mGenerationNameFlags
+        || mFilterGenerationTimer.getElapsedTimeF32() > FILTER_GENERATION_MAX_AGE)
+    {
+        mGenerationRegexSearch = mRegexSearch;
+        mGenerationNameFlags = name_flags;
+        if (++mFilterGeneration == 0)
+        {
+            mFilterGeneration = 1;
+        }
+        mFilterGenerationTimer.reset();
+    }
 }
 
 void FSAreaSearch::findObjects()
@@ -552,6 +596,13 @@ void FSAreaSearch::findObjects()
     // Only loop through the gObjectList every so often. There is a performance hit if done too often.
     if (!(mActive && ((mRefresh && mLastUpdateTimer.getElapsedTimeF32() > MIN_REFRESH_INTERVAL) || mLastUpdateTimer.getElapsedTimeF32() > REFRESH_INTERVAL)))
     {
+        return;
+    }
+
+    // Don't scan while minimized or closed; the request queue keeps going. Scan as soon as it is shown again.
+    if (isMinimized() || !isInVisibleChain())
+    {
+        mRefresh = true;
         return;
     }
 
@@ -569,6 +620,7 @@ void FSAreaSearch::findObjects()
     mRequestQueuePause = true;
     checkRegion();
     mRefresh = false;
+    updateFilterGeneration();
     mSearchableObjects = 0;
     S32 object_count = gObjectList.getNumObjects();
 
@@ -859,6 +911,7 @@ void FSAreaSearch::processObjectProperties(LLMessageSystem* msg)
 
     LLViewerRegion* our_region = gAgent.getRegion();
     bool counter_text_update = false;
+    updateFilterGeneration();
 
     S32 count = msg->getNumberOfBlocksFast(_PREHASH_ObjectData);
     LL_DEBUGS("FSAreaSearch")  << "Got processObjectProperties message with " << count << " object(s)" << LL_ENDL;
@@ -902,6 +955,7 @@ void FSAreaSearch::processObjectProperties(LLMessageSystem* msg)
                 counter_text_update = true;
             }
 
+            details.rejected_generation = 0;
             msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_CreatorID, details.creator_id, i);
             msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_OwnerID, details.owner_id, i);
             msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_GroupID, details.group_id, i);
@@ -962,6 +1016,12 @@ void FSAreaSearch::matchObject(FSObjectProperties& details, LLViewerObject* obje
     if (details.listed)
     {
         // object allready listed on the scroll list.
+        return;
+    }
+
+    if (details.rejected_generation == mFilterGeneration)
+    {
+        // The text filters below already rejected this object and nothing they depend on changed since.
         return;
     }
 
@@ -1100,6 +1160,22 @@ void FSAreaSearch::matchObject(FSObjectProperties& details, LLViewerObject* obje
     owner_name = RLVa_hideNameIfRestricted(owner_name);
     last_owner_name = RLVa_hideNameIfRestricted(last_owner_name);
 
+    // Remember a rejection by the text filters below, unless a name is still being looked up
+    // and could change the outcome. Objects passing them get listed and are not matched again.
+    struct TextRejection
+    {
+        FSObjectProperties& details;
+        U32 generation;
+        bool rejected{ true };
+        ~TextRejection()
+        {
+            if (rejected && !details.name_requested)
+            {
+                details.rejected_generation = generation;
+            }
+        }
+    } text_rejection{ details, mFilterGeneration };
+
     // FIRE-35212: The displayed name is setting-depending and can fail to find a user if the
     // format entered in the search input does not match the format used in the UI.
     // This matches the behavior of other LL floaters
@@ -1201,6 +1277,7 @@ void FSAreaSearch::matchObject(FSObjectProperties& details, LLViewerObject* obje
     // Object passed all above tests, add it to the List tab.
     //-----------------------------------------------------------------------
 
+    text_rejection.rejected = false;
     details.listed = true;
 
     LLScrollListCell::Params cell_params;
@@ -1356,6 +1433,8 @@ void FSAreaSearch::avatarNameCacheCallback(const LLUUID& id, const LLAvatarName&
 
 void FSAreaSearch::callbackLoadFullName(const LLUUID& id, const std::string& full_name)
 {
+    updateFilterGeneration();
+
     if (auto iter = mNameCacheConnections.find(id); iter != mNameCacheConnections.end())
     {
         if (iter->second.connected())
