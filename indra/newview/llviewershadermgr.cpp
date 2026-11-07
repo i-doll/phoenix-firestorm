@@ -2340,6 +2340,15 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredSoftenProgram.addPermutation("HAS_SSAO", "1");
         }
 
+        // <FS:Trish> Water caustics, linked in only when enabled
+        static LLCachedControl<bool> water_caustics(gSavedSettings, "FSRenderWaterCaustics", false);
+        if (water_caustics)
+        {
+            gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/fsCausticsF.glsl", GL_FRAGMENT_SHADER));
+            gDeferredSoftenProgram.addPermutation("FS_WATER_CAUSTICS", "1");
+        }
+        // </FS:Trish>
+
         success = gDeferredSoftenProgram.createShader();
         llassert(success);
     }

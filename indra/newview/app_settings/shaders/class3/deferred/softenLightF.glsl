@@ -79,6 +79,10 @@ vec3 srgb_to_linear(vec3 c);
 
 uniform vec4 waterPlane;
 
+#ifdef FS_WATER_CAUSTICS
+float fsWaterCaustics(vec3 pos, vec3 norm, vec3 light_dir, vec4 water_plane);
+#endif
+
 uniform int cube_snapshot;
 
 uniform float sky_hdr_scale;
@@ -199,6 +203,17 @@ void main()
 
     vec3 sunlit_linear = sunlit;
     vec3 amblit_linear = amblit;
+
+#ifdef FS_WATER_CAUSTICS
+    // Sunlight focused by the waves onto surfaces under the water, on the diffuse albedo and
+    // under the same sun shadow (fsCausticsF.glsl). Taken before the branches below modify scol.
+    vec3 fs_caustics = vec3(0);
+    if (needs_atmos)
+    {
+        vec3 fs_albedo = is_pbr ? baseColor.rgb * (1.0 - spec.b) : srgb_to_linear(baseColor.rgb) * (1.0 - baseColor.a);
+        fs_caustics = fsWaterCaustics(pos.xyz, gb.normal, light_dir, waterPlane) * scol * sunlit_linear * fs_albedo;
+    }
+#endif
 
     vec3  radiance  = vec3(0);
 
@@ -338,6 +353,10 @@ void main()
             applyLegacyEnv(color, legacyenv, spec, pos.xyz, gb.normal, envIntensity);
         }
    }
+
+#ifdef FS_WATER_CAUSTICS
+    color.rgb += fs_caustics;
+#endif
 
     //color.r = classic_mode > 0 ? 1.0 : 0.0;
     float final_scale = 1;

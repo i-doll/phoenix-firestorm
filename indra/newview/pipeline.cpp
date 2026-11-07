@@ -10424,6 +10424,37 @@ LLVector4 pow4fsrgb(LLVector4 v, F32 f)
     return v;
 }
 
+// <FS:Trish> Water caustics: uniforms for fsCausticsF.glsl in the sun light pass. Left at zero
+// strength in reflection probe captures, which would freeze one frame of the animation.
+static void fs_bind_water_caustics(LLGLSLShader& shader)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderWaterCaustics", false);
+    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderWaterCausticsStrength", 1.f);
+    static LLCachedControl<F32> scale(gSavedSettings, "FSRenderWaterCausticsScale", 1.5f);
+    static LLCachedControl<F32> speed(gSavedSettings, "FSRenderWaterCausticsSpeed", 1.f);
+    static LLStaticHashedString s_params("fs_caustic_params");
+    static LLStaticHashedString s_inv_view("fs_caustic_inv_view");
+
+    if (!enabled || shader.getUniformLocation(s_params) < 0)
+    {
+        return;
+    }
+
+    // The pattern only moves by whole turns of this phase, so wrapping it at a multiple of 2 pi
+    // is seamless
+    constexpr F64 wrap = 6283.185307179586; // 1000 turns
+    const F32 phase = (F32)fmod(LLFrameTimer::getElapsedSeconds() * llclamp((F32)speed, 0.f, 10.f), wrap);
+    shader.uniform4f(s_params,
+                     gCubeSnapshot ? 0.f : llclamp((F32)strength, 0.f, 10.f),
+                     1.f / llclamp((F32)scale, 0.1f, 20.f),
+                     phase,
+                     0.f);
+
+    const glm::mat4 inv_view = glm::inverse(get_current_modelview());
+    shader.uniformMatrix4fv(s_inv_view, 1, GL_FALSE, glm::value_ptr(inv_view));
+}
+// </FS:Trish>
+
 void LLPipeline::renderDeferredLighting()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -10620,6 +10651,7 @@ void LLPipeline::renderDeferredLighting()
             soften_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
 
             soften_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
+            fs_bind_water_caustics(soften_shader); // <FS:Trish/>
 
             {
                 LLGLDepthTest depth(GL_FALSE);
