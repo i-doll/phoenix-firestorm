@@ -256,11 +256,36 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 }
 
 
+// <FS:Trish> Coalesced shader reloads. A full reload stalls the main thread for seconds, and every
+// setting that changes the shaders used to start one at once: toggling a few options in a row,
+// or Cancel in Preferences restoring several, reloaded once per setting. Once the shaders are
+// loaded, a change now only marks the reload as due, and process_deferred_shader_reload runs it
+// once from display() when no further change has come in for SHADER_RELOAD_QUIET_SECONDS. Until
+// then the old programs, all still complete, keep drawing; code that picks a program by a setting
+// checks that the program was built for it. Before the first load (startup), and while a caller
+// batches settings under LLViewerShaderMgr::sSkipReload and reloads itself afterwards, it runs at
+// once as before.
+static constexpr F32 SHADER_RELOAD_QUIET_SECONDS = 0.4f;
+static bool sShaderReloadPending = false;
+static bool sShaderReloadRunning = false;
+static LLTimer sShaderReloadTimer;
+// </FS:Trish>
+
 // <FS:Ansariel> Expose handleSetShaderChanged()
 //static bool handleSetShaderChanged(const LLSD& newvalue)
 bool handleSetShaderChanged(const LLSD& newvalue)
 // </FS:Ansariel>
 {
+    // <FS:Trish> Coalesced shader reloads
+    if (!sShaderReloadRunning && gPipeline.isInit() && gPipeline.mShadersLoaded &&
+        LLViewerShaderMgr::sInitialized && !LLViewerShaderMgr::sSkipReload)
+    {
+        sShaderReloadPending = true;
+        sShaderReloadTimer.reset();
+        return true;
+    }
+    // </FS:Trish>
+
     // changing shader level may invalidate existing cached bump maps, as the shader type determines the format of the bump map it expects - clear and repopulate the bump cache
     gBumpImageList.destroyGL();
     gBumpImageList.restoreGL();
@@ -275,6 +300,21 @@ bool handleSetShaderChanged(const LLSD& newvalue)
     LLViewerShaderMgr::instance()->setShaders();
     return true;
 }
+
+// <FS:Trish> Coalesced shader reloads: runs a reload marked as due by handleSetShaderChanged once
+// shader-affecting settings have stopped changing
+void process_deferred_shader_reload()
+{
+    if (!sShaderReloadPending || sShaderReloadTimer.getElapsedTimeF32() < SHADER_RELOAD_QUIET_SECONDS)
+    {
+        return;
+    }
+    sShaderReloadPending = false;
+    sShaderReloadRunning = true;
+    handleSetShaderChanged(LLSD());
+    sShaderReloadRunning = false;
+}
+// </FS:Trish>
 
 static bool handleRenderPerfTestChanged(const LLSD& newvalue)
 {

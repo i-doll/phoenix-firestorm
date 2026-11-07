@@ -49,6 +49,10 @@ void create_graphics_group(LLControlGroup& group);
 
 // <FS:Ansariel> Expose handleSetShaderChanged()
 bool handleSetShaderChanged(const LLSD& newvalue);
+// <FS:Trish> Runs a shader reload that handleSetShaderChanged deferred, once settings have
+// stopped changing; called every frame from display()
+void process_deferred_shader_reload();
+// </FS:Trish>
 
 // saved at end of session
 extern LLControlGroup gSavedSettings;

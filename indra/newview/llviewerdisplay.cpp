@@ -602,6 +602,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     }
 
     gViewerWindow->checkSettings();
+    process_deferred_shader_reload(); // <FS:Trish/> coalesced shader reloads for settings changes
 
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Picking");
