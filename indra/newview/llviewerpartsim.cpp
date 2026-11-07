@@ -731,6 +731,24 @@ void LLViewerPartSim::updateSimulation()
 
     LL_RECORD_BLOCK_TIME(FTM_SIMULATE_PARTICLES);
 
+    // <FS:Trish> While particles are hidden, keep simulating them (see FS:LO above) but at a low rate and
+    // without geometry rebuilds. Elapsed time is carried over so sources do not burst when shown again.
+    constexpr U32 HIDDEN_PARTICLE_UPDATE_RATE = 8;
+    static F32 sHiddenSourceTime = 0.f;
+    const bool particles_hidden = !gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_PARTICLES);
+    F32 source_dt = dt + sHiddenSourceTime;
+    bool update_sources = true;
+    if (particles_hidden && (LLDrawable::getCurrentFrame() % HIDDEN_PARTICLE_UPDATE_RATE) != 0)
+    {
+        sHiddenSourceTime = source_dt;
+        update_sources = false;
+    }
+    else
+    {
+        sHiddenSourceTime = 0.f;
+    }
+    // </FS:Trish>
+
     // Start at a random particle system so the same
     // particle system doesn't always get first pick at the
     // particles.  Theoretically we'd want to do this in distance
@@ -748,7 +766,10 @@ void LLViewerPartSim::updateSimulation()
     }
 
     S32 num_updates = 0;
-    for (i = start; num_updates < count;)
+    // <FS:Trish> Low rate source updates while particles are hidden
+    //for (i = start; num_updates < count;)
+    for (i = start; update_sources && num_updates < count;)
+    // </FS:Trish>
     {
         if (i >= count)
         {
@@ -790,7 +811,10 @@ void LLViewerPartSim::updateSimulation()
 
             if (upd)
             {
-                mViewerPartSources[i]->update(dt);
+                // <FS:Trish> Low rate source updates while particles are hidden
+                //mViewerPartSources[i]->update(dt);
+                mViewerPartSources[i]->update(source_dt);
+                // </FS:Trish>
             }
         }
 
@@ -822,11 +846,21 @@ void LLViewerPartSim::updateSimulation()
             }
         }
 
+        // <FS:Trish> Low rate group updates while particles are hidden
+        if (particles_hidden)
+        {
+            visirate = HIDDEN_PARTICLE_UPDATE_RATE;
+        }
+        // </FS:Trish>
+
         if ((LLDrawable::getCurrentFrame()+mViewerPartGroups[i]->mID)%visirate == 0)
         {
             // <FS:CR> FIRE-11593: Opensim "4096 Bug" Fix by Latif Khalifa
             // <vobj && !vobj->isDead())
-            if (vobj && !vobj->isDead() && vobj->mDrawable)
+            // <FS:Trish> No geometry rebuilds while particles are hidden; the first update after they are shown again rebuilds
+            //if (vobj && !vobj->isDead() && vobj->mDrawable)
+            if (!particles_hidden && vobj && !vobj->isDead() && vobj->mDrawable)
+            // </FS:Trish>
             {
                 gPipeline.markRebuild(vobj->mDrawable, LLDrawable::REBUILD_ALL);
             }
