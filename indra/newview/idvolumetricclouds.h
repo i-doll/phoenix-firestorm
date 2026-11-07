@@ -8,6 +8,7 @@
 #ifndef ID_VOLUMETRIC_CLOUDS_H
 #define ID_VOLUMETRIC_CLOUDS_H
 
+#include "llrendertarget.h"
 #include "llsingleton.h"
 
 #include <boost/signals2.hpp>
@@ -15,7 +16,6 @@
 #include <vector>
 
 class LLGLSLShader;
-class LLRenderTarget;
 struct IDCloudNoiseJob;
 struct IDCloudWeatherJob;
 
@@ -40,9 +40,18 @@ private:
     void updateNoise();
     void updateWeather();
 
+    bool ensureSceneTarget(U32 width, U32 height);
+    void setDensityInputs(LLGLSLShader& shader);
+    void clearDensityInputs(LLGLSLShader& shader);
+    void march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples);
+    void composite(LLRenderTarget* depth_src);
+
     U32 mNoiseBase   = 0;
     U32 mNoiseDetail = 0;
     U32 mWeather     = 0;
+
+    // Attachment 0: RGBA16F fogged in-scatter + transmittance. Attachment 1: R32F mean cloud distance.
+    LLRenderTarget mSceneRT;
 
     std::shared_ptr<IDCloudNoiseJob>   mNoiseJob;
     std::shared_ptr<IDCloudWeatherJob> mWeatherJob;

@@ -10497,6 +10497,14 @@ void LLPipeline::renderDeferredLighting()
         gGL.setColorMask(true, true);
     }
 
+    // <ID:VolumetricClouds>
+    if (!gCubeSnapshot && IDVolumetricClouds::instance().isActive())
+    {
+        LL_PROFILE_GPU_ZONE("volumetric clouds");
+        IDVolumetricClouds::instance().render(screen_target, &mRT->deferredScreen);
+    }
+    // </ID:VolumetricClouds>
+
     static LLCachedControl<bool> rlv_sphere_opaque_depth(gSavedSettings, "RLVaDebugSphereUseOpaqueDepth", false);
     if (rlv_sphere_opaque_depth() && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
     {

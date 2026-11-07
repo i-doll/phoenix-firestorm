@@ -10,14 +10,21 @@
 #include "idvolumetricclouds.h"
 
 #include "idvolumetriccloudsettings.h"
+#include "llagent.h"
 #include "llappviewer.h"
 #include "lldir.h"
+#include "lldrawpoolalpha.h"
+#include "llenvironment.h"
 #include "llfile.h"
 #include "llframetimer.h"
 #include "llgl.h"
+#include "llglslshader.h"
 #include "llimagegl.h"
 #include "llrender.h"
+#include "llviewercamera.h"
 #include "llviewercontrol.h"
+#include "llviewershadermgr.h"
+#include "pipeline.h"
 #include "rlvactions.h"
 #include "workqueue.h"
 
@@ -67,6 +74,11 @@ namespace
     constexpr S32 BASE_DIM    = 128;
     constexpr S32 DETAIL_DIM  = 32;
     constexpr S32 WEATHER_DIM = 512;
+
+    constexpr S32 FULL_STEPS   = 96;
+    constexpr S32 LIVE_STEPS   = 48;
+    constexpr S32 FULL_SAMPLES = 4;
+    constexpr F32 PLANET_RADIUS_M = 6360000.f;
 
     const char* CACHE_DIR   = "volumetric_clouds";
     const char* BASE_FILE   = "noise_base_v1_128.raw";
@@ -537,7 +549,8 @@ bool IDVolumetricClouds::prerequisitesMet() const
 
 bool IDVolumetricClouds::isActive() const
 {
-    return prerequisitesMet() && mNoiseBase && mNoiseDetail && mWeather;
+    return prerequisitesMet() && mNoiseBase && mNoiseDetail && mWeather
+        && gIDCloudsProgram.isComplete() && gIDCloudsCompositeProgram.isComplete();
 }
 
 bool IDVolumetricClouds::fullQuality() const
@@ -722,6 +735,7 @@ void IDVolumetricClouds::release()
         LLImageGL::deleteTextures(1, &mWeather);
         mWeather = 0;
     }
+    mSceneRT.release();
     mWeatherKey.clear();
     mWeatherDirty = true;
 }
@@ -732,6 +746,200 @@ void IDVolumetricClouds::renderShadowMap()
 
 void IDVolumetricClouds::render(LLRenderTarget* screen, LLRenderTarget* depth_src)
 {
+    if (!screen || !depth_src || !isActive())
+    {
+        return;
+    }
+    llassert(LLRenderTarget::getCurrentBoundTarget() == screen);
+
+    if (!ensureSceneTarget(screen->getWidth(), screen->getHeight()))
+    {
+        return;
+    }
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+
+    const bool full = fullQuality();
+    march(mSceneRT, depth_src, full ? FULL_STEPS : LIVE_STEPS, full ? FULL_SAMPLES : 1);
+    composite(depth_src);
+}
+
+bool IDVolumetricClouds::ensureSceneTarget(U32 width, U32 height)
+{
+    if (mSceneRT.isComplete() && mSceneRT.getWidth() == width && mSceneRT.getHeight() == height)
+    {
+        return true;
+    }
+    mSceneRT.release();
+    if (mSceneRT.allocate(width, height, GL_RGBA16F) && mSceneRT.addColorAttachment(GL_R32F))
+    {
+        return true;
+    }
+    LL_WARNS_ONCE("VolumetricClouds") << "Could not allocate the cloud render target" << LL_ENDL;
+    mSceneRT.release();
+    return false;
+}
+
+void IDVolumetricClouds::setDensityInputs(LLGLSLShader& shader)
+{
+    S32 channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_NOISE_BASE, LLTexUnit::TT_TEXTURE_3D);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mNoiseBase, true);
+    }
+    channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_NOISE_DETAIL, LLTexUnit::TT_TEXTURE_3D);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mNoiseDetail, true);
+    }
+    channel = shader.enableTexture(LLShaderMgr::ID_CLOUD_WEATHER, LLTexUnit::TT_TEXTURE);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mWeather, true);
+    }
+
+    static LLStaticHashedString s_layer_count("id_layer_count");
+    static LLStaticHashedString s_layer_base("id_layer_base");
+    static LLStaticHashedString s_layer_top("id_layer_top");
+    static LLStaticHashedString s_layer_coverage("id_layer_coverage");
+    static LLStaticHashedString s_layer_density("id_layer_density");
+    static LLStaticHashedString s_layer_detail("id_layer_detail");
+    static LLStaticHashedString s_layer_type("id_layer_type");
+    static LLStaticHashedString s_layer_wind("id_layer_wind");
+    static LLStaticHashedString s_layer_wind_dir("id_layer_wind_dir");
+    static LLStaticHashedString s_planet_radius("id_planet_radius");
+    static LLStaticHashedString s_camera_global("id_camera_global");
+
+    constexpr U32 MAX = IDCloudPreset::MAX_LAYERS;
+    F32 base[MAX] = {};
+    F32 top[MAX] = {};
+    F32 coverage[MAX] = {};
+    F32 density[MAX] = {};
+    F32 detail[MAX] = {};
+    GLint type[MAX] = {};
+    F32 wind[MAX * 2] = {};
+    F32 wind_dir[MAX * 2] = {};
+
+    const IDCloudState& state = IDCloudState::instance();
+    const std::vector<IDCloudLayer>& layers = state.current().mLayers;
+    const U32 count = llmin((U32)layers.size(), MAX);
+    for (U32 i = 0; i < count; ++i)
+    {
+        const IDCloudLayer& l = layers[i];
+        base[i] = l.mBaseM;
+        top[i] = l.mTopM;
+        coverage[i] = l.mCoverage;
+        density[i] = l.mDensity;
+        detail[i] = l.mDetail;
+        type[i] = (GLint)l.mType;
+        const LLVector2 offset = state.windOffsetM(i);
+        wind[i * 2] = offset.mV[VX];
+        wind[i * 2 + 1] = offset.mV[VY];
+        const F32 rad = l.mWindDirDeg * DEG_TO_RAD;
+        wind_dir[i * 2] = std::sin(rad);
+        wind_dir[i * 2 + 1] = std::cos(rad);
+    }
+
+    shader.uniform1i(s_layer_count, (GLint)count);
+    shader.uniform1fv(s_layer_base, MAX, base);
+    shader.uniform1fv(s_layer_top, MAX, top);
+    shader.uniform1fv(s_layer_coverage, MAX, coverage);
+    shader.uniform1fv(s_layer_density, MAX, density);
+    shader.uniform1fv(s_layer_detail, MAX, detail);
+    shader.uniform1iv(s_layer_type, MAX, type);
+    shader.uniform2fv(s_layer_wind, MAX, wind);
+    shader.uniform2fv(s_layer_wind_dir, MAX, wind_dir);
+    shader.uniform1f(s_planet_radius, PLANET_RADIUS_M);
+
+    const F64 wrap = (F64)IDCloudState::WIND_WRAP_M;
+    const LLVector3d cam = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin());
+    F64 cx = std::fmod(cam.mdV[VX], wrap);
+    F64 cy = std::fmod(cam.mdV[VY], wrap);
+    if (cx < 0.0) cx += wrap;
+    if (cy < 0.0) cy += wrap;
+    shader.uniform3f(s_camera_global, (F32)cx, (F32)cy, (F32)cam.mdV[VZ]);
+}
+
+void IDVolumetricClouds::clearDensityInputs(LLGLSLShader& shader)
+{
+    S32 channel = shader.getTextureChannel(LLShaderMgr::ID_CLOUD_NOISE_BASE);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+        shader.disableTexture(LLShaderMgr::ID_CLOUD_NOISE_BASE, LLTexUnit::TT_TEXTURE_3D);
+    }
+    channel = shader.getTextureChannel(LLShaderMgr::ID_CLOUD_NOISE_DETAIL);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+        shader.disableTexture(LLShaderMgr::ID_CLOUD_NOISE_DETAIL, LLTexUnit::TT_TEXTURE_3D);
+    }
+    channel = shader.getTextureChannel(LLShaderMgr::ID_CLOUD_WEATHER);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE);
+        shader.disableTexture(LLShaderMgr::ID_CLOUD_WEATHER, LLTexUnit::TT_TEXTURE);
+    }
+}
+
+void IDVolumetricClouds::march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples)
+{
+    static LLStaticHashedString s_eye_to_world("id_eye_to_world");
+    static LLStaticHashedString s_pixel_angle("id_pixel_angle");
+    static LLStaticHashedString s_steps("id_steps");
+    static LLStaticHashedString s_samples("id_samples");
+
+    LLGLSLShader& shader = gIDCloudsProgram;
+    LLGLDisable blend(GL_BLEND);
+
+    target.bindTarget();
+    gPipeline.bindDeferredShader(shader, nullptr, depth_src);
+    setDensityInputs(shader);
+
+    const glm::mat4 eye_to_world(glm::mat3(glm::inverse(get_current_modelview())));
+    shader.uniformMatrix4fv(s_eye_to_world, 1, GL_FALSE, glm::value_ptr(eye_to_world));
+    const F32 fov = LLViewerCamera::getInstance()->getView();
+    shader.uniform1f(s_pixel_angle, 2.f * std::tan(fov * 0.5f) / (F32)llmax(target.getHeight(), 1u));
+    shader.uniform1i(s_steps, steps);
+    shader.uniform1i(s_samples, samples);
+
+    LLEnvironment& environment = LLEnvironment::instance();
+    shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
+    shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+
+    gPipeline.mScreenTriangleVB->setBuffer();
+    gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    clearDensityInputs(shader);
+    gPipeline.unbindDeferredShader(shader);
+    target.flush();
+}
+
+void IDVolumetricClouds::composite(LLRenderTarget* depth_src)
+{
+    static LLStaticHashedString s_haze_compensate("id_haze_compensate");
+
+    LLGLSLShader& shader = gIDCloudsCompositeProgram;
+    gPipeline.bindDeferredShader(shader, nullptr, depth_src);
+    shader.bindTexture(LLShaderMgr::ID_CLOUD_SCENE, &mSceneRT, false, LLTexUnit::TFO_POINT, 0);
+
+    LLEnvironment& environment = LLEnvironment::instance();
+    shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
+    shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+    shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
+    shader.uniform1i(s_haze_compensate, LLPipeline::RenderDeferredAtmospheric ? 1 : 0);
+
+    gGL.setColorMask(true, true);
+    LLGLEnable blend(GL_BLEND);
+    gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
+
+    gPipeline.mScreenTriangleVB->setBuffer();
+    gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    shader.disableTexture(LLShaderMgr::ID_CLOUD_SCENE);
+    gPipeline.unbindDeferredShader(shader);
 }
 
 void IDVolumetricClouds::bindForSampling(LLGLSLShader& shader)
