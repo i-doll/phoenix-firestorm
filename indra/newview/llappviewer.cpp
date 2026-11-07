@@ -935,17 +935,25 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
     std::error_code ec;
     const fsyspath src(firestorm_dir);
     const fsyspath dst(idyll_dir);
-    if (!fs::is_directory(src, ec))
-    {
-        return false;
-    }
-
     fs::path pending = dst;
     pending += ".migration-pending";
     const int attempts = idReadAttempts(pending);
+    auto clear_pending = [&]()
+    {
+        if (!idRetryFs([&](std::error_code& e) { fs::remove(pending, e); }, ec))
+        {
+            sIdyllMigrationWarn += "Could not remove " + fsyspath(pending).string() + ": " + ec.message() + "\n";
+        }
+    };
+
+    if (!fs::is_directory(src, ec))
+    {
+        clear_pending();
+        return false;
+    }
     if (attempts >= ID_MIGRATION_MAX_ATTEMPTS)
     {
-        fs::remove(pending, ec);
+        clear_pending();
         sIdyllMigrationWarn += "Gave up copying Firestorm user data after " + std::to_string(attempts) + " failed attempts\n";
         return false;
     }
@@ -956,6 +964,7 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
     {
         if (attempts == 0 || !fs::is_directory(dst_status))
         {
+            clear_pending();
             return false;
         }
         std::ofstream(pending, std::ios::trunc) << (attempts + 1);
@@ -1067,10 +1076,7 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
         fs::remove_all(tmp, ec);
         return false;
     }
-    if (!idRetryFs([&](std::error_code& e) { fs::remove(pending, e); }, ec))
-    {
-        sIdyllMigrationWarn += "Could not remove " + fsyspath(pending).string() + ": " + ec.message() + "\n";
-    }
+    clear_pending();
     sIdyllMigrationInfo = "Copied Firestorm user data from " + firestorm_dir + " to " + idyll_dir + ": "
         + std::to_string(copied) + " entries, " + std::to_string(failed) + " failed. Skipped the cache folder and crash markers, and cleared saved cache locations."
         + set_aside_note;
