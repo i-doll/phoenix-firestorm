@@ -15676,4 +15676,72 @@ Folder names cannot contain / or \.
       <button default="true" index="1" name="Cancel" text="Cancel" />
     </form>
   </notification>
+  <!-- <FS:Trish> Experimental settings presets -->
+  <notification
+   icon="alertmodal.tga"
+   label="Save Experimental Preset"
+   name="FSExperimentalPresetSaveAs"
+   type="alertmodal">
+    <unique/>
+Save the settings of the Photo, Effects, Rendering, Shadows and Performance tabs as preset:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="message" type="text" default="true">
+[NAME]
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="FSExperimentalPresetOverwrite"
+   type="alertmodal">
+A preset named "[NAME]" already exists. Replace it with the current settings?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Replace"/>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="FSExperimentalPresetDelete"
+   type="alertmodal">
+Delete the preset "[NAME]"?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="FSExperimentalPresetNameReserved"
+   type="alertmodal">
+"[NAME]" is the name of a built-in preset. Please choose another name.
+    <tag>fail</tag>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="FSExperimentalPresetSaveFailed"
+   type="alertmodal">
+Couldn't save the preset "[NAME]".
+    <tag>fail</tag>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="FSExperimentalPresetLoadFailed"
+   type="alertmodal">
+Couldn't read the preset "[NAME]". The file is missing or not a valid preset.
+    <tag>fail</tag>
+  </notification>
+  <!-- </FS:Trish> -->
 </notifications>

@@ -821,11 +821,39 @@ void FSDecodedTextureCache::evictIfNeeded()
 //----------------------------------------------------------------------------
 // Preferences > Experimental shows how the cache is doing
 
+#include "llbutton.h"
+#include "llcombobox.h"
+#include "lldiriterator.h"
+#include "llnotificationsutil.h"
+#include "llsdserialize.h"
 #include "lltextbox.h"
+#include "lluri.h"
+
+#include <boost/algorithm/string.hpp>
+#include <list>
+#include <set>
+
+FSPanelPreferenceExperimental::FSPanelPreferenceExperimental()
+{
+    // <FS:Trish> Preset bar above the tabs
+    mCommitCallbackRegistrar.add("FSExperimental.PresetSelect", [this](LLUICtrl*, const LLSD&) { updatePresetButtons(); });
+    mCommitCallbackRegistrar.add("FSExperimental.PresetLoad", [this](LLUICtrl*, const LLSD&) { onPresetLoad(); });
+    mCommitCallbackRegistrar.add("FSExperimental.PresetSaveAs", [this](LLUICtrl*, const LLSD&) { onPresetSaveAs(); });
+    mCommitCallbackRegistrar.add("FSExperimental.PresetDelete", [this](LLUICtrl*, const LLSD&) { onPresetDelete(); });
+    // </FS:Trish>
+}
 
 bool FSPanelPreferenceExperimental::postBuild()
 {
     mCacheStats = findChild<LLTextBox>("decoded_texture_cache_stats");
+
+    // <FS:Trish> Presets
+    mPresetCombo = findChild<LLComboBox>("experimental_preset_combo");
+    mPresetLoadBtn = findChild<LLButton>("experimental_preset_load");
+    mPresetDeleteBtn = findChild<LLButton>("experimental_preset_delete");
+    refreshPresetList(LLStringUtil::null);
+    // </FS:Trish>
+
     return LLPanelPreference::postBuild();
 }
 
@@ -861,5 +889,406 @@ std::string FSPanelPreferenceExperimental::formatStats() const
     args["[REMOVED]"] = llformat("%u", stats.mRemoved);
     return getString("decoded_cache_stats", args);
 }
+
+//------------------------------------------------------------------------
+// <FS:Trish> Presets of the rendering tabs' settings.
+//
+// A preset file is an LLSD map { Version: 1, Settings: { name: value, ... } }. A preset covers
+// every setting a control on the Photo, Effects, Rendering, Shadows and Performance tabs is
+// bound to, found by walking those tabs whenever a preset is saved or loaded, so settings added
+// to the tabs later are covered without listing them anywhere. Loading sets the settings in the
+// file and resets every other covered setting to its default, so a preset fully defines the
+// state. "Stock Firestorm" is the empty preset, all defaults. Built-in presets ship in
+// app_settings/experimental_presets and are read-only; user presets are saved in
+// user_settings/experimental_presets, one file per preset named after the escaped name.
+
+namespace
+{
+    constexpr const char* PRESET_DIR = "experimental_presets";
+    constexpr const char* PRESET_STOCK = "stock";
+    constexpr const char* PRESET_BUILTIN_PREFIX = "builtin:";
+    constexpr const char* PRESET_USER_PREFIX = "user:";
+    constexpr S32 PRESET_VERSION = 1;
+    constexpr size_t PRESET_NAME_MAX_LENGTH = 64;
+
+    std::string userPresetDir()
+    {
+        const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESET_DIR);
+        if (!gDirUtilp->fileExists(dir))
+        {
+            LLFile::mkdir(dir);
+        }
+        return dir;
+    }
+
+    std::string builtinPresetDir()
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESET_DIR);
+    }
+
+    std::string presetPath(const std::string& dir, const std::string& name)
+    {
+        return gDirUtilp->add(dir, LLURI::escape(name) + ".xml");
+    }
+
+    // Names of the presets in a directory, sorted
+    std::vector<std::string> listPresets(const std::string& dir)
+    {
+        std::vector<std::string> names;
+        if (!gDirUtilp->fileExists(dir))
+        {
+            return names;
+        }
+        LLDirIterator iter(dir, "*.xml");
+        std::string file;
+        while (iter.next(file))
+        {
+            names.push_back(LLURI::unescape(gDirUtilp->getBaseFileName(file, true)));
+        }
+        std::sort(names.begin(), names.end(), [](const std::string& a, const std::string& b)
+        {
+            return LLStringUtil::compareDict(a, b) < 0;
+        });
+        return names;
+    }
+
+    // Reads the settings map of a preset file
+    bool readPresetFile(const std::string& path, LLSD& settings)
+    {
+        llifstream file(path.c_str());
+        if (!file.is_open())
+        {
+            LL_WARNS("Preferences") << "Cannot open experimental preset " << path << LL_ENDL;
+            return false;
+        }
+        LLSD preset;
+        if (LLSDSerialize::fromXML(preset, file) == LLSDParser::PARSE_FAILURE || !preset.isMap()
+            || !preset.has("Settings") || !preset["Settings"].isMap())
+        {
+            LL_WARNS("Preferences") << "Experimental preset " << path << " is not a valid preset file" << LL_ENDL;
+            return false;
+        }
+        settings = preset["Settings"];
+        return true;
+    }
+
+    bool writePresetFile(const std::string& path, const LLSD& settings)
+    {
+        LLSD preset;
+        preset["Version"] = PRESET_VERSION;
+        preset["Settings"] = settings;
+        llofstream file(path.c_str());
+        if (!file.is_open())
+        {
+            LL_WARNS("Preferences") << "Cannot write experimental preset " << path << LL_ENDL;
+            return false;
+        }
+        LLSDSerialize::toPrettyXML(preset, file);
+        file.close();
+        return !file.fail();
+    }
+
+    // Converts a value read from a preset file to the type of the setting, false if it can't be
+    bool presetValueForControl(LLControlVariable* control, const LLSD& value, LLSD& result)
+    {
+        if (value.isUndefined())
+        {
+            return false;
+        }
+        switch (control->type())
+        {
+            case TYPE_LLSD:
+                result = value;
+                return true;
+            case TYPE_BOOLEAN:
+                // The setting itself parses "true", "false" and the like
+                result = value.isString() ? value : LLSD(value.asBoolean());
+                return !value.isArray() && !value.isMap();
+            case TYPE_U32:
+            case TYPE_S32:
+                result = value.asInteger();
+                return !value.isArray() && !value.isMap();
+            case TYPE_F32:
+                result = value.asReal();
+                return !value.isArray() && !value.isMap();
+            case TYPE_STRING:
+                result = value.asString();
+                return !value.isArray() && !value.isMap();
+            default:
+                // Vectors, colours, rectangles: an array as long as the default value
+                result = value;
+                return value.isArray() && value.size() == control->getDefault().size();
+        }
+    }
+}
+
+// Every setting a preset covers, by name
+FSPanelPreferenceExperimental::preset_controls_t FSPanelPreferenceExperimental::collectPresetControls()
+{
+    static const char* const PRESET_TABS[] =
+    {
+        "experimental_photo_tab",
+        "experimental_effects_tab",
+        "experimental_rendering_tab",
+        "experimental_shadows_tab",
+        "experimental_performance_tab"
+    };
+
+    // Settings on those tabs that are not part of the look, such as driver workarounds that
+    // need a restart, are listed in the panel's preset_excluded_settings string
+    std::set<std::string> excluded;
+    if (hasString("preset_excluded_settings"))
+    {
+        std::vector<std::string> list;
+        boost::split(list, getString("preset_excluded_settings"), boost::is_any_of(","));
+        for (std::string name : list)
+        {
+            LLStringUtil::trim(name);
+            excluded.insert(name);
+        }
+    }
+
+    preset_controls_t controls;
+    for (const char* tab_name : PRESET_TABS)
+    {
+        LLView* tab = findChild<LLView>(tab_name);
+        if (!tab)
+        {
+            continue;
+        }
+        std::list<LLView*> view_stack{ tab };
+        while (!view_stack.empty())
+        {
+            LLView* view = view_stack.front();
+            view_stack.pop_front();
+            if (LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view))
+            {
+                LLControlVariable* control = ctrl->getControlVariable();
+                if (control && !excluded.count(control->getName()))
+                {
+                    controls.emplace(control->getName(), control);
+                }
+            }
+            for (LLView* child : *view->getChildList())
+            {
+                view_stack.push_back(child);
+            }
+        }
+    }
+    return controls;
+}
+
+// Sets every covered setting from the preset, or to its default when the preset doesn't have
+// it, through the settings' own setters so their listeners run. Cancel restores the values
+// the floater was opened with, as for any other change on the panel.
+void FSPanelPreferenceExperimental::applyPreset(const LLSD& settings)
+{
+    for (const auto& [name, control] : collectPresetControls())
+    {
+        LLSD value;
+        if (settings.has(name) && presetValueForControl(control, settings[name], value))
+        {
+            control->set(value);
+        }
+        else
+        {
+            if (settings.has(name))
+            {
+                LL_WARNS("Preferences") << "Experimental preset: invalid value for " << name << ", using the default" << LL_ENDL;
+            }
+            if (!control->isDefault())
+            {
+                control->resetToDefault(true);
+            }
+        }
+    }
+}
+
+// Fills the preset combo: Stock Firestorm, the built-in presets, then the user's own. Selects
+// the given entry, else keeps the current one, else selects the first.
+void FSPanelPreferenceExperimental::refreshPresetList(const std::string& select_value)
+{
+    if (!mPresetCombo)
+    {
+        return;
+    }
+    std::string selection = select_value.empty() ? mPresetCombo->getValue().asString() : select_value;
+    mPresetCombo->removeall();
+
+    mPresetCombo->add(getString("preset_stock_name"), LLSD(PRESET_STOCK));
+    for (const std::string& name : listPresets(builtinPresetDir()))
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = name;
+        mPresetCombo->add(getString("preset_builtin_label", args), LLSD(PRESET_BUILTIN_PREFIX + name));
+    }
+    const std::vector<std::string> user_presets = listPresets(userPresetDir());
+    if (!user_presets.empty())
+    {
+        mPresetCombo->addSeparator();
+        for (const std::string& name : user_presets)
+        {
+            mPresetCombo->add(name, LLSD(PRESET_USER_PREFIX + name));
+        }
+    }
+
+    if (selection.empty() || !mPresetCombo->selectByValue(LLSD(selection)))
+    {
+        mPresetCombo->selectFirstItem();
+    }
+    updatePresetButtons();
+}
+
+std::string FSPanelPreferenceExperimental::selectedPreset() const
+{
+    return mPresetCombo ? mPresetCombo->getValue().asString() : std::string();
+}
+
+void FSPanelPreferenceExperimental::updatePresetButtons()
+{
+    const std::string selected = selectedPreset();
+    if (mPresetLoadBtn)
+    {
+        mPresetLoadBtn->setEnabled(!selected.empty());
+    }
+    if (mPresetDeleteBtn)
+    {
+        mPresetDeleteBtn->setEnabled(LLStringUtil::startsWith(selected, PRESET_USER_PREFIX));
+    }
+}
+
+void FSPanelPreferenceExperimental::onPresetLoad()
+{
+    const std::string selected = selectedPreset();
+    LLSD settings = LLSD::emptyMap();
+    std::string name = getString("preset_stock_name");
+    if (LLStringUtil::startsWith(selected, PRESET_BUILTIN_PREFIX))
+    {
+        name = selected.substr(strlen(PRESET_BUILTIN_PREFIX));
+        if (!readPresetFile(presetPath(builtinPresetDir(), name), settings))
+        {
+            LLNotificationsUtil::add("FSExperimentalPresetLoadFailed", LLSD().with("NAME", name));
+            return;
+        }
+    }
+    else if (LLStringUtil::startsWith(selected, PRESET_USER_PREFIX))
+    {
+        name = selected.substr(strlen(PRESET_USER_PREFIX));
+        if (!readPresetFile(presetPath(userPresetDir(), name), settings))
+        {
+            LLNotificationsUtil::add("FSExperimentalPresetLoadFailed", LLSD().with("NAME", name));
+            return;
+        }
+    }
+    else if (selected != PRESET_STOCK)
+    {
+        return;
+    }
+    LL_INFOS("Preferences") << "Loading experimental preset " << name << LL_ENDL;
+    applyPreset(settings);
+}
+
+void FSPanelPreferenceExperimental::onPresetSaveAs()
+{
+    LLSD args;
+    const std::string selected = selectedPreset();
+    if (LLStringUtil::startsWith(selected, PRESET_USER_PREFIX))
+    {
+        args["NAME"] = selected.substr(strlen(PRESET_USER_PREFIX));
+    }
+    LLHandle<FSPanelPreferenceExperimental> handle = getDerivedHandle<FSPanelPreferenceExperimental>();
+    LLNotificationsUtil::add("FSExperimentalPresetSaveAs", args, LLSD(),
+        [handle](const LLSD& notification, const LLSD& response)
+        {
+            FSPanelPreferenceExperimental* self = handle.get();
+            if (self && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+            {
+                self->onPresetNameEntered(response["message"].asString());
+            }
+        });
+}
+
+void FSPanelPreferenceExperimental::onPresetNameEntered(std::string name)
+{
+    LLStringUtil::trim(name);
+    if (name.empty())
+    {
+        return;
+    }
+    if (name.size() > PRESET_NAME_MAX_LENGTH)
+    {
+        name = utf8str_truncate(name, (S32)PRESET_NAME_MAX_LENGTH);
+        LLStringUtil::trim(name);
+    }
+
+    // Built-in names stay unambiguous in the list
+    std::vector<std::string> reserved = listPresets(builtinPresetDir());
+    reserved.push_back(getString("preset_stock_name"));
+    for (const std::string& builtin : reserved)
+    {
+        if (LLStringUtil::compareInsensitive(name, builtin) == 0)
+        {
+            LLNotificationsUtil::add("FSExperimentalPresetNameReserved", LLSD().with("NAME", name));
+            return;
+        }
+    }
+
+    if (gDirUtilp->fileExists(presetPath(userPresetDir(), name)))
+    {
+        LLHandle<FSPanelPreferenceExperimental> handle = getDerivedHandle<FSPanelPreferenceExperimental>();
+        LLNotificationsUtil::add("FSExperimentalPresetOverwrite", LLSD().with("NAME", name), LLSD(),
+            [handle, name](const LLSD& notification, const LLSD& response)
+            {
+                FSPanelPreferenceExperimental* self = handle.get();
+                if (self && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+                {
+                    self->savePreset(name);
+                }
+            });
+        return;
+    }
+    savePreset(name);
+}
+
+void FSPanelPreferenceExperimental::savePreset(const std::string& name)
+{
+    LLSD settings = LLSD::emptyMap();
+    for (const auto& [setting, control] : collectPresetControls())
+    {
+        settings[setting] = control->getValue();
+    }
+    if (!writePresetFile(presetPath(userPresetDir(), name), settings))
+    {
+        LLNotificationsUtil::add("FSExperimentalPresetSaveFailed", LLSD().with("NAME", name));
+        return;
+    }
+    LL_INFOS("Preferences") << "Saved experimental preset " << name << " with " << settings.size() << " settings" << LL_ENDL;
+    refreshPresetList(PRESET_USER_PREFIX + name);
+}
+
+void FSPanelPreferenceExperimental::onPresetDelete()
+{
+    const std::string selected = selectedPreset();
+    if (!LLStringUtil::startsWith(selected, PRESET_USER_PREFIX))
+    {
+        return;
+    }
+    const std::string name = selected.substr(strlen(PRESET_USER_PREFIX));
+    LLHandle<FSPanelPreferenceExperimental> handle = getDerivedHandle<FSPanelPreferenceExperimental>();
+    LLNotificationsUtil::add("FSExperimentalPresetDelete", LLSD().with("NAME", name), LLSD(),
+        [handle, name](const LLSD& notification, const LLSD& response)
+        {
+            if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+            {
+                return;
+            }
+            LLFile::remove(presetPath(userPresetDir(), name));
+            if (FSPanelPreferenceExperimental* self = handle.get())
+            {
+                self->refreshPresetList(PRESET_STOCK);
+            }
+        });
+}
+// </FS:Trish>
 
 static LLPanelInjector<FSPanelPreferenceExperimental> t_pref_experimental("panel_preference_experimental");

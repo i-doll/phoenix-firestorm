@@ -12,6 +12,10 @@
     <string name="decoded_cache_stats">[ENTRIES] textures, [USED] of [MAX] GB. This session: [LOADS] loaded, [STORES] stored, [REMOVED] removed.</string>
     <string name="decoded_cache_stats_off">Decoded texture cache is off.</string>
     <string name="decoded_cache_stats_indexing">Reading the decoded texture cache...</string>
+    <string name="preset_stock_name">Stock Firestorm</string>
+    <string name="preset_builtin_label">[NAME] (built-in)</string>
+    <!-- Settings on the preset tabs that presets leave alone: driver workarounds and skinning tests that need a restart -->
+    <string name="preset_excluded_settings">RenderAMDDisableShaderCache,RenderAMDDisableTextureThreading,RenderRiggedDirectNormals,RenderRiggedLocalOrigin,RenderRiggedPreciseMath</string>
     <text
      follows="left|top|right"
      height="18"
@@ -23,6 +27,68 @@
      width="520">
         Experimental and diagnostic settings. Some changes require a viewer restart.
     </text>
+    <text
+     follows="left|top"
+     height="18"
+     layout="topleft"
+     left="10"
+     name="experimental_preset_label"
+     tool_tip="Presets hold every setting on the Photo, Effects, Rendering, Shadows and Performance tabs. The General, Textures, Avatar and Five tabs are not included."
+     top="32"
+     width="50">
+        Preset:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="20"
+     layout="topleft"
+     left="62"
+     name="experimental_preset_combo"
+     tool_tip="Presets hold every setting on the Photo, Effects, Rendering, Shadows and Performance tabs; settings a preset doesn't list are set to their defaults when it is loaded. The General, Textures, Avatar and Five tabs are not included. Built-in presets can't be changed or deleted; Cancel undoes a loaded preset."
+     top="30"
+     width="200">
+        <combo_box.commit_callback
+         function="FSExperimental.PresetSelect" />
+    </combo_box>
+    <button
+     follows="left|top"
+     height="20"
+     label="Load"
+     layout="topleft"
+     left_pad="6"
+     name="experimental_preset_load"
+     tool_tip="Set the settings of the Photo, Effects, Rendering, Shadows and Performance tabs from the selected preset. Settings it doesn't list go back to their defaults. Cancel undoes it."
+     top="30"
+     width="60">
+        <button.commit_callback
+         function="FSExperimental.PresetLoad" />
+    </button>
+    <button
+     follows="left|top"
+     height="20"
+     label="Save as..."
+     layout="topleft"
+     left_pad="6"
+     name="experimental_preset_save"
+     tool_tip="Save the current settings of the Photo, Effects, Rendering, Shadows and Performance tabs as a new preset, or replace one of your own."
+     top="30"
+     width="80">
+        <button.commit_callback
+         function="FSExperimental.PresetSaveAs" />
+    </button>
+    <button
+     follows="left|top"
+     height="20"
+     label="Delete"
+     layout="topleft"
+     left_pad="6"
+     name="experimental_preset_delete"
+     tool_tip="Delete the selected preset. Only your own presets can be deleted."
+     top="30"
+     width="60">
+        <button.commit_callback
+         function="FSExperimental.PresetDelete" />
+    </button>
     <tab_container
      follows="all"
      layout="topleft"
@@ -31,7 +97,7 @@
      right="-1"
      tab_min_width="60"
      tab_position="top"
-     top="28"
+     top="56"
      bottom="-1">
         <panel
          follows="all"

@@ -33,6 +33,7 @@
 #include "threadpool_fwd.h"
 
 #include <atomic>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -163,16 +164,38 @@ private:
 #include "llfloaterpreference.h"
 #include "llframetimer.h"
 
+class LLButton;
+class LLComboBox;
+class LLControlVariable;
 class LLTextBox;
 
 class FSPanelPreferenceExperimental : public LLPanelPreference
 {
 public:
+    FSPanelPreferenceExperimental();
     bool postBuild() override;
     void draw() override;
 
 private:
     std::string formatStats() const;
+
+    // <FS:Trish> Presets of the rendering tabs' settings
+    typedef std::map<std::string, LLControlVariable*> preset_controls_t;
+    preset_controls_t collectPresetControls();
+    void applyPreset(const LLSD& settings);
+    void refreshPresetList(const std::string& select_value);
+    std::string selectedPreset() const;
+    void updatePresetButtons();
+    void onPresetLoad();
+    void onPresetSaveAs();
+    void onPresetNameEntered(std::string name);
+    void savePreset(const std::string& name);
+    void onPresetDelete();
+
+    LLComboBox* mPresetCombo = nullptr;
+    LLButton* mPresetLoadBtn = nullptr;
+    LLButton* mPresetDeleteBtn = nullptr;
+    // </FS:Trish>
 
     LLTextBox* mCacheStats = nullptr;
     LLFrameTimer mStatsTimer;

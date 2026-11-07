@@ -1,0 +1,61 @@
+<?xml version="1.0" ?>
+<!-- Built-in Experimental preset. Settings not listed here are set to their defaults when it is loaded. -->
+<llsd>
+<map>
+  <key>Version</key>
+  <integer>1</integer>
+  <key>Settings</key>
+  <map>
+    <key>FSPerfAlphaResortOnly</key>
+    <boolean>1</boolean>
+    <key>FSPerfAttachmentExtentsCache</key>
+    <boolean>1</boolean>
+    <key>FSPerfAudioThrottleChecks</key>
+    <boolean>1</boolean>
+    <key>FSPerfHeroProbeSkipHiddenFaces</key>
+    <boolean>1</boolean>
+    <key>FSPerfInventoryIdleThrottle</key>
+    <boolean>1</boolean>
+    <key>FSPerfLightRescanThrottle</key>
+    <boolean>1</boolean>
+    <key>FSPerfProbeUniformCache</key>
+    <boolean>1</boolean>
+    <key>FSPerfRiggedPaletteCache</key>
+    <boolean>1</boolean>
+    <key>FSPerfShadowMergedBatches</key>
+    <boolean>1</boolean>
+    <key>FSRenderBloom</key>
+    <boolean>1</boolean>
+    <key>FSRenderBloomStrength</key>
+    <real>0.12</real>
+    <key>FSRenderBloomThreshold</key>
+    <real>1.0</real>
+    <key>FSRenderCloudShadowStrength</key>
+    <real>0.5</real>
+    <key>FSRenderCloudShadows</key>
+    <boolean>1</boolean>
+    <key>FSRenderContactShadowLength</key>
+    <real>0.5</real>
+    <key>FSRenderContactShadowStrength</key>
+    <real>0.8</real>
+    <key>FSRenderContactShadows</key>
+    <boolean>1</boolean>
+    <key>FSRenderShadowFastFilter</key>
+    <boolean>1</boolean>
+    <key>FSRenderShadowTexelSnap</key>
+    <boolean>1</boolean>
+    <key>FSRenderSpecularAA</key>
+    <boolean>1</boolean>
+    <key>FSRenderSpecularAAStrength</key>
+    <real>0.25</real>
+    <key>FSRenderSpecularAAThreshold</key>
+    <real>0.18</real>
+    <key>FSRenderSunRays</key>
+    <boolean>1</boolean>
+    <key>FSRenderSunRaysResolution</key>
+    <real>0.5</real>
+    <key>FSRenderSunRaysSteps</key>
+    <integer>24</integer>
+  </map>
+</map>
+</llsd>

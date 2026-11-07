@@ -118,6 +118,10 @@ class ViewerManifest(LLManifest,FSViewerManifest):
                 # ... and the default camera position settings
                 self.path("camera")
 
+                # <FS:Trish> Built-in presets of the Experimental preferences
+                self.path("experimental_presets")
+                # </FS:Trish>
+
                 # ... and the entire windlight directory
                 self.path("windlight")
 
