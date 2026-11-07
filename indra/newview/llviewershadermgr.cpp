@@ -223,6 +223,7 @@ LLGLSLShader            gIDCloudsUpsampleProgram;
 LLGLSLShader            gIDCloudsFroxelProgram;
 LLGLSLShader            gIDCloudsFroxelAccumProgram;
 // </ID:VolumetricClouds>
+LLGLSLShader            gFSDynResUpscaleProgram; // <FS:Trish/> Dynamic resolution
 // </FS:Trish>
 LLGLSLShader            gFSLocalTonemapLumProgram; // <FS:Trish/> Local tone mapping
 LLGLSLShader            gFSSkinSSSProgram; // <FS:Trish/>
@@ -1490,6 +1491,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSBloomUpProgram.unload();
         gFSLensDirtProgram.unload();
         gFSLensEffectsProgram.unload();
+        gFSDynResUpscaleProgram.unload(); // <FS:Trish/> Dynamic resolution
         gFSLocalTonemapLumProgram.unload(); // <FS:Trish/> Local tone mapping
         gFSSkinSSSProgram.unload(); // <FS:Trish/>
         // </FS:Trish>
@@ -3051,6 +3053,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             { &gFSLensDirtProgram,         "FS Lens Dirt",          "deferred/fsLensDirtF.glsl",         false },
             { &gFSLensEffectsProgram,      "FS Lens Effects",       "deferred/fsLensEffectsF.glsl",      false },
             { &gFSLocalTonemapLumProgram,  "FS Local Tonemap Base", "deferred/fsLocalTonemapLumF.glsl",  false },
+            { &gFSDynResUpscaleProgram,    "FS Dynamic Resolution Upscale", "deferred/fsDynResUpscaleF.glsl", false }, // <FS:Trish/>
         };
         for (const FSPostShader& post : fs_post_shaders)
         {

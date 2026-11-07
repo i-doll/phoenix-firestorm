@@ -271,6 +271,7 @@ extern LLGLSLShader         gFSBloomDownProgram;
 extern LLGLSLShader         gFSBloomUpProgram;
 extern LLGLSLShader         gFSLensDirtProgram;
 extern LLGLSLShader         gFSLensEffectsProgram;
+extern LLGLSLShader         gFSDynResUpscaleProgram; // <FS:Trish/> Dynamic resolution
 // </FS:Trish>
 
 // <ID:VolumetricClouds>

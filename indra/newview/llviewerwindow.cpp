@@ -240,6 +240,7 @@
 #include "idvolumetriccloudsettings.h"
 #include <optional>
 // </ID:VolumetricClouds>
+#include "fsdynamicresolution.h" // <FS:Trish/> Dynamic resolution
 
 #include "lltracerecording.h"
 
@@ -6206,6 +6207,8 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         return false;
     }
 
+    FSDynamicResolution::SnapshotGuard dynamic_resolution_off; // <FS:Trish/> Snapshots render at full resolution
+
     //check if there is enough memory for the snapshot image
     if(image_width * image_height > (1 << 22)) //if snapshot image is larger than 2K by 2K
     {
@@ -6628,6 +6631,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_height, const int num_render_passes)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
+    FSDynamicResolution::SnapshotGuard dynamic_resolution_off; // <FS:Trish/> Snapshots render at full resolution
     gDisplaySwapBuffers = false;
 
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // stencil buffer is deprecated | GL_STENCIL_BUFFER_BIT);

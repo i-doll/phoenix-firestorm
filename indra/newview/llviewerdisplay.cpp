@@ -96,6 +96,7 @@
 // [/RLVa:KB]
 #include "llpresetsmanager.h"
 #include "fsdata.h"
+#include "fsdynamicresolution.h" // <FS:Trish/> Dynamic resolution
 
 // <FS:PP> Render chat range spheres in 3D world
 #include "lfsimfeaturehandler.h"
@@ -931,6 +932,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 2")
+            FSDynamicResolution::beginScene(for_snapshot); // <FS:Trish/> Dynamic resolution: may resize the screen targets, starts the GPU timing
             if (gResizeScreenTexture)
             {
                 gPipeline.resizeScreenTexture();
@@ -1661,6 +1663,7 @@ void render_ui(F32 zoom_factor, int subfield)
 
     // apply gamma correction and post effects
     gPipeline.renderFinalize();
+    FSDynamicResolution::endScene(); // <FS:Trish/> Dynamic resolution: ends the GPU timing
 
     {
         LLGLState::checkStates();
