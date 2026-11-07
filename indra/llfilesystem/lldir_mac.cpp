@@ -64,7 +64,7 @@ LLDir_Mac::LLDir_Mac()
 {
     mDirDelimiter = "/";
 
-    const std::string     secondLifeString = "Firestorm";
+    const std::string     secondLifeString = "Idyll";
 
     std::string executablepathstr = getSystemExecutableFolder();
 

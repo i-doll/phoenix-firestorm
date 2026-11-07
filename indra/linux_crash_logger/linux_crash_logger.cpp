@@ -54,8 +54,8 @@ int main(int argc, char **argv)
 
     if( strAsk == "ask" )
     {
-        int ret = system("zenity --question --title='Firestorm Crash' "
-                         "--text='Firestorm has crashed. Submit the minidump?' "
+        int ret = system("zenity --question --title='Idyll Crash' "
+                         "--text='Idyll has crashed. Submit the minidump?' "
                          "--ok-label='Yes' --cancel-label='No' 2>/dev/null");
         if (WIFEXITED(ret) && WEXITSTATUS(ret) != 0)
         {
@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 
         field = curl_mime_addpart(form);
         curl_mime_name(field, "product");
-        curl_mime_data(field, "Firestorm-Releasex64", CURL_ZERO_TERMINATED);
+        curl_mime_data(field, "Idyll-Releasex64", CURL_ZERO_TERMINATED);
 
         field = curl_mime_addpart(form);
         curl_mime_name(field, "version");
@@ -118,7 +118,7 @@ if (auto curl_handle = curl_easy_init()) {
     // Add the 'product' part
     curl_formadd(&formpost, &lastptr,
                  CURLFORM_COPYNAME, "product",
-                 CURLFORM_COPYCONTENTS, "Firestorm-Releasex64",
+                 CURLFORM_COPYCONTENTS, "Idyll-Releasex64",
                  CURLFORM_END);
 
     // Add the 'version' part

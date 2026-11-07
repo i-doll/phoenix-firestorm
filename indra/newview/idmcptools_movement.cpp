@@ -1385,7 +1385,7 @@ void idmcp_register_movement_tools(IDMCPToolRegistry& reg)
         IDMCPTool t;
         t.name = "ao.getStatus";
         t.description =
-            "Firestorm Animation Overlay (AO) status: {enabled, stands_enabled, "
+            "Idyll Animation Overlay (AO) status: {enabled, stands_enabled, "
             "current_set, sets:[names]}. No arguments.";
         t.input_schema = boost::json::parse(
             R"({"type":"object","properties":{},"additionalProperties":false})");
@@ -1414,7 +1414,7 @@ void idmcp_register_movement_tools(IDMCPToolRegistry& reg)
         IDMCPTool t;
         t.name = "ao.setEnabled";
         t.description =
-            "Turn the Firestorm AO on or off ({\"enabled\"} boolean). Returns "
+            "Turn the Idyll AO on or off ({\"enabled\"} boolean). Returns "
             "{enabled}.";
         t.input_schema = boost::json::parse(
             R"({"type":"object","properties":{"enabled":{"type":"boolean"}},"required":["enabled"],"additionalProperties":false})");

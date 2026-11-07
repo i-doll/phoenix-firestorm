@@ -306,7 +306,7 @@ static std::wstring get_app_name()
     //    channel.replace(channel.size() - release_suffix.size(), release_suffix.size(), L" Viewer");
     //}
     //return channel;
-    std::wstring prefix = L"Firestorm";
+    std::wstring prefix = L"Idyll";
     if (channel.starts_with(prefix))
         channel.erase(0, prefix.size());
 #ifdef OPENSIM
@@ -892,7 +892,7 @@ static void on_first_run(void* p_user_data, const char* app_version)
 
         // <FS:TJ> Look for Firestorms settings.xml and not LL's
         //std::string user_settings_path = app_data_path + "\\SecondLife\\user_settings\\settings.xml";
-        std::string user_settings_path = app_data_path + "\\Firestorm_x64\\user_settings\\settings.xml";
+        std::string user_settings_path = app_data_path + "\\Idyll_x64\\user_settings\\settings.xml";
         // </FS:TJ>
         LLControlGroup settings("global");
         if (settings.loadFromFile(user_settings_path))
