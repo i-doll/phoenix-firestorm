@@ -36,6 +36,8 @@ float idAltitude(vec3 rel)
 uniform mat4  id_eye_to_world;
 uniform int   id_steps;
 uniform int   id_samples;
+uniform int   id_light_steps;
+uniform int   id_detail_noise;
 // The pixels being marched belong to a grid of id_march_grid size (half the screen size, possibly
 // fractional, at half resolution). Each fragment marches the grid pixel at its own coordinate times
 // id_march_block plus id_march_offset.
@@ -196,11 +198,14 @@ float idPhase(float cos_theta, float scale)
 
 float idLightOpticalDepth(vec3 rel, vec3 light_w, float footprint_m)
 {
+    // Step lengths double each step and always add up to 1890 m, so fewer steps reach as far.
+    int steps = clamp(id_light_steps, 1, 6);
+    float first = 1890.0 / (exp2(float(steps)) - 1.0);
     float od = 0.0;
     float dist = 0.0;
-    for (int j = 0; j < 6; ++j)
+    for (int j = 0; j < steps; ++j)
     {
-        float len = 30.0 * exp2(float(j));
+        float len = first * exp2(float(j));
         vec3 p = rel + light_w * (dist + 0.5 * len);
         dist += len;
         vec3 wp = vec3(id_camera_global.xy + p.xy, idAltitude(p));
@@ -290,7 +295,7 @@ void idMarch(vec3 dir, float scene_t, int steps, float jitter, float pixel_angle
         vec3 wp = vec3(id_camera_global.xy + rel.xy, alt);
         float footprint = max(t * pixel_angle, 1.0);
 
-        float dens = idCloudDensityAll(wp, footprint, false) * (1.0 - smoothstep(ID_FADE_START, ID_MAX_DIST, t));
+        float dens = idCloudDensityAll(wp, footprint, id_detail_noise == 0) * (1.0 - smoothstep(ID_FADE_START, ID_MAX_DIST, t));
         if (dens <= 0.0)
         {
             continue;

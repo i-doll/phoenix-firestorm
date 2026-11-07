@@ -36,7 +36,7 @@ public:
     void renderShadowMap();
     void render(LLRenderTarget* screen, LLRenderTarget* depth_src);
     void bindForSampling(LLGLSLShader& shader);
-    void onHazeApplied() { mHazePending = false; }
+    void onHazeApplied();
 
 private:
     void cleanupSingleton() override;
@@ -47,15 +47,17 @@ private:
     bool ensureSceneTarget(U32 width, U32 height);
     void setDensityInputs(LLGLSLShader& shader);
     void clearDensityInputs(LLGLSLShader& shader);
-    void march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples,
+    void march(LLRenderTarget& target, LLRenderTarget* depth_src, S32 steps, S32 samples, S32 light_steps, bool detail,
                const glm::vec2& grid, const glm::ivec2& block, const glm::ivec2& offset);
     bool renderLive(LLRenderTarget* depth_src);
     bool ensureLiveTargets(U32 width, U32 height);
     bool historyUsable(const LLVector3d& camera) const;
     void reproject(LLRenderTarget& target, LLRenderTarget& history, LLRenderTarget* depth_src,
                    const glm::mat4& to_last_eye, const glm::vec2& grid, const glm::ivec2& offset);
-    void upsample(LLRenderTarget& source, LLRenderTarget* depth_src, const glm::vec2& grid);
-    void composite(LLRenderTarget* depth_src);
+    void upsample(LLRenderTarget& source, LLRenderTarget& dest, LLRenderTarget* depth_src, const glm::vec2& grid);
+    void composite(LLRenderTarget& scene, LLRenderTarget* depth_src, bool haze_compensate);
+    void renderProbe(LLRenderTarget* screen, LLRenderTarget* depth_src);
+    bool ensureProbeTargets(U32 slot, U32 width, U32 height);
     bool sceneMatchesTarget() const;
 
     U32 mNoiseBase   = 0;
@@ -80,6 +82,12 @@ private:
     U32 mTemporalIndex = 0;
     LLVector3d mHistoryCamera;
     LLVector3d mHistoryOrigin;
+
+    // Reflection probe and hero probe faces, one slot each since both can update in one frame.
+    // The march runs at a quarter of the face size and is upsampled to the face size.
+    LLRenderTarget mProbeMarchRT[2];
+    LLRenderTarget mProbeSceneRT[2];
+    bool mWasActive = false;
 
     // R16F sunlight transmittance through all layers, top-down around the camera.
     LLRenderTarget mShadowRT;

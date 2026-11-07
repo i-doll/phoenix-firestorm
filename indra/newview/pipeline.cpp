@@ -10502,7 +10502,7 @@ void LLPipeline::renderDeferredLighting()
     }
 
     // <ID:VolumetricClouds>
-    if (!gCubeSnapshot && IDVolumetricClouds::instance().isActive())
+    if (IDVolumetricClouds::instance().isActive())
     {
         LL_PROFILE_GPU_ZONE("volumetric clouds");
         IDVolumetricClouds::instance().render(screen_target, &mRT->deferredScreen);
