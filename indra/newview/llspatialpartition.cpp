@@ -385,7 +385,10 @@ void LLSpatialPartition::rebuildGeom(LLSpatialGroup* group)
             group->mBuilt = 1.f;
             if (group->mVertexBuffer.isNull() ||
                 group->mVertexBuffer->getNumVerts() != vertex_count ||
-                group->mVertexBuffer->getNumVerts() != index_count)
+                // <FS:Trish> Compare the index count with the buffer's indices, not its vertices
+                //group->mVertexBuffer->getNumVerts() != index_count)
+                group->mVertexBuffer->getNumIndices() != index_count)
+                // </FS:Trish>
             {
                 group->mVertexBuffer = new LLVertexBuffer(mVertexDataMask);
                 if (!group->mVertexBuffer->allocateBuffer(vertex_count, index_count))
