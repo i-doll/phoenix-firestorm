@@ -139,6 +139,7 @@
 #include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
 #include "fsdynamicresolution.h" // <FS:Trish/> Dynamic resolution
 #include "fsrepresentativefragment.h" // <FS:Trish/> Representative fragment test for occlusion queries
+#include "fsvrs.h" // <FS:Trish/> Variable rate shading
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -1522,6 +1523,7 @@ void LLPipeline::releaseGLBuffers()
     }
 
     releaseLUTBuffers();
+    FSVRS::releaseGL(); // <FS:Trish/> Variable rate shading
 
     mWaterDis.release();
 
@@ -10389,6 +10391,8 @@ void LLPipeline::renderFinalize()
         renderDoF(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
+
+    FSVRS::buildRateImage(sourceBuffer, &mRT->deferredScreen); // <FS:Trish/> Variable rate shading: next frame's rates
 
      if (RenderFSAAType == 1)
     {

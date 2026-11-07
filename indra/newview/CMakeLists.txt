@@ -234,6 +234,7 @@ set(viewer_SOURCE_FILES
     fsskinonce.cpp
     fsssrhiz.cpp
     fsvirtualtrackpad.cpp
+    fsvrs.cpp
     fsworldmapmessage.cpp
     lggbeamcolormapfloater.cpp
     lggbeammapfloater.cpp
@@ -1141,6 +1142,7 @@ set(viewer_HEADER_FILES
     fsskinonce.h
     fsssrhiz.h
     fsvirtualtrackpad.h
+    fsvrs.h
     fsworldmapmessage.h
     lggbeamcolormapfloater.h
     lggbeammapfloater.h

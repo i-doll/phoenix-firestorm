@@ -27642,6 +27642,39 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSRenderVRSQuality</key>
+    <map>
+      <key>Comment</key>
+      <string>Variable rate shading: how much detail a tile may have and still be shaded coarsely, 0 to 1. Higher keeps more tiles at full rate (better quality, smaller saving); lower shades more tiles coarsely. Maps to a per pixel luminance step threshold of 0.05 (at 0) to 0.005 (at 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>FSRenderVRSPeriphery</key>
+    <map>
+      <key>Comment</key>
+      <string>Variable rate shading: extra coarsening towards the screen edges, 0 to 1. 0 treats the whole screen alike; 1 lets the corners be shaded coarsely with up to five times the contrast of the centre. Strong edges always stay at full rate.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSRenderVRSLogInterval</key>
+    <map>
+      <key>Comment</key>
+      <string>Variable rate shading: seconds between log lines giving the share of tiles at each shading rate and the average G-buffer pass GPU time with and without variable rate shading. 0 turns the log off.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>5.0</real>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
