@@ -771,6 +771,7 @@ namespace
 {
 std::string sIdyllMigrationInfo;
 std::string sIdyllMigrationWarn;
+constexpr int ID_MIGRATION_MAX_ATTEMPTS = 3;
 
 bool idHoldsFiles(const std::filesystem::path& dir)
 {
@@ -800,7 +801,82 @@ bool idSkipWhenMigrating(const std::filesystem::path& rel)
     return *top == "logs" && rel.filename().u8string().ends_with(u8"_marker");
 }
 
-void idRepointSettingsFile(const std::filesystem::path& file, const std::string& from, const std::string& to)
+template <typename Op>
+bool idRetryFs(Op op, std::error_code& ec)
+{
+    for (int attempt = 0; attempt < 5; ++attempt)
+    {
+        if (attempt > 0)
+        {
+            ms_sleep(200);
+        }
+        ec.clear();
+        op(ec);
+        if (!ec)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string idTrimSeparators(std::string dir)
+{
+    while (dir.size() > 1 && (dir.back() == '/' || dir.back() == '\\'))
+    {
+        dir.pop_back();
+    }
+    return dir;
+}
+
+int idReadAttempts(const std::filesystem::path& marker)
+{
+    std::ifstream in(marker);
+    if (!in)
+    {
+        return 0;
+    }
+    int attempts = 1;
+    in >> attempts;
+    return std::max(attempts, 1);
+}
+
+std::filesystem::path idUnusedPath(const std::filesystem::path& base)
+{
+    std::error_code ec;
+    std::filesystem::path candidate = base;
+    for (int n = 2; std::filesystem::exists(std::filesystem::symlink_status(candidate, ec)); ++n)
+    {
+        candidate = base;
+        candidate += "-" + std::to_string(n);
+    }
+    return candidate;
+}
+
+bool idBlankStringSetting(std::string& text, const std::string& name)
+{
+    const size_t key = text.find("<key>" + name + "</key>");
+    if (key == std::string::npos)
+    {
+        return false;
+    }
+    const size_t map_end = text.find("</map>", key);
+    const size_t value = text.find("<key>Value</key>", key);
+    if (value == std::string::npos || value > map_end)
+    {
+        return false;
+    }
+    const size_t start = text.find("<string>", value);
+    const size_t close = text.find("</string>", value);
+    if (start == std::string::npos || close == std::string::npos || close > map_end || start > close)
+    {
+        return false;
+    }
+    text.replace(start, close + 9 - start, "<string />");
+    return true;
+}
+
+void idRewriteSettingsFile(const std::filesystem::path& file, const std::string& from, const std::string& to, bool clear_cache_locations)
 {
     std::string text;
     {
@@ -829,6 +905,13 @@ void idRepointSettingsFile(const std::filesystem::path& file, const std::string&
             pos = after;
         }
     }
+    if (clear_cache_locations)
+    {
+        for (const char* name : { "CacheLocation", "NewCacheLocation", "NewCacheLocationTopFolder", "FSSoundCacheLocation" })
+        {
+            changed = idBlankStringSetting(text, name) || changed;
+        }
+    }
     if (changed)
     {
         std::ofstream out(file, std::ios::binary | std::ios::trunc);
@@ -840,9 +923,11 @@ void idRepointSettingsFile(const std::filesystem::path& file, const std::string&
     }
 }
 
-bool idMigrateFirestormUserData(const std::string& idyll_dir, const std::string& firestorm_dir)
+bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::string& firestorm_dir_in)
 {
     namespace fs = std::filesystem;
+    const std::string idyll_dir = idTrimSeparators(idyll_dir_in);
+    const std::string firestorm_dir = idTrimSeparators(firestorm_dir_in);
     if (idyll_dir.empty() || firestorm_dir.empty())
     {
         return false;
@@ -854,10 +939,39 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir, const std::string&
     {
         return false;
     }
+
+    fs::path pending = dst;
+    pending += ".migration-pending";
+    const int attempts = idReadAttempts(pending);
+    if (attempts >= ID_MIGRATION_MAX_ATTEMPTS)
+    {
+        fs::remove(pending, ec);
+        sIdyllMigrationWarn += "Gave up copying Firestorm user data after " + std::to_string(attempts) + " failed attempts\n";
+        return false;
+    }
+
+    std::string set_aside_note;
     const fs::file_status dst_status = fs::symlink_status(dst, ec);
     if (fs::exists(dst_status) && (!fs::is_directory(dst_status) || idHoldsFiles(dst)))
     {
-        return false;
+        if (attempts == 0 || !fs::is_directory(dst_status))
+        {
+            return false;
+        }
+        std::ofstream(pending, std::ios::trunc) << (attempts + 1);
+        fs::path before = dst;
+        before += ".before-migration";
+        const fs::path set_aside = idUnusedPath(before);
+        if (!idRetryFs([&](std::error_code& e) { fs::rename(dst, set_aside, e); }, ec))
+        {
+            sIdyllMigrationWarn += "Could not move " + idyll_dir + " aside to retry the copy: " + ec.message() + "\n";
+            return false;
+        }
+        set_aside_note = " Moved the folder left by the failed attempt to " + fsyspath(set_aside).string() + ".";
+    }
+    else
+    {
+        std::ofstream(pending, std::ios::trunc) << (attempts + 1);
     }
 
     fs::path tmp = dst;
@@ -919,14 +1033,14 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir, const std::string&
 
     if (ok)
     {
-        idRepointSettingsFile(tmp / "user_settings" / "settings.xml", firestorm_dir, idyll_dir);
+        idRewriteSettingsFile(tmp / "user_settings" / "settings.xml", firestorm_dir, idyll_dir, true);
         fs::directory_iterator account(tmp, ec);
         for (; !ec && account != fs::directory_iterator(); account.increment(ec))
         {
             std::error_code type_ec;
             if (account->is_directory(type_ec))
             {
-                idRepointSettingsFile(account->path() / "settings_per_account.xml", firestorm_dir, idyll_dir);
+                idRewriteSettingsFile(account->path() / "settings_per_account.xml", firestorm_dir, idyll_dir, false);
             }
         }
         ec.clear();
@@ -934,22 +1048,17 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir, const std::string&
         const fs::file_status final_status = fs::symlink_status(dst, ec);
         if (fs::exists(final_status))
         {
-            ok = fs::is_directory(final_status) && !idHoldsFiles(dst);
-            if (ok)
-            {
-                fs::remove_all(dst, ec);
-                ok = !ec;
-            }
+            ok = fs::is_directory(final_status) && !idHoldsFiles(dst)
+                && idRetryFs([&](std::error_code& e) { fs::remove_all(dst, e); }, ec);
         }
         if (ok)
         {
-            ec.clear();
-            fs::rename(tmp, dst, ec);
-            ok = !ec;
+            ok = idRetryFs([&](std::error_code& e) { fs::rename(tmp, dst, e); }, ec);
         }
         if (!ok)
         {
-            sIdyllMigrationWarn += "Could not move " + fsyspath(tmp).string() + " to " + idyll_dir + (ec ? ": " + ec.message() : "") + "\n";
+            sIdyllMigrationWarn += "Could not move " + fsyspath(tmp).string() + " to " + idyll_dir + (ec ? ": " + ec.message() : "")
+                + ". The copy is retried on the next launch.\n";
         }
     }
 
@@ -958,8 +1067,13 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir, const std::string&
         fs::remove_all(tmp, ec);
         return false;
     }
+    if (!idRetryFs([&](std::error_code& e) { fs::remove(pending, e); }, ec))
+    {
+        sIdyllMigrationWarn += "Could not remove " + fsyspath(pending).string() + ": " + ec.message() + "\n";
+    }
     sIdyllMigrationInfo = "Copied Firestorm user data from " + firestorm_dir + " to " + idyll_dir + ": "
-        + std::to_string(copied) + " entries, " + std::to_string(failed) + " failed. Skipped the cache folder and crash markers.";
+        + std::to_string(copied) + " entries, " + std::to_string(failed) + " failed. Skipped the cache folder and crash markers, and cleared saved cache locations."
+        + set_aside_note;
     return true;
 }
 
