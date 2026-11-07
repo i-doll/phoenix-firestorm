@@ -10866,6 +10866,20 @@ void LLPipeline::renderDeferredLighting()
                 // </ID:PCSS>
 
                 fs_bind_sun_shadow_extras(sun_shader, mat); // <FS:Trish/> cloud and contact shadows
+                // <FS:Trish> GTAO search radius (metres) and visibility exponent; only a sun
+                // program built with FS_GTAO has these uniforms
+                static LLCachedControl<bool> fs_gtao(gSavedSettings, "FSRenderGTAO", false);
+                if (fs_gtao)
+                {
+                    static LLCachedControl<F32> fs_gtao_radius(gSavedSettings, "FSRenderGTAORadius", 1.f);
+                    static LLCachedControl<F32> fs_gtao_intensity(gSavedSettings, "FSRenderGTAOIntensity", 1.5f);
+                    static LLStaticHashedString sGTAORadius("fs_gtao_radius");
+                    static LLStaticHashedString sGTAOIntensity("fs_gtao_intensity");
+                    sun_shader.uniform1f(sGTAORadius, llclamp((F32)fs_gtao_radius, 0.05f, 10.f));
+                    sun_shader.uniform1f(sGTAOIntensity, llclamp((F32)fs_gtao_intensity, 0.1f, 8.f));
+                }
+                // </FS:Trish>
+
                 mScreenTriangleVB->setBuffer();
                 // <FS:Trish> The sun shaders write every pixel of the full screen triangle (blend off, depth always)
                 //glClearColor(1, 1, 1, 1);

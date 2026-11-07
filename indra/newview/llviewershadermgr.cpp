@@ -2053,6 +2053,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredSunProgram);
         add_sun_shadow_extras(gDeferredSunProgram); // <FS:Trish/> cloud and contact shadows
 
+        // <FS:Trish> GTAO in place of the SSAO estimator, slice count compiled in
+        static LLCachedControl<bool> fs_gtao(gSavedSettings, "FSRenderGTAO", false);
+        static LLCachedControl<S32> fs_gtao_slices(gSavedSettings, "FSRenderGTAOSlices", 2);
+        if (use_ao && fs_gtao)
+        {
+            gDeferredSunProgram.addPermutation("FS_GTAO", "1");
+            gDeferredSunProgram.addPermutation("FS_GTAO_SLICES", llformat("%d", llclamp((S32)fs_gtao_slices, 1, 4)));
+            gDeferredSunProgram.mShaderFiles.push_back(make_pair("deferred/fsGTAOF.glsl", GL_FRAGMENT_SHADER));
+        }
+        // </FS:Trish>
+
         success = gDeferredSunProgram.createShader();
         llassert(success);
     }

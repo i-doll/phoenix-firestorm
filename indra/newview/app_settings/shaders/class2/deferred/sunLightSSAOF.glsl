@@ -41,6 +41,9 @@ float sampleDirectionalShadow(vec3 shadow_pos, vec3 norm, vec2 pos_screen);
 float fsSunShadowExtras(float shadow, vec3 pos, vec3 norm); // fsShadowExtrasF.glsl
 #endif
 float calcAmbientOcclusion(vec4 pos, vec3 norm, vec2 pos_screen);
+#ifdef FS_GTAO
+float fsCalcGTAO(vec3 pos, vec3 norm, vec2 pos_screen);
+#endif
 vec3 getGeoNorm(vec2 pos_screen);
 
 void main()
@@ -68,7 +71,11 @@ void main()
     // Geometric normal, not the shading one. The occlusion test compares neighbouring depths
     // against this plane, and depth knows nothing about normal-mapped detail -- testing against a
     // perturbed normal makes a flat wall occlude itself wherever its map has texture.
+#ifdef FS_GTAO
+    col.g = fsCalcGTAO(pos.xyz, getGeoNorm(pos_screen), pos_screen);
+#else
     col.g = calcAmbientOcclusion(pos, getGeoNorm(pos_screen), pos_screen);
+#endif
     col.b = 1.0f; // projector shadows are sampled per light in spotLightF
     col.a = 1.0f;
 
