@@ -15,7 +15,8 @@ label_pad_left - padding to the left of tab button labels
                tabs_flashing_color="ButtonFlashBgColor"
                label_pad_bottom="1"
                label_pad_left="4"
-               vertical_label_pad_left="14">
+               vertical_label_pad_left="14"
+               horizontal_label_pad="3">
   <!--
   Possible additional attributes for tabs:
   tab_bottom_image_flash

@@ -215,6 +215,7 @@ LLTabContainer::Params::Params()
     label_pad_bottom("label_pad_bottom"),
     label_pad_left("label_pad_left"),
     vertical_label_pad_left("vertical_label_pad_left"), // <ID:MaterialTheme/>
+    horizontal_label_pad("horizontal_label_pad", 0), // <ID:MaterialTheme/>
     tab_position("tab_position"),
     hide_tabs("hide_tabs", false),
     hide_scroll_arrows("hide_scroll_arrows", false),
@@ -257,6 +258,7 @@ LLTabContainer::LLTabContainer(const LLTabContainer::Params& p)
     mLabelPadBottom(p.label_pad_bottom),
     mLabelPadLeft(p.label_pad_left),
     mVerticalLabelPadLeft(p.vertical_label_pad_left.isProvided() ? std::make_optional<S32>(p.vertical_label_pad_left) : std::nullopt), // <ID:MaterialTheme/>
+    mHorizontalLabelPad(p.horizontal_label_pad), // <ID:MaterialTheme/>
     mPrevArrowBtn(NULL),
     mNextArrowBtn(NULL),
     mIsVertical( p.tab_position == LEFT ),
@@ -1123,7 +1125,7 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
     S32 button_width = mMinTabWidth;
     if (!mIsVertical)
     {
-        button_width = llclamp(mFont->getWidth(trimmed_label) + tab_padding, mMinTabWidth, mMaxTabWidth);
+        button_width = llclamp(mFont->getWidth(trimmed_label) + tab_padding + 2 * mHorizontalLabelPad, mMinTabWidth, mMaxTabWidth); // <ID:MaterialTheme/>
     }
 
     // Tab panel
@@ -1932,7 +1934,7 @@ void LLTabContainer::reshapeTuple(LLTabTuple* tuple)
 
         tuple->mPadding = image_overlay_width;
 
-        tuple->mButton->reshape(llclamp(mFont->getWidth(tuple->mButton->getLabelSelected()) + tab_padding + tuple->mPadding, mMinTabWidth, mMaxTabWidth),
+        tuple->mButton->reshape(llclamp(mFont->getWidth(tuple->mButton->getLabelSelected()) + tab_padding + 2 * mHorizontalLabelPad + tuple->mPadding, mMinTabWidth, mMaxTabWidth), // <ID:MaterialTheme/>
                                 tuple->mButton->getRect().getHeight());
         // add back in button width to total tab strip width
         mTotalTabWidth += tuple->mButton->getRect().getWidth();
@@ -1988,7 +1990,7 @@ void LLTabContainer::setPanelTitle(S32 index, const std::string& title)
         LLButton* tab_button = tuple->mButton;
         const LLFontGL* fontp = LLFontGL::getFontSansSerifSmall();
         mTotalTabWidth -= tab_button->getRect().getWidth();
-        tab_button->reshape(llclamp(fontp->getWidth(title) + tab_padding + tuple->mPadding, mMinTabWidth, mMaxTabWidth), tab_button->getRect().getHeight());
+        tab_button->reshape(llclamp(fontp->getWidth(title) + tab_padding + (mIsVertical ? 0 : 2 * mHorizontalLabelPad) + tuple->mPadding, mMinTabWidth, mMaxTabWidth), tab_button->getRect().getHeight()); // <ID:MaterialTheme/>
         mTotalTabWidth += tab_button->getRect().getWidth();
         tab_button->setLabelSelected(title);
         tab_button->setLabelUnselected(title);
@@ -2026,7 +2028,7 @@ void LLTabContainer::setTabPadding(S32 index, S32 padding)
     static LLUICachedControl<S32> tab_padding("UITabPadding", 0);
     mTotalTabWidth -= tuple->mButton->getRect().getWidth();
     tuple->mPadding = padding;
-    tuple->mButton->reshape(llclamp(mFont->getWidth(tuple->mButton->getLabelSelected()) + tab_padding + tuple->mPadding, mMinTabWidth, mMaxTabWidth), tuple->mButton->getRect().getHeight());
+    tuple->mButton->reshape(llclamp(mFont->getWidth(tuple->mButton->getLabelSelected()) + tab_padding + (mIsVertical ? 0 : 2 * mHorizontalLabelPad) + tuple->mPadding, mMinTabWidth, mMaxTabWidth), tuple->mButton->getRect().getHeight()); // <ID:MaterialTheme/>
     mTotalTabWidth += tuple->mButton->getRect().getWidth();
     updateMaxScrollPos();
 }
