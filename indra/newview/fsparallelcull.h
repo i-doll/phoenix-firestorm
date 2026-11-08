@@ -1,6 +1,6 @@
 /**
  * @file fsparallelcull.h
- * @brief Worker pool for the parallel shadow cascade culls (FSPerfParallelShadowCull)
+ * @brief Worker pool for the parallel octree culls (FSPerfParallelShadowCull, FSPerfParallelMainCull)
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Phoenix Firestorm Viewer Source Code

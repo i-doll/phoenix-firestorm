@@ -359,6 +359,10 @@ public:
     bool fsParallelShadowCullDefer(S32 cascade, LLCamera& shadow_cam, F32 min_texel_size);
     void fsParallelShadowCullFlush();
     // </FS:Trish>
+    // <FS:Trish> FSPerfParallelMainCull (fsparallelcull.cpp): updateCull's region and partition walks on worker
+    // threads, their side effects committed afterwards in the serial order. False when the serial loop should run.
+    bool fsParallelMainCull(LLCamera& camera, LLCullResult& result, bool hud_attachments, bool avatars_only);
+    // </FS:Trish>
 
     // Populate given LLCullResult with results of a frustum cull of the entire scene against the given LLCamera
     void updateCull(LLCamera& camera, LLCullResult& result, bool hud_attachments = false);

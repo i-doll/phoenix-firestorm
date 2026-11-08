@@ -44,6 +44,7 @@ F32 LLVOCacheEntry::sRearFarRadius = 1.0f;
 F32 LLVOCacheEntry::sFrontPixelThreshold = 1.0f;
 F32 LLVOCacheEntry::sRearPixelThreshold = 1.0f;
 bool LLVOCachePartition::sNeedsOcclusionCheck = false;
+bool LLVOCachePartition::sFSDeferFrontCull = false; // <FS:Trish/> FSPerfParallelMainCull
 
 const S32 ENTRY_HEADER_SIZE = 6 * sizeof(S32);
 const S32 MAX_ENTRY_BODY_SIZE = 10000;
@@ -1085,6 +1086,15 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
     {
         mBackSlectionEnabled = -1; //reset it.
     }
+
+    // <FS:Trish> FSPerfParallelMainCull: the front walk runs on a worker thread and its results are
+    // applied by fsparallelcull.cpp, which also does the rest of this function
+    if (sFSDeferFrontCull)
+    {
+        mFrontCull = true;
+        return 2;
+    }
+    // </FS:Trish>
 
     //localize the camera
     LLVector3 region_agent = mRegionp->getOriginAgent();

@@ -2928,6 +2928,10 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, bool hud_att
 
     const bool avatars_only = !hud_attachments && isAvatarOnlyRender(); // <FS:Trish/> Avatars only snapshot
 
+    // <FS:Trish> FSPerfParallelMainCull: the walks below on worker threads, see fsparallelcull.cpp
+    if (!fsParallelMainCull(camera, result, hud_attachments, avatars_only))
+    {
+    // </FS:Trish>
     for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
             iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
     {
@@ -2964,6 +2968,7 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, bool hud_att
             vo_part->cull(camera, sUseOcclusion > 0 && !gAgent.getFSAreaSearchActive());
         }
     }
+    } // <FS:Trish/> FSPerfParallelMainCull
 
     // <FS:Trish> Avatars only snapshot: no sky
     //if (hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&

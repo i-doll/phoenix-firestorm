@@ -4294,7 +4294,7 @@
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
-                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify,FSPerfParallelGeometry,FSPerfParallelGeometryVerify,FSPerfParallelGeometryMinVerts,FSPerfParallelAvatarUpdate,FSPerfParallelAvatarUpdateVerify" />
+                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify,FSPerfParallelGeometry,FSPerfParallelGeometryVerify,FSPerfParallelGeometryMinVerts,FSPerfParallelAvatarUpdate,FSPerfParallelAvatarUpdateVerify,FSPerfParallelMainCull,FSPerfParallelMainCullVerify" />
                     </button>
                     <check_box
                      control_name="FSPerfParallelShadowCull"
@@ -4392,6 +4392,29 @@
                      tool_tip="EXPERIMENTAL. Debug check: recomputes the avatar joints serially after the worker threads and logs any difference. Costs extra CPU time, only for testing."
                      top="1078"
                      width="455" />
+                    <check_box
+                     control_name="FSPerfParallelMainCull"
+                     follows="left|top"
+                     height="20"
+                     label="Cull the main view and reflection probes on worker threads"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfparallelmaincull"
+                     tool_tip="EXPERIMENTAL. Works out which objects are in view (main camera and reflection probe updates) on several CPU cores at once instead of only on the main thread. The scene looks the same; saves main thread time in busy scenes."
+                     top="1108"
+                     width="475" />
+                    <check_box
+                     control_name="FSPerfParallelMainCullVerify"
+                     enabled_control="FSPerfParallelMainCull"
+                     follows="left|top"
+                     height="20"
+                     label="Check worker view culls against the old cull"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfparallelmaincullverify"
+                     tool_tip="Debug. Also runs the old view cull and writes any difference to the log. Slower; only for testing."
+                     top="1134"
+                     width="455" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
@@ -4399,7 +4422,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_gpu_driven_draws"
-                     top="1118"
+                     top="1170"
                      width="340">
                         GPU-driven draws
                     </text>
@@ -4411,7 +4434,7 @@
                      left="370"
                      name="reset_fs_heading_gpu_driven_draws"
                      tool_tip="Set every option in &quot;GPU-driven draws&quot; back to its default value."
-                     top="1117"
+                     top="1169"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -4427,7 +4450,7 @@
                      left="15"
                      name="fs_fsperfgpudrivendraws"
                      tool_tip="EXPERIMENTAL. Sends the opaque buildings and objects of each shadow map to the graphics card as one multi-draw call instead of one call per object batch, from a copy of their positions kept in video memory. Shadows look the same; saves CPU time in busy scenes. Works together with 'Draw sun shadow cascades in one pass'. Needs OpenGL 4.3 (most NVIDIA, AMD and Intel cards with current drivers; not macOS); otherwise nothing changes."
-                     top="1144"
+                     top="1196"
                      width="475" />
                     <check_box
                      control_name="FSPerfGPUDrivenDrawsVerify"
@@ -4439,7 +4462,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsverify"
                      tool_tip="Debug. Draws the shadow casters a second time the old way and logs any place where the result would differ, plus draw statistics every 10 seconds. Slows rendering down; for testing only."
-                     top="1170"
+                     top="1222"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4448,7 +4471,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsarenamb_label"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1198"
+                     top="1250"
                      width="285">
                         Shadow caster memory (MB)
                     </text>
@@ -4465,7 +4488,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivendrawsarenamb"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1196"
+                     top="1248"
                      width="100" />
                 </panel>
             </scroll_container>

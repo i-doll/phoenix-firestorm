@@ -231,12 +231,14 @@ public:
     void setCullHistory(bool has_new_object);
 
     bool isFrontCull() const {return mFrontCull;}
+    bool fsHasOccluders() const { return !mOccludedGroups.empty(); } // <FS:Trish/> FSPerfParallelMainCull
 
 private:
     void selectBackObjects(LLCamera &camera, F32 projection_area_cutoff, bool use_occlusion); //select objects behind camera.
 
 public:
     static bool sNeedsOcclusionCheck;
+    static bool sFSDeferFrontCull; // <FS:Trish/> FSPerfParallelMainCull: cull() returns 2 instead of walking the front
 
 private:
     bool  mFrontCull; //the view frustum cull if set, otherwise is back sphere cull.

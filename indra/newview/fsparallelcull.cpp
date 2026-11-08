@@ -1,6 +1,7 @@
 /**
  * @file fsparallelcull.cpp
- * @brief Sun shadow cascades culled on worker threads (FSPerfParallelShadowCull)
+ * @brief Shadow cascade, main camera and probe face culls on worker threads (FSPerfParallelShadowCull,
+ *        FSPerfParallelMainCull)
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Phoenix Firestorm Viewer Source Code
@@ -58,12 +59,16 @@
 // both main thread only), the projector shadows, the RenderShadowCullMode 1 union cull (already one
 // walk) and the reflection probe sun shadows rendered by generateProbeSunShadow.
 
+// The main camera and reflection probe face culls (FSPerfParallelMainCull) are described further down.
+
 #include "llviewerprecompiledheaders.h"
 
 #include "fsparallelcull.h"
 
 #include "pipeline.h"
 
+#include "llagent.h"
+#include "llagentcamera.h"
 #include "llenvironment.h"
 #include "llrender.h"
 #include "llspatialpartition.h"
@@ -121,11 +126,11 @@ namespace
                 }
                 catch (const std::exception& e)
                 {
-                    LL_WARNS("FSParallelCull") << "Could not start a shadow cull worker: " << e.what() << LL_ENDL;
+                    LL_WARNS("FSParallelCull") << "Could not start a cull worker: " << e.what() << LL_ENDL;
                     break;
                 }
             }
-            LL_INFOS("FSParallelCull") << "Shadow cull workers: " << mThreads.size() << LL_ENDL;
+            LL_INFOS("FSParallelCull") << "Cull workers: " << mThreads.size() << LL_ENDL;
         }
 
         ~FSCullPool()
@@ -167,7 +172,7 @@ namespace
 
             // every job is taken; wait for the workers still running one (each is one octree walk)
             {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs shadow cull wait");
+                LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs cull wait");
                 std::unique_lock<std::mutex> lock(mMutex);
                 mDone.wait(lock, [&batch]() { return batch.mUsers == 0; });
                 mBatch = nullptr;
@@ -177,7 +182,7 @@ namespace
     private:
         void workerLoop(U32 index)
         {
-            std::string name = "FS Shadow Cull " + std::to_string(index);
+            std::string name = "FS Cull " + std::to_string(index);
             LL_PROFILER_SET_THREAD_NAME(name.c_str());
             U64 seen = 0;
             while (true)
@@ -630,4 +635,481 @@ void LLPipeline::fsParallelShadowCullFlush()
     set_current_projection(saved_proj);
     set_last_modelview(saved_last_view);
     set_last_projection(saved_last_proj);
+}
+
+//-----------------------------------------------------------------------------
+// Main camera and reflection probe face culls (FSPerfParallelMainCull)
+//-----------------------------------------------------------------------------
+
+// updateCull for the world camera and for every reflection / hero probe cube face walks, region by
+// region, the octree of each spatial partition (LLOctreeCull / LLOctreeCullNoFarClip) and then the
+// region's object cache octree (LLVOCachePartition::cull). Unlike the shadow culls these walks have side
+// effects on the way down: earlyFail reads back occlusion queries (checkOcclusion, GL), prunes the
+// subtree of an occluded group and marks it as an occluder; processGroup (markNotCulled) sets the group
+// visible, updates its distance and may queue an occlusion query; the object cache walk adds groups to
+// the region's visible list or to the occluder set.
+//
+// What a walk reaches does not depend on any of that: the frustum tests and the traversal state (mRes)
+// only read bounds and the camera, and an occlusion prune never changes which nodes a following sibling
+// tests (only an only-child, flagged SKIP_FRUSTUM_CHECK, inherits mRes, and it has no siblings). So with
+// FSPerfParallelMainCull on:
+//
+//  1. prepare, main thread, in region order: rebound each partition root (as cull does) and make a job
+//     per region and partition; run LLVOCachePartition::cull with sFSDeferFrontCull set, which does all
+//     its bookkeeping (pause, culled time, idle hash, back object selection) and returns 2 where it would
+//     walk the front, and give that walk a job with its own camera holding the region frustum planes;
+//  2. workers (and this thread): every job walks its octree with the frustum tests only, without any
+//     occlusion prune, and records each node it reaches in traversal order, the end of its subtree and
+//     whether processGroup would run;
+//  3. commit, main thread, in the serial order (region, partition, then the object cache): replay each
+//     record exactly as the serial walk would have treated that node: earlyFail (checkOcclusion, then on
+//     an occluded group markOccluder and skip its subtree) and processGroup (markNotCulled, or the object
+//     cache's visible group / occluder bookkeeping). Every write and every GL call happens here.
+//
+// The walks parallelise; occlusion reads, query bookkeeping, updateDistance and the object cache side
+// effects stay serial. Walks also descend into occluded subtrees the serial cull would have skipped;
+// that extra work is on the workers. The probe face culls run with occlusion off and object cache culls
+// return early for them, so their commit is only the markNotCulled pass. The octree is not changed while
+// the workers run: the main thread is inside the job loop, and no other thread changes octrees during
+// display. The partitions of a region are rebounded before any of the region's side effects are
+// committed rather than one after the other, which only matters if markNotCulled moved something (it
+// does not).
+//
+// FSPerfParallelMainCullVerify runs the serial partition culls again after the commit, into a separate
+// result, and compares the visible and drawable group lists. That second pass sees the occlusion state
+// the commit left (queries already read back, groups already marked as occluders); a query whose result
+// became available between the two passes can make a rare group differ. The object cache walks are not
+// compared.
+
+namespace
+{
+    // a node a walk reached, in the serial traversal order
+    struct FSCullNode
+    {
+        LLViewerOctreeGroup*    mGroup;
+        U32                     mEnd;       // index after this node's subtree
+        bool                    mProcess;   // processGroup would run for it
+    };
+
+    // LLViewerOctreeCull::traverse without earlyFail, recording every node it reaches
+    class FSOctreeRecordCull : public LLViewerOctreeCull
+    {
+    public:
+        FSOctreeRecordCull(LLCamera* camera, std::vector<FSCullNode>& out)
+            : LLViewerOctreeCull(camera), mOut(out) { }
+
+        virtual void traverse(const OctreeNode* n)
+        {
+            LLViewerOctreeGroup* group = (LLViewerOctreeGroup*)n->getListener(0);
+            const U32 index = (U32)mOut.size();
+            mOut.push_back({ group, 0, false });
+
+            if (mRes == 2 ||
+                (mRes && group->hasState(LLViewerOctreeGroup::SKIP_FRUSTUM_CHECK)))
+            {
+                OctreeTraveler::traverse(n);
+            }
+            else
+            {
+                mRes = frustumCheck(group);
+                if (mRes)
+                {
+                    OctreeTraveler::traverse(n);
+                }
+                mRes = 0;
+            }
+
+            mOut[index].mEnd = (U32)mOut.size();
+        }
+
+        // visit() runs first thing in OctreeTraveler::traverse, right after the push above
+        virtual void processGroup(LLViewerOctreeGroup* group)
+        {
+            mOut.back().mProcess = true;
+        }
+
+    protected:
+        std::vector<FSCullNode>& mOut;
+    };
+
+    // the frustum tests of LLOctreeCull (far clip) and LLOctreeCullNoFarClip
+    class FSOctreeRecordCullSpatial : public FSOctreeRecordCull
+    {
+    public:
+        FSOctreeRecordCullSpatial(LLCamera* camera, bool far_clip, std::vector<FSCullNode>& out)
+            : FSOctreeRecordCull(camera, out), mFarClip(far_clip) { }
+
+        virtual S32 frustumCheck(const LLViewerOctreeGroup* group)
+        {
+            S32 res = AABBInFrustumNoFarClipGroupBounds(group);
+            if (mFarClip && res != 0)
+            {
+                res = llmin(res, AABBSphereIntersectGroupExtents(group));
+            }
+            return res;
+        }
+
+        virtual S32 frustumCheckObjects(const LLViewerOctreeGroup* group)
+        {
+            S32 res = AABBInFrustumNoFarClipObjectBounds(group);
+            if (mFarClip && res != 0)
+            {
+                res = llmin(res, AABBSphereIntersectObjectExtents(group));
+            }
+            return res;
+        }
+
+    private:
+        bool mFarClip;
+    };
+
+    // the frustum tests of LLVOCacheOctreeCull (llvocache.cpp)
+    class FSOctreeRecordCullVOCache : public FSOctreeRecordCull
+    {
+    public:
+        FSOctreeRecordCullVOCache(LLCamera* camera, const LLVector3& shift, F32 pixel_threshold, F32 near_radius,
+                                  std::vector<FSCullNode>& out)
+            : FSOctreeRecordCull(camera, out), mLocalShift(shift), mPixelThreshold(pixel_threshold), mNearRadius(near_radius) { }
+
+        virtual S32 frustumCheck(const LLViewerOctreeGroup* group)
+        {
+            S32 res = AABBInRegionFrustumNoFarClipGroupBounds(group);
+            if (res != 0)
+            {
+                res = llmin(res, AABBRegionSphereIntersectGroupExtents(group, mLocalShift));
+            }
+            return res;
+        }
+
+        virtual S32 frustumCheckObjects(const LLViewerOctreeGroup* group)
+        {
+            S32 res = AABBInRegionFrustumNoFarClipObjectBounds(group);
+            if (res != 0)
+            {
+                res = llmin(res, AABBRegionSphereIntersectObjectExtents(group, mLocalShift));
+            }
+            if (res != 0)
+            {
+                const LLVector4a* exts = group->getObjectExtents();
+                res = checkProjectionArea(exts[0], exts[1], mLocalShift, mPixelThreshold, mNearRadius);
+            }
+            return res;
+        }
+
+    private:
+        LLVector3   mLocalShift;
+        F32         mPixelThreshold;
+        F32         mNearRadius;
+    };
+
+    struct FSMainCullJob
+    {
+        LLViewerRegion*         mRegion = nullptr;
+        LLSpatialPartition*     mPartition = nullptr;   // a spatial partition walk, or
+        LLVOCachePartition*     mVOPartition = nullptr; // an object cache front walk
+        bool                    mFarClip = true;
+        bool                    mVOOcclusion = false;
+        F32                     mPixelThreshold = 0.f;
+        F32                     mNearRadius = 0.f;
+        LLVector3               mShift;
+        LLCamera                mCamera;                // object cache walks: the camera with this region's planes
+        std::vector<FSCullNode> mNodes;
+    };
+
+    std::vector<FSMainCullJob>  sMainJobs;
+    std::vector<U32>            sMainJobOrder;
+    LLCullResult                sMainVerifyResult;
+
+    U32 sMainVerifyChecks = 0;
+    U32 sMainVerifyMismatches = 0;
+    F64 sMainVerifyLastLog = 0.0;
+    U32 sMainVerifyWarnings = 0;
+
+    // updateCull's partition filter for a world camera or probe face (not the HUD)
+    bool fs_main_cull_partition(LLPipeline& pipeline, LLSpatialPartition* part, U32 i, bool avatars_only)
+    {
+        if (avatars_only &&
+            i != LLViewerRegion::PARTITION_BRIDGE &&
+            i != LLViewerRegion::PARTITION_AVATAR &&
+            i != LLViewerRegion::PARTITION_CONTROL_AV)
+        {
+            return false;
+        }
+        return part && (LLViewerRegion::PARTITION_BRIDGE == i || pipeline.hasRenderType(part->mDrawableType));
+    }
+}
+
+// updateCull, in place of its region loop. False when the serial loop should run.
+bool LLPipeline::fsParallelMainCull(LLCamera& camera, LLCullResult& result, bool hud_attachments, bool avatars_only)
+{
+    static LLCachedControl<bool> parallel_cull(gSavedSettings, "FSPerfParallelMainCull", false);
+    // shadow cameras (projectors, the union cull) use LLOctreeCullShadow and have their own parallel path
+    if (!parallel_cull || hud_attachments || sShadowRender)
+    {
+        return false;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    static LLCachedControl<bool> verify(gSavedSettings, "FSPerfParallelMainCullVerify", false);
+    static LLCachedControl<bool> use_object_cache_occlusion(gSavedSettings, "UseObjectCacheOcclusion");
+
+    const LLWorld::region_list_t& regions = LLWorld::getInstance()->getRegionList();
+    // as updateCull passes it to LLVOCachePartition::cull (<FS:Beq> area search)
+    const bool vo_do_occlusion = sUseOcclusion > 0 && !gAgent.getFSAreaSearchActive();
+    // LLSpatialPartition::cull's choice of culler
+    const bool no_far_clip = !sUseFarClip && !gCubeSnapshot;
+
+    // 1. main thread: rebounds, the object cache bookkeeping and the job list, in the serial order
+    U32 job_count = 0;
+    LLViewerRegion* last_front_region = nullptr;
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs main cull prepare");
+        for (LLViewerRegion* region : regions)
+        {
+            for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
+            {
+                LLSpatialPartition* part = region->getSpatialPartition(i);
+                if (!fs_main_cull_partition(*this, part, i, avatars_only))
+                {
+                    continue;
+                }
+                ((LLSpatialGroup*)part->mOctree->getListener(0))->rebound();
+
+                if (job_count >= sMainJobs.size())
+                {
+                    sMainJobs.emplace_back();
+                }
+                FSMainCullJob& job = sMainJobs[job_count++];
+                job.mRegion = region;
+                job.mPartition = part;
+                job.mVOPartition = nullptr;
+                job.mFarClip = !(part->mInfiniteFarClip || no_far_clip);
+                job.mNodes.clear();
+            }
+
+            LLVOCachePartition* vo_part = region->getVOCachePartition();
+            if (vo_part)
+            {
+                LLVOCachePartition::sFSDeferFrontCull = true;
+                const S32 res = vo_part->cull(camera, vo_do_occlusion);
+                LLVOCachePartition::sFSDeferFrontCull = false;
+                if (res == 2)
+                {   // the rest of LLVOCachePartition::cull: the front walk
+                    if (job_count >= sMainJobs.size())
+                    {
+                        sMainJobs.emplace_back();
+                    }
+                    FSMainCullJob& job = sMainJobs[job_count++];
+                    job.mRegion = region;
+                    job.mPartition = nullptr;
+                    job.mVOPartition = vo_part;
+                    job.mShift = region->getOriginAgent();
+                    job.mCamera = camera;
+                    job.mCamera.calcRegionFrustumPlanes(job.mShift, gAgentCamera.mDrawDistance);
+                    job.mVOOcclusion = vo_do_occlusion && use_object_cache_occlusion;
+                    job.mPixelThreshold = LLVOCacheEntry::getSquaredPixelThreshold(true);
+                    job.mNearRadius = LLVOCacheEntry::sNearRadius;
+                    job.mNodes.clear();
+                    last_front_region = region;
+                }
+            }
+        }
+
+        // the big walks first
+        sMainJobOrder.resize(job_count);
+        for (U32 i = 0; i < job_count; ++i)
+        {
+            sMainJobOrder[i] = i;
+        }
+        std::stable_sort(sMainJobOrder.begin(), sMainJobOrder.end(), [](U32 a, U32 b)
+        {
+            auto heavy = [](const FSMainCullJob& job)
+            {
+                if (job.mVOPartition)
+                {
+                    return true;
+                }
+                const U32 type = job.mPartition->mPartitionType;
+                return type == LLViewerRegion::PARTITION_VOLUME || type == LLViewerRegion::PARTITION_BRIDGE;
+            };
+            return heavy(sMainJobs[a]) && !heavy(sMainJobs[b]);
+        });
+    }
+
+    // 2. worker threads (and this one): the walks, read only
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs main cull parallel");
+        LLCamera* cam = &camera;
+        FSParallelCull::run(job_count, [cam](U32 index)
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs main cull job");
+            FSMainCullJob& job = sMainJobs[sMainJobOrder[index]];
+            if (job.mVOPartition)
+            {
+                FSOctreeRecordCullVOCache culler(&job.mCamera, job.mShift, job.mPixelThreshold, job.mNearRadius, job.mNodes);
+                culler.traverse(job.mVOPartition->mOctree);
+            }
+            else
+            {
+                FSOctreeRecordCullSpatial culler(cam, job.mFarClip, job.mNodes);
+                culler.traverse(job.mPartition->mOctree);
+            }
+        });
+    }
+
+    // 3. main thread: the serial walks' side effects, in their order
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs main cull commit");
+        // LLOctreeCull::earlyFail does nothing in reflection renders
+        const bool check_occlusion = !sReflectionRender;
+        const U32 any_query_state = LLOcclusionCullingGroup::QUERY_PENDING | LLOcclusionCullingGroup::DISCARD_QUERY;
+
+        for (U32 j = 0; j < job_count; ++j)
+        {
+            FSMainCullJob& job = sMainJobs[j];
+            const std::vector<FSCullNode>& nodes = job.mNodes;
+            const U32 count = (U32)nodes.size();
+
+            if (job.mPartition)
+            {   // LLOctreeCull::earlyFail and processGroup
+                for (U32 i = 0; i < count; )
+                {
+                    LLSpatialGroup* group = (LLSpatialGroup*)nodes[i].mGroup;
+                    if (check_occlusion)
+                    {
+                        // checkOcclusion changes nothing on a group with neither a pending nor a discarded query
+                        if (group->isOcclusionState(any_query_state))
+                        {
+                            group->checkOcclusion();
+                        }
+                        if (group->getOctreeNode() &&
+                            group->getOctreeNode()->getParent() &&
+                            sUseOcclusion &&
+                            group->isOcclusionState(LLSpatialGroup::OCCLUDED))
+                        {
+                            markOccluder(group);
+                            i = nodes[i].mEnd;
+                            continue;
+                        }
+                    }
+                    if (nodes[i].mProcess)
+                    {
+                        markNotCulled(group, camera);
+                    }
+                    ++i;
+                }
+            }
+            else
+            {   // LLVOCacheOctreeCull::earlyFail and processGroup
+                LLVOCachePartition* vo_part = job.mVOPartition;
+                LLViewerRegion* region = job.mRegion;
+                for (U32 i = 0; i < count; )
+                {
+                    LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)nodes[i].mGroup;
+                    const bool use_occlusion = job.mVOOcclusion && group->getOctreeNode()->getParent();
+                    if (use_occlusion && !group->needsUpdate())
+                    {
+                        group->checkOcclusion();
+                        if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
+                        {
+                            i = nodes[i].mEnd;
+                            continue;
+                        }
+                    }
+                    if (nodes[i].mProcess)
+                    {
+                        if (!use_occlusion)
+                        {
+                            if (region->addVisibleGroup(group))
+                            {
+                                group->setVisible();
+                            }
+                        }
+                        else if (group->needsUpdate() || !group->isRecentlyVisible())
+                        {
+                            vo_part->addOccluders(group);
+                            group->setVisible();
+                        }
+                        else if (group->isOcclusionState(LLOcclusionCullingGroup::QUERY_PENDING) ||
+                                 group->isOcclusionState(LLOcclusionCullingGroup::ACTIVE_OCCLUSION))
+                        {
+                            group->setVisible();
+                        }
+                        else if (region->addVisibleGroup(group))
+                        {
+                            group->setVisible();
+                        }
+                    }
+                    ++i;
+                }
+                if (!LLVOCachePartition::sNeedsOcclusionCheck)
+                {
+                    LLVOCachePartition::sNeedsOcclusionCheck = vo_part->fsHasOccluders();
+                }
+            }
+            job.mNodes.clear();
+        }
+
+        // the serial object cache culls leave the camera with the last walked region's planes
+        if (last_front_region)
+        {
+            camera.calcRegionFrustumPlanes(last_front_region->getOriginAgent(), gAgentCamera.mDrawDistance);
+        }
+    }
+
+    if (verify)
+    {   // the serial partition culls again, into their own result
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs main cull verify");
+        const S32 saved_nodes = mNumVisibleNodes;
+        grabReferences(sMainVerifyResult);
+        sMainVerifyResult.clear();
+        for (LLViewerRegion* region : regions)
+        {
+            for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
+            {
+                LLSpatialPartition* part = region->getSpatialPartition(i);
+                if (fs_main_cull_partition(*this, part, i, avatars_only))
+                {
+                    part->cull(camera);
+                }
+            }
+        }
+        mNumVisibleNodes = saved_nodes;
+        grabReferences(result);
+
+        std::vector<LLSpatialGroup*> par_visible, par_drawable, ser_visible, ser_drawable;
+        fs_list_groups(result, par_visible, par_drawable);
+        fs_list_groups(sMainVerifyResult, ser_visible, ser_drawable);
+        sMainVerifyResult.clear();
+        ++sMainVerifyChecks;
+        if (par_visible != ser_visible || par_drawable != ser_drawable)
+        {
+            ++sMainVerifyMismatches;
+            if (sMainVerifyWarnings < 20)
+            {
+                ++sMainVerifyWarnings;
+                LL_WARNS("FSParallelCull") << (gCubeSnapshot ? "Probe face" : "Main camera") << " cull differs from the serial cull:"
+                    << " by group " << par_visible.size() << " vs " << ser_visible.size()
+                    << " (missing " << fs_count_missing(ser_visible, par_visible)
+                    << ", extra " << fs_count_missing(par_visible, ser_visible) << "),"
+                    << " by drawable " << par_drawable.size() << " vs " << ser_drawable.size()
+                    << " (missing " << fs_count_missing(ser_drawable, par_drawable)
+                    << ", extra " << fs_count_missing(par_drawable, ser_drawable) << ")"
+                    << (sMainVerifyWarnings == 20 ? "; further differences only in the summary" : "") << LL_ENDL;
+            }
+        }
+
+        const F64 now = LLTimer::getTotalSeconds();
+        if (now - sMainVerifyLastLog > 10.0)
+        {
+            sMainVerifyLastLog = now;
+            LL_INFOS("FSParallelCull") << "Main/probe cull verify: " << sMainVerifyChecks << " culls checked, "
+                << sMainVerifyMismatches << " differed from the serial cull ("
+                << FSParallelCull::workerCount() << " workers)" << LL_ENDL;
+            sMainVerifyChecks = 0;
+            sMainVerifyMismatches = 0;
+        }
+    }
+
+    return true;
 }
