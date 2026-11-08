@@ -37,9 +37,11 @@ uniform float sun_wash;
 flat in vec4 fs_light_color; // rgb linear colour, a falloff
 flat in float fs_light_size;
 flat in vec3 trans_center;
-vec3 color;
+vec3 fs_batch_color;
 float falloff;
-float size;
+float fs_batch_size;
+#define color fs_batch_color
+#define size fs_batch_size
 #else
 uniform vec3 color;
 uniform float falloff;
