@@ -21,7 +21,7 @@ uniform sampler2D coloredShadowMap1;
 // with no translucent casters in the cascade, or with shadows skipped this frame
 uniform vec2 colored_shadow_valid;
 
-uniform mat4 shadow_matrix[6];
+uniform mat4 shadow_matrix[4];
 uniform vec4 shadow_clip;
 
 // the map's transmittance at view space position pos, white outside the map
