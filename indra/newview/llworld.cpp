@@ -2053,7 +2053,18 @@ void process_enable_simulator(LLMessageSystem *msg, void **user_data)
     msg->addU32Fast(_PREHASH_Code, msg->getOurCircuitCode());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_ID, gAgent.getID());
-    msg->sendReliable(sim);
+    // <FS:Trish> A new circuit starts with a 1 s ping estimate, so the
+    // default ping-based retry waited about 4-5 s after a lost packet.
+    // Use the login retry strategy instead.
+    //msg->sendReliable(sim);
+    msg->sendReliable(
+        sim,
+        gSavedSettings.getS32("UseCircuitCodeMaxRetries"),
+        false,
+        (F32Seconds)gSavedSettings.getF32("UseCircuitCodeTimeout"),
+        NULL,
+        NULL);
+    // </FS:Trish>
 }
 
 class LLEstablishAgentCommunication : public LLHTTPNode
