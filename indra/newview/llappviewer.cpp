@@ -7439,12 +7439,27 @@ void LLAppViewer::idleNetwork()
     }
     add(LLStatViewer::NUM_NEW_OBJECTS, gObjectList.mNumNewObjects);
 
-    // Retransmit unacknowledged packets.
-    if (gXferManager)
+    // <FS:Trish> processAcks() above already runs both of these every frame;
+    // only run them here when it was skipped.
+    //// Retransmit unacknowledged packets.
+    //if (gXferManager)
+    //{
+    //    gXferManager->retransmitUnackedPackets();
+    //}
+    //gAssetStorage->checkForTimeouts();
+    if (speed_test())
     {
-        gXferManager->retransmitUnackedPackets();
+        // Retransmit unacknowledged packets.
+        if (gXferManager)
+        {
+            gXferManager->retransmitUnackedPackets();
+        }
+        if (gAssetStorage)
+        {
+            gAssetStorage->checkForTimeouts();
+        }
     }
-    gAssetStorage->checkForTimeouts();
+    // </FS:Trish>
     gViewerThrottle.setBufferLoadRate(gMessageSystem->getBufferLoadRate());
     gViewerThrottle.updateDynamicThrottle();
 
