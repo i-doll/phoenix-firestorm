@@ -3862,7 +3862,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="646"
+                 height="768"
                  layout="topleft"
                  left="0"
                  name="experimental_performance_settings"
@@ -4162,6 +4162,80 @@
                      name="fs_fsperftextureuploadbudgetmb"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
                      top="604"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_variable_rate_shading"
+                     top="646"
+                     width="475">
+                        Variable rate shading
+                    </text>
+                    <check_box
+                     control_name="FSRenderVRS"
+                     follows="left|top"
+                     height="20"
+                     label="Variable rate shading"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsrendervrs"
+                     tool_tip="EXPERIMENTAL. NVIDIA RTX / GTX 16xx (Turing) or newer only; does nothing on other graphics cards. Shades low-detail parts of the scene (flat or low-contrast surfaces, the sky, areas blurred by depth of field) at a coarser rate to save GPU time in the opaque geometry pass. Edges and fine detail stay at full rate. Snapshots are always rendered at full rate."
+                     top="672"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrendervrsquality_label"
+                     tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
+                     top="700"
+                     width="285">
+                        Quality
+                    </text>
+                    <spinner
+                     control_name="FSRenderVRSQuality"
+                     decimal_digits="2"
+                     enabled_control="FSRenderVRS"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1.0"
+                     min_val="0.0"
+                     name="fs_fsrendervrsquality"
+                     tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
+                     top="698"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrendervrsperiphery_label"
+                     tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
+                     top="728"
+                     width="285">
+                        Coarser at screen edges
+                    </text>
+                    <spinner
+                     control_name="FSRenderVRSPeriphery"
+                     decimal_digits="2"
+                     enabled_control="FSRenderVRS"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1.0"
+                     min_val="0.0"
+                     name="fs_fsrendervrsperiphery"
+                     tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
+                     top="726"
                      width="100" />
                 </panel>
             </scroll_container>

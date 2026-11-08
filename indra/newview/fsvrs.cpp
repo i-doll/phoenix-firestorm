@@ -73,7 +73,7 @@
 extern bool gCubeSnapshot;
 extern bool gSnapshot;
 
-#if LL_GL_FUNC_POINTER
+#if LL_WINDOWS || LL_SDL
 
 namespace
 {
@@ -682,7 +682,7 @@ void FSVRS::releaseGL()
     }
 }
 
-#else // !LL_GL_FUNC_POINTER: the extension is never available
+#else // no GL entry point loader on this platform: the extension is never available
 
 // static
 void FSVRS::beginGBuffer(bool for_snapshot)
@@ -704,4 +704,4 @@ void FSVRS::releaseGL()
 {
 }
 
-#endif // LL_GL_FUNC_POINTER
+#endif // LL_WINDOWS || LL_SDL
