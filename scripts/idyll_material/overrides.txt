@@ -1,3 +1,4 @@
+hand          alert_line_editor.xml
 hand          floater_edit_ext_day_cycle.xml
 hand          floater_fixedenvironment.xml
 hand          floater_fs_fixedenvironment.xml

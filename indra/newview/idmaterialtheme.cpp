@@ -92,7 +92,7 @@ namespace
         { "TextFgColor", Role::OnSurface, 1.f },
         { "TextDefaultColor", Role::OnSurface, 1.f },
         { "TextFgReadOnlyColor", Role::OnSurfaceVariant, 1.f },
-        { "TextFgTentativeColor", Role::Outline, 1.f },
+        { "TextFgTentativeColor", Role::OnSurfaceVariant, 1.f },
         { "White_50", Role::OnSurfaceVariant, 1.f },
         { "LtGray_50", Role::OnSurfaceVariant, 1.f },
         { "White_25", Role::OnSurface, 0.38f },
