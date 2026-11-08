@@ -121,7 +121,7 @@ namespace
         { "ButtonLabelSelectedDisabledColor", Role::OnSurface, 0.38f },
         { "ButtonSelectedBgColor", Role::PrimaryContainer, 1.f },
         { "ButtonSelectedColor", Role::OnPrimaryContainer, 1.f },
-        { "ButtonFlashBgColor", Role::Primary, 0.5f },
+        { "ButtonFlashBgColor", Role::InversePrimary, 1.f },
 
         { "ComboListBgColor", Role::SurfaceContainerHigh, 1.f },
         { "ScrollBgWriteableColor", Role::SurfaceContainerLow, 1.f },
@@ -236,7 +236,7 @@ namespace
         { "ChatMentionFont", 0x3D6B00, 0xB5E86A, 1.f },
         { "ChatMentionHighlight", 0xFFD8C2, 0x5C3B26, 1.f },
         { "ChatSelfMentionHighlight", 0xFFDAD4, 0x6B2018, 1.f },
-        { "MentionFlashBgColor", 0xFFFF00, 0xFFFF00, 0.5f },
+        { "MentionFlashBgColor", 0xFFE17B, 0x554500, 1.f },
 
         { "ChatNameColor", 0x3B6A00, 0xC0EB7D, 1.f },
         { "ChatNameObjectColor", 0x3B6A00, 0xC0EB7D, 1.f },

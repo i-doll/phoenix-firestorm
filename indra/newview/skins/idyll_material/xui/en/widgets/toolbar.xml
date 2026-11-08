@@ -36,7 +36,7 @@
                         auto_resize="true"
                         button_flash_count="99999"
                         button_flash_rate="1.0"
-                        flash_color="EmphasisColor"/>
+                        flash_color="ButtonFlashBgColor"/>
   <button_icon pad_left="10"
                image_overlay_color="ButtonLabelColor"
                image_overlay_selected_color="ButtonSelectedColor"
@@ -60,7 +60,7 @@
                auto_resize="true"
                button_flash_count="99999"
                button_flash_rate="1.0"
-               flash_color="EmphasisColor"/>
+               flash_color="ButtonFlashBgColor"/>
   <!-- <FS:Zi> Added text only button -->
   <button label_color_selected="ButtonSelectedColor"
           halign="center"
@@ -80,6 +80,6 @@
           auto_resize="true"
           button_flash_count="99999"
           button_flash_rate="1.0"
-          flash_color="EmphasisColor"/>
+          flash_color="ButtonFlashBgColor"/>
   <!-- </FS:Zi> -->
 </toolbar>
