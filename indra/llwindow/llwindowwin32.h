@@ -139,6 +139,12 @@ public:
 
     void initWatchdog() override;
 
+    // <FS:Trish> FSRenderThread: the render thread owns the context and presents
+    static bool (*sFSSwapBuffersHook)(); // returns true if it presented
+    HDC getFSDeviceContext() const { return mhDC; }
+    HGLRC getFSGLContext() const { return mhRC; }
+    // </FS:Trish>
+
 protected:
     LLWindowWin32(LLWindowCallbacks* callbacks,
         const std::string& title, const std::string& name, int x, int y, int width, int height, U32 flags,

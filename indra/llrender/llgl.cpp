@@ -36,6 +36,7 @@
 #include "llsys.h"
 
 #include "llgl.h"
+#include "fsglstream.h" // <FS:Trish/> FSRenderThread
 #include "llglstates.h"
 #include "llrender.h"
 
@@ -1486,7 +1487,10 @@ void LLGLManager::fsSetMaxShaderCompilerThreads()
     if (mHasParallelShaderCompile && fs_glMaxShaderCompilerThreads)
     {
         // 0xFFFFFFFF asks for the implementation's maximum
-        fs_glMaxShaderCompilerThreads(0xFFFFFFFFu);
+        // <FS:Trish> FSRenderThread: this pointer isn't proxied, run it where the context is
+        //fs_glMaxShaderCompilerThreads(0xFFFFFFFFu);
+        FSGLStream::runSync([]() { fs_glMaxShaderCompilerThreads(0xFFFFFFFFu); });
+        // </FS:Trish>
     }
 }
 // </FS:Trish>
@@ -2612,8 +2616,11 @@ void assert_glerror()
 
 void clear_glerror()
 {
-    glGetError();
-    glGetError();
+    // <FS:Trish> Deferred on the render thread instead of waiting for it twice
+    //glGetError();
+    //glGetError();
+    FSGLStream::clearErrors();
+    // </FS:Trish>
 }
 
 ///////////////////////////////////////////////////////////////

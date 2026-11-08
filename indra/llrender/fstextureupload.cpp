@@ -29,6 +29,7 @@
 #include "linden_common.h"
 
 #include "fstextureupload.h"
+#include "fsglstream.h"
 
 #include "llgl.h"
 #include "llthread.h"
@@ -199,6 +200,13 @@ namespace FSTextureUpload
 {
     void setPBOEnabled(bool enabled)
     {
+        // The ring's fences and persistent mapping would make every upload a
+        // synchronous call on the render thread (FSRenderThread); the stream
+        // copies client-memory uploads instead.
+        if (FSGLStream::isRunning())
+        {
+            enabled = false;
+        }
         if (sEnabled && !enabled)
         {
             releaseGL();

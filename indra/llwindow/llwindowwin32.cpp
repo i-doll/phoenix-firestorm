@@ -3963,11 +3963,21 @@ bool LLWindowWin32::resetDisplayResolution()
     return success;
 }
 
+// <FS:Trish> FSRenderThread
+bool (*LLWindowWin32::sFSSwapBuffersHook)() = nullptr;
+// </FS:Trish>
+
 void LLWindowWin32::swapBuffers()
 {
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_WIN32;
-        SwapBuffers(mhDC);
+        // <FS:Trish> FSRenderThread: the render thread presents in stream order
+        //SwapBuffers(mhDC);
+        if (!sFSSwapBuffersHook || !sFSSwapBuffersHook())
+        {
+            SwapBuffers(mhDC);
+        }
+        // </FS:Trish>
     }
 
     {

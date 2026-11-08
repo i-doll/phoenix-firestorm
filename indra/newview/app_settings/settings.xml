@@ -28254,6 +28254,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSRenderThread</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Restart required. Windows only. Runs every OpenGL call on a separate render thread that owns the GL context. The main thread runs the old frame code unchanged but its GL calls are recorded into a command stream (arguments and the client memory they read are copied) and replayed in the same order by the render thread, so the driver's CPU work overlaps the main thread's work for the rest of the frame and the next one. Calls that return something are made synchronously (the main thread waits for the render thread); frequent state queries are answered from tracked state, and query object results arrive asynchronously. At most one frame is in flight. Threaded texture and media uploads on the shared-context workers and the texture upload PBO ring are turned off while it runs. Off: GL calls go straight to the driver exactly as before.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderThreadCheck</key>
+    <map>
+      <key>Comment</key>
+      <string>Debug. With FSRenderThread running, log every GL entry point called on a thread that has no GL context (once per entry point), and log the first synchronous call of each entry point (calls that make the main thread wait for the render thread). The stats line every 10 seconds lists the most frequent synchronous calls either way.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

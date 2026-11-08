@@ -30,6 +30,7 @@
 #include "idmcp.h" // <ID> Embedded MCP server (stable facade)
 #include "idheadless.h" // <ID> headless
 #include "idmaterialtheme.h" // <ID:MaterialTheme>
+#include "fsrenderthread.h" // <FS:Trish/> FSRenderThread
 
 // Viewer includes
 #include "llversioninfo.h"
@@ -2071,6 +2072,7 @@ bool LLAppViewer::frame()
 
 bool LLAppViewer::doFrame()
 {
+    FSRenderThread::frameStart(); // <FS:Trish/> FSRenderThread: start, check setting, stats
     resumeMainloopTimeout("Main:doFrameStart");
 #ifdef LL_DISCORD
     {
@@ -2516,6 +2518,8 @@ void LLAppViewer::flushLFSIO()
 
 bool LLAppViewer::cleanup()
 {
+    FSRenderThread::shutdown(); // <FS:Trish/> FSRenderThread: GL back to the main thread before any teardown
+
 #if LL_VELOPACK
     // Apply any pending Velopack update before shutdown
     if (velopack_is_update_pending())

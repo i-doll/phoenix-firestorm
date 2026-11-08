@@ -68,6 +68,8 @@
 
 #include "fsgpudrivenpbr.h"
 
+#include "fsglstream.h"
+
 #include "fsgddarena.h"
 
 #include "lldrawpool.h"
@@ -233,6 +235,37 @@ namespace
     PFNGLGETTEXTURESAMPLERHANDLEARBPROC sGetTextureSamplerHandle = nullptr;
     PFNGLMAKETEXTUREHANDLERESIDENTARBPROC sMakeResident = nullptr;
     PFNGLMAKETEXTUREHANDLENONRESIDENTARBPROC sMakeNonResident = nullptr;
+
+    // The bindless entry points are loaded here, not through llglheaders.h, so FSRenderThread's
+    // GL command stream doesn't proxy them: run them where the context is, in stream order
+    // (runSync and recordCall call them directly when the stream isn't recording). Residency
+    // changes return nothing, so they are recorded rather than waited for.
+    GLuint64 fsGetHandle(GLuint texture, GLuint sampler)
+    {
+        GLuint64 handle = 0;
+        FSGLStream::runSync([&]() { handle = sGetTextureSamplerHandle(texture, sampler); });
+        return handle;
+    }
+
+    void fsMakeResidentNow(U64 handle)
+    {
+        sMakeResident((GLuint64)handle);
+    }
+
+    void fsMakeNonResidentNow(U64 handle)
+    {
+        sMakeNonResident((GLuint64)handle);
+    }
+
+    void fsMakeResident(GLuint64 handle)
+    {
+        FSGLStream::recordCall(&fsMakeResidentNow, (U64)handle);
+    }
+
+    void fsMakeNonResident(GLuint64 handle)
+    {
+        FSGLStream::recordCall(&fsMakeNonResidentNow, (U64)handle);
+    }
 #endif
 
     struct SamplerState
@@ -307,7 +340,7 @@ namespace
         {
             if (slot.mResident)
             {
-                sMakeNonResident(slot.mHandle);
+                fsMakeNonResident(slot.mHandle);
                 --sResident;
             }
             glDeleteSamplers(1, &slot.mSampler);
@@ -379,12 +412,12 @@ namespace
         GLuint sampler = 0;
         glGenSamplers(1, &sampler);
         glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        const GLuint64 handle = sGetTextureSamplerHandle(tex, sampler);
+        const GLuint64 handle = fsGetHandle(tex, sampler);
         bool ok = handle != 0 && glGetError() == GL_NO_ERROR;
         if (ok)
         {
-            sMakeResident(handle);
-            sMakeNonResident(handle);
+            fsMakeResident(handle);
+            fsMakeNonResident(handle);
             glDeleteSamplers(1, &sampler);
             sampler = 0;
             ok = glGetError() == GL_NO_ERROR;
@@ -438,7 +471,7 @@ namespace
             {
                 if (!slot.mResident)
                 {
-                    sMakeResident(slot.mHandle);
+                    fsMakeResident(slot.mHandle);
                     slot.mResident = true;
                     ++sResident;
                 }
@@ -459,7 +492,7 @@ namespace
             glSamplerParameterf(slot.mSampler, GL_TEXTURE_MAX_ANISOTROPY, state.mAniso);
         }
         // 0 (and GL_INVALID_OPERATION) for a texture that isn't complete with this sampler
-        slot.mHandle = sGetTextureSamplerHandle(name, slot.mSampler);
+        slot.mHandle = fsGetHandle(name, slot.mSampler);
         if (!slot.mHandle)
         {
             glDeleteSamplers(1, &slot.mSampler);
@@ -473,7 +506,7 @@ namespace
             }
             return 0;
         }
-        sMakeResident(slot.mHandle);
+        fsMakeResident(slot.mHandle);
         slot.mResident = true;
         slot.mLastFrame = frame;
         ++sResident;
@@ -512,7 +545,7 @@ namespace
                 }
                 if (idle >= FS_GDD_HANDLE_IDLE_FRAMES && slot.mResident)
                 {
-                    sMakeNonResident(slot.mHandle);
+                    fsMakeNonResident(slot.mHandle);
                     slot.mResident = false;
                     --sResident;
                 }

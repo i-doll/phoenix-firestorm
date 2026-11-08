@@ -27,6 +27,7 @@
 #include "linden_common.h"
 
 #include "llrender.h"
+#include "fsglstream.h" // <FS:Trish/> FSRenderThread
 
 #include "llvertexbuffer.h"
 #include "llcubemap.h"
@@ -1651,10 +1652,13 @@ bool LLRender::verifyTexUnitActive(U32 unitToVerify)
 
 void LLRender::clearErrors()
 {
-    while (glGetError())
-    {
-        //loop until no more error flags left
-    }
+    // <FS:Trish> Deferred on the render thread instead of waiting for it once per flag
+    //while (glGetError())
+    //{
+    //    //loop until no more error flags left
+    //}
+    FSGLStream::clearErrors();
+    // </FS:Trish>
 }
 
 void LLRender::beginList(std::list<LLVertexBufferData> *list)

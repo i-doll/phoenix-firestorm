@@ -4752,6 +4752,54 @@
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven PBR surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
                      top="1464"
                      width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_render_thread"
+                     top="1506"
+                     width="340">
+                        Render thread
+                    </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_render_thread"
+                     tool_tip="Set every option in &quot;Render thread&quot; back to its default value."
+                     top="1505"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderThread,FSRenderThreadCheck" />
+                    </button>
+                    <check_box
+                     control_name="FSRenderThread"
+                     follows="left|top"
+                     height="20"
+                     label="Run OpenGL on a separate render thread (restart required)"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsrenderthread"
+                     tool_tip="EXPERIMENTAL. Windows only, takes effect after a restart. The main thread hands its OpenGL work to a render thread, which talks to the graphics driver while the main thread already prepares the next frame. Can raise the frame rate when the main thread is the bottleneck. The picture is the same; if something renders wrongly or the viewer stalls, turn it off."
+                     top="1532"
+                     width="475" />
+                    <check_box
+                     control_name="FSRenderThreadCheck"
+                     enabled_control="FSRenderThread"
+                     follows="left|top"
+                     height="20"
+                     label="Log render thread problems"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderthreadcheck"
+                     tool_tip="Debug. Writes OpenGL calls made from the wrong thread, and calls that make the main thread wait for the render thread, to the log. Only for testing."
+                     top="1558"
+                     width="455" />
                 </panel>
             </scroll_container>
         </panel>
