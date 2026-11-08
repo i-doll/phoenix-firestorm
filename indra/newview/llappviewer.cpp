@@ -772,6 +772,7 @@ namespace
 std::string sIdyllMigrationInfo;
 std::string sIdyllMigrationWarn;
 constexpr int ID_MIGRATION_MAX_ATTEMPTS = 3;
+constexpr auto ID_MIGRATION_LOCK_STALE = std::chrono::minutes(10);
 
 bool idHoldsFiles(const std::filesystem::path& dir)
 {
@@ -799,6 +800,71 @@ bool idSkipWhenMigrating(const std::filesystem::path& rel)
         return std::next(top) == rel.end();
     }
     return *top == "logs" && rel.filename().u8string().ends_with(u8"_marker");
+}
+
+bool idFailureNeedsRetry(const std::filesystem::path& rel)
+{
+    auto top = rel.begin();
+    if (top == rel.end() || std::next(top) == rel.end())
+    {
+        return false;
+    }
+    return *top != "logs" && *top != "browser_profile" && *top != "data";
+}
+
+struct IDMigrationLock
+{
+    std::filesystem::path path;
+    bool held = false;
+    ~IDMigrationLock()
+    {
+        if (held)
+        {
+            std::error_code ec;
+            std::filesystem::remove(path, ec);
+        }
+    }
+};
+
+bool idLockIsRecent(const std::filesystem::path& lock)
+{
+    std::error_code ec;
+    const auto written = std::filesystem::last_write_time(lock, ec);
+    if (ec)
+    {
+        return false;
+    }
+    const auto age = std::filesystem::file_time_type::clock::now() - written;
+    return age < ID_MIGRATION_LOCK_STALE && age > -ID_MIGRATION_LOCK_STALE;
+}
+
+bool idTakeMigrationLock(IDMigrationLock& lock)
+{
+    namespace fs = std::filesystem;
+    std::error_code create_ec;
+    if (fs::create_directory(lock.path, create_ec))
+    {
+        lock.held = true;
+        return true;
+    }
+    std::error_code ec;
+    if (!fs::exists(fs::symlink_status(lock.path, ec)))
+    {
+        sIdyllMigrationWarn += "Could not create " + fsyspath(lock.path).string() + ": " + create_ec.message() + "\n";
+        return true;
+    }
+    if (idLockIsRecent(lock.path))
+    {
+        sIdyllMigrationInfo = "Another launch is copying Firestorm user data, so this launch skipped it.";
+        return false;
+    }
+    fs::remove_all(lock.path, ec);
+    lock.held = fs::create_directory(lock.path, ec);
+    if (!lock.held)
+    {
+        sIdyllMigrationWarn += "Could not take over " + fsyspath(lock.path).string() + (ec ? ": " + ec.message() : "") + "\n";
+    }
+    return lock.held;
 }
 
 template <typename Op>
@@ -836,8 +902,20 @@ int idReadAttempts(const std::filesystem::path& marker)
     {
         return 0;
     }
+    std::string text;
+    in >> text;
+    if (text == "done")
+    {
+        return 0;
+    }
     int attempts = 1;
-    in >> attempts;
+    try
+    {
+        attempts = std::stoi(text);
+    }
+    catch (const std::exception&)
+    {
+    }
     return std::max(attempts, 1);
 }
 
@@ -923,7 +1001,7 @@ void idRewriteSettingsFile(const std::filesystem::path& file, const std::string&
     }
 }
 
-bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::string& firestorm_dir_in)
+bool idCopyFirestormUserData(const std::string& idyll_dir_in, const std::string& firestorm_dir_in)
 {
     namespace fs = std::filesystem;
     const std::string idyll_dir = idTrimSeparators(idyll_dir_in);
@@ -935,6 +1013,13 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
     std::error_code ec;
     const fsyspath src(firestorm_dir);
     const fsyspath dst(idyll_dir);
+    fs::path lock_path = dst;
+    lock_path += ".migration-lock";
+    IDMigrationLock lock{ lock_path };
+    if (!idTakeMigrationLock(lock))
+    {
+        return false;
+    }
     fs::path pending = dst;
     pending += ".migration-pending";
     const int attempts = idReadAttempts(pending);
@@ -1001,6 +1086,11 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
     {
         const fs::path rel = it->path().lexically_relative(src);
         std::error_code op_ec;
+        if (lock.held && (copied + failed) % 256 == 255)
+        {
+            fs::last_write_time(lock.path, fs::file_time_type::clock::now(), op_ec);
+            op_ec.clear();
+        }
         const fs::file_status status = it->symlink_status(op_ec);
         if (idSkipWhenMigrating(rel))
         {
@@ -1028,6 +1118,11 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
         {
             ++failed;
             sIdyllMigrationWarn += "Could not copy " + fsyspath(it->path()).string() + ": " + op_ec.message() + "\n";
+            if (idFailureNeedsRetry(rel))
+            {
+                ok = false;
+                sIdyllMigrationWarn += "The copy is retried on the next launch.\n";
+            }
         }
         else
         {
@@ -1062,7 +1157,12 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
         }
         if (ok)
         {
+            std::ofstream(pending, std::ios::trunc) << "done";
             ok = idRetryFs([&](std::error_code& e) { fs::rename(tmp, dst, e); }, ec);
+            if (!ok)
+            {
+                std::ofstream(pending, std::ios::trunc) << (attempts + 1);
+            }
         }
         if (!ok)
         {
@@ -1081,6 +1181,23 @@ bool idMigrateFirestormUserData(const std::string& idyll_dir_in, const std::stri
         + std::to_string(copied) + " entries, " + std::to_string(failed) + " failed. Skipped the cache folder and crash markers, and cleared saved cache locations."
         + set_aside_note;
     return true;
+}
+
+bool idMigrateFirestormUserData(const std::string& idyll_dir, const std::string& firestorm_dir)
+{
+    try
+    {
+        return idCopyFirestormUserData(idyll_dir, firestorm_dir);
+    }
+    catch (const std::exception& e)
+    {
+        sIdyllMigrationWarn += std::string("Stopped copying Firestorm user data: ") + e.what() + "\n";
+    }
+    catch (...)
+    {
+        sIdyllMigrationWarn += "Stopped copying Firestorm user data after an unexpected error\n";
+    }
+    return false;
 }
 
 std::string idUserDataDir(const std::string& folder_name)
