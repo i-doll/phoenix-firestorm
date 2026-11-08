@@ -923,6 +923,24 @@ public:
 
     void renderSunRays();
     void renderSpotVolumetrics();
+    // <FS:Trish> Dust motes in the sunbeams and projector cones (FSRenderDustMotes). The two
+    // volumetric passes leave what they lit this frame here, renderDustMotes reads and clears it.
+    struct FSDustSpot
+    {
+        glm::mat4 mProj;            // view space to the projector's texture space
+        glm::mat4 mShadowMatrix;    // view space to its shadow map
+        LLVector4 mCenter;          // view space position, range
+        LLVector4 mOrigin;          // view space frustum apex, falloff
+        LLVector4 mColor;           // linear colour, shadow fade (1 - fade) or -1 unshadowed
+        S32 mSlot;                  // shadow slot, -1 for none
+    };
+    static constexpr U32    FS_DUST_MAX_SPOTS = 4;
+    FSDustSpot              mFSDustSpots[FS_DUST_MAX_SPOTS];
+    U32                     mFSDustSpotCount = 0;
+    bool                    mFSDustSunValid = false;    // mSunRayMap holds this frame's sun rays
+    LLColor3                mFSDustSunColor;            // their light colour, before the rays' strength
+    void renderDustMotes();
+    // </FS:Trish>
     void renderBloom();
     bool renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst);
     void bindColorGrading(LLGLSLShader* shader);

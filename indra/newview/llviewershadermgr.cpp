@@ -218,6 +218,7 @@ LLGLSLShader            gFSSunRaysProgram;
 LLGLSLShader            gFSSunRaysCompositeProgram;
 LLGLSLShader            gFSSpotVolumetricProgram;
 LLGLSLShader            gFSSpotVolumetricCompositeProgram;
+LLGLSLShader            gFSDustMotesProgram; // <FS:Trish/> Dust motes
 LLGLSLShader            gFSBloomPrefilterProgram;
 LLGLSLShader            gFSBloomDownProgram;
 LLGLSLShader            gFSBloomUpProgram;
@@ -1683,6 +1684,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gFSSunRaysCompositeProgram.unload();
         gFSSpotVolumetricProgram.unload();
         gFSSpotVolumetricCompositeProgram.unload();
+        gFSDustMotesProgram.unload(); // <FS:Trish/> Dust motes
         gFSBloomPrefilterProgram.unload();
         gFSBloomDownProgram.unload();
         gFSBloomUpProgram.unload();
@@ -3319,6 +3321,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             { &gFSSunRaysCompositeProgram, "FS Sun Rays Composite", "deferred/fsSunRaysCompositeF.glsl", true },
             { &gFSSpotVolumetricProgram,   "FS Spot Volumetric",    "deferred/fsSpotVolumetricF.glsl",   true },
             { &gFSSpotVolumetricCompositeProgram, "FS Spot Volumetric Composite", "deferred/fsSpotVolumetricCompositeF.glsl", true },
+            { &gFSDustMotesProgram,        "FS Dust Motes",         "deferred/fsDustMotesF.glsl",        true }, // <FS:Trish/> Dust motes
             { &gFSBloomPrefilterProgram,   "FS Bloom Prefilter",    "deferred/fsBloomPrefilterF.glsl",   false },
             { &gFSBloomDownProgram,        "FS Bloom Downsample",   "deferred/fsBloomDownF.glsl",        false },
             { &gFSBloomUpProgram,          "FS Bloom Upsample",     "deferred/fsBloomUpF.glsl",          false },

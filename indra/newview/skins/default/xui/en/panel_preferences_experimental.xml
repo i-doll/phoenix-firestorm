@@ -935,6 +935,147 @@
                      tool_tip="EXPERIMENTAL. While the sun is down, draw much fainter rays from the moon, scaled by its brightness in the sky settings."
                      top="344"
                      width="455" />
+                    <check_box
+                     control_name="FSRenderDustMotes"
+                     follows="left|top"
+                     height="20"
+                     label="Dust motes in light shafts"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsrenderdustmotes"
+                     tool_tip="EXPERIMENTAL. Tiny sparkling specks of dust drifting in sunbeams and projector cones, like dust in the sun through a window. Only visible where the sun rays or the volumetric projector light (further down) are on and lighting the air."
+                     top="402"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderdustmotesdensity_label"
+                     tool_tip="EXPERIMENTAL. Dust motes per cubic metre of air."
+                     top="430"
+                     width="285">
+                        Dust density
+                    </text>
+                    <spinner
+                     control_name="FSRenderDustMotesDensity"
+                     decimal_digits="1"
+                     enabled_control="FSRenderDustMotes"
+                     follows="left|top"
+                     height="20"
+                     increment="0.1"
+                     layout="topleft"
+                     left="330"
+                     max_val="8.0"
+                     min_val="0.1"
+                     name="fs_fsrenderdustmotesdensity"
+                     tool_tip="EXPERIMENTAL. Dust motes per cubic metre of air."
+                     top="428"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderdustmotessize_label"
+                     tool_tip="EXPERIMENTAL. How big a dust mote looks on screen, in pixels. Motes right in front of the camera grow to at most twice this."
+                     top="458"
+                     width="285">
+                        Dust mote size (pixels)
+                    </text>
+                    <spinner
+                     control_name="FSRenderDustMotesSize"
+                     decimal_digits="2"
+                     enabled_control="FSRenderDustMotes"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="4.0"
+                     min_val="0.5"
+                     name="fs_fsrenderdustmotessize"
+                     tool_tip="EXPERIMENTAL. How big a dust mote looks on screen, in pixels. Motes right in front of the camera grow to at most twice this."
+                     top="456"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderdustmotesbrightness_label"
+                     tool_tip="EXPERIMENTAL. How brightly dust motes glint. They are brightest when you look toward the light."
+                     top="486"
+                     width="285">
+                        Dust brightness
+                    </text>
+                    <spinner
+                     control_name="FSRenderDustMotesBrightness"
+                     decimal_digits="1"
+                     enabled_control="FSRenderDustMotes"
+                     follows="left|top"
+                     height="20"
+                     increment="0.1"
+                     layout="topleft"
+                     left="330"
+                     max_val="10.0"
+                     min_val="0.0"
+                     name="fs_fsrenderdustmotesbrightness"
+                     tool_tip="EXPERIMENTAL. How brightly dust motes glint. They are brightest when you look toward the light."
+                     top="484"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderdustmotesrange_label"
+                     tool_tip="EXPERIMENTAL. How far from the camera dust motes are drawn, in metres. They fade out toward this distance."
+                     top="514"
+                     width="285">
+                        Dust range (m)
+                    </text>
+                    <spinner
+                     control_name="FSRenderDustMotesRange"
+                     decimal_digits="0"
+                     enabled_control="FSRenderDustMotes"
+                     follows="left|top"
+                     height="20"
+                     increment="1.0"
+                     layout="topleft"
+                     left="330"
+                     max_val="30.0"
+                     min_val="2.0"
+                     name="fs_fsrenderdustmotesrange"
+                     tool_tip="EXPERIMENTAL. How far from the camera dust motes are drawn, in metres. They fade out toward this distance."
+                     top="512"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderdustmotesturbulence_label"
+                     tool_tip="EXPERIMENTAL. How much the dust motes wobble and swirl as they drift. 0 drifts smoothly in straight lines, 2 is restless air."
+                     top="546"
+                     width="285">
+                        Dust turbulence
+                    </text>
+                    <spinner
+                     control_name="FSRenderDustMotesTurbulence"
+                     decimal_digits="1"
+                     enabled_control="FSRenderDustMotes"
+                     follows="left|top"
+                     height="20"
+                     increment="0.1"
+                     layout="topleft"
+                     left="330"
+                     max_val="2.0"
+                     min_val="0.0"
+                     name="fs_fsrenderdustmotesturbulence"
+                     tool_tip="EXPERIMENTAL. How much the dust motes wobble and swirl as they drift. 0 drifts smoothly in straight lines, 2 is restless air."
+                     top="544"
+                     width="100" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"

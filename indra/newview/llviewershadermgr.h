@@ -273,6 +273,7 @@ extern LLGLSLShader         gFSSunRaysProgram;
 extern LLGLSLShader         gFSSunRaysCompositeProgram;
 extern LLGLSLShader         gFSSpotVolumetricProgram;
 extern LLGLSLShader         gFSSpotVolumetricCompositeProgram;
+extern LLGLSLShader         gFSDustMotesProgram; // <FS:Trish/> Dust motes
 extern LLGLSLShader         gFSBloomPrefilterProgram;
 extern LLGLSLShader         gFSBloomDownProgram;
 extern LLGLSLShader         gFSBloomUpProgram;

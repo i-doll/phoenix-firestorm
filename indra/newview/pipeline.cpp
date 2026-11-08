@@ -10691,6 +10691,7 @@ void LLPipeline::renderFinalize()
         // for them. After the SSR copy, so reflections don't pick them up a second time.
         renderSunRays();
         renderSpotVolumetrics();
+        renderDustMotes(); // <FS:Trish/> Dust motes, lit by the two passes above
         renderBloom();
         // </FS:Trish>
 
@@ -14083,6 +14084,8 @@ void LLPipeline::renderSunRays()
         gFSSunRaysCompositeProgram.uniform3fv(s_ray_color, 1, light.mV);
         fs_draw_screen_triangle(mScreenTriangleVB);
         gFSSunRaysCompositeProgram.unbind();
+        mFSDustSunColor = light * (1.f / (F32)strength); // <FS:Trish/> Dust motes
+        mFSDustSunValid = true; // <FS:Trish/> Dust motes
 
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         gGL.setColorMask(true, true);
@@ -14105,6 +14108,7 @@ void LLPipeline::renderSpotVolumetrics()
     static LLCachedControl<S32> steps(gSavedSettings, "FSRenderSpotVolumetricSteps", 24);
     static LLCachedControl<bool> unshadowed(gSavedSettings, "FSRenderSpotVolumetricUnshadowed", false);
     static LLCachedControl<F32> anisotropy(gSavedSettings, "FSRenderSpotVolumetricAnisotropy", 0.3f);
+    static LLCachedControl<bool> dust_motes(gSavedSettings, "FSRenderDustMotes", false); // <FS:Trish/> Dust motes
 
     if (!enabled)
     {
@@ -14311,6 +14315,20 @@ void LLPipeline::renderSpotVolumetrics()
                 shader.uniform1f(s_vol_shadow_fade, 1.f - mSpotLightFade[light.mSlot]);
             }
 
+            // <FS:Trish> Dust motes: the nearest lights also light the motes
+            if (dust_motes && mFSDustSpotCount < FS_DUST_MAX_SPOTS)
+            {
+                const bool shadowed = light.mSlot >= 0 && shadow_channel > -1;
+                FSDustSpot& dust = mFSDustSpots[mFSDustSpotCount++];
+                dust.mProj = screen_to_light;
+                dust.mShadowMatrix = shadowed ? (light.mSlot < 2 ? mSunShadowMatrix[4 + light.mSlot] : mFSSpotShadowMatrix[light.mSlot]) : glm::mat4(1.f);
+                dust.mCenter.set(center.x, center.y, center.z, s);
+                dust.mOrigin.set(screen_origin.x, screen_origin.y, screen_origin.z, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
+                dust.mColor.set(col.mV[0], col.mV[1], col.mV[2], shadowed ? 1.f - mSpotLightFade[light.mSlot] : -1.f);
+                dust.mSlot = shadowed ? light.mSlot : -1;
+            }
+            // </FS:Trish>
+
             // The first light also writes the distances into alpha, the others add colour only
             gGL.setColorMask(true, first);
             first = false;
@@ -14343,6 +14361,242 @@ void LLPipeline::renderSpotVolumetrics()
         mRT->screen.flush();
     }
 }
+
+// <FS:Trish> Dust motes: tiny specks floating in the sunbeams and projector cones, sharp at full
+// resolution. One full screen draw (fsDustMotesF) walks each pixel's view ray through a world
+// fixed grid of cells near the camera, finds the first mote on it and lights it with the sun
+// shadow and the projectors the volumetric passes used this frame, added to the HDR scene before
+// exposure.
+// Pixels where the volumetric maps saw no lit air are skipped. Nothing runs unless the sun rays
+// or the volumetric projector light ran this frame, so it is off underwater and in snapshots
+// without post processing, like them; reflection probes never reach the post passes.
+void LLPipeline::renderDustMotes()
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderDustMotes", false);
+    static LLCachedControl<F32> density(gSavedSettings, "FSRenderDustMotesDensity", 2.f);
+    static LLCachedControl<F32> mote_size(gSavedSettings, "FSRenderDustMotesSize", 1.5f);
+    static LLCachedControl<F32> brightness(gSavedSettings, "FSRenderDustMotesBrightness", 1.f);
+    static LLCachedControl<F32> range(gSavedSettings, "FSRenderDustMotesRange", 12.f);
+    static LLCachedControl<F32> turbulence(gSavedSettings, "FSRenderDustMotesTurbulence", 1.f);
+
+    // What the volumetric passes lit this frame, cleared so it never carries into the next
+    const bool sun_on = mFSDustSunValid;
+    const U32 spot_count = llmin(mFSDustSpotCount, FS_DUST_MAX_SPOTS);
+    mFSDustSunValid = false;
+    mFSDustSpotCount = 0;
+
+    if (!enabled || (!sun_on && spot_count == 0) || brightness <= 0.f || density <= 0.f ||
+        gCubeSnapshot || gSnapshotNoPost || sUnderWaterRender || !gFSDustMotesProgram.isComplete())
+    {
+        return;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    LL_PROFILE_GPU_ZONE("dust motes");
+
+    // The grid: cells sized so a walk to the range crosses a bounded number of them (at most
+    // sqrt(3) * 24 + 3 = 45 for any range), one mote at most per cell
+    const F32 dust_range = llclamp((F32)range, 2.f, 30.f);
+    const F32 cell = llclamp(dust_range / 24.f, 0.25f, 1.25f);
+    const S32 max_cells = llclamp((S32)ceilf(dust_range / cell * 1.7321f) + 3, 4, 64);
+    const F32 probability = llclamp((F32)density * cell * cell * cell, 0.f, 1.f);
+
+    // Time, wrapped in double precision: no shared wind moves the grid, each mote drifts on its
+    // own, and all its motion runs on whole turns of the shader's 960 second cycle, so the wrap is
+    // seamless
+    constexpr F64 DRIFT_CYCLE = 960.0;
+    const F32 drift_time = (F32)fmod(LLFrameTimer::getElapsedSeconds(), DRIFT_CYCLE);
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+    const LLVector3d cam_global = gAgent.getPosGlobalFromAgent(camera->getOrigin());
+    F32 cam_cell[3];
+    F32 cell_base[3];
+    for (S32 i = 0; i < 3; ++i)
+    {
+        // The camera in cells of the world fixed grid, split into a whole cell (wrapped, the hash
+        // wraps with it) and the position inside it, so the shader works with small numbers
+        const F64 g = cam_global.mdV[i] / (F64)cell;
+        const F64 whole = floor(g);
+        cam_cell[i] = (F32)(g - whole);
+        F64 wrapped = fmod(whole, 65536.0);
+        if (wrapped < 0.0)
+        {
+            wrapped += 65536.0;
+        }
+        cell_base[i] = (F32)wrapped;
+    }
+
+    const glm::mat4 view_to_world = glm::mat4(glm::transpose(glm::mat3(get_current_modelview()))); // rotation only
+    const F32 pixel_angle = 2.f * tanf(camera->getView() * 0.5f) / (F32)llmax(mRT->screen.getHeight(), 1u);
+
+    // Colours scaled so brightness 1 makes a backlit mote about as bright as a sunlit surface
+    const F32 gain = (F32)brightness * 0.15f;
+    const LLColor3 sun_color = sun_on ? mFSDustSunColor * gain : LLColor3::black;
+
+    F32 spot_proj[FS_DUST_MAX_SPOTS * 16] = {};
+    F32 spot_shadow_matrix[FS_DUST_MAX_SPOTS * 16] = {};
+    F32 spot_center[FS_DUST_MAX_SPOTS * 4] = {};
+    F32 spot_origin[FS_DUST_MAX_SPOTS * 4] = {};
+    F32 spot_color[FS_DUST_MAX_SPOTS * 4] = {};
+    for (U32 i = 0; i < spot_count; ++i)
+    {
+        const FSDustSpot& spot = mFSDustSpots[i];
+        memcpy(spot_proj + i * 16, glm::value_ptr(spot.mProj), sizeof(F32) * 16);
+        memcpy(spot_shadow_matrix + i * 16, glm::value_ptr(spot.mShadowMatrix), sizeof(F32) * 16);
+        memcpy(spot_center + i * 4, spot.mCenter.mV, sizeof(F32) * 4);
+        memcpy(spot_origin + i * 4, spot.mOrigin.mV, sizeof(F32) * 4);
+        spot_color[i * 4 + 0] = spot.mColor.mV[0] * gain;
+        spot_color[i * 4 + 1] = spot.mColor.mV[1] * gain;
+        spot_color[i * 4 + 2] = spot.mColor.mV[2] * gain;
+        spot_color[i * 4 + 3] = spot.mColor.mV[3];
+    }
+
+    static LLStaticHashedString s_sun_rays("dust_sun_rays");
+    static LLStaticHashedString s_spot_volume("dust_spot_volume");
+    static LLStaticHashedString s_spot_shadow[FS_DUST_MAX_SPOTS] = {
+        LLStaticHashedString("dust_spot_shadow0"), LLStaticHashedString("dust_spot_shadow1"),
+        LLStaticHashedString("dust_spot_shadow2"), LLStaticHashedString("dust_spot_shadow3") };
+    static LLStaticHashedString s_sun_on("dust_sun_on");
+    static LLStaticHashedString s_sun_color("dust_sun_color");
+    static LLStaticHashedString s_spot_count("dust_spot_count");
+    static LLStaticHashedString s_spot_proj("dust_spot_proj");
+    static LLStaticHashedString s_spot_shadow_matrix("dust_spot_shadow_matrix");
+    static LLStaticHashedString s_spot_center("dust_spot_center");
+    static LLStaticHashedString s_spot_origin("dust_spot_origin");
+    static LLStaticHashedString s_spot_color("dust_spot_color");
+    static LLStaticHashedString s_view_to_world("dust_view_to_world");
+    static LLStaticHashedString s_cam_cell("dust_cam_cell");
+    static LLStaticHashedString s_cell_base("dust_cell_base");
+    static LLStaticHashedString s_cell_size("dust_cell_size");
+    static LLStaticHashedString s_range("dust_range");
+    static LLStaticHashedString s_max_cells("dust_max_cells");
+    static LLStaticHashedString s_probability("dust_probability");
+    static LLStaticHashedString s_size("dust_size");
+    static LLStaticHashedString s_pixel_angle("dust_pixel_angle");
+    static LLStaticHashedString s_time("dust_time");
+    static LLStaticHashedString s_turbulence("dust_turbulence");
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+
+    mRT->screen.bindTarget();
+    gGL.setColorMask(true, false); // the screen's alpha is glow
+    LLGLEnable blend(GL_BLEND);
+    gGL.setSceneBlendType(LLRender::BT_ADD);
+
+    LLGLSLShader& shader = gFSDustMotesProgram;
+    bindDeferredShader(shader); // depth, sun shadow maps, their matrices and the light directions
+
+    // The shader's own samplers go on the units after the ones the program reserved, as
+    // fsBeginExtraSpotShadows does
+    S32 units[2 + FS_DUST_MAX_SPOTS];
+    S32 unit_count = 0;
+    S32 next = shader.mActiveTextureChannels;
+    const S32 limit = llmin(gGLManager.mNumTextureImageUnits, (S32)LL_NUM_TEXTURE_LAYERS);
+    auto take_unit = [&](const LLStaticHashedString& name) -> S32
+    {
+        if (shader.getUniformLocation(name) < 0 || next >= limit)
+        {
+            return -1;
+        }
+        shader.uniform1i(name, next);
+        units[unit_count++] = next;
+        return next++;
+    };
+
+    // The volumetric maps, filtered so one tap covers the 2x2 reduced texels around a pixel. The
+    // composites set their own point filtering again when they bind them.
+    const S32 sun_unit = take_unit(s_sun_rays);
+    const bool sun_mask = sun_on && sun_unit > -1 && mSunRayMap.isComplete();
+    if (sun_unit > -1)
+    {
+        if (sun_mask)
+        {
+            gGL.getTexUnit(sun_unit)->bind(&mSunRayMap);
+            gGL.getTexUnit(sun_unit)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+        }
+        else
+        {
+            gGL.getTexUnit(sun_unit)->bind(LLViewerFetchedTexture::sWhiteImagep.get());
+        }
+    }
+    const S32 spot_unit = take_unit(s_spot_volume);
+    const bool spot_mask = spot_count > 0 && spot_unit > -1 && mSpotVolumeMap.isComplete();
+    if (spot_unit > -1)
+    {
+        if (spot_mask)
+        {
+            gGL.getTexUnit(spot_unit)->bind(&mSpotVolumeMap);
+            gGL.getTexUnit(spot_unit)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+        }
+        else
+        {
+            gGL.getTexUnit(spot_unit)->bind(LLViewerFetchedTexture::sWhiteImagep.get());
+        }
+    }
+
+    // Each projector's shadow map. Unused samplers still get a depth map, so a shadow sampler's
+    // unit never holds another kind of texture.
+    LLRenderTarget* any_depth = mSpotShadow[0].isComplete() ? &mSpotShadow[0] : (mRT->shadow[0].isComplete() ? &mRT->shadow[0] : nullptr);
+    for (U32 i = 0; i < FS_DUST_MAX_SPOTS; ++i)
+    {
+        const S32 unit = take_unit(s_spot_shadow[i]);
+        const S32 slot = i < spot_count ? mFSDustSpots[i].mSlot : -1;
+        LLRenderTarget* map = (slot >= 0 && mSpotShadow[slot].isComplete()) ? &mSpotShadow[slot] : any_depth;
+        if (slot >= 0 && (unit < 0 || map != &mSpotShadow[slot]))
+        {
+            spot_color[i * 4 + 3] = -1.f; // its map is gone or has no unit: unshadowed
+        }
+        if (unit < 0)
+        {
+            continue;
+        }
+        if (map)
+        {
+            gGL.getTexUnit(unit)->bind(map, true);
+        }
+        else
+        {
+            gGL.getTexUnit(unit)->unbind(LLTexUnit::TT_TEXTURE);
+        }
+    }
+
+    shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, LLEnvironment::instance().getIsSunUp() ? 1 : 0);
+    shader.uniform1i(s_sun_on, sun_mask ? 1 : 0);
+    shader.uniform3fv(s_sun_color, 1, sun_color.mV);
+    shader.uniform1i(s_spot_count, spot_mask ? (S32)spot_count : 0);
+    shader.uniformMatrix4fv(s_spot_proj, FS_DUST_MAX_SPOTS, GL_FALSE, spot_proj);
+    shader.uniformMatrix4fv(s_spot_shadow_matrix, FS_DUST_MAX_SPOTS, GL_FALSE, spot_shadow_matrix);
+    shader.uniform4fv(s_spot_center, FS_DUST_MAX_SPOTS, spot_center);
+    shader.uniform4fv(s_spot_origin, FS_DUST_MAX_SPOTS, spot_origin);
+    shader.uniform4fv(s_spot_color, FS_DUST_MAX_SPOTS, spot_color);
+    shader.uniformMatrix4fv(s_view_to_world, 1, GL_FALSE, glm::value_ptr(view_to_world));
+    shader.uniform3fv(s_cam_cell, 1, cam_cell);
+    shader.uniform3fv(s_cell_base, 1, cell_base);
+    shader.uniform1f(s_cell_size, cell);
+    shader.uniform1f(s_range, dust_range);
+    shader.uniform1i(s_max_cells, max_cells);
+    shader.uniform1f(s_probability, probability);
+    shader.uniform1f(s_size, llclamp((F32)mote_size, 0.25f, 6.f));
+    shader.uniform1f(s_pixel_angle, pixel_angle);
+    shader.uniform1f(s_time, drift_time);
+    shader.uniform1f(s_turbulence, llclamp((F32)turbulence, 0.f, 2.f) * 0.07f); // cells, at most 0.14
+
+    if (sun_mask || spot_mask)
+    {
+        fs_draw_screen_triangle(mScreenTriangleVB);
+    }
+
+    for (S32 i = 0; i < unit_count; ++i)
+    {
+        gGL.getTexUnit(units[i])->unbind(LLTexUnit::TT_TEXTURE);
+    }
+    unbindDeferredShader(shader);
+
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    gGL.setColorMask(true, true);
+    mRT->screen.flush();
+}
+// </FS:Trish>
 
 // Lens dirt: scales the summed bloom by 1 + mask * strength, with a procedural smudge mask fixed
 // to the screen, so bright lights and the sun light up the grime on the lens. A blend of
