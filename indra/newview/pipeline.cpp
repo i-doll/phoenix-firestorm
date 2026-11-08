@@ -4225,6 +4225,9 @@ void LLPipeline::postSort(LLCamera &camera)
     // build render map
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("build render map");
+    // <FS:Trish> FSPerfParallelPostSort: collect the draw infos on worker threads; false = do it here
+    if (!postSortBuildRenderMapParallel(camera))
+    // </FS:Trish>
     for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(); i != sCull->endVisibleGroups(); ++i)
     {
         LLSpatialGroup *group = *i;
@@ -4520,6 +4523,267 @@ void LLPipeline::postSort(LLCamera &camera)
     // LLSpatialGroup::sNoDelete = false;
     LL_PUSH_CALLSTACKS();
 }
+
+// <FS:Trish> FSPerfParallelPostSort
+//
+// The "build render map" loop of postSort, split in two:
+//  1. a serial pass, in visible group order, with everything that has side effects or reads state
+//     that can change: the dead / occluded / auto hide filter, the rebuildGeom of groups that cannot
+//     be drawn without one, the alpha distance update (calcDistance can markRebuild the group) and
+//     the alpha / rigged alpha group lists. It also records the groups that passed the filter.
+//  2. the draw info collection, on the FSParallelCull workers: the passed groups are split into
+//     contiguous chunks, each job walks its groups' draw maps (read only) into its own buffer of
+//     (pass, draw info) and sums the index counts. The main thread then appends the buffers to the
+//     render maps in chunk order.
+// The render map of each pass is the concatenation, in visible group order, of that group's draw
+// infos for the pass, exactly as the serial loop pushes them. Moving the draw map walk after the
+// whole serial pass is safe because rebuildGeom and markRebuild only change the group they are
+// called for. Index counts are summed in U32 like sIndicesDrawnCount, so the total is the same.
+// FSPerfParallelPostSortVerify also walks each group serially at the original place in the loop and
+// compares the sequence and the index count.
+namespace
+{
+    typedef std::vector<std::pair<U32, LLDrawInfo*> > fs_postsort_infos_t;
+
+    struct FSPostSortChunk
+    {
+        fs_postsort_infos_t mInfos;
+        U32                 mIndices = 0;
+    };
+
+    std::vector<LLSpatialGroup*> sFSPostSortGroups;
+    std::vector<FSPostSortChunk> sFSPostSortChunks;
+    fs_postsort_infos_t          sFSPostSortReference;
+}
+
+bool LLPipeline::postSortBuildRenderMapParallel(LLCamera& camera)
+{
+    static LLCachedControl<bool> parallel_post_sort(gSavedSettings, "FSPerfParallelPostSort", false);
+    if (!parallel_post_sort)
+    {
+        return false;
+    }
+    static LLCachedControl<U32> min_groups(gSavedSettings, "FSPerfParallelPostSortMinGroups", 128);
+    if (sCull->getVisibleGroupsSize() < llmax((U32)min_groups, 2U))
+    {
+        return false;
+    }
+    static LLCachedControl<bool> verify(gSavedSettings, "FSPerfParallelPostSortVerify", false);
+    const bool do_verify = verify;
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    const bool count_indices = !sShadowRender && !sReflectionRender && !gCubeSnapshot;
+
+    // 1. serial pass
+    sFSPostSortGroups.clear();
+    sFSPostSortReference.clear();
+    U32 reference_indices = 0;
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs postsort serial pass");
+        for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(); i != sCull->endVisibleGroups(); ++i)
+        {
+            LLSpatialGroup* group = *i;
+
+            if (group->isDead())
+            {
+                continue;
+            }
+
+            if ((sUseOcclusion && group->isOcclusionState(LLSpatialGroup::OCCLUDED)) ||
+                (RenderAutoHideSurfaceAreaLimit > 0.f &&
+                 group->mSurfaceArea > RenderAutoHideSurfaceAreaLimit * llmax(group->mObjectBoxSize, 10.f)))
+            {
+                continue;
+            }
+
+            if (group->hasState(LLSpatialGroup::NEW_DRAWINFO) && group->hasState(LLSpatialGroup::GEOM_DIRTY) && !gCubeSnapshot)
+            {  // no way this group is going to be drawable without a rebuild
+                group->rebuildGeom();
+            }
+
+            if (do_verify)
+            {   // the serial walk, at its original place
+                for (LLSpatialGroup::draw_map_t::iterator j = group->mDrawMap.begin(); j != group->mDrawMap.end(); ++j)
+                {
+                    if (!hasRenderType(j->first))
+                    {
+                        continue;
+                    }
+                    for (LLSpatialGroup::drawmap_elem_t::iterator k = j->second.begin(); k != j->second.end(); ++k)
+                    {
+                        LLDrawInfo* info = *k;
+                        sFSPostSortReference.emplace_back(j->first, info);
+                        if (count_indices)
+                        {
+                            reference_indices += (U32)(S32)info->mCount;
+                        }
+                    }
+                }
+            }
+
+            sFSPostSortGroups.push_back(group);
+
+            if (hasRenderType(LLPipeline::RENDER_TYPE_PASS_ALPHA))
+            {
+                LLSpatialGroup::draw_map_t::iterator alpha = group->mDrawMap.find(LLRenderPass::PASS_ALPHA);
+
+                if (alpha != group->mDrawMap.end())
+                {  // store alpha groups for sorting
+                    LLSpatialBridge *bridge = group->getSpatialPartition()->asBridge();
+                    if (LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD && !gCubeSnapshot)
+                    {
+                        if (bridge)
+                        {
+                            LLCamera trans_camera = bridge->transformCamera(camera);
+                            group->updateDistance(trans_camera);
+                        }
+                        else
+                        {
+                            group->updateDistance(camera);
+                        }
+                    }
+
+                    if (hasRenderType(LLDrawPool::POOL_ALPHA))
+                    {
+                        sCull->pushAlphaGroup(group);
+                    }
+                }
+
+                LLSpatialGroup::draw_map_t::iterator rigged_alpha = group->mDrawMap.find(LLRenderPass::PASS_ALPHA_RIGGED);
+
+                if (rigged_alpha != group->mDrawMap.end())
+                {  // store rigged alpha groups for LLDrawPoolAlpha prepass (skip distance update, rigged attachments use depth buffer)
+                    if (hasRenderType(LLDrawPool::POOL_ALPHA))
+                    {
+                        sCull->pushRiggedAlphaGroup(group);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. draw info collection on the workers. Nothing changes the groups, draw maps, draw infos or
+    // render type mask while the main thread is inside run().
+    const U32 group_count = (U32)sFSPostSortGroups.size();
+    if (group_count == 0)
+    {
+        return true;
+    }
+    const U32 workers = FSParallelCull::workerCount() ? FSParallelCull::workerCount() : 4U; // 0 before the first run
+    // a few chunks per thread so that groups with many draw infos even out
+    const U32 chunk_count = llclamp(group_count / 32U, 1U, (workers + 1U) * 4U);
+    if (sFSPostSortChunks.size() < chunk_count)
+    {
+        sFSPostSortChunks.resize(chunk_count);
+    }
+
+    LLSpatialGroup* const* groups = sFSPostSortGroups.data();
+    FSPostSortChunk* chunks = sFSPostSortChunks.data();
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs postsort collect");
+        FSParallelCull::run(chunk_count, [this, groups, chunks, group_count, chunk_count, count_indices](U32 c)
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs postsort collect job");
+            FSPostSortChunk& chunk = chunks[c];
+            chunk.mInfos.clear();
+            U32 indices = 0;
+            const U32 begin = (U32)((U64)group_count * c / chunk_count);
+            const U32 end = (U32)((U64)group_count * (c + 1) / chunk_count);
+            for (U32 g = begin; g < end; ++g)
+            {
+                // references only: no LLPointer copies, their reference counts are not atomic
+                const LLSpatialGroup::draw_map_t& draw_map = groups[g]->mDrawMap;
+                for (LLSpatialGroup::draw_map_t::const_iterator j = draw_map.begin(); j != draw_map.end(); ++j)
+                {
+                    if (!hasRenderType(j->first))
+                    {
+                        continue;
+                    }
+                    for (LLSpatialGroup::drawmap_elem_t::const_iterator k = j->second.begin(); k != j->second.end(); ++k)
+                    {
+                        LLDrawInfo* info = k->get();
+                        chunk.mInfos.emplace_back(j->first, info);
+                        if (count_indices)
+                        {
+                            indices += (U32)(S32)info->mCount;
+                        }
+                    }
+                }
+            }
+            chunk.mIndices = indices;
+        });
+    }
+
+    // 3. append in chunk order
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs postsort merge");
+        for (U32 c = 0; c < chunk_count; ++c)
+        {
+            const FSPostSortChunk& chunk = chunks[c];
+            for (const std::pair<U32, LLDrawInfo*>& entry : chunk.mInfos)
+            {
+                sCull->pushDrawInfo(entry.first, entry.second);
+            }
+            if (count_indices)
+            {
+                addTrianglesDrawn((S32)chunk.mIndices);
+            }
+        }
+    }
+
+    if (do_verify)
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs postsort verify");
+        static U32 sChecks = 0;
+        static U32 sMismatches = 0;
+        ++sChecks;
+
+        size_t total = 0;
+        size_t first_diff = std::string::npos;
+        U32 indices = 0;
+        for (U32 c = 0; c < chunk_count; ++c)
+        {
+            const fs_postsort_infos_t& infos = chunks[c].mInfos;
+            for (size_t n = 0; n < infos.size(); ++n, ++total)
+            {
+                if (first_diff == std::string::npos &&
+                    (total >= sFSPostSortReference.size() || infos[n] != sFSPostSortReference[total]))
+                {
+                    first_diff = total;
+                }
+            }
+            indices += chunks[c].mIndices;
+        }
+        if (first_diff == std::string::npos && total != sFSPostSortReference.size())
+        {
+            first_diff = total;
+        }
+
+        if (first_diff != std::string::npos || indices != reference_indices)
+        {
+            ++sMismatches;
+            if (sMismatches <= 10 || (sMismatches % 1000) == 0)
+            {
+                LL_WARNS("FSParallelPostSort") << "Parallel postSort differs from serial (mismatch " << sMismatches
+                    << " of " << sChecks << " checks): draw infos " << total << " vs " << sFSPostSortReference.size()
+                    << ", first difference at " << (S64)(first_diff == std::string::npos ? -1 : (S64)first_diff)
+                    << ", indices " << indices << " vs " << reference_indices
+                    << ", groups " << group_count << ", chunks " << chunk_count
+                    << ", shadow " << sShadowRender << ", cube " << gCubeSnapshot << LL_ENDL;
+            }
+        }
+        else if ((sChecks % 1000) == 1)
+        {
+            LL_INFOS("FSParallelPostSort") << "Parallel postSort matches serial (" << sChecks << " checks, "
+                << sMismatches << " mismatches; this one " << total << " draw infos, " << group_count
+                << " groups, " << chunk_count << " chunks)" << LL_ENDL;
+        }
+    }
+
+    return true;
+}
+// </FS:Trish>
 
 
 void render_hud_elements()
