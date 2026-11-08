@@ -11285,6 +11285,35 @@ static void fs_bind_water_caustics(LLGLSLShader& shader)
 }
 // </FS:Trish>
 
+// <FS:Trish> Wet shoreline band: uniforms for fsWetShoreF.glsl in the sun light pass. The swells
+// stand still in reflection probe captures, which keep one frame of them.
+static void fs_bind_wet_shore(LLGLSLShader& shader)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderWetShore", false);
+    static LLCachedControl<F32> strength(gSavedSettings, "FSRenderWetShoreStrength", 1.f);
+    static LLCachedControl<F32> height(gSavedSettings, "FSRenderWetShoreHeight", 0.35f);
+    static LLCachedControl<F32> swell(gSavedSettings, "FSRenderWetShoreSwell", 0.15f);
+    static LLStaticHashedString s_params("fs_wet_shore_params");
+    static LLStaticHashedString s_inv_view("fs_wet_shore_inv_view");
+
+    if (!enabled || shader.getUniformLocation(s_params) < 0)
+    {
+        return;
+    }
+
+    // The swells are sines of this phase at fractional rates: wrapped at an hour, they jump once
+    const F32 phase = gCubeSnapshot ? 0.f : (F32)fmod(LLFrameTimer::getElapsedSeconds(), 3600.0);
+    shader.uniform4f(s_params,
+                     llclamp((F32)strength, 0.f, 1.f),
+                     llclamp((F32)height, 0.f, 5.f),
+                     phase,
+                     llclamp((F32)swell, 0.f, 2.f));
+
+    const glm::mat4 inv_view = glm::inverse(get_current_modelview());
+    shader.uniformMatrix4fv(s_inv_view, 1, GL_FALSE, glm::value_ptr(inv_view));
+}
+// </FS:Trish>
+
 // <FS:Trish> Per frame uniforms of the extra sun shadow terms (fsShadowExtrasF.glsl, fsShadowFadeF.glsl).
 // Programs built without a feature have no such uniforms, and setting them is then a no-op.
 static void fs_bind_sun_shadow_extras(LLGLSLShader& shader, const glm::mat4& modelview)
@@ -11804,6 +11833,7 @@ void LLPipeline::renderDeferredLighting()
 
             soften_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
             fs_bind_water_caustics(soften_shader); // <FS:Trish/>
+            fs_bind_wet_shore(soften_shader); // <FS:Trish/>
 
             {
                 LLGLDepthTest depth(GL_FALSE);

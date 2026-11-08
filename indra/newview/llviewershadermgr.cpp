@@ -2809,6 +2809,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/fsCausticsF.glsl", GL_FRAGMENT_SHADER));
             gDeferredSoftenProgram.addPermutation("FS_WATER_CAUSTICS", "1");
         }
+        // Wet shoreline band, likewise
+        static LLCachedControl<bool> wet_shore(gSavedSettings, "FSRenderWetShore", false);
+        if (wet_shore)
+        {
+            gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/fsWetShoreF.glsl", GL_FRAGMENT_SHADER));
+            gDeferredSoftenProgram.addPermutation("FS_WET_SHORE", "1");
+        }
         // </FS:Trish>
 
         // <FS:Trish> Coloured shadows: sunlight through translucent casters

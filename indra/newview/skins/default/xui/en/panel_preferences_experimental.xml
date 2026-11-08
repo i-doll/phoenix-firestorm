@@ -1905,6 +1905,95 @@
                      tool_tip="EXPERIMENTAL. How many sun glints there are."
                      top="1430"
                      width="100" />
+                    <check_box
+                     control_name="FSRenderWetShore"
+                     follows="left|top"
+                     height="20"
+                     label="Wet shoreline"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsrenderwetshore"
+                     tool_tip="EXPERIMENTAL. Sand, rock and anything else just above the water line looks wet: darker and glossier, with a ragged edge that slowly rises and falls with the swell. Uses the region's water height. Practically free. Changing it rebuilds the shaders."
+                     top="1914"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderwetshorestrength_label"
+                     tool_tip="EXPERIMENTAL. How wet the shoreline band looks."
+                     top="1942"
+                     width="285">
+                        Wetness
+                    </text>
+                    <spinner
+                     control_name="FSRenderWetShoreStrength"
+                     decimal_digits="2"
+                     enabled_control="FSRenderWetShore"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1.0"
+                     min_val="0.0"
+                     name="fs_fsrenderwetshorestrength"
+                     tool_tip="EXPERIMENTAL. How wet the shoreline band looks."
+                     top="1940"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderwetshoreheight_label"
+                     tool_tip="EXPERIMENTAL. How far above the water line the wet band reaches."
+                     top="1970"
+                     width="285">
+                        Wet band height (m)
+                    </text>
+                    <spinner
+                     control_name="FSRenderWetShoreHeight"
+                     decimal_digits="2"
+                     enabled_control="FSRenderWetShore"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="5.0"
+                     min_val="0.0"
+                     name="fs_fsrenderwetshoreheight"
+                     tool_tip="EXPERIMENTAL. How far above the water line the wet band reaches."
+                     top="1968"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderwetshoreswell_label"
+                     tool_tip="EXPERIMENTAL. How far the slow swells lift the top of the wet band."
+                     top="1998"
+                     width="285">
+                        Swell height (m)
+                    </text>
+                    <spinner
+                     control_name="FSRenderWetShoreSwell"
+                     decimal_digits="2"
+                     enabled_control="FSRenderWetShore"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="2.0"
+                     min_val="0.0"
+                     name="fs_fsrenderwetshoreswell"
+                     tool_tip="EXPERIMENTAL. How far the slow swells lift the top of the wet band."
+                     top="1996"
+                     width="100" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
@@ -2342,6 +2431,7 @@
                      layout="topleft"
                      left="15"
                      name="shadow_cull_bridges_per_cascade"
+                     visible="false"
                      tool_tip="EXPERIMENTAL. When casters are found once for all maps, test avatars, attachments and animesh against each sun shadow map by their position in the world, instead of drawing them into maps they don't reach."
                      top="279"
                      width="475" />

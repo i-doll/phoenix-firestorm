@@ -86,6 +86,9 @@ uniform vec4 waterPlane;
 #ifdef FS_WATER_CAUSTICS
 float fsWaterCaustics(vec3 pos, vec3 norm, vec3 light_dir, vec4 water_plane);
 #endif
+#ifdef FS_WET_SHORE
+float fsWetShore(vec3 pos, vec3 norm, vec4 water_plane);
+#endif
 
 uniform int cube_snapshot;
 
@@ -224,6 +227,16 @@ void main()
     }
 #endif
 
+    // Wet shoreline band (fsWetShoreF.glsl): how wet the surface is, applied to the material in
+    // the branches below before any lighting, so every term sees the wet surface
+    float fs_wet = 0.0;
+#ifdef FS_WET_SHORE
+    if (needs_atmos)
+    {
+        fs_wet = fsWetShore(pos.xyz, gb.normal, waterPlane);
+    }
+#endif
+
     vec3  radiance  = vec3(0);
 
     if (is_pbr)
@@ -232,6 +245,11 @@ void main()
         float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
         float ao = orm.r;
+
+        // Wet: water fills the pores, so porous (non-metal) surfaces darken, and the film on top
+        // makes every surface smoother
+        baseColor.rgb *= mix(1.0, 0.55, fs_wet * (1.0 - metallic));
+        perceptualRoughness = mix(perceptualRoughness, min(perceptualRoughness, 0.15), fs_wet);
 
         vec3  irradiance = amblit_linear;
 
@@ -286,6 +304,12 @@ void main()
         baseColor.rgb = srgb_to_linear(baseColor.rgb);
 
         spec.rgb = srgb_to_linear(spec.rgb);
+
+        // Wet (see the PBR branch): darker, glossier, and reflecting the environment
+        baseColor.rgb *= mix(1.0, 0.6, fs_wet);
+        spec.a = mix(spec.a, max(spec.a, 0.8), fs_wet);
+        spec.rgb = max(spec.rgb, vec3(0.04 * fs_wet));
+        envIntensity = max(envIntensity, 0.35 * fs_wet);
 
         float da          = clamp(dot(gb.normal, light_dir.xyz), 0.0, 1.0);
 
