@@ -38,8 +38,20 @@ public:
     LLPacketBuffer(S32 hSocket);    // receive a packet
     ~LLPacketBuffer();
 
-    LLPacketBuffer(const LLPacketBuffer&) = default;
-    LLPacketBuffer& operator=(const LLPacketBuffer&) = default;
+    // <FS:Trish> Copy only the used bytes, not the whole 8 KB buffer. The
+    // ring copies every buffered packet in on push and out on pop.
+    //LLPacketBuffer(const LLPacketBuffer&) = default;
+    //LLPacketBuffer& operator=(const LLPacketBuffer&) = default;
+    LLPacketBuffer(const LLPacketBuffer& other) { copyFrom(other); }
+    LLPacketBuffer& operator=(const LLPacketBuffer& other)
+    {
+        if (this != &other)
+        {
+            copyFrom(other);
+        }
+        return *this;
+    }
+    // </FS:Trish>
 
     S32         getSize() const                 { return mSize; }
     const char  *getData() const                { return mData; }
@@ -62,6 +74,31 @@ public:
     // </FS:Trish>
 
 protected:
+    // <FS:Trish>
+    void copyFrom(const LLPacketBuffer& other)
+    {
+        // mSize can be negative after a failed receive; copy no data then.
+        S32 bytes = other.mSize;
+        if (bytes < 0)
+        {
+            bytes = 0;
+        }
+        else if (bytes > NET_BUFFER_SIZE)
+        {
+            bytes = NET_BUFFER_SIZE;
+        }
+        if (bytes > 0)
+        {
+            memcpy(mData, other.mData, bytes); /* Flawfinder: ignore */
+        }
+        mSize = other.mSize;
+        mHost = other.mHost;
+        mReceivingIF = other.mReceivingIF;
+        mPacketIDChecked = other.mPacketIDChecked;
+        mAckCollected = other.mAckCollected;
+    }
+    // </FS:Trish>
+
     char    mData[NET_BUFFER_SIZE]; // packet data       /* Flawfinder : ignore */
     S32     mSize;                  // size of buffer in bytes
     LLHost  mHost;                  // source/dest IP and port
