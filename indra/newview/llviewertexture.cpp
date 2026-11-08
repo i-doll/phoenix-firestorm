@@ -31,6 +31,7 @@
 
 // Library includes
 #include "llmath.h"
+#include <deque> // <FS:Trish/>
 #include "llerror.h"
 #include "llgl.h"
 #include "llglheaders.h"
@@ -509,6 +510,12 @@ void LLViewerTexture::updateClass()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     sCurrentTime = gFrameTimeSeconds;
 
+    // <FS:Trish> The controller below works on its own state; sDesiredDiscardBias is what the
+    // textures see, and it only follows that state in steps (see the end of this function)
+    static F32 s_bias_state = 1.f;
+    sDesiredDiscardBias = s_bias_state;
+    // </FS:Trish>
+
     LLTexturePipelineTester* tester = (LLTexturePipelineTester*)LLMetricPerformanceTesterBasic::getTester(sTesterName);
     if (tester)
     {
@@ -568,38 +575,95 @@ void LLViewerTexture::updateClass()
     // would shrink the target by the same factor and leave too little room after a teleport.
     static LLCachedControl<bool> use_live_vram(gSavedSettings, "FSTextureUseLiveVRAM", false);
     static LLCachedControl<U32> live_vram_reserve(gSavedSettings, "FSTextureVRAMReserveMB", 2048);
+    //
+    // The driver hands freed memory back late. Right after the bias drops textures, what we
+    // track has already shrunk but the free figure hasn't grown yet, so for a moment it looks as
+    // if something else took that memory: the target fell with our own usage, the bias kept
+    // rising, far too much was dropped, then the memory showed up as free all at once and it all
+    // loaded back in, over and over. So the target is worked out only when the free figure is
+    // read, from what we held at that moment, a drop only counts once it has lasted a few
+    // seconds, and what is taken outside of us is the smallest seen over a longer window.
     static LLFrameTimer live_vram_timer;
     static S32 live_vram_free = -1;
     static F32 live_vram_untracked = -1.f; // GPU MB in use outside of what we track, measured without pressure
+    static F32 live_vram_target = -1.f;    // held between reads
+    static std::deque<std::pair<F64, F32>> live_untracked_samples; // (time, untracked MB)
+    static std::deque<std::pair<F64, F32>> live_target_samples;    // (time, target MB)
+    constexpr F64 UNTRACKED_WINDOW = 20.0;  // seconds
+    constexpr F64 TARGET_DROP_DELAY = 4.0;  // seconds
     if (use_live_vram && !max_vram_budget_enabled)
     {
+        const F32 tracked = (F32)ll_round((LLImageGL::getTextureBytesAllocated() + LLVertexBuffer::getBytesAllocated()) / 1024.0 / 1024.0);
         // The query is cheap, but the answer only needs to keep up with the bias ramp
         if (live_vram_free < 0 || live_vram_timer.getElapsedTimeF32() > 1.f)
         {
             live_vram_free = gGLManager.getAvailableVRAMMegabytes();
             live_vram_timer.reset();
+            if (live_vram_free >= 0)
+            {
+                const F64 now = LLTimer::getTotalSeconds();
+                const F32 reserve = (F32)live_vram_reserve();
+                const F32 total = (F32)(gGLManager.mVRAMDetected > 0 ? gGLManager.mVRAMDetected : (S32)gGLManager.mVRAM);
+                if ((F32)live_vram_free > 2.f * reserve && total > (F32)live_vram_free)
+                {
+                    live_untracked_samples.emplace_back(now, llmax(total - (F32)live_vram_free - tracked, 0.f));
+                    while (live_untracked_samples.size() > 1 && now - live_untracked_samples.front().first > UNTRACKED_WINDOW)
+                    {
+                        live_untracked_samples.pop_front();
+                    }
+                    live_vram_untracked = live_untracked_samples.front().second;
+                    for (const auto& sample : live_untracked_samples)
+                    {
+                        live_vram_untracked = llmin(live_vram_untracked, sample.second);
+                    }
+                }
+
+                F32 sample_target = tracked + (F32)live_vram_free - reserve;
+                if (live_vram_untracked >= 0.f)
+                {
+                    sample_target = llmin(sample_target, total - reserve - live_vram_untracked);
+                }
+                // The hold is only for drops that follow our own freeing (what we track went down
+                // since the last read): those are the driver handing memory back late. While we
+                // are loading, a drop in free memory is real and counts at once, or usage ran on
+                // to 100% before the target followed and a big batch had to go all at once.
+                static F32 live_last_tracked = -1.f;
+                static F64 live_last_shrink = -1.0e9;
+                constexpr F32 SHRINK_MB = 32.f;
+                if (live_last_tracked >= 0.f && tracked < live_last_tracked - SHRINK_MB)
+                {
+                    live_last_shrink = now;
+                }
+                live_last_tracked = tracked;
+                if (now - live_last_shrink > TARGET_DROP_DELAY)
+                {
+                    live_target_samples.clear();
+                }
+                live_target_samples.emplace_back(now, sample_target);
+                while (live_target_samples.size() > 1 && now - live_target_samples.front().first > TARGET_DROP_DELAY)
+                {
+                    live_target_samples.pop_front();
+                }
+                live_vram_target = sample_target;
+                for (const auto& sample : live_target_samples)
+                {
+                    live_vram_target = llmax(live_vram_target, sample.second);
+                }
+            }
         }
-        if (live_vram_free >= 0)
+        if (live_vram_free >= 0 && live_vram_target >= 0.f)
         {
-            used = (F32)ll_round((LLImageGL::getTextureBytesAllocated() + LLVertexBuffer::getBytesAllocated()) / 1024.0 / 1024.0);
-            const F32 reserve = (F32)live_vram_reserve();
-            const F32 total = (F32)(gGLManager.mVRAMDetected > 0 ? gGLManager.mVRAMDetected : (S32)gGLManager.mVRAM);
-            if ((F32)live_vram_free > 2.f * reserve && total > (F32)live_vram_free)
-            {
-                live_vram_untracked = llmax(total - (F32)live_vram_free - used, 0.f);
-            }
-            target = used + (F32)live_vram_free - reserve;
-            if (live_vram_untracked >= 0.f)
-            {
-                target = llmin(target, total - reserve - live_vram_untracked);
-            }
-            target = llmax(target, MIN_VRAM_BUDGET);
+            used = tracked;
+            target = llmax(live_vram_target, MIN_VRAM_BUDGET);
         }
     }
     else
     {
         live_vram_free = -1;
         live_vram_untracked = -1.f;
+        live_vram_target = -1.f;
+        live_untracked_samples.clear();
+        live_target_samples.clear();
     }
     // </FS:Trish>
 
@@ -622,6 +686,8 @@ void LLViewerTexture::updateClass()
     // stops a little above it while headroom is modest, otherwise the textures it lets back in
     // fill memory, the bias rises, and the scene keeps cycling between blurry and sharp.
     static F32 overflow_bias = 0.f;
+    static F32 soft_zone_peak = 0.f;    // highest bias the soft zone raised it to since it was last left
+    static LLFrameTimer recovery_timer; // how long usage has been low enough to lower the bias
     // </FS:Trish>
 
     if (is_low && !was_low)
@@ -635,7 +701,11 @@ void LLViewerTexture::updateClass()
         else
         {
             // Slam to 1.5 bias the moment we hit low memory (discards off screen textures immediately)
-            sDesiredDiscardBias = llmax(sDesiredDiscardBias, 1.5f);
+            // <FS:Trish> A capped step: coming from the soft zone the bias is already raised, and a
+            // jump to 1.5 crosses every texture threshold at once
+            //sDesiredDiscardBias = llmax(sDesiredDiscardBias, 1.5f);
+            sDesiredDiscardBias = llmax(sDesiredDiscardBias, llmin(sDesiredDiscardBias + 0.25f, 1.5f));
+            // </FS:Trish>
         }
 
         if (is_sys_low || over_pct > 2.f)
@@ -686,15 +756,19 @@ void LLViewerTexture::updateClass()
         // edge and textures would keep switching resolution.
         static LLCachedControl<F32> soft_zone_setting(gSavedSettings, "FSTextureBiasSoftZone", 0.1f);
         const F32 soft_zone = llclamp(soft_zone_setting(), 0.f, 0.5f);
+        // The band between raising and lowering is wide, as textures take seconds to load or drop
+        // after the bias moves; a narrow band let the bias swing back and forth across it.
         if (soft_zone > 0.f)
         {
-            FREE_PERCENTAGE_TRESHOLD = llmin(FREE_PERCENTAGE_TRESHOLD, -soft_zone - 0.05f);
+            FREE_PERCENTAGE_TRESHOLD = llmin(FREE_PERCENTAGE_TRESHOLD, -soft_zone - 0.15f);
         }
         if (soft_zone > 0.f && over_pct > -soft_zone)
         {
             static LLCachedControl<F32> soft_discard_increment(gSavedSettings, "RenderLowMemMinDiscardIncrement", .1f);
             const F32 depth = (over_pct + soft_zone) / soft_zone; // 0 at the edge of the zone, 1 at the target
             sDesiredDiscardBias += soft_discard_increment * depth * gFrameIntervalSeconds;
+            soft_zone_peak = llmax(soft_zone_peak, sDesiredDiscardBias);
+            recovery_timer.reset(); // the band below no longer resets it, so the delay starts here
         }
         else
         // </FS:Trish>
@@ -708,22 +782,83 @@ void LLViewerTexture::updateClass()
             static LLCachedControl<F32> high_mem_discard_decrement(gSavedSettings, "RenderHighMemMinDiscardDecrement", .1f);
 
             F32 decrement = high_mem_discard_decrement - llmin(over_pct - FREE_PERCENTAGE_TRESHOLD, 0.f);
-            // <FS:Trish> Hold above the bias that last overflowed unless there is plenty of room,
-            // as after moving somewhere lighter. Once room shrinks back the hold applies from
-            // wherever the bias got to.
+            // <FS:Trish> Lowering waits until there has been room for a few seconds and then goes
+            // slowly, unless there is plenty of room, as after moving somewhere lighter: the
+            // textures it lets back in take a while to arrive, and lowering faster than that
+            // overshot and filled memory again. It also holds above the bias that last ran out of
+            // memory (or that the soft zone needed) while headroom is modest. Once room shrinks
+            // back the hold applies from wherever the bias got to.
             //sDesiredDiscardBias -= decrement * gFrameIntervalSeconds;
             static LLCachedControl<F32> recovery_margin(gSavedSettings, "FSTextureBiasRecoveryMargin", 0.25f);
             static LLCachedControl<F32> recovery_headroom(gSavedSettings, "FSTextureBiasRecoveryHeadroom", 0.3f);
-            const F32 previous_bias = sDesiredDiscardBias;
-            sDesiredDiscardBias -= decrement * gFrameIntervalSeconds;
-            if (recovery_margin() > 0.f && overflow_bias > 0.f && over_pct > -recovery_headroom())
+            constexpr F32 RECOVERY_DELAY = 3.f;     // seconds of room before lowering
+            constexpr F32 SLOW_DECREMENT = 0.05f;   // per second, while headroom is modest
+            constexpr F32 HOLD_DECAY = 0.005f;      // per second, of the hold while headroom is modest
+            const F32 headroom = llmax((F32)recovery_headroom(), -FREE_PERCENTAGE_TRESHOLD + 0.1f);
+            overflow_bias = llmax(overflow_bias, soft_zone_peak);
+            soft_zone_peak = 0.f;
+            if (recovery_timer.getElapsedTimeF32() > RECOVERY_DELAY)
             {
-                const F32 hold = overflow_bias + recovery_margin();
-                sDesiredDiscardBias = llmax(sDesiredDiscardBias, llmin(previous_bias, hold));
+                if (over_pct > -headroom)
+                {
+                    decrement = llmin(decrement, SLOW_DECREMENT);
+                    // The hold relaxes slowly, otherwise steady modest headroom kept the bias
+                    // above 1 for good
+                    overflow_bias = llmax(overflow_bias - HOLD_DECAY * gFrameIntervalSeconds.value(), 0.f);
+                }
+                const F32 previous_bias = sDesiredDiscardBias;
+                sDesiredDiscardBias -= decrement * gFrameIntervalSeconds;
+                if (recovery_margin() > 0.f && overflow_bias > 0.f && over_pct > -headroom)
+                {
+                    const F32 hold = overflow_bias + recovery_margin();
+                    sDesiredDiscardBias = llmax(sDesiredDiscardBias, llmin(previous_bias, hold));
+                }
             }
             // </FS:Trish>
         }
+        // <FS:Trish>
+        //else
+        //{
+        //    recovery_timer.reset();
+        //}
+        // Between the soft zone and the lowering threshold the bias used to freeze wherever it
+        // was. It still doesn't go below the hold there, but a bias above it creeps down to it.
+        else if (soft_zone > 0.f && sDesiredDiscardBias > 1.f && over_pct < FREE_PERCENTAGE_TRESHOLD + 0.15f
+                 && isSystemMemoryRecovered())
+        {
+            constexpr F32 BAND_RECOVERY_DELAY = 3.f;
+            constexpr F32 BAND_DECREMENT = 0.05f; // per second
+            static LLCachedControl<F32> band_recovery_margin(gSavedSettings, "FSTextureBiasRecoveryMargin", 0.25f);
+            const F32 hold_from = llmax(overflow_bias, soft_zone_peak);
+            if (hold_from > 0.f && recovery_timer.getElapsedTimeF32() > BAND_RECOVERY_DELAY)
+            {
+                const F32 hold = hold_from + llmax((F32)band_recovery_margin(), 0.f);
+                if (sDesiredDiscardBias > hold)
+                {
+                    sDesiredDiscardBias = llmax(sDesiredDiscardBias - BAND_DECREMENT * gFrameIntervalSeconds.value(), hold);
+                }
+            }
+        }
+        else
+        {
+            recovery_timer.reset();
+        }
+
+        // Back at 1 there is nothing left to hold: forget the old overflow, or its hold kept
+        // the next recovery above 1 however much memory was free by then
+        if (sDesiredDiscardBias <= 1.f)
+        {
+            overflow_bias = 0.f;
+            soft_zone_peak = 0.f;
+        }
+        // </FS:Trish>
     }
+    // <FS:Trish>
+    if (is_low)
+    {
+        recovery_timer.reset();
+    }
+    // </FS:Trish>
 
     // set to max discard bias if the window has been backgrounded for a while
     static F32 last_desired_discard_bias = 1.f;
@@ -763,7 +898,40 @@ void LLViewerTexture::updateClass()
     }
 
     sDesiredDiscardBias = llclamp(sDesiredDiscardBias, 1.f, 4.f);
-    if (last_texture_update_count_bias < sDesiredDiscardBias)
+
+    // <FS:Trish> Textures see the bias in steps. Their thresholds (on and off screen resets, the
+    // vsize divisor, the downscale test) are hard cut-offs, so a bias drifting slowly across one
+    // flipped thousands of textures at once, and drifting back flipped them back. Back at 1 it
+    // follows at once, as that is where everything is allowed full resolution.
+    {
+        constexpr F32 BIAS_STEP = 0.15f;
+        static F32 s_applied_bias = 1.f;
+        // Once the state has settled for a while the applied bias catches up with it, otherwise
+        // it could sit up to a step away from it indefinitely
+        constexpr F32 SETTLE_TIME = 2.f;
+        constexpr F32 SETTLE_EPSILON = 0.01f;
+        static F32 s_settle_ref = 1.f;
+        static LLFrameTimer s_settle_timer;
+        s_bias_state = sDesiredDiscardBias;
+        if (fabsf(s_bias_state - s_settle_ref) > SETTLE_EPSILON)
+        {
+            s_settle_ref = s_bias_state;
+            s_settle_timer.reset();
+        }
+        if (s_bias_state <= 1.f || s_bias_state >= 4.f || fabsf(s_bias_state - s_applied_bias) >= BIAS_STEP
+            || s_settle_timer.getElapsedTimeF32() > SETTLE_TIME)
+        {
+            s_applied_bias = s_bias_state;
+        }
+        sDesiredDiscardBias = s_applied_bias;
+    }
+    // </FS:Trish>
+
+    // <FS:Trish> Only a real rise restarts the faster update pass; the soft zone raises the
+    // bias a little every frame, which kept it running permanently
+    //if (last_texture_update_count_bias < sDesiredDiscardBias)
+    if (last_texture_update_count_bias + 0.1f <= sDesiredDiscardBias)
+    // </FS:Trish>
     {
         // bias increased, reset texture update counter to
         // let updates happen at an increased rate.
@@ -3476,7 +3644,24 @@ void LLViewerLODTexture::processTextureStats()
             discard_level = (F32)(log(mTexelsPerImage / mMaxVirtualSize) / log_4);
         }
 
-        discard_level = floorf(discard_level);
+        // <FS:Trish> A deadband on the drop side only: going down a level waits until it is a
+        // quarter of a level past the boundary, so a size hovering at a boundary doesn't keep
+        // dropping and refetching the texture. Upgrades are never held back: holding them pinned
+        // textures at a reduced level (e.g. half resolution, or mid progressive fetch) forever.
+        //discard_level = floorf(discard_level);
+        {
+            const F32 wanted = discard_level;
+            discard_level = floorf(wanted);
+            const S32 current = getDiscardLevel();
+            if (current >= 0 && hasGLTexture())
+            {
+                if (discard_level > (F32)current && wanted < (F32)current + 1.25f)
+                {
+                    discard_level = (F32)current;
+                }
+            }
+        }
+        // </FS:Trish>
 
         // <FS:Trish> A snapshot larger than the window shows each texture over more pixels than
         // the screen does: one discard level per doubling, set while the snapshot waits for them
