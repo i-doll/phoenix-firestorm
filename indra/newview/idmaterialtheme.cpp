@@ -122,6 +122,9 @@ namespace
         { "ButtonSelectedBgColor", Role::PrimaryContainer, 1.f },
         { "ButtonSelectedColor", Role::OnPrimaryContainer, 1.f },
         { "ButtonFlashBgColor", Role::InversePrimary, 1.f },
+        { "IDButtonFilledBgColor", Role::Primary, 1.f },
+        { "IDButtonFilledLabelColor", Role::OnPrimary, 1.f },
+        { "IDButtonTextLabelColor", Role::Primary, 1.f },
 
         { "ComboListBgColor", Role::SurfaceContainerHigh, 1.f },
         { "ScrollBgWriteableColor", Role::SurfaceContainerLow, 1.f },

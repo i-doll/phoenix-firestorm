@@ -91,6 +91,9 @@
 	<color name="ButtonSelectedBgColor" value="0.0000 0.3137 0.3020 1" />
 	<color name="ButtonSelectedColor" value="0.4392 0.9686 0.9451 1" />
 	<color name="ButtonFlashBgColor" value="0.3059 0.8549 0.8353 0.5" />
+	<color name="IDButtonFilledBgColor" value="0.3059 0.8549 0.8353 1" />
+	<color name="IDButtonFilledLabelColor" value="0.0000 0.2157 0.2078 1" />
+	<color name="IDButtonTextLabelColor" value="0.3059 0.8549 0.8353 1" />
 	<color name="ComboListBgColor" value="0.1451 0.1686 0.1686 1" />
 	<color name="ScrollBgWriteableColor" value="0.0863 0.1137 0.1098 1" />
 	<color name="ScrollBGStripeColor" value="0.8667 0.8941 0.8863 0.03" />

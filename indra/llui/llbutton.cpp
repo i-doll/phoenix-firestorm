@@ -68,6 +68,40 @@ S32 BTN_HEIGHT_SMALL= 23;
 S32 BTN_HEIGHT      = 23;
 S32 BTN_DROP_SHADOW = 2;
 
+// <ID:MaterialTheme>
+namespace
+{
+    bool idNameListed(const std::string& names, std::string_view name)
+    {
+        size_t start = 0;
+        while (start <= names.size())
+        {
+            size_t end = names.find(',', start);
+            if (end == std::string::npos)
+                end = names.size();
+            std::string_view item(names.data() + start, end - start);
+            const size_t first = item.find_first_not_of(" \t\r\n");
+            if (first != std::string_view::npos)
+            {
+                item = item.substr(first, item.find_last_not_of(" \t\r\n") - first + 1);
+                if (item == name)
+                    return true;
+            }
+            start = end + 1;
+        }
+        return false;
+    }
+}
+
+LLButton::IDEmphasisParams::IDEmphasisParams()
+:   names("names"),
+    image_color("image_color"),
+    image_color_disabled("image_color_disabled"),
+    label_color("label_color"),
+    label_color_disabled("label_color_disabled")
+{}
+// </ID:MaterialTheme>
+
 LLButton::Params::Params()
 :   label_selected("label_selected"),               // requires is_toggle true
     label_shadow("label_shadow", true),
@@ -130,8 +164,12 @@ LLButton::Params::Params()
     // <FS:Zi> Add checkbox control toggle
     //button_flash_rate("button_flash_rate")
     button_flash_rate("button_flash_rate"),
-    checkbox_control("checkbox_control")
+    checkbox_control("checkbox_control"),
     // </FS:Zi>
+    // <ID:MaterialTheme>
+    filled_style("filled_style"),
+    text_style("text_style")
+    // </ID:MaterialTheme>
 {
     addSynonym(is_toggle, "toggle");
     changeDefault(initial_value, LLSD(false));
@@ -298,6 +336,8 @@ LLButton::LLButton(const LLButton::Params& p)
         LL_WARNS() << "Button: " << getName() << " with no image!" << LL_ENDL;
     }
 
+    idApplyEmphasis(p.filled_style(), p.text_style()); // <ID:MaterialTheme/>
+
     if (p.click_callback.isProvided())
     {
         setCommitCallback(initCommitCallback(p.click_callback)); // alias -> commit_callback
@@ -326,6 +366,38 @@ LLButton::LLButton(const LLButton::Params& p)
         LLBadgeOwner::initBadgeParams(p.badge());
     }
 }
+
+// <ID:MaterialTheme>
+void LLButton::idApplyEmphasis()
+{
+    const Params& defaults = LLUICtrlFactory::getDefaultParams<LLButton>();
+    idApplyEmphasis(defaults.filled_style(), defaults.text_style());
+}
+
+void LLButton::idApplyEmphasis(const IDEmphasisParams& filled, const IDEmphasisParams& text)
+{
+    const Params& defaults = LLUICtrlFactory::getDefaultParams<LLButton>();
+    if (mImageUnselected.get() != defaults.image_unselected() || mImageColor.get() != defaults.image_color().get())
+        return;
+
+    const IDEmphasisParams* style = nullptr;
+    if (filled.names.isProvided() && idNameListed(filled.names(), getName()))
+        style = &filled;
+    else if (text.names.isProvided() && idNameListed(text.names(), getName()))
+        style = &text;
+    if (!style)
+        return;
+
+    if (style->image_color.isProvided())
+        mImageColor = style->image_color();
+    if (style->image_color_disabled.isProvided())
+        mDisabledImageColor = style->image_color_disabled();
+    if (style->label_color.isProvided())
+        mUnselectedLabelColor = mSelectedLabelColor = style->label_color();
+    if (style->label_color_disabled.isProvided())
+        mDisabledLabelColor = style->label_color_disabled();
+}
+// </ID:MaterialTheme>
 
 LLButton::~LLButton()
 {

@@ -129,6 +129,13 @@ LLButton* LLToastNotifyPanel::createButton(const LLSD& form_element, bool is_opt
     p.auto_resize = false;
     p.follows.flags(FOLLOWS_LEFT | FOLLOWS_BOTTOM);
     p.enabled = !form_element.has("enabled") || form_element["enabled"].asBoolean();
+    // <ID:MaterialTheme>
+    if (mIsScriptDialog)
+    {
+        p.filled_style.names("");
+        p.text_style.names("");
+    }
+    // </ID:MaterialTheme>
     if (mIsCaution)
     {
         p.image_color(LLUIColorTable::instance().getColor("ButtonCautionImageColor"));

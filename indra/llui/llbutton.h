@@ -66,6 +66,19 @@ class LLButton
 , public ll::ui::SearchableControl
 {
 public:
+    // <ID:MaterialTheme>
+    struct IDEmphasisParams : public LLInitParam::Block<IDEmphasisParams>
+    {
+        Optional<std::string>   names;
+        Optional<LLUIColor>     image_color,
+                                image_color_disabled,
+                                label_color,
+                                label_color_disabled;
+
+        IDEmphasisParams();
+    };
+    // </ID:MaterialTheme>
+
     struct Params
     :   public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -155,6 +168,11 @@ public:
 
         Optional<std::string>       checkbox_control;       // <FS:Zi> Add checkbox control toggle
 
+        // <ID:MaterialTheme>
+        Optional<IDEmphasisParams>  filled_style,
+                                    text_style;
+        // </ID:MaterialTheme>
+
         Optional<EnableCallbackParam>   is_toggled_callback;    // <FS:Ansariel> Toggle callback check
 
         Params();
@@ -191,6 +209,7 @@ public:
 
     virtual void    onCommit() override;
 
+    void            idApplyEmphasis(); // <ID:MaterialTheme/>
     void            setUnselectedLabelColor(const LLUIColor& c);
     void            setSelectedLabelColor(const LLUIColor& c);
     void            setUseEllipses(bool use_ellipses);
@@ -386,6 +405,7 @@ protected:
     LLUIColor                   mDisabledImageColor;
     std::optional<LLUIColor>    mSelectedImageColor; // <ID:MaterialTheme/>
     // <ID:MaterialTheme>
+    void                        idApplyEmphasis(const IDEmphasisParams& filled, const IDEmphasisParams& text);
     std::optional<LLUIColor>    mGlyphImageColor;
     LLUIColor                   mGlyphSelectedImageColor;
     LLUIColor                   mGlyphDisabledImageColor;

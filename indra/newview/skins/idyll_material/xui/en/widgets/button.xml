@@ -39,5 +39,12 @@
         button_flash_count="8"
         button_flash_rate="1.25"
         display_pressed_state="true"
+        filled_style.names="OK,ok,ok_btn,btn_ok,Save,save,save_btn,btn_commit,Apply,apply,apply_btn,btn_apply,button apply to selection,Select,select_btn,btn_select,connect_btn,send_btn,send_notice,send_chat,upload_btn,combo_ok,perms_btn_ok,goto_btn,set_price_btn,Teleport"
+        filled_style.image_color="IDButtonFilledBgColor"
+        filled_style.label_color="IDButtonFilledLabelColor"
+        text_style.names="Cancel,cancel,cancel_btn,btn_cancel,cancel_button,cancel btn,combo_cancel,perms_btn_cancel,autoreplace_cancel,BeamColor_Cancel,Close,close,close_btn,close_button"
+        text_style.image_color="Transparent"
+        text_style.image_color_disabled="Transparent"
+        text_style.label_color="IDButtonTextLabelColor"
         >
 </button>

@@ -366,6 +366,7 @@ LLToastAlertPanel::LLToastAlertPanel( LLNotificationPtr notification, bool modal
         if(btn)
         {
             btn->setName(options[i].first);
+            btn->idApplyEmphasis(); // <ID:MaterialTheme/>
             btn->setRect(button_rect.setOriginAndSize( button_left, VPAD, (mButtonData[i].mWidth == 0) ? button_width : mButtonData[i].mWidth, BTN_HEIGHT ));
             btn->setLabel(options[i].second);
             btn->setFont(font);
