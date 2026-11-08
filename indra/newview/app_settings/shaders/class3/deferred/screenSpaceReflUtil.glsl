@@ -80,6 +80,18 @@ uniform float noiseSine;
 
 float epsilon = 0.1;
 
+// FS: hits on the negative side of this view-space plane are misses (the water sets it to its
+// surface, so it only reflects what is above it). Zero, as every other shader leaves it: no clip.
+// A clipped hit ends the ray (the callers break out of the march) rather than marching on past
+// it: deliberate. The ray has reached something below the surface, and whatever lies behind that
+// along the same ray is hidden from it, so continuing would only find wrong hits.
+uniform vec4 fs_ssr_clip_plane;
+
+bool fsSSRClipped(vec3 p)
+{
+    return dot(fs_ssr_clip_plane.xyz, p) + fs_ssr_clip_plane.w < 0.0;
+}
+
 float getLinearDepth(vec2 tc)
 {
     float depth = texture(sceneDepth, tc).r;
@@ -145,6 +157,10 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
 
             if (abs(delta) < distanceBias)
             {
+                if (fsSSRClipped(marchingPosition))
+                {
+                    break;
+                }
                 vec4 color = vec4(1);
                 if(debugDraw)
                     color = vec4( 0.5+ sign(delta)/2,0.3,0.5- sign(delta)/2, 0);
@@ -221,6 +237,10 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
 
                 if (abs(delta) < distanceBias && depthFromScreen != (depth - distanceBias))
                 {
+                    if (fsSSRClipped(marchingPosition))
+                    {
+                        break;
+                    }
                     vec4 color = vec4(1);
                     if(debugDraw)
                         color = vec4( 0.5+ sign(delta)/2,0.3,0.5- sign(delta)/2, 0);
