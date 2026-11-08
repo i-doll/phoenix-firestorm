@@ -3862,7 +3862,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="768"
+                 height="834"
                  layout="topleft"
                  left="0"
                  name="experimental_performance_settings"
@@ -4122,8 +4122,30 @@
                      height="18"
                      layout="topleft"
                      left="15"
-                     name="fs_heading_textures"
+                     name="fs_heading_shaders"
                      top="552"
+                     width="475">
+                        Shaders
+                    </text>
+                    <check_box
+                     control_name="FSPerfParallelShaderCompile"
+                     follows="left|top"
+                     height="20"
+                     label="Compile shaders in parallel"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfparallelshadercompile"
+                     tool_tip="EXPERIMENTAL. Shorter pauses when graphics settings change and shaders are rebuilt, because the graphics driver compiles them on several threads at once. Needs a driver that supports parallel shader compile (current NVIDIA and AMD drivers, Mesa). Without that support nothing changes. Applies from the next shader rebuild."
+                     top="578"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_textures"
+                     top="618"
                      width="475">
                         Textures
                     </text>
@@ -4136,7 +4158,7 @@
                      left="15"
                      name="fs_fsperftextureuploadpbo"
                      tool_tip="EXPERIMENTAL. Copies newly loaded textures to the graphics card asynchronously, which can reduce stutter when many textures arrive at once. Only has an effect when textures are not already created on a background thread (usually AMD and Intel graphics). Needs OpenGL 4.4."
-                     top="578"
+                     top="644"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4145,7 +4167,7 @@
                      left="35"
                      name="fs_fsperftextureuploadbudgetmb_label"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="606"
+                     top="672"
                      width="285">
                         Texture upload budget per frame (MB)
                     </text>
@@ -4161,7 +4183,7 @@
                      min_val="0"
                      name="fs_fsperftextureuploadbudgetmb"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="604"
+                     top="670"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4170,7 +4192,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_variable_rate_shading"
-                     top="646"
+                     top="712"
                      width="475">
                         Variable rate shading
                     </text>
@@ -4183,7 +4205,7 @@
                      left="15"
                      name="fs_fsrendervrs"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / GTX 16xx (Turing) or newer only; does nothing on other graphics cards. Shades low-detail parts of the scene (flat or low-contrast surfaces, the sky, areas blurred by depth of field) at a coarser rate to save GPU time in the opaque geometry pass. Edges and fine detail stay at full rate. Snapshots are always rendered at full rate."
-                     top="672"
+                     top="738"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4192,7 +4214,7 @@
                      left="35"
                      name="fs_fsrendervrsquality_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="700"
+                     top="766"
                      width="285">
                         Quality
                     </text>
@@ -4209,7 +4231,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsquality"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="698"
+                     top="764"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4218,7 +4240,7 @@
                      left="35"
                      name="fs_fsrendervrsperiphery_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="728"
+                     top="794"
                      width="285">
                         Coarser at screen edges
                     </text>
@@ -4235,7 +4257,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsperiphery"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="726"
+                     top="792"
                      width="100" />
                 </panel>
             </scroll_container>
