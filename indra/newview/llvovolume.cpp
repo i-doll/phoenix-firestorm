@@ -289,7 +289,7 @@ static bool gltf_blend_has_transparency(const LLGLTFMaterial* mat)
     if (fetched && fetched->mBaseColorTexture.notNull())
     {
         const S32 comps = fetched->mBaseColorTexture->getComponents();
-        return (comps == 4 || comps == 2);
+        return (comps == 0 || comps == 4 || comps == 2);
     }
 
     return mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].notNull();
