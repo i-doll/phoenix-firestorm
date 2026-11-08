@@ -55,6 +55,7 @@
 
 #include "fsshadowsinglepass.h"
 
+#include "fsgpudrivendraws.h"
 #include "pipeline.h"
 
 #include "lldrawpool.h"
@@ -611,6 +612,15 @@ void LLPipeline::fsShadowSinglePassFinish()
                 }
                 const bool rigged = r == 1;
                 const bool opaque = kind == FS_SHADOW_SP_OPAQUE;
+                if (opaque && !rigged)
+                {   // FSPerfGPUDrivenDraws: what is in the position arena goes out as one multi-draw per cascade set,
+                    // the rest stays in the list for the loop below
+                    draws += fsGDDDrawShadowSinglePass(list, clip);
+                    if (list.empty())
+                    {
+                        continue;
+                    }
+                }
                 LLGLSLShader& program = opaque ? gFSShadowSPProgram :
                                         kind == FS_SHADOW_SP_ALPHA_MASK ? gFSShadowSPAlphaMaskProgram :
                                         kind == FS_SHADOW_SP_FULLBRIGHT_MASK ? gFSShadowSPFullbrightAlphaMaskProgram :

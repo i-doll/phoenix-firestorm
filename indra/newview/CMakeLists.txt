@@ -153,6 +153,7 @@ set(viewer_SOURCE_FILES
     fsfloateraddtocontactset.cpp
     fsfavoritegroups.cpp
     fsfoginterior.cpp
+    fsgpudrivendraws.cpp
     fsinventorycustomtabs.cpp
     # <ID:i.doll> [Received inventory destination controls]
     idfloaterinventorydestinationconfig.cpp
@@ -1064,6 +1065,7 @@ set(viewer_HEADER_FILES
     fsfloateraddtocontactset.h
     fsfavoritegroups.h
     fsfoginterior.h
+    fsgpudrivendraws.h
     fsinventorycustomtabs.h
     # <ID:i.doll> [Received inventory destination controls]
     idfloaterinventorydestinationconfig.h

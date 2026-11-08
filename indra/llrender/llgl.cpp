@@ -1595,6 +1595,20 @@ void LLGLManager::initExtensions()
     LL_INFOS("RenderInit") << "Vertex shader viewport index: " << mFSVertexViewportIndex << LL_ENDL;
     // </FS:Trish>
 
+    // <FS:Trish> GPU-driven draws (FSPerfGPUDrivenDraws): glMultiDrawElementsIndirect with base instances and
+    // glCopyBufferSubData (OpenGL 4.3, loaded below), and a shader storage block the vertex shader can read.
+    mFSHasGPUDrivenDraws = false;
+    if (mGLVersion >= 4.29f && !mIsApple &&
+        mGLExtensions.contains("GL_ARB_shader_storage_buffer_object") &&
+        mGLExtensions.contains("GL_ARB_multi_draw_indirect"))
+    {
+        GLint vs_blocks = 0;
+        glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &vs_blocks);
+        mFSHasGPUDrivenDraws = vs_blocks >= 1;
+    }
+    LL_INFOS("RenderInit") << "GPU-driven draws available: " << mFSHasGPUDrivenDraws << LL_ENDL;
+    // </FS:Trish>
+
     mInited = true;
 
 // <FS:Zi> Linux support

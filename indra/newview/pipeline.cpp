@@ -142,6 +142,7 @@
 #include "fsvrs.h" // <FS:Trish/> Variable rate shading
 #include "fsfoginterior.h" // <FS:Trish/> height fog kept out of interiors
 #include "fsparallelcull.h" // <FS:Trish/> FSPerfParallelShadowCull
+#include "fsgpudrivendraws.h" // <FS:Trish/> FSPerfGPUDrivenDraws
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -12637,7 +12638,11 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
     static LLCachedControl<bool> batch_stats(gSavedSettings, "FSPerfShadowBatchStats", false);
 
     const U32 filter = mFSShadowCasterFilter;
-    if (!merged_batches && filter == FS_SHADOW_ALL)
+    // <FS:Trish> FSPerfGPUDrivenDraws: collect the list for the multi-draw too
+    //if (!merged_batches && filter == FS_SHADOW_ALL)
+    const bool gpu_driven = fsGDDShadowEnabled(false);
+    if (!merged_batches && filter == FS_SHADOW_ALL && !gpu_driven)
+    // </FS:Trish>
     {
         if (batch_stats)
         {   // count what the per pass type path is about to draw: one call per non-empty batch
@@ -12671,6 +12676,11 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
         }
     }
 
+    // <FS:Trish> FSPerfGPUDrivenDraws: the casters in the position arena go out as one multi-draw, the rest below
+    const size_t collected = batches.size();
+    U32 draws = gpu_driven ? fsGDDDrawShadowOpaque(batches) : 0;
+    // </FS:Trish>
+
     std::sort(batches.begin(), batches.end(), [](const LLDrawInfo* lhs, const LLDrawInfo* rhs)
     {
         if (lhs->mModelMatrix != rhs->mModelMatrix)
@@ -12691,7 +12701,7 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
     gGL.loadMatrix(gGLModelView);
     gGLLastMatrix = NULL;
 
-    U32 draws = 0;
+    //U32 draws = 0; // <FS:Trish/> FSPerfGPUDrivenDraws, above
     const size_t count = batches.size();
     size_t i = 0;
     while (i < count)
@@ -12736,7 +12746,8 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
 
     if (batch_stats)
     {
-        fsCountShadowDraws((U32)count, draws);
+        //fsCountShadowDraws((U32)count, draws);
+        fsCountShadowDraws((U32)collected, draws); // <FS:Trish/> FSPerfGPUDrivenDraws
     }
     return true;
 }

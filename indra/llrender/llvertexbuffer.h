@@ -321,6 +321,13 @@ public:
     // draws this many instances, one per cascade the batch goes to. Zero everywhere else.
     static U32 sFSInstanceCount;
     // </FS:Trish>
+    // <FS:Trish> GPU-driven draws (FSPerfGPUDrivenDraws, newview/fsgpudrivendraws.cpp) copy the positions and
+    // indices of this buffer into shared arenas on the GPU.
+    U32 getFSGLBuffer() const               { return mGLBuffer; }
+    U32 getFSGLIndices() const              { return mGLIndices; }
+    U32 getFSIndicesType() const            { return mIndicesType; }
+    bool isFSMapped() const                 { return mMapped; }
+    // </FS:Trish>
 
 protected:
     U32     mGLBuffer = 0;      // GL VBO handle

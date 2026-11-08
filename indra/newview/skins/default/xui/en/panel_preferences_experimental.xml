@@ -4392,6 +4392,81 @@
                      tool_tip="EXPERIMENTAL. Debug check: recomputes the avatar joints serially after the worker threads and logs any difference. Costs extra CPU time, only for testing."
                      top="1078"
                      width="455" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_gpu_driven_draws"
+                     top="1118"
+                     width="340">
+                        GPU-driven draws
+                    </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_gpu_driven_draws"
+                     tool_tip="Set every option in &quot;GPU-driven draws&quot; back to its default value."
+                     top="1117"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfGPUDrivenDraws,FSPerfGPUDrivenDrawsVerify,FSPerfGPUDrivenDrawsArenaMB" />
+                    </button>
+                    <check_box
+                     control_name="FSPerfGPUDrivenDraws"
+                     enabled_control="RenderShadowDetail"
+                     follows="left|top"
+                     height="20"
+                     label="Draw shadow casters with multi-draw indirect"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfgpudrivendraws"
+                     tool_tip="EXPERIMENTAL. Sends the opaque buildings and objects of each shadow map to the graphics card as one multi-draw call instead of one call per object batch, from a copy of their positions kept in video memory. Shadows look the same; saves CPU time in busy scenes. Works together with 'Draw sun shadow cascades in one pass'. Needs OpenGL 4.3 (most NVIDIA, AMD and Intel cards with current drivers; not macOS); otherwise nothing changes."
+                     top="1144"
+                     width="475" />
+                    <check_box
+                     control_name="FSPerfGPUDrivenDrawsVerify"
+                     enabled_control="FSPerfGPUDrivenDraws"
+                     follows="left|top"
+                     height="20"
+                     label="Verify multi-draw shadows (slow)"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfgpudrivendrawsverify"
+                     tool_tip="Debug. Draws the shadow casters a second time the old way and logs any place where the result would differ, plus draw statistics every 10 seconds. Slows rendering down; for testing only."
+                     top="1170"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfgpudrivendrawsarenamb_label"
+                     tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
+                     top="1198"
+                     width="285">
+                        Shadow caster memory (MB)
+                    </text>
+                    <spinner
+                     control_name="FSPerfGPUDrivenDrawsArenaMB"
+                     decimal_digits="0"
+                     enabled_control="FSPerfGPUDrivenDraws"
+                     follows="left|top"
+                     height="20"
+                     increment="16"
+                     layout="topleft"
+                     left="330"
+                     max_val="2048"
+                     min_val="16"
+                     name="fs_fsperfgpudrivendrawsarenamb"
+                     tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
+                     top="1196"
+                     width="100" />
                 </panel>
             </scroll_container>
         </panel>

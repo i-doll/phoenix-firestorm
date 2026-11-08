@@ -28023,6 +28023,39 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSPerfGPUDrivenDraws</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Draw the opaque, non-rigged shadow casters of each shadow map (sun cascades, projector and probe shadows) with one glMultiDrawElementsIndirect call instead of one draw call per batch: the positions and indices of their vertex buffers are copied (on the GPU) into a shared arena once and reused while they don't change. Works with FSPerfShadowSinglePass (one multi-draw per set of cascades). Shadows look the same; saves CPU time in busy scenes. Needs OpenGL 4.3 with GL_ARB_multi_draw_indirect and GL_ARB_shader_storage_buffer_object; otherwise, and on macOS, nothing changes. Uses up to FSPerfGPUDrivenDrawsArenaMB of video memory. Rebuilds shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfGPUDrivenDrawsVerify</key>
+    <map>
+      <key>Comment</key>
+      <string>Debug for FSPerfGPUDrivenDraws: after each multi-draw, draws the same shadow casters again the old way with depth writes off and counts (occlusion query) the samples the old way would have put nearer than the multi-draw did, and reads back a couple of arena copies per pass to compare them with their vertex buffers. Mismatches are logged (Rendering, at most every 5 seconds); also logs draw statistics every 10 seconds. Stalls the GPU: slow, for testing only.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfGPUDrivenDrawsArenaMB</key>
+    <map>
+      <key>Comment</key>
+      <string>FSPerfGPUDrivenDraws: most video memory (MB, 16 to 2048) the shadow position arena may grow to; three quarters for positions, a quarter for indices. Casters that don't fit are drawn the old way.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>256</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

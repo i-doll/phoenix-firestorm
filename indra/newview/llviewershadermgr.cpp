@@ -57,6 +57,7 @@
 #include "fsskinonce.h" // <FS:Trish/>
 #include "fsshadowsinglepass.h" // <FS:Trish/>
 #include "llviewercamera.h" // <FS:Trish/> height fog: far clip for the sky
+#include "fsgpudrivendraws.h" // <FS:Trish/> FSPerfGPUDrivenDraws
 
 static LLStaticHashedString sTexture0("texture0");
 static LLStaticHashedString sTexture1("texture1");
@@ -1056,6 +1057,7 @@ void LLViewerShaderMgr::setShaders()
 void LLViewerShaderMgr::unloadShaders()
 {
     FSSkinOnce::cleanupGL(); // <FS:Trish/> skin-once capture program and pool
+    fsGDDReleaseGL(); // <FS:Trish/> FSPerfGPUDrivenDraws arenas
     while (!LLGLSLShader::sInstances.empty())
     {
         LLGLSLShader* shader = *(LLGLSLShader::sInstances.begin());
@@ -1643,6 +1645,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // </ID:VolumetricClouds>
         unload_fs_colored_shadow_casters(); // <FS:Trish/>
         fsUnloadShadowSinglePassShaders(); // <FS:Trish/>
+        fsGDDUnloadShaders(); // <FS:Trish/> FSPerfGPUDrivenDraws
 
         for (auto i = 0; i < 4; ++i)
         {
@@ -2941,6 +2944,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     if (success)
     {
         fsLoadShadowSinglePassShaders(mShaderLevel[SHADER_DEFERRED], use_sun_shadow);
+    }
+    // </FS:Trish>
+    // <FS:Trish> FSPerfGPUDrivenDraws: multi-draw opaque shadow casters, after the single pass programs it pairs with.
+    // Optional, a failure leaves the casters on the stock path.
+    fsGDDUnloadShaders();
+    if (success)
+    {
+        fsGDDLoadShaders(mShaderLevel[SHADER_DEFERRED], use_sun_shadow);
     }
     // </FS:Trish>
 
