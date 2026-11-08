@@ -4703,14 +4703,6 @@ LLWindowCallbacks::DragNDropResult LLWindowWin32::completeDragNDropRequest( cons
     return mCallbacks->handleDragNDrop( this, gl_coord, mask, action, url );
 }
 
-// <FS:Trish> Drag and drop files to upload
-LLWindowCallbacks::DragNDropResult LLWindowWin32::completeDropFilesRequest( const LLCoordGL gl_coord, const MASK mask, LLWindowCallbacks::DragNDropAction action, const std::vector<std::string>& files )
-{
-    ASSERT_MAIN_THREAD();
-    return mCallbacks->handleDropFiles( this, gl_coord, mask, action, files );
-}
-// </FS:Trish>
-
 // Gathers on the main thread what handleImeRequests() needs to answer from the window thread.
 // Only mImeCache's writer, the main thread, may read it without locking.
 void LLWindowWin32::updateImeCache()
