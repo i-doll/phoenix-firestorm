@@ -6364,6 +6364,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         if (reset_deferred)
         {
             mWorldViewRectRaw = window_rect;
+            mFSSnapshotScreenHeight = 0.f; // <FS:Trish/>
             LLViewerCamera::getInstance()->setViewNoBroadcast(original_fov);
             LLViewerCamera::getInstance()->setViewHeightInPixels(mWorldViewRectRaw.getHeight());
             LLViewerCamera::getInstance()->setAspect(getWorldViewAspectRatio());
@@ -6422,10 +6423,14 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
                     F32 window_aspect = (F32)window_rect.getWidth() / (F32)window_rect.getHeight();
                     F32 image_aspect  = (F32)image_width / (F32)image_height;
+                    // <FS:Trish> The window height covering the same view, for pixel-sized post effects
+                    mFSSnapshotScreenHeight = (F32)window_rect.getHeight();
+                    // </FS:Trish>
                     if (image_aspect > window_aspect)
                     {
                         F32 crop = window_aspect / image_aspect;
                         LLViewerCamera::getInstance()->setViewNoBroadcast(2.f * atanf(tanf(original_fov * 0.5f) * crop));
+                        mFSSnapshotScreenHeight *= crop; // <FS:Trish/> a narrower view: fewer window pixels span it
                     }
                     mWorldViewRectRaw.set(0, image_height, image_width, 0);
                     LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
@@ -7136,6 +7141,17 @@ S32 LLViewerWindow::getWorldViewWidthScaled() const
     return mWorldViewRectScaled.getWidth();
 }
 
+
+// <FS:Trish>
+F32 LLViewerWindow::getFSScreenEquivalentHeightRaw() const
+{
+    if (mFSSnapshotScreenHeight > 0.f) // only set while rawSnapshot renders at the image size
+    {
+        return mFSSnapshotScreenHeight;
+    }
+    return (F32)getWorldViewHeightRaw();
+}
+// </FS:Trish>
 
 S32 LLViewerWindow::getWorldViewHeightRaw() const
 {

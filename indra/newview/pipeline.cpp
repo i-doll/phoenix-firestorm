@@ -15185,9 +15185,10 @@ bool LLPipeline::renderLensEffects(LLRenderTarget* src, LLRenderTarget* dst)
         ca = 0.f;
     }
     // Scale with the target, so snapshots larger than the window and dynamic resolution look the
-    // same. The world view, not the window, is what the main target covers.
+    // same. The world view, not the window, is what the main target covers; a large snapshot sets
+    // the world view to the image size, so it takes the screen height from before the snapshot.
     //ca *= (F32)dst->getHeight() / (F32)llmax(gViewerWindow->getWindowHeightRaw(), 1);
-    const F32 target_scale = (F32)dst->getHeight() / (F32)llmax(gViewerWindow->getWorldViewHeightRaw(), 1);
+    const F32 target_scale = (F32)dst->getHeight() / llmax(gViewerWindow->getFSScreenEquivalentHeightRaw(), 1.f);
     ca *= target_scale;
 
     F32 flare = llmax((F32)flare_strength, 0.f);
