@@ -159,8 +159,13 @@ public:
     joints_t mChildren;
 
     // debug statics
-    static S32      sNumTouches;
-    static S32      sNumUpdates;
+    // <FS:Trish> FSPerfParallelAvatarUpdate: per thread, workers recompute joints too and shared counters would
+    // race and bounce a cache line between them; the joint debug log shows the main thread's
+    //static S32      sNumTouches;
+    //static S32      sNumUpdates;
+    static thread_local S32 sNumTouches;
+    static thread_local S32 sNumUpdates;
+    // </FS:Trish>
     typedef std::set<std::string> debug_joint_name_t;
     static debug_joint_name_t s_debugJointNames;
     static void setDebugJointNames(const debug_joint_name_t& names);

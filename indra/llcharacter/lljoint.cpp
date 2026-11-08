@@ -34,11 +34,33 @@
 #include "llmath.h"
 #include <boost/algorithm/string.hpp>
 
-S32 LLJoint::sNumUpdates = 0;
-S32 LLJoint::sNumTouches = 0;
 // <FS:Trish> FSPerfParallelAvatarUpdate
+//S32 LLJoint::sNumUpdates = 0;
+//S32 LLJoint::sNumTouches = 0;
+thread_local S32 LLJoint::sNumUpdates = 0;
+thread_local S32 LLJoint::sNumTouches = 0;
 //U64 LLJoint::sWorldMatrixSerial = 0; // <FS:Trish/>
 std::atomic<U64> LLJoint::sWorldMatrixSerial{ 0 };
+
+namespace
+{
+    // Each thread takes serials in blocks, one atomic add per block instead of per joint update. The palette
+    // cache only compares a joint's stamp for equality with the one it saw, so stamps need to be unique and
+    // never 0 (no joint), not ordered across threads.
+    constexpr U64 FS_JOINT_SERIAL_BLOCK = 4096;
+    thread_local U64 tJointSerialNext = 0;
+    thread_local U64 tJointSerialEnd = 0;
+
+    inline U64 fs_next_joint_serial()
+    {
+        if (tJointSerialNext == tJointSerialEnd)
+        {
+            tJointSerialNext = LLJoint::sWorldMatrixSerial.fetch_add(FS_JOINT_SERIAL_BLOCK, std::memory_order_relaxed) + 1;
+            tJointSerialEnd = tJointSerialNext + FS_JOINT_SERIAL_BLOCK;
+        }
+        return tJointSerialNext++;
+    }
+}
 // </FS:Trish>
 
 template <class T>
@@ -994,7 +1016,8 @@ void LLJoint::updateWorldMatrix()
         mWorldMatrix.loadu(mXform.getWorldMatrix());
         // <FS:Trish> FSPerfParallelAvatarUpdate
         //mWorldMatrixSerial = ++sWorldMatrixSerial; // <FS:Trish/>
-        mWorldMatrixSerial = sWorldMatrixSerial.fetch_add(1, std::memory_order_relaxed) + 1;
+        //mWorldMatrixSerial = sWorldMatrixSerial.fetch_add(1, std::memory_order_relaxed) + 1;
+        mWorldMatrixSerial = fs_next_joint_serial();
         // </FS:Trish>
         mDirtyFlags = 0x0;
     }

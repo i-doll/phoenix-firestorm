@@ -43,12 +43,13 @@
 //   are deferred to the main thread.
 // - LLSmoothInterpolation's interpolant cache is frozen while the workers run (cache misses
 //   are computed without growing the shared vector).
-// - LLJoint::sWorldMatrixSerial is atomic, so the rigged palette cache never sees a stamp twice.
+// - LLJoint world matrix serials come from per thread blocks of an atomic counter, so the rigged
+//   palette cache never sees a stamp twice.
 // - LLPhysicsMotion's cached control is created on the main thread and its default table is
 //   only looked up, never inserted into.
 // - Random numbers (eye jitter, blinks) use the thread local generator of llrand.
-// - LLJoint::sNumTouches/sNumUpdates are debug counters only shown with the joint debug
-//   option; concurrent increments can lose counts, nothing else.
+// - LLJoint::sNumTouches/sNumUpdates are thread local debug counters; the joint debug option
+//   shows the main thread's.
 
 #include "llviewerprecompiledheaders.h"
 
@@ -57,6 +58,7 @@
 #include "llapp.h"
 #include "llcriticaldamp.h"
 #include "lljoint.h"
+#include "llcontrolavatar.h"
 #include "llviewercontrol.h"
 #include "llvoavatar.h"
 
@@ -65,7 +67,9 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+#include <unordered_set>
 #include <vector>
+#include <emmintrin.h>
 
 bool FSParallelAvatar::sCollecting = false;
 
@@ -146,9 +150,15 @@ namespace
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_AVATAR("FSParallelAvatar wait");
-                while (mDone.load(std::memory_order_acquire) < count)
+                // spin briefly (the tasks in flight are usually short), then block until the last one signals
+                for (U32 i = 0; i < 1024 && mDone.load(std::memory_order_acquire) < count; ++i)
                 {
-                    std::this_thread::yield();
+                    _mm_pause();
+                }
+                if (mDone.load(std::memory_order_acquire) < count)
+                {
+                    std::unique_lock<std::mutex> lock(mMutex);
+                    mIdle.wait(lock, [this, count] { return mDone.load(std::memory_order_acquire) >= count; });
                 }
             }
 
@@ -181,7 +191,13 @@ namespace
             while ((index = mNext.fetch_add(1, std::memory_order_relaxed)) < mCount)
             {
                 mFn(mContext, index);
-                mDone.fetch_add(1, std::memory_order_release);
+                if (mDone.fetch_add(1, std::memory_order_acq_rel) + 1 == mCount)
+                {   // the mutex orders this with a waiter between its test and its wait (callers don't hold it)
+                    {
+                        std::lock_guard<std::mutex> lock(mMutex);
+                    }
+                    mIdle.notify_all();
+                }
             }
         }
 
@@ -290,8 +306,12 @@ void FSParallelAvatar::beginIdle()
 //static
 bool FSParallelAvatar::queuePose(LLVOAvatar* avatar, bool was_sit_ground_constrained)
 {
-    if (!sCollecting || !avatar || avatar->isSelf() || avatar->isUIAvatar() || avatar->isDead()
-        || avatar->mFSPosePending)
+    if (sCollecting && avatar && avatar->mFSPosePending)
+    {   // updateCharacter ran again this idle loop: the pose queued the first time is evaluated in endIdle,
+        // don't also run the full serial motion update now
+        return true;
+    }
+    if (!sCollecting || !avatar || avatar->isSelf() || avatar->isUIAvatar() || avatar->isDead())
     {
         return false;
     }
@@ -509,6 +529,7 @@ void FSParallelAvatar::endIdle()
     }
 
     // Main thread part, in the original avatar order
+    bool any_animesh = false;
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_AVATAR("FSParallelAvatar finish");
         for (PendingPose& pending : sPending)
@@ -517,6 +538,37 @@ void FSParallelAvatar::endIdle()
             if (pending.mAlive)
             {
                 finishPose(pending.mAvatar.get());
+                any_animesh |= pending.mAvatar->isControlAvatar();
+            }
+        }
+    }
+
+    // Animesh attachments matched their root to the wearer's attachment point in updateCharacter, before
+    // the wearer's queued pose was evaluated (a frame behind); match them again now that it is
+    if (any_animesh)
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_AVATAR("FSParallelAvatar animesh rematch");
+        std::unordered_set<const LLVOAvatar*> queued;
+        for (const PendingPose& pending : sPending)
+        {
+            if (pending.mAlive)
+            {
+                queued.insert(pending.mAvatar.get());
+            }
+        }
+        for (PendingPose& pending : sPending)
+        {
+            LLVOAvatar* avatar = pending.mAvatar.get();
+            if (!pending.mAlive || !avatar->isControlAvatar() || avatar->isDead())
+            {
+                continue;
+            }
+            LLControlAvatar* cav = static_cast<LLControlAvatar*>(avatar);
+            const LLVOAvatar* wearer = cav->getAttachedAvatar();
+            if (wearer && wearer != avatar && queued.count(wearer))
+            {
+                cav->matchVolumeTransform();
+                avatar->mRoot->updateWorldMatrixChildren();
             }
         }
     }

@@ -116,36 +116,50 @@ namespace
     U64 sStatLeft = 0;
 }
 
+namespace
+{
+    // the shadow pass's own GL objects; the PBR pass (fsGDDPBR*) releases its own
+    void release_shadow_gl()
+    {
+        sArena.releaseGL();
+        GLuint buffers[3] = { sIndirectBuffer, sDrawBuffer, sMatrixBuffer };
+        for (GLuint buffer : buffers)
+        {
+            if (buffer)
+            {
+                glDeleteBuffers(1, &buffer);
+            }
+        }
+        sIndirectBuffer = 0;
+        sDrawBuffer = 0;
+        sMatrixBuffer = 0;
+        if (sQuery)
+        {
+            glDeleteQueries(1, &sQuery);
+            sQuery = 0;
+        }
+    }
+
+    void unload_shadow_shaders()
+    {
+        gFSGDDShadowProgram.unload();
+        gFSGDDShadowSPProgram.unload();
+        sInputsReady[0] = 0;
+        sInputsReady[1] = 0;
+        release_shadow_gl();
+    }
+}
+
 void fsGDDReleaseGL()
 {
     fsGDDPBRReleaseGL();
-    sArena.releaseGL();
-    GLuint buffers[3] = { sIndirectBuffer, sDrawBuffer, sMatrixBuffer };
-    for (GLuint buffer : buffers)
-    {
-        if (buffer)
-        {
-            glDeleteBuffers(1, &buffer);
-        }
-    }
-    sIndirectBuffer = 0;
-    sDrawBuffer = 0;
-    sMatrixBuffer = 0;
-    if (sQuery)
-    {
-        glDeleteQueries(1, &sQuery);
-        sQuery = 0;
-    }
+    release_shadow_gl();
 }
 
 void fsGDDUnloadShaders()
 {
-    gFSGDDShadowProgram.unload();
-    gFSGDDShadowSPProgram.unload();
-    sInputsReady[0] = 0;
-    sInputsReady[1] = 0;
-    fsGDDPBRUnloadShaders();
-    fsGDDReleaseGL();
+    unload_shadow_shaders();
+    fsGDDPBRUnloadShaders();    // releases the PBR GL objects too
 }
 
 namespace
@@ -155,7 +169,7 @@ namespace
     {
         const GLuint matrices = glGetProgramResourceIndex(shader.mProgramObject, GL_SHADER_STORAGE_BLOCK, "FSGDDMatrices");
         record_attrib = glGetAttribLocation(shader.mProgramObject, "fs_gdd_draw");
-        if (matrices == GL_INVALID_INDEX || record_attrib <= 0)
+        if (matrices == GL_INVALID_INDEX || record_attrib < 0)
         {
             return false;
         }
@@ -182,9 +196,9 @@ namespace
 
 bool fsGDDLoadShaders(S32 shader_level, bool use_shadow)
 {
-    fsGDDUnloadShaders();
+    unload_shadow_shaders();
 
-    // the PBR pass (FSPerfGPUDrivenPBR) has its own setting and doesn't need shadows
+    // the PBR pass (FSPerfGPUDrivenPBR) has its own setting and doesn't need shadows; it unloads its own first
     fsGDDPBRLoadShaders();
 
     static LLCachedControl<bool> enabled(gSavedSettings, "FSPerfGPUDrivenDraws", false);
@@ -204,7 +218,7 @@ bool fsGDDLoadShaders(S32 shader_level, bool use_shadow)
     {
         LL_WARNS("ShaderLoading") << "FSPerfGPUDrivenDraws: the multi-draw shadow program failed to build, "
                                   << "shadow casters are drawn as before" << LL_ENDL;
-        fsGDDUnloadShaders();
+        unload_shadow_shaders();    // not the PBR programs, they don't depend on this one
         return false;
     }
 
@@ -455,7 +469,8 @@ namespace
         for (const Item& item : sHandled)
         {
             LLVertexBuffer* vb = item.mParams->mVertexBuffer.get();
-            FSGDDArenaEntry* found = sArena.find(vb, LLFrameTimer::getFrameCount());
+            // peek, not find: a verify pass must not copy, evict or touch entries
+            FSGDDArenaEntry* found = sArena.peek(vb);
             if (found && !found->mVerified)
             {
                 if (!sArena.verifyEntry(vb, *found))

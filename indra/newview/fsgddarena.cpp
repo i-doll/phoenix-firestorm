@@ -147,9 +147,15 @@ FSGDDArena::FSGDDArena(const char* name, const std::vector<U32>& types, const ch
     }
 }
 
-void FSGDDArena::limits(U32& max_verts, U32& max_indices) const
+void FSGDDArena::limits(U32 frame, U32& max_verts, U32& max_indices)
 {
-    // only when allocating, so a plain lookup of the setting this arena was given
+    if (mLimitsFrame == frame)
+    {   // the setting is looked up by name, so once per frame, not per allocation
+        max_verts = mMaxVerts;
+        max_indices = mMaxIndices;
+        return;
+    }
+    mLimitsFrame = frame;
     S32 mb = mDefaultMB;
     if (LLControlVariable* control = gSavedSettings.getControl(mBudgetSetting).get())
     {
@@ -159,6 +165,8 @@ void FSGDDArena::limits(U32& max_verts, U32& max_indices) const
     const U64 index_bytes = bytes / mIndexShare;
     max_verts = (U32)llmin((U64)U32_MAX / 64, (bytes - index_bytes) / mStride);
     max_indices = (U32)llmin((U64)U32_MAX / 4, index_bytes / sizeof(U16));
+    mMaxVerts = max_verts;
+    mMaxIndices = max_indices;
 }
 
 U32 FSGDDArena::vertexMB() const
@@ -200,6 +208,8 @@ bool FSGDDArena::growBuffer(GLuint& buffer, U32 old_bytes, U32 new_bytes)
         return false;
     }
     glBindBuffer(GL_COPY_WRITE_BUFFER, grown);
+    // clear older errors first, so the check below sees only this allocation's GL_OUT_OF_MEMORY
+    clear_glerror();
     glBufferData(GL_COPY_WRITE_BUFFER, new_bytes, nullptr, GL_STATIC_DRAW);
     if (glGetError() != GL_NO_ERROR)
     {
@@ -247,24 +257,31 @@ bool FSGDDArena::allocate(U32 verts, U32 indices, U32 frame, U32& vertex_offset,
     }
     U32 max_verts = 0;
     U32 max_indices = 0;
-    limits(max_verts, max_indices);
+    limits(frame, max_verts, max_indices);
 
     for (U32 attempt = 0; attempt < 3; ++attempt)
     {
-        if (mVerts.allocate(verts, vertex_offset))
+        // both tried, so a failure grows only the allocator that is short
+        const bool verts_fit = mVerts.allocate(verts, vertex_offset);
+        const bool indices_fit = mIndices.allocate(indices, index_offset);
+        if (verts_fit && indices_fit)
         {
-            if (mIndices.allocate(indices, index_offset))
-            {
-                return true;
-            }
+            return true;
+        }
+        if (verts_fit)
+        {
             mVerts.release(vertex_offset, verts);
+        }
+        if (indices_fit)
+        {
+            mIndices.release(index_offset, indices);
         }
 
         if (attempt == 0)
         {   // grow, doubling, up to the limit; every attribute buffer by the same number of vertices
             const U32 want_verts = llmin(max_verts, llmax(mVerts.capacity() * 2, llmax(verts * 4, (U32)(1u << 20))));
             const U32 want_indices = llmin(max_indices, llmax(mIndices.capacity() * 2, llmax(indices * 4, (U32)(3u << 20))));
-            if (want_verts > mVerts.capacity())
+            if (!verts_fit && want_verts > mVerts.capacity())
             {
                 bool grown = true;
                 for (size_t i = 0; i < mTypes.size() && grown; ++i)
@@ -278,7 +295,7 @@ bool FSGDDArena::allocate(U32 verts, U32 indices, U32 frame, U32& vertex_offset,
                 }
                 // else: the buffers that did grow hold the old range at the old offsets, still consistent
             }
-            if (want_indices > mIndices.capacity() &&
+            if (!indices_fit && want_indices > mIndices.capacity() &&
                 growBuffer(mIB, mIndices.capacity() * (U32)sizeof(U16), want_indices * (U32)sizeof(U16)))
             {
                 mIndices.grow(want_indices);
@@ -286,7 +303,13 @@ bool FSGDDArena::allocate(U32 verts, U32 indices, U32 frame, U32& vertex_offset,
         }
         else if (attempt == 1)
         {   // at the limit: drop what no pass used in this frame or the last one (entries used this frame are
-            // still referenced by commands not yet drawn)
+            // still referenced by commands not yet drawn). Once per frame: a second walk this frame would
+            // find nothing new to drop
+            if (mEvictFrame == frame)
+            {
+                break;
+            }
+            mEvictFrame = frame;
             evict(frame, 2);
         }
     }
@@ -494,4 +517,6 @@ void FSGDDArena::releaseGL()
     mEntries.clear();
     mCopies = 0;
     mFullFrame = U32_MAX;
+    mEvictFrame = U32_MAX;
+    mLimitsFrame = U32_MAX;
 }

@@ -648,6 +648,15 @@ void fsGDDPBRLoadShaders()
                                        << "GL_ARB_shader_storage_buffer_object; PBR batches are drawn as before" << LL_ENDL;
         return;
     }
+    // mFSHasGPUDrivenDraws asks for one vertex shader storage block (the shadow pass); this program uses two
+    GLint vs_blocks = 0;
+    glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &vs_blocks);
+    if (vs_blocks < 2)
+    {
+        LL_INFOS_ONCE("ShaderLoading") << "FSPerfGPUDrivenPBR: needs two shader storage blocks in the vertex shader, "
+                                       << "the driver offers " << vs_blocks << "; PBR batches are drawn as before" << LL_ENDL;
+        return;
+    }
     if (gDeferredPBROpaqueProgram.mShaderFiles.empty())
     {
         return;
@@ -661,7 +670,13 @@ void fsGDDPBRLoadShaders()
         return;
     }
 
-    if (bindless)
+    if (bindless && !gGLManager.mIsNVIDIA)
+    {   // only tested on NVIDIA; elsewhere drivers may want handles uniform within a multi-draw wave,
+        // which the commands of a batch don't guarantee
+        LL_INFOS_ONCE("ShaderLoading") << "FSPerfGPUDrivenPBRBindless: only used on NVIDIA GPUs, "
+                                       << "PBR textures are bound as before" << LL_ENDL;
+    }
+    else if (bindless)
     {
         if (!sBindlessTested)
         {
@@ -804,6 +819,11 @@ namespace
                 for (LLViewerTexture* tex : textures)
                 {
                     tex->setActive();   // as LLTexUnit::bindFast does, so the texture stays wanted
+                    // and counts as bound this frame (isJustBound, getBoundRecently), as a real bind would
+                    if (LLImageGL* gl = tex->getGLTexture())
+                    {
+                        gl->updateBindStats();
+                    }
                 }
             }
         }
@@ -832,10 +852,6 @@ namespace
 
         const U32 frame = LLFrameTimer::getFrameCount();
         sArena.beginFrame(frame);
-        if (bindless)
-        {
-            sweep_handles(frame);
-        }
         const glm::mat4 proj = gGL.getProjectionMatrix();
         const glm::mat4 view = get_current_modelview();
         sMatrices.push_back(glm::mat4(1.f));   // texture matrix 0: identity
@@ -1190,6 +1206,10 @@ namespace
 
 bool fsGDDDrawPBR(U32 type)
 {
+    // before any early return, so idle handles go non resident and away also while no PBR batch (or no
+    // bindless one) is drawn; cheap, it does something every 120 frames
+    sweep_handles(LLFrameTimer::getFrameCount());
+
     static LLCachedControl<bool> enabled(gSavedSettings, "FSPerfGPUDrivenPBR", false);
     if (!enabled || !gGLManager.mFSHasGPUDrivenDraws || !program_usable(0) ||
         LLGLSLShader::sCurBoundShaderPtr != &gDeferredPBROpaqueProgram || LLPipeline::sShadowRender)

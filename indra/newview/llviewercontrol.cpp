@@ -269,6 +269,9 @@ static constexpr F32 SHADER_RELOAD_QUIET_SECONDS = 0.4f;
 static bool sShaderReloadPending = false;
 static bool sShaderReloadRunning = false;
 static LLTimer sShaderReloadTimer;
+// fs_revert_shader_settings_after_failure is putting settings back; setShaders, its caller, loads again
+// afterwards, so a control's change must not reload (or rebuild the bump cache) once per control
+static bool sShaderSettingsReverting = false;
 // </FS:Trish>
 
 // <FS:Ansariel> Expose handleSetShaderChanged()
@@ -277,6 +280,10 @@ bool handleSetShaderChanged(const LLSD& newvalue)
 // </FS:Ansariel>
 {
     // <FS:Trish> Coalesced shader reloads
+    if (sShaderSettingsReverting)
+    {
+        return true;
+    }
     if (!sShaderReloadRunning && gPipeline.isInit() && gPipeline.mShadersLoaded &&
         LLViewerShaderMgr::sInitialized && !LLViewerShaderMgr::sSkipReload)
     {
@@ -1373,12 +1380,14 @@ bool fs_revert_shader_settings_after_failure(const char* phase)
         }
     }
     sFSRevertingShaderSettings = true;
+    sShaderSettingsReverting = true;
     for (auto& change : changes)
     {
         LL_WARNS("Shader") << "Failed to load " << phase << " shaders (see the preceding compile/link errors): setting "
                            << change.first->getName() << " back to " << change.second << " and loading again." << LL_ENDL;
         change.first->setValue(change.second);
     }
+    sShaderSettingsReverting = false;
     sFSRevertingShaderSettings = false;
     sFSPendingShaderChanges.clear();
     return true;

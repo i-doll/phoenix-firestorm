@@ -3018,10 +3018,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     // </FS:Trish>
     // <FS:Trish> FSPerfGPUDrivenDraws: multi-draw opaque shadow casters, after the single pass programs it pairs with.
     // Optional, a failure leaves the casters on the stock path.
-    fsGDDUnloadShaders();
+    // fsGDDLoadShaders unloads first, so unload here only when it won't run
     if (success)
     {
         fsGDDLoadShaders(mShaderLevel[SHADER_DEFERRED], use_sun_shadow);
+    }
+    else
+    {
+        fsGDDUnloadShaders();
     }
     // </FS:Trish>
 

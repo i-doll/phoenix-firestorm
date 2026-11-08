@@ -86,6 +86,7 @@
 #include <mutex>
 #include <thread>
 #include <xmmintrin.h>
+#include <emmintrin.h>
 
 extern bool gCubeSnapshot;
 
@@ -153,18 +154,12 @@ namespace
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("fs tex priority - join");
-                while (mDone.load() < count)
-                {
-                    std::this_thread::yield();
-                }
+                waitUntil([this, count] { return mDone.load() >= count; });
             }
 
             // Late wakers see mOpen false and leave; wait for any that got in before.
             mOpen.store(false);
-            while (mActive.load() != 0)
-            {
-                std::this_thread::yield();
-            }
+            waitUntil([this] { return mActive.load() == 0; });
             mJob = nullptr;
         }
 
@@ -196,8 +191,37 @@ namespace
             while ((index = mNext.fetch_add(1)) < mCount)
             {
                 (*mJob)(index);
-                mDone.fetch_add(1);
+                if (mDone.fetch_add(1) + 1 == mCount)
+                {
+                    signalDone();
+                }
             }
+        }
+
+        // Spins briefly (the in-flight chunks are usually short), then blocks until a worker
+        // signals mDoneCV, rather than yielding a core away for the whole wait.
+        template <typename Pred> void waitUntil(Pred done)
+        {
+            for (U32 i = 0; i < 1024; ++i)
+            {
+                if (done())
+                {
+                    return;
+                }
+                _mm_pause();
+            }
+            std::unique_lock<std::mutex> lock(mDoneMutex);
+            mDoneCV.wait(lock, done);
+        }
+
+        // after the state waitUntil tests changed: taking the mutex orders this with a waiter
+        // between its test and its wait, so the wake isn't lost
+        void signalDone()
+        {
+            {
+                std::lock_guard<std::mutex> lock(mDoneMutex);
+            }
+            mDoneCV.notify_all();
         }
 
         void workerLoop()
@@ -220,7 +244,10 @@ namespace
                     _mm_setcsr(mCSR);
                     work();
                 }
-                mActive.fetch_sub(1);
+                if (mActive.fetch_sub(1) == 1)
+                {
+                    signalDone();
+                }
             }
         }
 
@@ -229,6 +256,8 @@ namespace
         std::mutex mMutex;
         std::condition_variable mCV;
         U64 mGeneration = 0;
+        std::mutex mDoneMutex;
+        std::condition_variable mDoneCV;    // mDone reached mCount, or mActive reached 0
 
         const std::function<void(U32)>* mJob = nullptr;
         U32 mCount = 0;
@@ -245,7 +274,12 @@ namespace
     std::vector<U8> sHasResult;                          // entries[i] has a result
     std::vector<FSTexturePriorityFaces> sResults;        // per entry
     std::vector<U32> sEligible;                          // entry indices that get a result
-    std::vector<std::vector<LLFace*> > sChunkFaces;      // step 1 output, per texture chunk
+    // a cache line each: workers push_back into neighbouring chunks at the same time
+    struct alignas(64) FSChunkFaces
+    {
+        std::vector<LLFace*> mFaces;
+    };
+    std::vector<FSChunkFaces> sChunkFaces;               // step 1 output, per texture chunk
     std::vector<LLFace*> sFaces;                         // step 3 input, non-rigged
     std::vector<LLFace*> sRiggedFaces;                   // step 3, main thread
 
@@ -501,7 +535,7 @@ bool FSParallelTexture::prepare(const entries_t& entries, const skip_set_t& skip
         }
         std::function<void(U32)> job = [frame](U32 chunk)
         {
-            std::vector<LLFace*>& out = sChunkFaces[chunk];
+            std::vector<LLFace*>& out = sChunkFaces[chunk].mFaces;
             out.clear();
             const U32 end = llmin((chunk + 1) * TEXTURES_PER_CHUNK, (U32)sEligible.size());
             for (U32 e = chunk * TEXTURES_PER_CHUNK; e < end; ++e)
@@ -519,7 +553,7 @@ bool FSParallelTexture::prepare(const entries_t& entries, const skip_set_t& skip
         sRiggedFaces.clear();
         for (U32 chunk = 0; chunk < texture_chunks; ++chunk)
         {
-            for (LLFace* face : sChunkFaces[chunk])
+            for (LLFace* face : sChunkFaces[chunk].mFaces)
             {
                 if ((frame - face->mLastTextureUpdate) > FACE_UPDATE_FRAMES)
                 {

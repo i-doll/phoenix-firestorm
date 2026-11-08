@@ -80,6 +80,7 @@
 #include <mutex>
 #include <thread>
 #include <xmmintrin.h>
+#include <emmintrin.h>
 
 int FSParallelGeometry::sDepth = 0;
 
@@ -121,18 +122,12 @@ namespace
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("fsgeom - join");
-                while (mDone.load() < count)
-                {
-                    std::this_thread::yield();
-                }
+                waitUntil([this, count] { return mDone.load() >= count; });
             }
 
             // Late wakers see mOpen false and leave; wait for any that got in before.
             mOpen.store(false);
-            while (mActive.load() != 0)
-            {
-                std::this_thread::yield();
-            }
+            waitUntil([this] { return mActive.load() == 0; });
         }
 
     private:
@@ -152,8 +147,37 @@ namespace
             while ((chunk = mNext.fetch_add(1)) < mCount)
             {
                 mFn(mCtx, chunk);
-                mDone.fetch_add(1);
+                if (mDone.fetch_add(1) + 1 == mCount)
+                {
+                    signalDone();
+                }
             }
+        }
+
+        // Spins briefly (the in-flight chunks are usually short), then blocks until a worker
+        // signals mDoneCV, rather than yielding a core away for the whole wait.
+        template <typename Pred> void waitUntil(Pred done)
+        {
+            for (U32 i = 0; i < 1024; ++i)
+            {
+                if (done())
+                {
+                    return;
+                }
+                _mm_pause();
+            }
+            std::unique_lock<std::mutex> lock(mDoneMutex);
+            mDoneCV.wait(lock, done);
+        }
+
+        // after the state waitUntil tests changed: taking the mutex orders this with a waiter
+        // between its test and its wait, so the wake isn't lost
+        void signalDone()
+        {
+            {
+                std::lock_guard<std::mutex> lock(mDoneMutex);
+            }
+            mDoneCV.notify_all();
         }
 
         void workerLoop()
@@ -176,7 +200,10 @@ namespace
                     _mm_setcsr(mCSR);
                     work();
                 }
-                mActive.fetch_sub(1);
+                if (mActive.fetch_sub(1) == 1)
+                {
+                    signalDone();
+                }
             }
         }
 
@@ -185,6 +212,8 @@ namespace
         std::mutex mMutex;
         std::condition_variable mCV;
         U64 mGeneration = 0;
+        std::mutex mDoneMutex;
+        std::condition_variable mDoneCV;    // mDone reached mCount, or mActive reached 0
 
         chunk_fn_t mFn = nullptr;
         void* mCtx = nullptr;

@@ -117,7 +117,7 @@ public:
     void clearCounts();
 
 private:
-    void limits(U32& max_verts, U32& max_indices) const;
+    void limits(U32 frame, U32& max_verts, U32& max_indices);
     bool allocate(U32 verts, U32 indices, U32 frame, U32& vertex_offset, U32& index_offset);
     void evict(U32 frame, U32 unused_frames);
     bool growBuffer(GLuint& buffer, U32 old_bytes, U32 new_bytes);
@@ -140,6 +140,10 @@ private:
     U32 mCopies = 0;                // this frame
     U32 mLastSweep = 0;
     U32 mFullFrame = U32_MAX;       // frame an allocation found the arena full
+    U32 mEvictFrame = U32_MAX;      // frame an allocation last evicted, at most once per frame
+    U32 mLimitsFrame = U32_MAX;     // frame mMaxVerts and mMaxIndices were read from the setting
+    U32 mMaxVerts = 0;
+    U32 mMaxIndices = 0;
     U32 mUploads = 0;               // since clearCounts
     U32 mFallbacks = 0;
     U32 mFails[FAIL_COUNT] = {};

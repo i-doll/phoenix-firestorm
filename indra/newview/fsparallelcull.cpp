@@ -302,7 +302,8 @@ namespace
         S32         mColoredCascade = -1;
     };
 
-    struct FSCullJob
+    // a cache line each: workers push_back into neighbouring jobs' mGroups at the same time
+    struct alignas(64) FSCullJob
     {
         U32                 mDeferred = 0;      // index into sDeferred
         LLSpatialPartition* mPartition = nullptr;
@@ -802,7 +803,8 @@ namespace
         F32         mNearRadius;
     };
 
-    struct FSMainCullJob
+    // a cache line each, as FSCullJob
+    struct alignas(64) FSMainCullJob
     {
         LLViewerRegion*         mRegion = nullptr;
         LLSpatialPartition*     mPartition = nullptr;   // a spatial partition walk, or
@@ -1061,6 +1063,11 @@ bool LLPipeline::fsParallelMainCull(LLCamera& camera, LLCullResult& result, bool
     {   // the serial partition culls again, into their own result
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("fs main cull verify");
         const S32 saved_nodes = mNumVisibleNodes;
+        // read only occlusion (1): occluded groups are still skipped, as in the parallel cull, but neither
+        // checkOcclusion nor markOccluder changes them. A group marked ACTIVE_OCCLUSION here would be pushed into
+        // the verify result, which is cleared below, and so stay occluded for good
+        const S32 saved_occlusion = sUseOcclusion;
+        sUseOcclusion = llmin(sUseOcclusion, 1);
         grabReferences(sMainVerifyResult);
         sMainVerifyResult.clear();
         for (LLViewerRegion* region : regions)
@@ -1075,6 +1082,7 @@ bool LLPipeline::fsParallelMainCull(LLCamera& camera, LLCullResult& result, bool
             }
         }
         mNumVisibleNodes = saved_nodes;
+        sUseOcclusion = saved_occlusion;
         grabReferences(result);
 
         std::vector<LLSpatialGroup*> par_visible, par_drawable, ser_visible, ser_drawable;
