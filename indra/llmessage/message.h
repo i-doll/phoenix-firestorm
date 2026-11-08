@@ -972,7 +972,10 @@ private:
     // Sets packet_id_already_checked to whether checkPacketInID() was already
     // run for this packet back when it was buffered (see bufferInboundPacket()).
     // Returns packet_size, or 0 if no packet or packet was dropped.
-    S32  receivePacketOrDrop(char* datap, bool& packet_id_already_checked);
+    // <FS:Trish> ack_already_collected: collectRAck() already ran at buffer time
+    //S32  receivePacketOrDrop(char* datap, bool& packet_id_already_checked);
+    S32  receivePacketOrDrop(char* datap, bool& packet_id_already_checked, bool& ack_already_collected);
+    // </FS:Trish>
 
     // Read one raw packet from mSocket into inbound message queues
     // Returns packet_size (0 if no packet was available).

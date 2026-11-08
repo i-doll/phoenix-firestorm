@@ -55,12 +55,19 @@ public:
     bool    getPacketIDChecked() const          { return mPacketIDChecked; }
     void    setPacketIDChecked(bool checked)    { mPacketIDChecked = checked; }
 
+    // <FS:Trish> Whether the reliable ack for this packet was already queued
+    // with LLCircuitData::collectRAck() at socket-read time.
+    bool    getAckCollected() const             { return mAckCollected; }
+    void    setAckCollected(bool collected)     { mAckCollected = collected; }
+    // </FS:Trish>
+
 protected:
     char    mData[NET_BUFFER_SIZE]; // packet data       /* Flawfinder : ignore */
     S32     mSize;                  // size of buffer in bytes
     LLHost  mHost;                  // source/dest IP and port
     LLHost  mReceivingIF;           // source/dest IP and port
     bool    mPacketIDChecked = false;
+    bool    mAckCollected = false; // <FS:Trish/>
 };
 
 #endif

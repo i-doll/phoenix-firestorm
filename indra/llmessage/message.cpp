@@ -529,10 +529,14 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
         S32 num_acks = 0;
         S32 true_rcv_size = 0;
         bool recv_packet_id_checked = false;
+        bool recv_ack_collected = false; // <FS:Trish/>
 
         U8* buffer = mTrueReceiveBuffer;
 
-        mTrueReceiveSize = receivePacketOrDrop((char *)mTrueReceiveBuffer, recv_packet_id_checked);
+        // <FS:Trish> Buffered packets may already have had their ack collected
+        //mTrueReceiveSize = receivePacketOrDrop((char *)mTrueReceiveBuffer, recv_packet_id_checked);
+        mTrueReceiveSize = receivePacketOrDrop((char *)mTrueReceiveBuffer, recv_packet_id_checked, recv_ack_collected);
+        // </FS:Trish>
         // If you want to dump all received packets into SecondLife.log, uncomment this
         //dumpPacketToLog();
 
@@ -635,7 +639,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
                         //}
                         // ***************************************
                         //mCircuitInfo.mCurrentCircuit->mAcks.put(mCurrentRecvPacketID);
-                        cdp->collectRAck(mCurrentRecvPacketID);
+                        // <FS:Trish> Skip if already acked when it was buffered
+                        //cdp->collectRAck(mCurrentRecvPacketID);
+                        if (!recv_ack_collected)
+                        {
+                            cdp->collectRAck(mCurrentRecvPacketID);
+                        }
+                        // </FS:Trish>
                     }
 
                     LL_DEBUGS("Messaging") << "Discarding duplicate resend from " << host << LL_ENDL;
@@ -727,7 +737,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
                     cdp->mRecentlyReceivedReliablePackets[mCurrentRecvPacketID] = getMessageTimeUsecs();
 
                     // Put it onto the list of packets to be acked
-                    cdp->collectRAck(mCurrentRecvPacketID);
+                    // <FS:Trish> Skip if already acked when it was buffered
+                    //cdp->collectRAck(mCurrentRecvPacketID);
+                    if (!recv_ack_collected)
+                    {
+                        cdp->collectRAck(mCurrentRecvPacketID);
+                    }
+                    // </FS:Trish>
                     mReliablePacketsIn++;
                 }
             }
@@ -955,9 +971,13 @@ void LLMessageSystem::setDropPercentage(F32 percent_to_drop)
     mDropPercentage = percent_to_drop;
 }
 
-S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked)
+// <FS:Trish> Also report whether the reliable ack was already collected
+//S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked)
+S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked, bool& ack_already_collected)
+// </FS:Trish>
 {
     packet_id_already_checked = false;
+    ack_already_collected = false; // <FS:Trish/>
 
     if (getNumBufferedPackets() > 0)
     {
@@ -972,6 +992,7 @@ S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_ch
         mLastSender      = pkt.getHost();
         mLastReceivingIF = pkt.getReceivingInterface();
         packet_id_already_checked = pkt.getPacketIDChecked();
+        ack_already_collected = pkt.getAckCollected(); // <FS:Trish/>
 
         if (packet_size > 0)
         {
@@ -1129,6 +1150,7 @@ S32 LLMessageSystem::bufferInboundPacket()
             if ((data[0] & LL_RELIABLE_FLAG))
             {
                 cdp->collectRAck(recv_packet_id);
+                pkt.setAckCollected(true); // <FS:Trish/> don't ack again when popped
             }
 
             // Check packet sequencing here, in true socket-arrival order, before
