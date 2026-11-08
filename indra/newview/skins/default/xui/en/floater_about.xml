@@ -26,13 +26,14 @@
       <text
         follows="top|left|right"
         font="SansSerif"
-        height="30"
+        height="45"
         layout="topleft"
         left="11"
         name="support_intro"
         top="16"
         width="434"
         wrap="true">
+Idyll is built on Firestorm.
 For the latest information about Firestorm, visit 
 https://www.firestormviewer.org
       </text>
@@ -40,7 +41,7 @@ https://www.firestormviewer.org
         parse_urls="true"
         follows="top|left"
         font="SansSerif"
-        height="468"
+        height="453"
         bg_readonly_color="Transparent"
         left="5"
         max_length="65536"

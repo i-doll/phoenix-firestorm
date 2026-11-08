@@ -3,7 +3,8 @@
 	<tab_container name="about_tab">
 		<panel label="Məlumat" name="support_panel">
 			<text name="support_intro">
-				Firestorm haqqında yeni məlumat burada mövcuddur 
+				Idyll is built on Firestorm.
+Firestorm haqqında yeni məlumat burada mövcuddur 
 https://www.firestormviewer.org
 			</text>
 			<button label="Buferə köçürt" name="copy_btn"/>
