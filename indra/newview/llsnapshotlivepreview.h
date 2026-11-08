@@ -169,6 +169,7 @@ private:
     LLFrameTimer                mSnapshotDelayTimer;
     // <FS:Trish> Wait for on screen textures to finish loading before capturing
     LLFrameTimer                mTextureWaitTimer;
+    bool                        mAutoRefreshSnapshot = false;   // the pending snapshot follows the camera (AutoSnapshot)
     bool                        waitForTextures();
     void                        endTextureWait();
     // </FS:Trish>

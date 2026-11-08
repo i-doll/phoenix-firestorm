@@ -162,11 +162,33 @@ static LLRenderTarget* fs_water_opaque_depth(LLRenderTarget& water_dis)
     return (sFSFoamDepthValid && sFSFoamDepth) ? sFSFoamDepth : &water_dis;
 }
 
+// Whether this view will draw any water: the water pass runs and has faces queued
+static bool fs_water_will_draw()
+{
+    LLDrawPool* pool = gPipeline.findPool(LLDrawPool::POOL_WATER);
+    return pool && gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_WATER) &&
+           !static_cast<LLFacePool*>(pool)->mDrawFace.empty() &&
+           pool->getNumPostDeferredPasses() > 0;
+}
+
 // static
 void LLDrawPoolWater::fsCaptureFoamDepth(LLRenderTarget& src)
 {
     sFSFoamDepthValid = false;
-    if (!fs_water_opaque_depth_wanted() || gCubeSnapshot || LLPipeline::sRenderingHUDs || !src.isComplete())
+    if (!fs_water_opaque_depth_wanted())
+    {
+        if (sFSFoamDepth && sFSFoamDepth->isComplete())
+        {
+            fsReleaseFoamDepth(); // nothing reads it any more
+        }
+        return;
+    }
+    if (gCubeSnapshot || LLPipeline::sRenderingHUDs || !src.isComplete() || !fs_water_will_draw())
+    {
+        return;
+    }
+    // The water SSR only marches from above the surface: without foam there is no reader below it
+    if (!fs_water_foam_enabled() && LLViewerCamera::getInstance()->cameraUnderWater())
     {
         return;
     }
@@ -180,7 +202,9 @@ void LLDrawPoolWater::fsCaptureFoamDepth(LLRenderTarget& src)
     if (!sFSFoamDepth->isComplete() || sFSFoamDepth->getWidth() != width || sFSFoamDepth->getHeight() != height)
     {
         sFSFoamDepth->release();
-        if (!sFSFoamDepth->allocate(width, height, GL_R8, true))
+        // depth only: nothing reads a colour attachment (the shadow maps are allocated the same way)
+        //if (!sFSFoamDepth->allocate(width, height, GL_R8, true))
+        if (!sFSFoamDepth->allocate(width, height, 0, true))
         {
             sFSFoamDepth->release();
             return;
@@ -221,6 +245,8 @@ static S32 fs_bind_water_foam(LLGLSLShader* shader, LLRenderTarget& water_dis)
     const S32 unit = shader->mActiveTextureChannels;
     if (shader->getUniformLocation(s_foam_depth) < 0 || unit >= llmin(gGLManager.mNumTextureImageUnits, (S32)LL_NUM_TEXTURE_LAYERS))
     {
+        // no depth to find the shore with: strength 0, or the foam would read whatever the unit holds
+        shader->uniform4f(s_params, 0.f, llclamp((F32)width, 0.05f, 5.f), phase, 0.f);
         return -1;
     }
     shader->uniform1i(s_foam_depth, unit);
@@ -355,11 +381,22 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         {
             static LLStaticHashedString s_clip_plane("fs_ssr_clip_plane");
             LLVector4 plane = LLDrawPoolAlpha::sWaterPlane;
+            // The camera is above water here, so it must be on the positive side. When it isn't
+            // the plane is stale or for another surface: flipping it would clip the wrong half,
+            // so a zero plane turns the clip off instead.
+            //if (plane.mV[VW] < 0.f)
+            //{
+            //    plane *= -1.f;
+            //}
+            //plane.mV[VW] += 0.05f;
             if (plane.mV[VW] < 0.f)
             {
-                plane *= -1.f;
+                plane.set(0.f, 0.f, 0.f, 0.f);
             }
-            plane.mV[VW] += 0.05f;
+            else
+            {
+                plane.mV[VW] += 0.05f;
+            }
             shader->uniform4f(s_clip_plane, plane.mV[VX], plane.mV[VY], plane.mV[VZ], plane.mV[VW]);
         }
         // </FS:Trish>

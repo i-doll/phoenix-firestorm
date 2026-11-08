@@ -908,6 +908,7 @@ public:
     static constexpr U32    FS_BLOOM_MAX_LEVELS = 8;
     LLRenderTarget          mBloomLevels[FS_BLOOM_MAX_LEVELS];
     U32                     mBloomLevelCount = 0;       // levels drawn this frame, 0 when bloom is off
+    bool                    mFSNoPost = false;          // tonemap runs the no-post programs this frame (set in renderFinalize)
     LLPointer<LLImageGL>    mColorGradeLUT;
     std::string             mColorGradeLUTName;
     S32                     mColorGradeLUTSize = 0;
@@ -971,6 +972,10 @@ public:
     LLVector3               mFarCascadeEye;                 // camera and sun at the last forced update
     LLVector3               mFarCascadeAt;
     LLVector3               mFarCascadeLight;
+    F32                     mFarCascadeFov = 0.f;           // projection at the last forced update
+    F32                     mFarCascadeAspect = 0.f;
+    void                    fsInvalidateShadowReuse(bool spots = true); // shadow maps were cleared or reallocated; spots: also the projector maps
+    static LLVector3        sShadowDistanceOrigin;          // main camera origin, cached once per frame
     struct SpotShadowState
     {
         const LLDrawable*   mLight = nullptr;               // identity only, never dereferenced

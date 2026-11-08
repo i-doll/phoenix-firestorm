@@ -445,7 +445,9 @@ namespace
             sState.mSnap = true;
         }
 
-        if (!sState.mHaveCast || sState.mSnap || since >= sState.mInterval || (moved > MOVE_RECAST && since >= 0.1f))
+        // Moving recasts sooner, but still no more often than half the cost-based interval
+        if (!sState.mHaveCast || sState.mSnap || since >= sState.mInterval ||
+            (moved > MOVE_RECAST && since >= llmax(0.1f, 0.5f * sState.mInterval)))
         {
             cast(pos, range, strength);
         }

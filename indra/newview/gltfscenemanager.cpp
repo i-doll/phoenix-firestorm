@@ -47,6 +47,7 @@
 #include "llfilesystem.h"
 #include "llviewercontrol.h"
 #include "boost/json.hpp"
+#include "fsfoginterior.h" // <FS:Trish/>
 
 #define GLTF_SIM_SUPPORT 1
 
@@ -688,6 +689,9 @@ void GLTFSceneManager::render(Asset& asset, U8 variant)
                 else
                 { // alpha shaders need all the shadow map setup etc
                     gPipeline.bindDeferredShader(gGLTFPBRMetallicRoughnessProgram.mGLTFVariants[variant]);
+                    // <FS:Trish> height fog kept out of the rooms around the main camera, as for other alpha
+                    FSFogInterior::uploadUniforms(gGLTFPBRMetallicRoughnessProgram.mGLTFVariants[variant]);
+                    // </FS:Trish>
                 }
 
                 if (!rigged)

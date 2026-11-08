@@ -173,6 +173,14 @@ void LLSnapshotLivePreview::updateSnapshot(bool new_snapshot, bool new_thumbnail
     // Update snapshot if requested.
     if (new_snapshot)
     {
+        // <FS:Trish> A new request restarts the texture wait, and is not an auto refresh unless
+        // onIdle says so after this call
+        mAutoRefreshSnapshot = false;
+        if (mTextureWaitTimer.getStarted())
+        {
+            endTextureWait();
+        }
+        // </FS:Trish>
         if (getSnapshotUpToDate())
         {
             S32 old_image_index = mCurImageIndex;
@@ -732,6 +740,12 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
     if (LLToolCamera::getInstance()->hasMouseCapture()) // Hide full-screen preview while camming, either don't take snapshots while ALT-zoom active
     {
         previewp->setVisible(false);
+        // <FS:Trish> The texture wait is abandoned: don't keep the global discard boost meanwhile
+        if (previewp->mTextureWaitTimer.getStarted())
+        {
+            previewp->endTextureWait();
+        }
+        // </FS:Trish>
         return false;
     }
 
@@ -760,6 +774,7 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
             new_snapshot, // whether a new snapshot is needed or merely invalidate the existing one
             false, // or if 1st arg is false, whether to produce a new thumbnail image.
             new_snapshot ? AUTO_SNAPSHOT_TIME_DELAY : 0.f); // shutter delay if 1st arg is true.
+        previewp->mAutoRefreshSnapshot = new_snapshot && !previewp->mForceUpdateSnapshot; // <FS:Trish/> skips the texture wait floor
         previewp->mForceUpdateSnapshot = false;
     }
 
@@ -876,8 +891,9 @@ bool LLSnapshotLivePreview::waitForTextures()
 
     // Texture stats are refreshed over several frames, give the desired discard levels time to
     // settle before trusting them
+    // (not for previews that refresh as the camera moves, they would lag a second behind it)
     const F32 elapsed = mTextureWaitTimer.getElapsedTimeF32();
-    if (elapsed < 1.f)
+    if (elapsed < 1.f && !mAutoRefreshSnapshot)
     {
         return true;
     }

@@ -232,8 +232,27 @@ namespace
                gPipeline.mRT == &gPipeline.mMainRT;
     }
 
-    // Reallocates the main view's screen targets at the new scale. The shadow maps are left
-    // alone: scaleMainTarget() keeps their base size at full resolution, so they early out.
+    // Reallocates the main view's screen targets at their logical size; scaleMainTarget() picks
+    // the scale (1 while a snapshot is in progress). The shadow maps are left alone:
+    // scaleMainTarget() keeps their base size at full resolution, so they early out.
+    void reallocate_main(const char* reason)
+    {
+        if (gPipeline.mRT != &gPipeline.mMainRT || gPipeline.mRT->width == 0 || gPipeline.mRT->height == 0)
+        {
+            return; // picked up by the next allocation
+        }
+
+        const F32 old_applied = sAppliedScale;
+        const U32 width = gPipeline.mRT->width;
+        const U32 height = gPipeline.mRT->height;
+        LLTimer timer;
+        gPipeline.releaseScreenBuffers();
+        gPipeline.allocateScreenBuffer(width, height);
+        LL_INFOS("DynamicResolution") << "Scene scale " << old_applied << " -> " << sAppliedScale << " (" << reason << "), "
+                                      << gPipeline.mRT->screen.getWidth() << "x" << gPipeline.mRT->screen.getHeight()
+                                      << ", reallocated in " << timer.getElapsedTimeF32() * 1000.f << " ms" << LL_ENDL;
+    }
+
     void apply_scale(F32 scale, const char* reason)
     {
         scale = llclamp(scale, SCALE_FLOOR, 1.f);
@@ -241,25 +260,11 @@ namespace
         {
             return;
         }
-        const F32 old_scale = sScale;
         sScale = scale;
         sLastChange = now_seconds();
         ++sGeneration;
         reset_smoothing();
-
-        if (gPipeline.mRT != &gPipeline.mMainRT || gPipeline.mRT->width == 0 || gPipeline.mRT->height == 0)
-        {
-            return; // picked up by the next allocation
-        }
-
-        const U32 width = gPipeline.mRT->width;
-        const U32 height = gPipeline.mRT->height;
-        LLTimer timer;
-        gPipeline.releaseScreenBuffers();
-        gPipeline.allocateScreenBuffer(width, height);
-        LL_INFOS("DynamicResolution") << "Scene scale " << old_scale << " -> " << sScale << " (" << reason << "), "
-                                      << gPipeline.mRT->screen.getWidth() << "x" << gPipeline.mRT->screen.getHeight()
-                                      << ", reallocated in " << timer.getElapsedTimeF32() * 1000.f << " ms" << LL_ENDL;
+        reallocate_main(reason);
     }
 
     void run_controller(F64 now)
@@ -389,6 +394,13 @@ void FSDynamicResolution::beginScene(bool for_snapshot)
     sOpenSlot = -1;
     if (for_snapshot || gCubeSnapshot || sSuspended > 0)
     {
+        // A snapshot renders at full scale. A larger than window snapshot has already
+        // reallocated the targets (at 1, scaleMainTarget forces it while suspended); otherwise
+        // the targets at the reduced scale are reallocated once here, not for every snapshot.
+        if (sSuspended > 0 && !gCubeSnapshot && sAppliedScale < 1.f)
+        {
+            reallocate_main("snapshot");
+        }
         return;
     }
 
@@ -398,8 +410,18 @@ void FSDynamicResolution::beginScene(bool for_snapshot)
         if (gPipeline.mRT == &gPipeline.mMainRT)
         {
             apply_scale(1.f, "off");
+            if (sAppliedScale != sScale)
+            {
+                reallocate_main("off");
+            }
         }
         return;
+    }
+
+    // A snapshot left the targets at full scale: go back to the scale from before it
+    if (sAppliedScale != sScale)
+    {
+        reallocate_main("snapshot done");
     }
 
     const F64 now = now_seconds();
@@ -493,7 +515,15 @@ bool FSDynamicResolution::upscalerReplacesCAS(const LLRenderTarget* src)
     // renderFinalize() asks before the present viewport is set, so compare with the world view
     // rectangle that viewport is made from
     const LLRect& rect = gViewerWindow->getWorldViewRectRaw();
-    return nisPresents(src, rect.getWidth(), rect.getHeight());
+    if (nisPresents(src, rect.getWidth(), rect.getHeight()))
+    {
+        return true;
+    }
+    // The sharpened bilinear upscale (presentShader's second choice) sharpens too: CAS before
+    // it would sharpen twice
+    static LLCachedControl<F32> sharpness(gSavedSettings, "FSRenderDynamicResolutionSharpness", 0.5f);
+    return sharpness > 0.f && sAppliedScale < 1.f && src && gFSDynResUpscaleProgram.isComplete() &&
+           ((S32)src->getWidth() < rect.getWidth() || (S32)src->getHeight() < rect.getHeight());
 }
 
 // static
@@ -536,12 +566,12 @@ F32 FSDynamicResolution::getScale()
     return sAppliedScale;
 }
 
+// Only marks the snapshot: sScale is kept so the scale before it comes back afterwards, and the
+// full scale targets are allocated by the snapshot's own allocateScreenBuffer or, failing that,
+// by beginScene, so a snapshot pays for at most one extra reallocation.
 FSDynamicResolution::SnapshotGuard::SnapshotGuard()
 {
-    if (sSuspended++ == 0 && sScale < 1.f)
-    {
-        apply_scale(1.f, "snapshot");
-    }
+    ++sSuspended;
 }
 
 FSDynamicResolution::SnapshotGuard::~SnapshotGuard()
