@@ -1921,7 +1921,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>0.1</real>
+      <real>0.025</real>
     </map>
     <key>AdminMenu</key>
     <map>

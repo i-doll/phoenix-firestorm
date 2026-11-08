@@ -184,12 +184,18 @@ enum EPacketHeaderLayout
 
 
 const S32 LL_DEFAULT_RELIABLE_RETRIES = 3;
-const F32Seconds LL_MINIMUM_RELIABLE_TIMEOUT_SECONDS(1.f);
+// <FS:Trish> Resend lost reliable packets sooner. Averaged ping is clamped to
+// at least LL_AVERAGED_PING_MIN (100 ms), so the timeout never drops below
+// 0.4 s, and resends back off exponentially (see LLCircuitData).
+//const F32Seconds LL_MINIMUM_RELIABLE_TIMEOUT_SECONDS(1.f);
+const F32Seconds LL_MINIMUM_RELIABLE_TIMEOUT_SECONDS(0.4f);
+// </FS:Trish>
 const F32Seconds LL_MINIMUM_SEMIRELIABLE_TIMEOUT_SECONDS(1.f);
 const F32Seconds LL_PING_BASED_TIMEOUT_DUMMY(0.0f);
 
 const F32 LL_SEMIRELIABLE_TIMEOUT_FACTOR    = 5.f;      // averaged ping
-const F32 LL_RELIABLE_TIMEOUT_FACTOR        = 5.f;      // averaged ping
+//const F32 LL_RELIABLE_TIMEOUT_FACTOR        = 5.f;      // averaged ping
+const F32 LL_RELIABLE_TIMEOUT_FACTOR        = 4.f;      // averaged ping // <FS:Trish/>
 const F32 LL_LOST_TIMEOUT_FACTOR            = 16.f;     // averaged ping for marking packets "Lost"
 const F32Seconds LL_MAX_LOST_TIMEOUT(5.f);              // Maximum amount of time before considering something "lost"
 

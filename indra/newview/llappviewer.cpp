@@ -7431,7 +7431,10 @@ void LLAppViewer::idleNetwork()
 
         // Handle per-frame message system processing.
 
-        static LLCachedControl<F32> ack_collection_time(gSavedSettings, "AckCollectTime", 0.1f);
+        // <FS:Trish> Send acks sooner so the sims resend less
+        //static LLCachedControl<F32> ack_collection_time(gSavedSettings, "AckCollectTime", 0.1f);
+        static LLCachedControl<F32> ack_collection_time(gSavedSettings, "AckCollectTime", 0.025f);
+        // </FS:Trish>
         lmc.processAcks(ack_collection_time());
     }
     add(LLStatViewer::NUM_NEW_OBJECTS, gObjectList.mNumNewObjects);

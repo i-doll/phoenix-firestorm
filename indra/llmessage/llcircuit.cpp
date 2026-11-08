@@ -361,7 +361,19 @@ S32 LLCircuitData::resendUnackedPackets(const F64Seconds now)
             // The new method, retry time based on ping
             if (packetp->mPingBasedRetry)
             {
-                packetp->mExpirationTime = now + llmax(LL_MINIMUM_RELIABLE_TIMEOUT_SECONDS, F32Seconds(LL_RELIABLE_TIMEOUT_FACTOR * getPingDelayAveraged()));
+                // <FS:Trish> Back off exponentially (capped) so the lower first
+                // timeout doesn't shorten the total time a reliable packet
+                // survives a network stall: 0.4 + 0.8 + 1.6 + 3.2 s at best,
+                // versus 4 x 1 s before.
+                //packetp->mExpirationTime = now + llmax(LL_MINIMUM_RELIABLE_TIMEOUT_SECONDS, F32Seconds(LL_RELIABLE_TIMEOUT_FACTOR * getPingDelayAveraged()));
+                F32Seconds base_timeout = llmax(LL_MINIMUM_RELIABLE_TIMEOUT_SECONDS, F32Seconds(LL_RELIABLE_TIMEOUT_FACTOR * getPingDelayAveraged()));
+                F32Seconds next_timeout = llmin(llmax(base_timeout, packetp->mTimeout * 2.f), LL_MAX_LOST_TIMEOUT);
+                if (packetp->mTimeout >= F32Seconds(0.f)) // negative is a debug marker, keep it
+                {
+                    packetp->mTimeout = next_timeout;
+                }
+                packetp->mExpirationTime = now + next_timeout;
+                // </FS:Trish>
             }
             else
             {
