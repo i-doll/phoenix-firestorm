@@ -73,6 +73,13 @@ public:
 
     // default material for when assets don't have one
     static LLFetchedGLTFMaterial sDefault;
+
+    // <FS:Trish> FSPerfGPUDrivenPBR (fsgpudrivenpbr.cpp): this material's record in the pass being
+    // built, valid while mFSGDDPass is that pass's number, so finding it needs no map
+    mutable U32 mFSGDDPass = 0;
+    mutable U32 mFSGDDIndex = 0;
+    mutable bool mFSGDDBindless = false;
+    // </FS:Trish>
 protected:
     // Lifetime management
 

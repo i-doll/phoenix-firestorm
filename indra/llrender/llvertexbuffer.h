@@ -349,6 +349,23 @@ public:
     // indices of this buffer into shared arenas on the GPU.
     U32 getFSGLBuffer() const               { return mGLBuffer; }
     U32 getFSGLIndices() const              { return mGLIndices; }
+    // <FS:Trish> The GPU-driven arenas (newview/fsgddarena.cpp) remember this buffer's entry here, so
+    // a lookup is a pointer read instead of a hash map search. The arena's epoch moves on whenever it
+    // drops entries, which makes every remembered one stale.
+    static constexpr U32 FS_ARENA_SLOTS = 2;
+    void* getFSArenaEntry(U32 slot, U32 epoch) const
+    {
+        return slot < FS_ARENA_SLOTS && mFSArenaEpoch[slot] == epoch ? mFSArenaEntry[slot] : nullptr;
+    }
+    void setFSArenaEntry(U32 slot, void* entry, U32 epoch) const
+    {
+        if (slot < FS_ARENA_SLOTS)
+        {
+            mFSArenaEntry[slot] = entry;
+            mFSArenaEpoch[slot] = epoch;
+        }
+    }
+    // </FS:Trish>
     U32 getFSIndicesType() const            { return mIndicesType; }
     bool isFSMapped() const                 { return mMapped; }
     // </FS:Trish>
@@ -374,6 +391,8 @@ protected:
     std::vector<MappedRegion> mMappedIndexRegions;   // list of mMappedIndexData byte ranges that must be sent to GL
 
     U32     mFSContentSerial;   // <FS:Trish/> see getFSContentSerial()
+    mutable void* mFSArenaEntry[FS_ARENA_SLOTS] = {};   // <FS:Trish/> see getFSArenaEntry()
+    mutable U32   mFSArenaEpoch[FS_ARENA_SLOTS] = {};
 
     // <FS:Trish> FSPerfVertexArrayObjects
     // six, replaced least recently used first: a buffer drawn with more attribute masks than it

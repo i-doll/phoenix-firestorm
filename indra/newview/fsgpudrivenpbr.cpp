@@ -208,7 +208,7 @@ namespace
         U32 mIndex;
         bool mBindless;
     };
-    std::unordered_map<const LLFetchedGLTFMaterial*, MaterialInfo> sMaterialIndex;
+    U32 sMaterialPass = 1;  // the pass being built; materials remember their record by it (mFSGDDPass)
 
     // stats, every 10 seconds with FSPerfGPUDrivenPBRVerify or FSPerfGPUDrivenPBRStats
     U64 sStatBatches = 0;
@@ -771,12 +771,11 @@ namespace
 
     // The material's record: what LLFetchedGLTFMaterial::bind(nullptr) sets in the deferred pass, and, when
     // bindless is wanted and every texture can have a handle, the handles of what it would bind.
-    const MaterialInfo& material_index(LLFetchedGLTFMaterial* mat, bool want_bindless, U32 frame)
+    MaterialInfo material_index(LLFetchedGLTFMaterial* mat, bool want_bindless, U32 frame)
     {
-        auto it = sMaterialIndex.find(mat);
-        if (it != sMaterialIndex.end())
+        if (mat->mFSGDDPass == sMaterialPass)
         {
-            return it->second;
+            return { mat->mFSGDDIndex, mat->mFSGDDBindless };
         }
         Material record = {};
         static const LLGLTFMaterial::TextureInfo infos[4] = { LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR,
@@ -829,7 +828,10 @@ namespace
         }
         const MaterialInfo info = { (U32)sMaterials.size(), bindless };
         sMaterials.push_back(record);
-        return sMaterialIndex.emplace(mat, info).first->second;
+        mat->mFSGDDPass = sMaterialPass;
+        mat->mFSGDDIndex = info.mIndex;
+        mat->mFSGDDBindless = info.mBindless;
+        return info;
     }
 
     void count(U32 reason)
@@ -848,7 +850,10 @@ namespace
         sCommandParams.clear();
         sMatrixIndex.clear();
         sTexMatrixIndex.clear();
-        sMaterialIndex.clear();
+        if (++sMaterialPass == 0)
+        {
+            sMaterialPass = 1; // 0 is what a material starts with
+        }
 
         const U32 frame = LLFrameTimer::getFrameCount();
         sArena.beginFrame(frame);
@@ -901,7 +906,7 @@ namespace
             // the media override replaces the base colour and emissive textures (bind()), so such a batch binds
             // its textures even when its material has handles
             LLViewerTexture* media = params.mTexture.get();
-            const MaterialInfo& info = material_index(mat, bindless, frame);
+            const MaterialInfo info = material_index(mat, bindless, frame);
             EOpKind kind = OP_BOUND;
             if (info.mBindless && !media)
             {

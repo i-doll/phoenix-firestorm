@@ -139,6 +139,8 @@ FSGDDArena::FSGDDArena(const char* name, const std::vector<U32>& types, const ch
     , mDefaultMB(default_mb)
     , mIndexShare(llmax(index_share, 2u))
 {
+    static U32 s_next_slot = 0;
+    mSlot = s_next_slot++; // past LLVertexBuffer::FS_ARENA_SLOTS: no cache, the map alone
     mVBs.resize(mTypes.size(), 0);
     for (U32 type : mTypes)
     {
@@ -241,6 +243,7 @@ void FSGDDArena::evict(U32 frame, U32 unused_frames)
             mVerts.release(it->second.mVertex, it->second.mNumVerts);
             mIndices.release(it->second.mIndex, it->second.mNumIndices);
             it = mEntries.erase(it);
+            ++mEpoch;
         }
         else
         {
@@ -334,13 +337,18 @@ void FSGDDArena::beginFrame(U32 frame)
 
 FSGDDArenaEntry* FSGDDArena::peek(const LLVertexBuffer* vb)
 {
-    auto it = mEntries.find(vb);
-    if (it == mEntries.end() || it->second.mSerial != vb->getFSContentSerial() ||
-        it->second.mNumVerts != vb->getNumVerts() || it->second.mNumIndices != vb->getNumIndices())
+    FSGDDArenaEntry* entry = static_cast<FSGDDArenaEntry*>(vb->getFSArenaEntry(mSlot, mEpoch));
+    if (!entry)
+    {
+        auto it = mEntries.find(vb);
+        entry = it != mEntries.end() ? &it->second : nullptr;
+    }
+    if (!entry || entry->mSerial != vb->getFSContentSerial() ||
+        entry->mNumVerts != vb->getNumVerts() || entry->mNumIndices != vb->getNumIndices())
     {
         return nullptr;
     }
-    return &it->second;
+    return entry;
 }
 
 FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
@@ -367,6 +375,15 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
     }
 
     const U32 serial = vb->getFSContentSerial();
+    // The entry the buffer remembers (map nodes don't move, and any erase moves the epoch on)
+    if (FSGDDArenaEntry* cached = static_cast<FSGDDArenaEntry*>(vb->getFSArenaEntry(mSlot, mEpoch)))
+    {
+        if (cached->mSerial == serial && cached->mNumVerts == vb->getNumVerts() && cached->mNumIndices == vb->getNumIndices())
+        {
+            cached->mLastFrame = frame;
+            return cached;
+        }
+    }
     auto it = mEntries.find(vb);
     if (it != mEntries.end())
     {
@@ -374,12 +391,14 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
         if (entry.mSerial == serial && entry.mNumVerts == vb->getNumVerts() && entry.mNumIndices == vb->getNumIndices())
         {
             entry.mLastFrame = frame;
+            vb->setFSArenaEntry(mSlot, &entry, mEpoch);
             return &entry;
         }
         // changed since it was copied (or another buffer at the same address)
         mVerts.release(entry.mVertex, entry.mNumVerts);
         mIndices.release(entry.mIndex, entry.mNumIndices);
         mEntries.erase(it);
+        ++mEpoch;
     }
 
     if (mCopies >= FS_GDD_COPIES_PER_FRAME)
@@ -422,7 +441,9 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
     }
     ++mCopies;
     ++mUploads;
-    return &(mEntries[vb] = entry);
+    FSGDDArenaEntry* stored = &(mEntries[vb] = entry);
+    vb->setFSArenaEntry(mSlot, stored, mEpoch);
+    return stored;
 }
 
 void FSGDDArena::bindForDraw(U32 attrib_mask)
@@ -517,6 +538,7 @@ void FSGDDArena::releaseGL()
     mVerts.reset();
     mIndices.reset();
     mEntries.clear();
+    ++mEpoch;
     mCopies = 0;
     mFullFrame = U32_MAX;
     mEvictFrame = U32_MAX;

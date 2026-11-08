@@ -142,6 +142,8 @@ private:
     U32 mFullFrame = U32_MAX;       // frame an allocation found the arena full
     U32 mEvictFrame = U32_MAX;      // frame an allocation last evicted, at most once per frame
     U32 mLimitsFrame = U32_MAX;     // frame mMaxVerts and mMaxIndices were read from the setting
+    U32 mSlot = U32_MAX;            // this arena's slot in LLVertexBuffer's entry cache
+    U32 mEpoch = 1;                 // moves on whenever entries are dropped (buffers' cached entries go stale)
     U32 mMaxVerts = 0;
     U32 mMaxIndices = 0;
     U32 mUploads = 0;               // since clearCounts
