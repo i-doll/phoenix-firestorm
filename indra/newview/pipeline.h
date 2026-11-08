@@ -324,7 +324,10 @@ public:
     // alpha masked casters instead of drawing them. After the last cascade each recorded batch is drawn
     // once, instanced into the atlas viewports of the cascades that recorded it, and each cascade's atlas
     // cell is merged into its shadow map.
-    enum EFSShadowSPKind { FS_SHADOW_SP_OPAQUE = 0, FS_SHADOW_SP_ALPHA_MASK, FS_SHADOW_SP_FULLBRIGHT_MASK,
+    // FS_SHADOW_SP_GLTF records the opaque GLTF casters, those with double sided materials go to
+    // FS_SHADOW_SP_GLTF_DOUBLE_SIDED (drawn without face culling).
+    enum EFSShadowSPKind { FS_SHADOW_SP_OPAQUE = 0, FS_SHADOW_SP_GLTF, FS_SHADOW_SP_GLTF_DOUBLE_SIDED,
+                           FS_SHADOW_SP_ALPHA_MASK, FS_SHADOW_SP_FULLBRIGHT_MASK,
                            FS_SHADOW_SP_MATERIAL_MASK, FS_SHADOW_SP_KINDS };
     struct FSShadowSPEntry
     {

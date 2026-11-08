@@ -12965,7 +12965,27 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
         }
         // </FS:Trish>
 
-        renderGLTFObjects(LLRenderPass::PASS_GLTF_PBR, false, rigged);
+        // <FS:Trish> FSPerfShadowSinglePass: the opaque GLTF batches are recorded too, only the
+        // GLTF scene manager's objects are drawn per cascade
+        //renderGLTFObjects(LLRenderPass::PASS_GLTF_PBR, false, rigged);
+        if (fsShadowSinglePassRecord(FS_SHADOW_SP_GLTF, rigged))
+        {
+            gGL.loadMatrix(gGLModelView);
+            gGLLastMatrix = NULL;
+            if (!rigged)
+            {
+                LL::GLTFSceneManager::instance().renderOpaque();
+            }
+            else
+            {
+                LL::GLTFSceneManager::instance().render(true, true);
+            }
+        }
+        else
+        {
+            renderGLTFObjects(LLRenderPass::PASS_GLTF_PBR, false, rigged);
+        }
+        // </FS:Trish>
 
         gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
     }

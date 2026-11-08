@@ -44,8 +44,9 @@
 // the minimum caster size of each cascade, the far cascade throttle (skipped cascades never record) and
 // the static cache (cached cascades record only their dynamic opaque casters) keep working unchanged.
 // Coloured shadows test translucent casters against the cascade's finished depth, so for those
-// cascades that pass runs after the merge. GLTF, alpha blended, grass, avatar, terrain and tree casters
-// keep their per cascade passes. Probe captures and projector shadows are untouched.
+// cascades that pass runs after the merge. Opaque GLTF casters are recorded too (those with double sided
+// materials in a list drawn without face culling), as they use the same depth only program. GLTF alpha
+// masked, alpha blended, grass, avatar, terrain and tree casters keep their per cascade passes. Probe captures and projector shadows are untouched.
 //
 // The consumers of the shadow maps (shadowUtil.glsl, PCSS, blur, coloured shadows, cloud and contact
 // shadows) read the same textures as before and are unchanged. The cost is the atlas (one more depth
@@ -386,6 +387,7 @@ bool LLPipeline::fsShadowSinglePassRecord(U32 kind, bool rigged, const U32* type
 
     static const U32 alpha_mask[] = { LLRenderPass::PASS_ALPHA_MASK };
     static const U32 fullbright_mask[] = { LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK };
+    static const U32 gltf[] = { LLRenderPass::PASS_GLTF_PBR };
     // the order renderShadow draws them in
     static const U32 material_mask[] = { LLRenderPass::PASS_NORMSPEC_MASK, LLRenderPass::PASS_MATERIAL_ALPHA_MASK,
                                          LLRenderPass::PASS_SPECMAP_MASK, LLRenderPass::PASS_NORMMAP_MASK };
@@ -396,6 +398,7 @@ bool LLPipeline::fsShadowSinglePassRecord(U32 kind, bool rigged, const U32* type
             case FS_SHADOW_SP_ALPHA_MASK:       types = alpha_mask;      type_count = LL_ARRAY_SIZE(alpha_mask);      break;
             case FS_SHADOW_SP_FULLBRIGHT_MASK:  types = fullbright_mask; type_count = LL_ARRAY_SIZE(fullbright_mask); break;
             case FS_SHADOW_SP_MATERIAL_MASK:    types = material_mask;   type_count = LL_ARRAY_SIZE(material_mask);   break;
+            case FS_SHADOW_SP_GLTF:             types = gltf;            type_count = LL_ARRAY_SIZE(gltf);            break;
             default:                            return false;
         }
     }
@@ -405,6 +408,9 @@ bool LLPipeline::fsShadowSinglePassRecord(U32 kind, bool rigged, const U32* type
     const U32 filter = (kind == FS_SHADOW_SP_OPAQUE && !rigged) ? mFSShadowCasterFilter : (U32)FS_SHADOW_ALL;
     const U32 bit = 1u << mFSShadowSPCascade;
     std::vector<FSShadowSPEntry>& list = mFSShadowSPEntries[kind][rigged ? 1 : 0];
+    // GLTF casters with double sided materials go to their own list, drawn without face culling
+    std::vector<FSShadowSPEntry>* double_sided = kind == FS_SHADOW_SP_GLTF ?
+        &mFSShadowSPEntries[FS_SHADOW_SP_GLTF_DOUBLE_SIDED][rigged ? 1 : 0] : nullptr;
     for (U32 t = 0; t < type_count; ++t)
     {
         const U32 type = rigged ? types[t] + 1 : types[t];   // rigged batches are in the next pass map
@@ -417,6 +423,11 @@ bool LLPipeline::fsShadowSinglePassRecord(U32 kind, bool rigged, const U32* type
             }
             if (filter != FS_SHADOW_ALL && fsIsStaticShadowBatch(params) != (filter == FS_SHADOW_STATIC))
             {
+                continue;
+            }
+            if (double_sided && params->mGLTFMaterial.notNull() && params->mGLTFMaterial->mDoubleSided)
+            {
+                double_sided->push_back({ params, params->mVertexBuffer, bit });
                 continue;
             }
             list.push_back({ params, params->mVertexBuffer, bit });
@@ -507,7 +518,7 @@ void LLPipeline::fsShadowSinglePassFinish()
             // grouped by cascade set, then by what saves state changes: model matrix and buffer (opaque, where
             // runs of index ranges merge), skin palette (rigged), texture (alpha masked)
             const bool rigged = r == 1;
-            const bool opaque = kind == FS_SHADOW_SP_OPAQUE;
+            const bool opaque = kind <= FS_SHADOW_SP_GLTF_DOUBLE_SIDED; // depth only, untextured
             std::sort(list.begin(), list.end(), [rigged, opaque](const FSShadowSPEntry& a, const FSShadowSPEntry& b)
             {
                 if (a.mMask != b.mMask)
@@ -611,7 +622,8 @@ void LLPipeline::fsShadowSinglePassFinish()
                     continue;
                 }
                 const bool rigged = r == 1;
-                const bool opaque = kind == FS_SHADOW_SP_OPAQUE;
+                const bool opaque = kind <= FS_SHADOW_SP_GLTF_DOUBLE_SIDED; // depth only, untextured
+                LLGLDisable no_cull(kind == FS_SHADOW_SP_GLTF_DOUBLE_SIDED ? GL_CULL_FACE : 0);
                 if (opaque && !rigged)
                 {   // FSPerfGPUDrivenDraws: what is in the position arena goes out as one multi-draw per cascade set,
                     // the rest stays in the list for the loop below
