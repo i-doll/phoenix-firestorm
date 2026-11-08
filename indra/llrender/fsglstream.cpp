@@ -87,6 +87,19 @@ namespace
     std::atomic<bool> sForeignLogged[FSGL_COUNT];
     bool sSyncLogged[FSGL_COUNT] = {};          // main thread
     U32 sSyncCount[FSGL_COUNT] = {};            // main thread
+    U32 sCallCount[FSGL_COUNT] = {};            // main thread: calls recorded, per entry point
+    U64 sCallBytes[FSGL_COUNT] = {};            // main thread: what they recorded
+    U32 sSkipCount[FSGL_COUNT] = {};            // main thread: calls dropped as changing nothing
+    U64 sStatSkips = 0;                         // main thread
+
+    // A call that would set state to what it already is: not recorded at all
+    bool sFilter = true;                        // main thread: FSRenderThreadFilter
+
+    inline void noteSkip(int id)
+    {
+        ++sSkipCount[id];
+        ++sStatSkips;
+    }
 
     template <typename Fn>
     inline Fn realFn(int id)
@@ -421,6 +434,8 @@ namespace
         {
             U8* p = allocRecord(&execTuple<ID, Fn, T>, sizeof(T));
             new (p) T(a...);
+            ++sCallCount[ID];
+            sCallBytes[ID] += sizeof(RecHdr) + align16(sizeof(T));
             commitRecord();
         }
 
@@ -480,6 +495,8 @@ namespace
             {
                 memcpy(p + align16(sizeof(T)), src, blob);
             }
+            ++sCallCount[ID];
+            sCallBytes[ID] += sizeof(RecHdr) + align16(align16(sizeof(T)) + blob);
             commitRecord();
         }
     };
@@ -570,6 +587,20 @@ namespace
         GLboolean mColorMask[4] = {};
         bool mDepthMaskOk = false;
         GLboolean mDepthMask = GL_TRUE;
+        bool mProgramOk = false;
+        GLuint mProgram = 0;
+        bool mDrawFBOk = false;
+        GLuint mDrawFB = 0;
+        bool mReadFBOk = false;
+        GLuint mReadFB = 0;
+        bool mBlendOk = false;
+        GLenum mBlend[4] = {};                      // src rgb, dst rgb, src alpha, dst alpha
+        bool mDepthFuncOk = false;
+        GLenum mDepthFunc = GL_LESS;
+        bool mCullFaceOk = false;
+        GLenum mCullFace = GL_BACK;
+        std::unordered_map<U64, GLuint> mTex;      // (unit << 32 | target) -> texture, where known
+        std::unordered_map<GLuint, GLuint> mSampler; // unit -> sampler, where known
         bool mPixelStoreOk[NUM_PIXEL_STORE] = {};
         GLint mPixelStore[NUM_PIXEL_STORE] = {};
         bool mBindOk[B_COUNT] = {};
@@ -611,6 +642,31 @@ namespace
         sSh.mColorMaskOk = true;
         getB(GL_DEPTH_WRITEMASK, &sSh.mDepthMask);
         sSh.mDepthMaskOk = true;
+        {
+            GLint v = 0;
+            getI(GL_CURRENT_PROGRAM, &v);
+            sSh.mProgram = (GLuint)v;
+            sSh.mProgramOk = true;
+            getI(GL_DRAW_FRAMEBUFFER_BINDING, &v);
+            sSh.mDrawFB = (GLuint)v;
+            sSh.mDrawFBOk = true;
+            getI(GL_READ_FRAMEBUFFER_BINDING, &v);
+            sSh.mReadFB = (GLuint)v;
+            sSh.mReadFBOk = true;
+            const GLenum blend_pnames[4] = { GL_BLEND_SRC_RGB, GL_BLEND_DST_RGB, GL_BLEND_SRC_ALPHA, GL_BLEND_DST_ALPHA };
+            for (int i = 0; i < 4; ++i)
+            {
+                getI(blend_pnames[i], &v);
+                sSh.mBlend[i] = (GLenum)v;
+            }
+            sSh.mBlendOk = true;
+            getI(GL_DEPTH_FUNC, &v);
+            sSh.mDepthFunc = (GLenum)v;
+            sSh.mDepthFuncOk = true;
+            getI(GL_CULL_FACE_MODE, &v);
+            sSh.mCullFace = (GLenum)v;
+            sSh.mCullFaceOk = true;
+        }
         for (int i = 0; i < NUM_PIXEL_STORE; ++i)
         {
             getI(PIXEL_STORE_PNAMES[i], &sSh.mPixelStore[i]);
@@ -814,6 +870,11 @@ namespace
         static void APIENTRY call(GLint x, GLint y, GLsizei w, GLsizei h)
         {
             if (!tRecording) { P::passthrough(x, y, w, h); return; }
+            if (sFilter && (sSh.mViewportOk && sSh.mViewport[0] == x && sSh.mViewport[1] == y && sSh.mViewport[2] == w && sSh.mViewport[3] == h))
+            {
+                noteSkip(FSGL_ID_glViewport);
+                return;
+            }
             sSh.mViewport[0] = x; sSh.mViewport[1] = y; sSh.mViewport[2] = w; sSh.mViewport[3] = h;
             sSh.mViewportOk = true;
             P::record(x, y, w, h);
@@ -824,6 +885,11 @@ namespace
         static void APIENTRY call(GLint x, GLint y, GLsizei w, GLsizei h)
         {
             if (!tRecording) { P::passthrough(x, y, w, h); return; }
+            if (sFilter && (sSh.mScissorOk && sSh.mScissor[0] == x && sSh.mScissor[1] == y && sSh.mScissor[2] == w && sSh.mScissor[3] == h))
+            {
+                noteSkip(FSGL_ID_glScissor);
+                return;
+            }
             sSh.mScissor[0] = x; sSh.mScissor[1] = y; sSh.mScissor[2] = w; sSh.mScissor[3] = h;
             sSh.mScissorOk = true;
             P::record(x, y, w, h);
@@ -883,6 +949,11 @@ namespace
         static void APIENTRY call(GLfloat factor, GLfloat units)
         {
             if (!tRecording) { P::passthrough(factor, units); return; }
+            if (sFilter && (sSh.mPolyOk && sSh.mPoly[0] == factor && sSh.mPoly[1] == units))
+            {
+                noteSkip(FSGL_ID_glPolygonOffset);
+                return;
+            }
             sSh.mPoly[0] = factor; sSh.mPoly[1] = units; sSh.mPolyOk = true;
             P::record(factor, units);
         }
@@ -901,6 +972,11 @@ namespace
         static void APIENTRY call(GLenum tex)
         {
             if (!tRecording) { P::passthrough(tex); return; }
+            if (sFilter && (sSh.mActiveTexOk && sSh.mActiveTex == (GLint)tex))
+            {
+                noteSkip(FSGL_ID_glActiveTexture);
+                return;
+            }
             sSh.mActiveTex = (GLint)tex; sSh.mActiveTexOk = true;
             P::record(tex);
         }
@@ -910,6 +986,11 @@ namespace
         static void APIENTRY call(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
         {
             if (!tRecording) { P::passthrough(r, g, b, a); return; }
+            if (sFilter && (sSh.mClearColorOk && sSh.mClearColor[0] == r && sSh.mClearColor[1] == g && sSh.mClearColor[2] == b && sSh.mClearColor[3] == a))
+            {
+                noteSkip(FSGL_ID_glClearColor);
+                return;
+            }
             sSh.mClearColor[0] = r; sSh.mClearColor[1] = g; sSh.mClearColor[2] = b; sSh.mClearColor[3] = a;
             sSh.mClearColorOk = true;
             P::record(r, g, b, a);
@@ -931,6 +1012,12 @@ namespace
         static void APIENTRY call(GLboolean r, GLboolean g, GLboolean b, GLboolean a)
         {
             if (!tRecording) { P::passthrough(r, g, b, a); return; }
+            if (sFilter && (sSh.mColorMaskOk && sSh.mColorMask[0] == (r ? GL_TRUE : GL_FALSE) && sSh.mColorMask[1] == (g ? GL_TRUE : GL_FALSE) &&
+                sSh.mColorMask[2] == (b ? GL_TRUE : GL_FALSE) && sSh.mColorMask[3] == (a ? GL_TRUE : GL_FALSE)))
+            {
+                noteSkip(FSGL_ID_glColorMask);
+                return;
+            }
             sSh.mColorMask[0] = r ? GL_TRUE : GL_FALSE; sSh.mColorMask[1] = g ? GL_TRUE : GL_FALSE;
             sSh.mColorMask[2] = b ? GL_TRUE : GL_FALSE; sSh.mColorMask[3] = a ? GL_TRUE : GL_FALSE;
             sSh.mColorMaskOk = true;
@@ -951,6 +1038,11 @@ namespace
         static void APIENTRY call(GLboolean flag)
         {
             if (!tRecording) { P::passthrough(flag); return; }
+            if (sFilter && (sSh.mDepthMaskOk && sSh.mDepthMask == (flag ? GL_TRUE : GL_FALSE)))
+            {
+                noteSkip(FSGL_ID_glDepthMask);
+                return;
+            }
             sSh.mDepthMask = flag ? GL_TRUE : GL_FALSE;
             sSh.mDepthMaskOk = true;
             P::record(flag);
@@ -994,6 +1086,12 @@ namespace
         static void APIENTRY call(GLenum cap)
         {
             if (!tRecording) { P::passthrough(cap); return; }
+            auto it = sSh.mCaps.find(cap);
+            if (sFilter && (it != sSh.mCaps.end() && it->second))
+            {
+                noteSkip(FSGL_ID_glEnable);
+                return;
+            }
             sSh.mCaps[cap] = true;
             P::record(cap);
         }
@@ -1003,6 +1101,12 @@ namespace
         static void APIENTRY call(GLenum cap)
         {
             if (!tRecording) { P::passthrough(cap); return; }
+            auto it = sSh.mCaps.find(cap);
+            if (sFilter && (it != sSh.mCaps.end() && !it->second))
+            {
+                noteSkip(FSGL_ID_glDisable);
+                return;
+            }
             sSh.mCaps[cap] = false;
             P::record(cap);
         }
@@ -1047,6 +1151,12 @@ namespace
             {
                 if (sSh.mVAOOk)
                 {
+                    auto it = sSh.mEBO.find(sSh.mVAO);
+                    if (sFilter && (it != sSh.mEBO.end() && it->second == buffer))
+                    {
+                        noteSkip(FSGL_ID_glBindBuffer);
+                        return;
+                    }
                     sSh.mEBO[sSh.mVAO] = buffer;
                 }
             }
@@ -1055,6 +1165,11 @@ namespace
                 const int slot = bindSlot(target);
                 if (slot >= 0)
                 {
+                    if (sFilter && (sSh.mBindOk[slot] && sSh.mBind[slot] == buffer))
+                    {
+                        noteSkip(FSGL_ID_glBindBuffer);
+                        return;
+                    }
                     sSh.mBind[slot] = buffer;
                     sSh.mBindOk[slot] = true;
                 }
@@ -1067,6 +1182,11 @@ namespace
         static void APIENTRY call(GLuint vao)
         {
             if (!tRecording) { P::passthrough(vao); return; }
+            if (sFilter && (sSh.mVAOOk && sSh.mVAO == vao))
+            {
+                noteSkip(FSGL_ID_glBindVertexArray);
+                return;
+            }
             sSh.mVAO = vao;
             sSh.mVAOOk = true;
             P::record(vao);
@@ -1083,6 +1203,292 @@ namespace
     FSGL_END
 
     //------------------------------------------------------------------------
+    // More tracked state: bindings and render state set far more often than changed
+
+    FSGL_BEGIN(glUseProgram)
+        static void APIENTRY call(GLuint program)
+        {
+            if (!tRecording) { P::passthrough(program); return; }
+            // a relinked program in use runs its new code without being used again, so the
+            // same name is always the same state
+            if (sFilter && (sSh.mProgramOk && sSh.mProgram == program))
+            {
+                noteSkip(FSGL_ID_glUseProgram);
+                return;
+            }
+            sSh.mProgram = program;
+            sSh.mProgramOk = true;
+            P::record(program);
+        }
+    FSGL_END
+
+    inline U64 texKey(GLuint unit, GLenum target)
+    {
+        return ((U64)unit << 32) | (U64)target;
+    }
+
+    FSGL_BEGIN(glBindTexture)
+        static void APIENTRY call(GLenum target, GLuint texture)
+        {
+            if (!tRecording) { P::passthrough(target, texture); return; }
+            if (sSh.mActiveTexOk)
+            {
+                const U64 key = texKey((GLuint)(sSh.mActiveTex - GL_TEXTURE0), target);
+                auto it = sSh.mTex.find(key);
+                if (sFilter && (it != sSh.mTex.end() && it->second == texture))
+                {
+                    noteSkip(FSGL_ID_glBindTexture);
+                    return;
+                }
+                sSh.mTex[key] = texture;
+            }
+            else
+            {
+                sSh.mTex.clear(); // which unit this binds is unknown
+            }
+            P::record(target, texture);
+        }
+    FSGL_END
+
+    // The target of a DSA bind is the texture's own, which isn't known here: forget the unit
+    void forgetTextureUnit(GLuint unit)
+    {
+        for (auto it = sSh.mTex.begin(); it != sSh.mTex.end();)
+        {
+            it = (GLuint)(it->first >> 32) == unit ? sSh.mTex.erase(it) : std::next(it);
+        }
+    }
+
+    FSGL_BEGIN(glBindTextureUnit)
+        static void APIENTRY call(GLuint unit, GLuint texture)
+        {
+            if (tRecording) { forgetTextureUnit(unit); }
+            P::generic(unit, texture);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glBindTextures)
+        static void APIENTRY call(GLuint first, GLsizei count, const GLuint* textures)
+        {
+            if (!tRecording) { P::passthrough(first, count, textures); return; }
+            for (GLsizei i = 0; i < count; ++i)
+            {
+                forgetTextureUnit(first + (GLuint)i);
+            }
+            FSGL_BLOB(glBindTextures, 2)::record(size_t(count > 0 ? count : 0) * sizeof(GLuint), first, count, textures);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glBindFramebuffer)
+        static void APIENTRY call(GLenum target, GLuint fb)
+        {
+            if (!tRecording) { P::passthrough(target, fb); return; }
+            const bool draw = target == GL_FRAMEBUFFER || target == GL_DRAW_FRAMEBUFFER;
+            const bool read = target == GL_FRAMEBUFFER || target == GL_READ_FRAMEBUFFER;
+            if (sFilter && ((!draw || (sSh.mDrawFBOk && sSh.mDrawFB == fb)) && (!read || (sSh.mReadFBOk && sSh.mReadFB == fb)) && (draw || read)))
+            {
+                noteSkip(FSGL_ID_glBindFramebuffer);
+                return;
+            }
+            if (draw)
+            {
+                sSh.mDrawFB = fb;
+                sSh.mDrawFBOk = true;
+            }
+            if (read)
+            {
+                sSh.mReadFB = fb;
+                sSh.mReadFBOk = true;
+            }
+            P::record(target, fb);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glBindSampler)
+        static void APIENTRY call(GLuint unit, GLuint sampler)
+        {
+            if (!tRecording) { P::passthrough(unit, sampler); return; }
+            auto it = sSh.mSampler.find(unit);
+            if (sFilter && (it != sSh.mSampler.end() && it->second == sampler))
+            {
+                noteSkip(FSGL_ID_glBindSampler);
+                return;
+            }
+            sSh.mSampler[unit] = sampler;
+            P::record(unit, sampler);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glBindSamplers)
+        static void APIENTRY call(GLuint first, GLsizei count, const GLuint* samplers)
+        {
+            if (!tRecording) { P::passthrough(first, count, samplers); return; }
+            for (GLsizei i = 0; i < count; ++i)
+            {
+                sSh.mSampler.erase(first + (GLuint)i);
+            }
+            FSGL_BLOB(glBindSamplers, 2)::record(size_t(count > 0 ? count : 0) * sizeof(GLuint), first, count, samplers);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glBlendFuncSeparate)
+        static void APIENTRY call(GLenum src_rgb, GLenum dst_rgb, GLenum src_a, GLenum dst_a)
+        {
+            if (!tRecording) { P::passthrough(src_rgb, dst_rgb, src_a, dst_a); return; }
+            if (sFilter && (sSh.mBlendOk && sSh.mBlend[0] == src_rgb && sSh.mBlend[1] == dst_rgb && sSh.mBlend[2] == src_a && sSh.mBlend[3] == dst_a))
+            {
+                noteSkip(FSGL_ID_glBlendFuncSeparate);
+                return;
+            }
+            sSh.mBlend[0] = src_rgb; sSh.mBlend[1] = dst_rgb; sSh.mBlend[2] = src_a; sSh.mBlend[3] = dst_a;
+            sSh.mBlendOk = true;
+            P::record(src_rgb, dst_rgb, src_a, dst_a);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glBlendFunc)
+        static void APIENTRY call(GLenum src, GLenum dst)
+        {
+            if (!tRecording) { P::passthrough(src, dst); return; }
+            if (sFilter && (sSh.mBlendOk && sSh.mBlend[0] == src && sSh.mBlend[1] == dst && sSh.mBlend[2] == src && sSh.mBlend[3] == dst))
+            {
+                noteSkip(FSGL_ID_glBlendFunc);
+                return;
+            }
+            sSh.mBlend[0] = src; sSh.mBlend[1] = dst; sSh.mBlend[2] = src; sSh.mBlend[3] = dst;
+            sSh.mBlendOk = true;
+            P::record(src, dst);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glDepthFunc)
+        static void APIENTRY call(GLenum func)
+        {
+            if (!tRecording) { P::passthrough(func); return; }
+            if (sFilter && (sSh.mDepthFuncOk && sSh.mDepthFunc == func))
+            {
+                noteSkip(FSGL_ID_glDepthFunc);
+                return;
+            }
+            sSh.mDepthFunc = func;
+            sSh.mDepthFuncOk = true;
+            P::record(func);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glCullFace)
+        static void APIENTRY call(GLenum mode)
+        {
+            if (!tRecording) { P::passthrough(mode); return; }
+            if (sFilter && (sSh.mCullFaceOk && sSh.mCullFace == mode))
+            {
+                noteSkip(FSGL_ID_glCullFace);
+                return;
+            }
+            sSh.mCullFace = mode;
+            sSh.mCullFaceOk = true;
+            P::record(mode);
+        }
+    FSGL_END
+
+    //------------------------------------------------------------------------
+    // Uniform values of up to 64 bytes (scalars, vectors, matrices, short arrays), per program
+    // and location: setting one to what it already holds isn't recorded. The viewer caches its
+    // scalar uniforms itself, but not vectors and matrices (model and texture matrices per draw).
+    // Every way a uniform of the current program can be set goes through here, and linking,
+    // loading a binary or deleting a program forgets its values (forgetProgram).
+
+    struct UniformValue
+    {
+        U8 mSize = 0;
+        U8 mBytes[72] = {};
+    };
+    std::unordered_map<GLuint, std::unordered_map<GLint, UniformValue>> sUniformValues; // main
+
+    // An array set as a whole: its elements are locations of their own, set one by one elsewhere,
+    // so the whole array isn't cached and every element it covers is forgotten
+    void forgetUniforms(GLint loc, GLsizei count)
+    {
+        if (!sSh.mProgramOk || loc < 0)
+        {
+            return;
+        }
+        auto it = sUniformValues.find(sSh.mProgram);
+        if (it != sUniformValues.end())
+        {
+            for (GLsizei i = 0; i < count; ++i)
+            {
+                it->second.erase(loc + i);
+            }
+        }
+    }
+
+    // True when the uniform at loc of the current program already holds these bytes; otherwise
+    // remembers them (or, when they can't be compared, forgets the location)
+    bool uniformUnchanged(GLint loc, const void* data, size_t bytes, U8 extra = 0)
+    {
+        if (!sSh.mProgramOk || sSh.mProgram == 0 || loc < 0)
+        {
+            return false;
+        }
+        auto& per_program = sUniformValues[sSh.mProgram];
+        if (!data || bytes == 0 || bytes > 64)
+        {
+            per_program.erase(loc);
+            return false;
+        }
+        UniformValue& v = per_program[loc];
+        const U8 size = (U8)(bytes + 1);
+        if (v.mSize == size && v.mBytes[bytes] == extra && memcmp(v.mBytes, data, bytes) == 0)
+        {
+            return true;
+        }
+        v.mSize = size;
+        memcpy(v.mBytes, data, bytes);
+        v.mBytes[bytes] = extra;
+        return false;
+    }
+
+#define FSGL_UNIFORMS(name, T, N) \
+    FSGL_BEGIN(name) \
+        template <typename... A> static void set(GLint loc, A... a) \
+        { \
+            if (!tRecording) { P::passthrough(loc, a...); return; } \
+            const T v[N] = { a... }; \
+            if (sFilter && (uniformUnchanged(loc, v, sizeof(v)))) \
+            { \
+                noteSkip(FSGL_ID_##name); \
+                return; \
+            } \
+            P::record(loc, a...); \
+        }
+
+    FSGL_UNIFORMS(glUniform1f, GLfloat, 1)
+        static void APIENTRY call(GLint loc, GLfloat x) { set(loc, x); }
+    FSGL_END
+    FSGL_UNIFORMS(glUniform2f, GLfloat, 2)
+        static void APIENTRY call(GLint loc, GLfloat x, GLfloat y) { set(loc, x, y); }
+    FSGL_END
+    FSGL_UNIFORMS(glUniform3f, GLfloat, 3)
+        static void APIENTRY call(GLint loc, GLfloat x, GLfloat y, GLfloat z) { set(loc, x, y, z); }
+    FSGL_END
+    FSGL_UNIFORMS(glUniform4f, GLfloat, 4)
+        static void APIENTRY call(GLint loc, GLfloat x, GLfloat y, GLfloat z, GLfloat w) { set(loc, x, y, z, w); }
+    FSGL_END
+    FSGL_UNIFORMS(glUniform1i, GLint, 1)
+        static void APIENTRY call(GLint loc, GLint x) { set(loc, x); }
+    FSGL_END
+    FSGL_UNIFORMS(glUniform2i, GLint, 2)
+        static void APIENTRY call(GLint loc, GLint x, GLint y) { set(loc, x, y); }
+    FSGL_END
+    FSGL_UNIFORMS(glUniform3i, GLint, 3)
+        static void APIENTRY call(GLint loc, GLint x, GLint y, GLint z) { set(loc, x, y, z); }
+    FSGL_END
+    FSGL_UNIFORMS(glUniform4i, GLint, 4)
+        static void APIENTRY call(GLint loc, GLint x, GLint y, GLint z, GLint w) { set(loc, x, y, z, w); }
+    FSGL_END
+
+    //------------------------------------------------------------------------
     // Client memory copied at record time
 
 #define FSGL_UNIFORMV(name, T, N) \
@@ -1090,7 +1496,17 @@ namespace
         static void APIENTRY call(GLint loc, GLsizei count, const T* v) \
         { \
             if (!tRecording) { P::passthrough(loc, count, v); return; } \
-            FSGL_BLOB(name, 2)::record(size_t(count > 0 ? count : 0) * (N) * sizeof(T), loc, count, v); \
+            const size_t bytes = size_t(count > 0 ? count : 0) * (N) * sizeof(T); \
+            if (count != 1) \
+            { \
+                forgetUniforms(loc, count); \
+            } \
+            else if (sFilter && (uniformUnchanged(loc, v, bytes))) \
+            { \
+                noteSkip(FSGL_ID_##name); \
+                return; \
+            } \
+            FSGL_BLOB(name, 2)::record(bytes, loc, count, v); \
         } \
     FSGL_END
 
@@ -1099,7 +1515,17 @@ namespace
         static void APIENTRY call(GLint loc, GLsizei count, GLboolean transpose, const GLfloat* v) \
         { \
             if (!tRecording) { P::passthrough(loc, count, transpose, v); return; } \
-            FSGL_BLOB(name, 3)::record(size_t(count > 0 ? count : 0) * (N) * sizeof(GLfloat), loc, count, transpose, v); \
+            const size_t bytes = size_t(count > 0 ? count : 0) * (N) * sizeof(GLfloat); \
+            if (count != 1) \
+            { \
+                forgetUniforms(loc, count); \
+            } \
+            else if (sFilter && (uniformUnchanged(loc, v, bytes, transpose ? 1 : 2))) \
+            { \
+                noteSkip(FSGL_ID_##name); \
+                return; \
+            } \
+            FSGL_BLOB(name, 3)::record(bytes, loc, count, transpose, v); \
         } \
     FSGL_END
 
@@ -1585,10 +2011,63 @@ namespace
         } \
     FSGL_END
 
-    FSGL_DELETE(glDeleteTextures)
-    FSGL_DELETE(glDeleteFramebuffers)
+    // Deleting a bound texture, framebuffer or sampler binds 0 in its place
+    FSGL_BEGIN(glDeleteTextures)
+        static void APIENTRY call(GLsizei n, const GLuint* ids)
+        {
+            if (!tRecording) { P::passthrough(n, ids); return; }
+            recordDeleted(n, ids, [](GLuint id)
+            {
+                for (auto& [key, texture] : sSh.mTex)
+                {
+                    if (texture == id)
+                    {
+                        texture = 0;
+                    }
+                }
+            });
+            FSGL_BLOB(glDeleteTextures, 1)::record(size_t(n > 0 ? n : 0) * sizeof(GLuint), n, ids);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glDeleteFramebuffers)
+        static void APIENTRY call(GLsizei n, const GLuint* ids)
+        {
+            if (!tRecording) { P::passthrough(n, ids); return; }
+            recordDeleted(n, ids, [](GLuint id)
+            {
+                if (id != 0 && sSh.mDrawFB == id)
+                {
+                    sSh.mDrawFB = 0;
+                }
+                if (id != 0 && sSh.mReadFB == id)
+                {
+                    sSh.mReadFB = 0;
+                }
+            });
+            FSGL_BLOB(glDeleteFramebuffers, 1)::record(size_t(n > 0 ? n : 0) * sizeof(GLuint), n, ids);
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glDeleteSamplers)
+        static void APIENTRY call(GLsizei n, const GLuint* ids)
+        {
+            if (!tRecording) { P::passthrough(n, ids); return; }
+            recordDeleted(n, ids, [](GLuint id)
+            {
+                for (auto& [unit, sampler] : sSh.mSampler)
+                {
+                    if (sampler == id)
+                    {
+                        sampler = 0;
+                    }
+                }
+            });
+            FSGL_BLOB(glDeleteSamplers, 1)::record(size_t(n > 0 ? n : 0) * sizeof(GLuint), n, ids);
+        }
+    FSGL_END
+
     FSGL_DELETE(glDeleteRenderbuffers)
-    FSGL_DELETE(glDeleteSamplers)
 
     //------------------------------------------------------------------------
     // Sync objects (glFenceSync and glClientWaitSync stay synchronous)
@@ -2216,6 +2695,7 @@ namespace
     {
         sUniformLocs.erase(program);
         sAttribLocs.erase(program);
+        sUniformValues.erase(program);
     }
 
     template <typename P>
@@ -2543,6 +3023,15 @@ namespace FSGLStream
         commitRecord();
     }
 
+    void setFilter(bool filter)
+    {
+        if (filter && !sFilter)
+        {
+            sUniformValues.clear(); // not kept up to date while off
+        }
+        sFilter = filter;
+    }
+
     void clearErrors()
     {
         if (!tRecording)
@@ -2628,6 +3117,39 @@ namespace FSGLStream
             }
             s.mTopSyncs += llformat("%s x%u", sNames[top[i].second], top[i].first);
         }
+
+        // Which calls make up the stream, per frame, and which were dropped as redundant
+        const F64 frames = (F64)llmax(sStatPresents, 1u);
+        std::vector<std::pair<U32, int>> calls;
+        std::vector<std::pair<U32, int>> skips;
+        for (int i = 0; i < FSGL_COUNT; ++i)
+        {
+            if (sCallCount[i])
+            {
+                calls.emplace_back(sCallCount[i], i);
+            }
+            if (sSkipCount[i])
+            {
+                skips.emplace_back(sSkipCount[i], i);
+            }
+        }
+        std::sort(calls.begin(), calls.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        std::sort(skips.begin(), skips.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        for (size_t i = 0; i < calls.size() && i < 16; ++i)
+        {
+            const int id = calls[i].second;
+            s.mTopCalls += llformat("%s%s %.0f (%.0f KB)", i ? ", " : "", sNames[id], (F64)calls[i].first / frames,
+                                    (F64)sCallBytes[id] / frames / 1024.0);
+        }
+        for (size_t i = 0; i < skips.size() && i < 10; ++i)
+        {
+            s.mTopSkips += llformat("%s%s %.0f", i ? ", " : "", sNames[skips[i].second], (F64)skips[i].first / frames);
+        }
+        s.mSkippedCalls = sStatSkips;
+        memset(sCallCount, 0, sizeof(sCallCount));
+        memset(sCallBytes, 0, sizeof(sCallBytes));
+        memset(sSkipCount, 0, sizeof(sSkipCount));
+        sStatSkips = 0;
 
         sStatPresents = 0;
         sStatCalls = 0;

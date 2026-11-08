@@ -87,8 +87,18 @@ namespace
                         sFrames, frame_ms, frame_ms - sync_ms - wait_ms, sync_ms, wait_ms,
                         s.mRenderBusyMs / frames, s.mRenderIdleMs / frames,
                         (F64)s.mSyncCalls / frames, (F64)s.mRecordedCalls / frames, (F64)s.mRecordedBytes / 1024.0 / frames)
+            << llformat(", %.0f redundant calls dropped", (F64)s.mSkippedCalls / frames)
             << (s.mTopSyncs.empty() ? std::string() : "; most frequent sync calls: " + s.mTopSyncs)
             << LL_ENDL;
+        // Which calls make up the stream: what to cut next
+        if (!s.mTopCalls.empty())
+        {
+            LL_INFOS("FSRenderThread") << "Calls per frame (recorded bytes): " << s.mTopCalls << LL_ENDL;
+        }
+        if (!s.mTopSkips.empty())
+        {
+            LL_INFOS("FSRenderThread") << "Redundant calls dropped per frame: " << s.mTopSkips << LL_ENDL;
+        }
         sFrames = 0;
         sFrameSeconds = 0.0;
     }
@@ -184,6 +194,8 @@ namespace FSRenderThread
 
         static LLCachedControl<bool> check(gSavedSettings, "FSRenderThreadCheck", false);
         FSGLStream::setCheck(check);
+        static LLCachedControl<bool> filter(gSavedSettings, "FSRenderThreadFilter", true);
+        FSGLStream::setFilter(filter);
 
         ++sFrames;
         sFrameSeconds += sFrameTimer.getElapsedTimeAndResetF64();

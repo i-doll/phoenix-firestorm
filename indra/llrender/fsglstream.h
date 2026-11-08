@@ -102,6 +102,10 @@ namespace FSGLStream
     // context, and the first synchronous call of each entry point.
     void setCheck(bool check);
 
+    // FSRenderThreadFilter: drop calls that would set state to what it already is (on by
+    // default; the stats line counts them). Main thread.
+    void setFilter(bool filter);
+
     struct Stats
     {
         U32 mPresents = 0;
@@ -113,6 +117,9 @@ namespace FSGLStream
         F64 mRenderBusyMs = 0.0;    // render thread replaying
         F64 mRenderIdleMs = 0.0;    // render thread waiting for work
         std::string mTopSyncs;      // "glGetError x12, ..." most frequent synchronous calls
+        std::string mTopCalls;      // "glUniformMatrix4fv 812 (50 KB), ..." most recorded calls, per frame
+        std::string mTopSkips;      // "glBindTexture 340, ..." calls dropped as redundant, per frame
+        U64 mSkippedCalls = 0;      // calls dropped as redundant (they would set state to what it is)
     };
     // Main thread. Returns the counters since the last call and resets them.
     Stats takeStats();
