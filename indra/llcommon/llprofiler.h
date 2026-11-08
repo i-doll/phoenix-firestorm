@@ -241,8 +241,42 @@ namespace LLProfiler
 #define LL_PROFILER_GPU_CONTEXT_NS(name, size)           TracyGpuContext;TracyGpuContextName(name,size);
 #define LL_PROFILER_GPU_CONTEXT_NAMED     TracyGpuContextName
 #else
-#define LL_PROFILE_GPU_ZONE(name)           (void)name;
-#define LL_PROFILE_GPU_ZONEC(name,color)    (void)name;(void)color;
+#include "llpreprocessor.h" // <FS:Trish/> LL_GLUE_TOKENS
+// <FS:Trish> Without Tracy, GPU zones feed FSRenderGPUTimings (FSGPUTimers in llrender): GPU time
+// per zone from timestamp queries, logged as averages. Off, a zone costs one test of a bool.
+namespace LLFSGPUZone
+{
+    // inline: llprofiler.cpp is only built with Tracy
+    inline bool sActive = false;                       // main thread
+    inline void (*sBegin)(const char* name) = nullptr; // set by FSGPUTimers
+    inline void (*sEnd)() = nullptr;
+
+    struct Scope
+    {
+        bool mOn;
+        explicit Scope(const char* name) : mOn(sActive && sBegin)
+        {
+            if (mOn)
+            {
+                sBegin(name);
+            }
+        }
+        ~Scope()
+        {
+            if (mOn && sEnd)
+            {
+                sEnd();
+            }
+        }
+        Scope(const Scope&) = delete;
+        Scope& operator=(const Scope&) = delete;
+    };
+}
+//#define LL_PROFILE_GPU_ZONE(name)           (void)name;
+//#define LL_PROFILE_GPU_ZONEC(name,color)    (void)name;(void)color;
+#define LL_PROFILE_GPU_ZONE(name)           LLFSGPUZone::Scope LL_GLUE_TOKENS(fs_gpu_zone_, __LINE__)(name);
+#define LL_PROFILE_GPU_ZONEC(name,color)    LLFSGPUZone::Scope LL_GLUE_TOKENS(fs_gpu_zone_, __LINE__)(name); (void)color;
+// </FS:Trish>
 #define LL_PROFILER_GPU_COLLECT
 #define LL_PROFILER_GPU_CONTEXT
 #define LL_PROFILER_GPU_CONTEXT_NAMED(name) (void)name;

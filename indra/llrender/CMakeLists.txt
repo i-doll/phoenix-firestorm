@@ -11,6 +11,7 @@ include(LLWindow)
 
 set(llrender_SOURCE_FILES
     fsglstream.cpp # <FS:Trish/> FSRenderThread
+    fsgputimers.cpp # <FS:Trish/> FSRenderGPUTimings
     fstextureupload.cpp # <FS:Trish/> FSPerfTextureUploadPBO
     llcubemap.cpp
     llcubemaparray.cpp
@@ -40,6 +41,7 @@ set(llrender_SOURCE_FILES
     
 set(llrender_HEADER_FILES
     fsglstream.h # <FS:Trish/> FSRenderThread
+    fsgputimers.h # <FS:Trish/> FSRenderGPUTimings
     fsglstream_funcs.inl # <FS:Trish/> FSRenderThread
     fstextureupload.h # <FS:Trish/> FSPerfTextureUploadPBO
     CMakeLists.txt
