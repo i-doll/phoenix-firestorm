@@ -4271,6 +4271,55 @@
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
                      top="818"
                      width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_threading"
+                     top="886"
+                     width="340">
+                        Threading
+                    </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_threading"
+                     tool_tip="Set every option in &quot;Threading&quot; back to its default value."
+                     top="885"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify" />
+                    </button>
+                    <check_box
+                     control_name="FSPerfParallelShadowCull"
+                     enabled_control="RenderShadowDetail"
+                     follows="left|top"
+                     height="20"
+                     label="Cull sun shadow maps on worker threads"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfparallelshadowcull"
+                     tool_tip="EXPERIMENTAL. Works out which objects fall into each sun shadow map on several CPU cores at once instead of one map after another on the main thread. Shadows look the same; saves main thread time in busy scenes."
+                     top="912"
+                     width="475" />
+                    <check_box
+                     control_name="FSPerfParallelShadowCullVerify"
+                     enabled_control="FSPerfParallelShadowCull"
+                     follows="left|top"
+                     height="20"
+                     label="Check worker shadow culls against the old cull"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfparallelshadowcullverify"
+                     tool_tip="Debug. Also runs the old shadow cull and writes any difference to the log. Slower; only for testing."
+                     top="938"
+                     width="455" />
                 </panel>
             </scroll_container>
         </panel>

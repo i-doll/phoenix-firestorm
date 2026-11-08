@@ -141,6 +141,7 @@
 #include "fsrepresentativefragment.h" // <FS:Trish/> Representative fragment test for occlusion queries
 #include "fsvrs.h" // <FS:Trish/> Variable rate shading
 #include "fsfoginterior.h" // <FS:Trish/> height fog kept out of interiors
+#include "fsparallelcull.h" // <FS:Trish/> FSPerfParallelShadowCull
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -750,6 +751,8 @@ LLPipeline::~LLPipeline()
 void LLPipeline::cleanup()
 {
     assertInitialized();
+
+    FSParallelCull::shutdown(); // <FS:Trish/> FSPerfParallelShadowCull workers
 
     mGroupQ1.clear() ;
 
@@ -15105,6 +15108,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         }
 
         fsShadowSinglePassBegin(); // <FS:Trish/> FSPerfShadowSinglePass
+        fsParallelShadowCullBegin(have_union_cull); // <FS:Trish/> FSPerfParallelShadowCull
         //for (S32 j = 0; j < (gCubeSnapshot ? 2 : 4); j++)
         for (S32 j = 0; !probe_shadow_done && j < (gCubeSnapshot ? 2 : 4); j++) // <FS:Trish/>
         {
@@ -15561,6 +15565,13 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
             stop_glerror();
 
+            // <FS:Trish> FSPerfParallelShadowCull: culled with the other cascades after this loop, and drawn then
+            if (fsParallelShadowCullDefer(j, shadow_cam, min_texel_size))
+            {
+                continue;
+            }
+            // </FS:Trish>
+
             mRT->shadow[j].bindTarget();
             mRT->shadow[j].getViewport(gGLViewport);
             mRT->shadow[j].clear();
@@ -15597,6 +15608,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 mShadowCamera[j+4] = shadow_cam;
             }
         }
+        fsParallelShadowCullFlush(); // <FS:Trish/> FSPerfParallelShadowCull: cull and draw the deferred cascades
         fsShadowSinglePassFinish(); // <FS:Trish/> FSPerfShadowSinglePass: the recorded casters, once for all cascades
         mColoredShadowCascade = -1; // <FS:Trish/> not for the projector shadows below
     }

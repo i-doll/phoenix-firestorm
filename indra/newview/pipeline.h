@@ -352,6 +352,13 @@ public:
     void fsShadowSinglePassFinish();
     void fsReleaseShadowSinglePass();
     // </FS:Trish>
+    // <FS:Trish> FSPerfParallelShadowCull (fsparallelcull.cpp): the sun cascade loop sets every cascade up and
+    // defers its draw, then the cascades' octree culls run on worker threads and the deferred draws follow
+    bool                    mFSParallelCullActive = false;
+    void fsParallelShadowCullBegin(bool have_union_cull);
+    bool fsParallelShadowCullDefer(S32 cascade, LLCamera& shadow_cam, F32 min_texel_size);
+    void fsParallelShadowCullFlush();
+    // </FS:Trish>
 
     // Populate given LLCullResult with results of a frustum cull of the entire scene against the given LLCamera
     void updateCull(LLCamera& camera, LLCullResult& result, bool hud_attachments = false);

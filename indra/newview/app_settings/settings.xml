@@ -27946,6 +27946,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSPerfParallelShadowCull</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Find the objects in each sun shadow map (the octree culls of the shadow cascades) on worker threads at the same time, instead of one cascade after another on the main thread. The cascades are set up first and drawn after all culls are done, in the same order and with the same results. Has no effect with RenderShadowCullMode 1. Projector shadows and reflection probe shadows are culled as before.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfParallelShadowCullVerify</key>
+    <map>
+      <key>Comment</key>
+      <string>Debug. With FSPerfParallelShadowCull on, also run the old one-at-a-time cull for each sun shadow cascade and compare the objects found. The first differences are written to the log as warnings, and every 10 seconds a summary of how many cascades were checked and how many differed. Costs the old cull time on top of the new one.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>
