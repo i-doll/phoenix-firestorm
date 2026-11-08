@@ -217,6 +217,7 @@ set(viewer_SOURCE_FILES
     fspanelprefs.cpp
     fspanelradar.cpp
     fsparallelcull.cpp
+    fsparallelgeometry.cpp
     fsparcelderender.cpp
     fsparticipantlist.cpp
     fspointlightbatch.cpp
@@ -1127,6 +1128,7 @@ set(viewer_HEADER_FILES
     fspanelprefs.h
     fspanelradar.h
     fsparallelcull.h
+    fsparallelgeometry.h
     fsparcelderender.h
     fsparticipantlist.h
     fspointlightbatch.h

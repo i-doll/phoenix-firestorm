@@ -4294,7 +4294,7 @@
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
-                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify" />
+                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify,FSPerfParallelGeometry,FSPerfParallelGeometryVerify,FSPerfParallelGeometryMinVerts" />
                     </button>
                     <check_box
                      control_name="FSPerfParallelShadowCull"
@@ -4320,6 +4320,55 @@
                      tool_tip="Debug. Also runs the old shadow cull and writes any difference to the log. Slower; only for testing."
                      top="938"
                      width="455" />
+                    <check_box
+                     control_name="FSPerfParallelGeometry"
+                     follows="left|top"
+                     height="20"
+                     label="Build object geometry on worker threads"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfparallelgeometry"
+                     tool_tip="EXPERIMENTAL. Fills the vertex data of rezzing and changing objects on several CPU cores instead of only the main thread. Reduces hitches on region arrival, teleports and heavy rezzing. Looks exactly the same as when off."
+                     top="968"
+                     width="475" />
+                    <check_box
+                     control_name="FSPerfParallelGeometryVerify"
+                     enabled_control="FSPerfParallelGeometry"
+                     follows="left|top"
+                     height="20"
+                     label="Verify threaded geometry (slow, debug)"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfparallelgeometryverify"
+                     tool_tip="EXPERIMENTAL. Debug aid: builds the geometry a second time on the main thread and logs any difference to the threaded result. Costs more than it saves; for testing only."
+                     top="994"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfparallelgeometryminverts_label"
+                     tool_tip="EXPERIMENTAL. A geometry rebuild uses the worker threads only when it has at least this many vertices; smaller ones are built on the main thread, where waking the workers would cost more than it saves."
+                     top="1022"
+                     width="285">
+                        Min. vertices for threaded geometry
+                    </text>
+                    <spinner
+                     control_name="FSPerfParallelGeometryMinVerts"
+                     decimal_digits="0"
+                     enabled_control="FSPerfParallelGeometry"
+                     follows="left|top"
+                     height="20"
+                     increment="1024"
+                     layout="topleft"
+                     left="330"
+                     max_val="262144"
+                     min_val="0"
+                     name="fs_fsperfparallelgeometryminverts"
+                     tool_tip="EXPERIMENTAL. A geometry rebuild uses the worker threads only when it has at least this many vertices; smaller ones are built on the main thread, where waking the workers would cost more than it saves."
+                     top="1020"
+                     width="100" />
                 </panel>
             </scroll_container>
         </panel>

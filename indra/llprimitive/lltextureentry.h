@@ -162,6 +162,7 @@ public:
     F32  getGlow() const { return mGlow; }
     const LLMaterialID& getMaterialID() const { return mMaterialID; };
     const LLMaterialPtr getMaterialParams() const { return mMaterial; };
+    LLMaterial* getMaterialParamsPtr() const { return mMaterial.get(); } // <FS:Trish/> no reference count traffic (safe on worker threads)
 
     // *NOTE: it is possible for hasMedia() to return true, but getMediaData() to return NULL.
     // CONVERSELY, it is also possible for hasMedia() to return false, but getMediaData()

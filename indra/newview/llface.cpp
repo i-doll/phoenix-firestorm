@@ -1525,7 +1525,10 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
         if (tep &&
             !isInAlphaPool() && tep->getGLTFRenderMaterial() == nullptr)  // <--- alpha channel MUST contain transparency, not shiny
     {
-            LLMaterial* mat = tep->getMaterialParams().get();
+            // <FS:Trish> Parallel geometry: the LLPointer copy changes the shared material's (non atomic) reference count
+            //LLMaterial* mat = tep->getMaterialParams().get();
+            LLMaterial* mat = tep->getMaterialParamsPtr();
+            // </FS:Trish>
 
             bool shiny_in_alpha = false;
 
@@ -1583,7 +1586,10 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
     // <FS:ND> Protection against faces w/o te set.
     // LLMaterial* mat = tep->getMaterialParams().get();
-    LLMaterial* mat = tep ? tep->getMaterialParams().get() : 0;
+    // <FS:Trish> Parallel geometry: the LLPointer copy changes the shared material's (non atomic) reference count
+    //LLMaterial* mat = tep ? tep->getMaterialParams().get() : 0;
+    LLMaterial* mat = tep ? tep->getMaterialParamsPtr() : 0;
+    // </FS:Trish>
     // </FS:ND>
 
     F32 r = 0, os = 0, ot = 0, ms = 0, mt = 0, cos_ang = 0, sin_ang = 0;

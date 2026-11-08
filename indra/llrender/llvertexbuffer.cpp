@@ -37,6 +37,7 @@
 #include "llglslshader.h"
 #include "llmemory.h"
 #include <glm/gtc/type_ptr.hpp>
+#include <atomic> // <FS:Trish/> parallel geometry
 
 //Next Highest Power Of Two
 //helper function, returns first number > v that is a power of 2, or v if v is already a power of 2
@@ -1343,10 +1344,72 @@ bool expand_region(LLVertexBuffer::MappedRegion& region, U32 start, U32 end)
 }
 
 
+// <FS:Trish> Parallel geometry: see FSMapRecorder in llvertexbuffer.h
+static std::atomic<bool> sFSMapRecordingActive{ false };
+static thread_local LLVertexBuffer::FSMapRecorder* tFSMapRecorder = nullptr;
+
+//static
+void LLVertexBuffer::fsSetMapRecordingActive(bool active)
+{
+    sFSMapRecordingActive.store(active);
+}
+
+//static
+void LLVertexBuffer::fsSetThreadMapRecorder(FSMapRecorder* recorder)
+{
+    tFSMapRecorder = recorder;
+}
+
+//static
+void LLVertexBuffer::fsReplayMap(const FSMapRecord& record)
+{
+    if (record.mType < 0)
+    {
+        record.mBuffer->mapIndexBuffer(record.mIndex, record.mCount);
+    }
+    else
+    {
+        record.mBuffer->mapVertexBuffer((AttributeType)record.mType, record.mIndex, record.mCount);
+    }
+}
+
+// Returns nullptr when the calling thread is not recording (normal path).
+U8* LLVertexBuffer::fsRecordMap(S32 type, U32 index, S32 count)
+{
+    FSMapRecorder* rec = tFSMapRecorder;
+    if (!rec)
+    {
+        return nullptr;
+    }
+    if (rec->mCount < FSMapRecorder::MAX_RECORDS)
+    {
+        rec->mRecords[rec->mCount++] = { this, type, index, count };
+    }
+    else
+    {
+        rec->mOverflow = true;
+    }
+    if (type < 0)
+    {
+        return mMappedIndexData + sizeof(U16) * index;
+    }
+    return mMappedData + mOffsets[type] + sTypeSize[type] * index;
+}
+// </FS:Trish>
+
 // Map for data access
 U8* LLVertexBuffer::mapVertexBuffer(LLVertexBuffer::AttributeType type, U32 index, S32 count)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
+    // <FS:Trish> Parallel geometry: a recording worker must not touch the shared map state
+    if (sFSMapRecordingActive.load(std::memory_order_relaxed))
+    {
+        if (U8* ptr = fsRecordMap(type, index, count))
+        {
+            return ptr;
+        }
+    }
+    // </FS:Trish>
     _mapBuffer();
 
     if (count == -1)
@@ -1384,6 +1447,15 @@ U8* LLVertexBuffer::mapVertexBuffer(LLVertexBuffer::AttributeType type, U32 inde
 U8* LLVertexBuffer::mapIndexBuffer(U32 index, S32 count)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
+    // <FS:Trish> Parallel geometry: a recording worker must not touch the shared map state
+    if (sFSMapRecordingActive.load(std::memory_order_relaxed))
+    {
+        if (U8* ptr = fsRecordMap(-1, index, count))
+        {
+            return ptr;
+        }
+    }
+    // </FS:Trish>
     _mapBuffer();
 
     if (count == -1)

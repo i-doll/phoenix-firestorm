@@ -120,6 +120,33 @@ public:
     // flush any pending mapped buffers
     static void flushBuffers();
 
+    // <FS:Trish> Parallel geometry (FSPerfParallelGeometry, newview/fsparallelgeometry.cpp).
+    // mapVertexBuffer/mapIndexBuffer touch the per-buffer region lists and the global mapped
+    // buffer list, which only the main thread may do. A worker filling vertex data installs a
+    // recorder for its thread: the map calls then only return the pointer and log the call,
+    // and the main thread replays the log (fsReplayMap) before anything is flushed.
+    struct FSMapRecord
+    {
+        LLVertexBuffer* mBuffer;
+        S32 mType;      // AttributeType, or -1 for the index buffer
+        U32 mIndex;
+        S32 mCount;
+    };
+    struct FSMapRecorder
+    {
+        static constexpr U32 MAX_RECORDS = 16;
+        FSMapRecord mRecords[MAX_RECORDS];
+        U32 mCount = 0;
+        bool mOverflow = false;
+    };
+    // main thread: true while any thread may have a recorder installed
+    static void fsSetMapRecordingActive(bool active);
+    // install (or with nullptr remove) the recorder for the calling thread
+    static void fsSetThreadMapRecorder(FSMapRecorder* recorder);
+    // main thread: perform a recorded map call for real
+    static void fsReplayMap(const FSMapRecord& record);
+    // </FS:Trish>
+
     //WARNING -- when updating these enums you MUST
     // 1 - update LLVertexBuffer::sTypeSize
     // 2 - update LLVertexBuffer::vb_type_name
@@ -327,6 +354,8 @@ private:
     friend class LLNavMeshVBOManager;
 
     void flush_vbo(GLenum target, U32 start, U32 end, void* data, U8* dst);
+
+    U8* fsRecordMap(S32 type, U32 index, S32 count); // <FS:Trish/> see FSMapRecorder
 
     LLVertexBuffer(U32 typemask, U32 usage)
         : LLVertexBuffer(typemask)

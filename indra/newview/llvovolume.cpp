@@ -96,6 +96,7 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 #include "llviewernetwork.h"
+#include "fsparallelgeometry.h" // <FS:Trish/> parallel geometry fill
 
 const F32 FORCE_SIMPLE_RENDER_AREA = 512.f;
 const F32 FORCE_CULL_AREA = 8.f;
@@ -6905,6 +6906,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
     U32 extra_mask = LLVertexBuffer::MAP_TEXTURE_INDEX;
     bool alpha_sort = true;
     bool rigged = false;
+    FSParallelGeometry::Scope fs_geom_scope; // <FS:Trish/> genDrawInfo queues the face fills, run below
     for (int i = 0; i < 2; ++i) //two sets, static and rigged)
     {
         geometryBytes += genDrawInfo(group, simple_mask | extra_mask, sSimpleFaces[i], simple_count[i], false, batch_textures, rigged);
@@ -6920,6 +6922,8 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         extra_mask |= LLVertexBuffer::MAP_WEIGHT4;
         rigged = true;
     }
+
+    fs_geom_scope.end(); // <FS:Trish/> run the queued face fills (on worker threads when big enough)
 
     group->mGeometryBytes = geometryBytes;
 
@@ -6956,6 +6960,8 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 
             U32 buffer_count = 0;
 
+            FSParallelGeometry::Scope fs_geom_scope; // <FS:Trish/> face fills are queued, run before the flush below
+
             for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); drawable_iter != group->getDataEnd(); ++drawable_iter)
             {
                 LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
@@ -6978,6 +6984,7 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 
                     LLVolume* volume = vobj->getVolume();
                     if (!volume) continue;
+                    bool fs_deferred = false; // <FS:Trish/> parallel geometry fill
                     for (S32 i = 0; i < drawablep->getNumFaces(); ++i)
                     {
                         LLFace* face = drawablep->getFace(i);
@@ -6986,6 +6993,13 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
                             LLVertexBuffer* buff = face->getVertexBuffer();
                             if (buff)
                             {
+                                // <FS:Trish> Parallel geometry: queue the fill, it fails the same way when it runs
+                                if (FSParallelGeometry::active() && FSParallelGeometry::deferFill(face, face->getGeomIndex(), false, true, group))
+                                {
+                                    fs_deferred = true;
+                                }
+                                else
+                                // </FS:Trish>
                                 if (!face->getGeometryVolume(*volume, // volume
                                     face->getTEOffset(),              // face_index
                                     vobj->getRelativeXform(),         // mat_vert_in
@@ -7007,9 +7021,21 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
                         vobj->updateRelativeXform();
                     }
 
-                    drawablep->clearState(LLDrawable::REBUILD_ALL);
+                    // <FS:Trish> Parallel geometry: the queued fills read the rebuild flags
+                    //drawablep->clearState(LLDrawable::REBUILD_ALL);
+                    if (fs_deferred)
+                    {
+                        FSParallelGeometry::clearStateAfterFill(drawablep, LLDrawable::REBUILD_ALL);
+                    }
+                    else
+                    {
+                        drawablep->clearState(LLDrawable::REBUILD_ALL);
+                    }
+                    // </FS:Trish>
                 }
             }
+
+            fs_geom_scope.end(); // <FS:Trish/> run the queued face fills (on worker threads when big enough)
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("rebuildMesh - flush");
@@ -7341,6 +7367,9 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 //for debugging, set last time face was updated vs moved
                 facep->updateRebuildFlags();
 
+                // <FS:Trish> Parallel geometry: queue the fill for when rebuildGeom's scope ends
+                if (!(FSParallelGeometry::active() && FSParallelGeometry::deferFill(facep, index_offset, true, false, nullptr)))
+                // </FS:Trish>
                 { //copy face geometry into vertex buffer
                     LLDrawable* drawablep = facep->getDrawable();
                     LLVOVolume* vobj = drawablep->getVOVolume();
