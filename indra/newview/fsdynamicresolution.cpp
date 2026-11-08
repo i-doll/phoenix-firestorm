@@ -157,7 +157,11 @@ namespace
 
     bool timing_supported()
     {
+#if LL_WINDOWS
         return glQueryCounter != nullptr && glGetQueryObjectui64v != nullptr;
+#else
+        return true;
+#endif
     }
 
     // Collects finished timestamp pairs without stalling and feeds the averages.

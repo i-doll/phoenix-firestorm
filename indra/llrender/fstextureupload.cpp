@@ -46,7 +46,7 @@ namespace
     constexpr U32 OFFSET_ALIGN = 256;
     constexpr size_t MAX_IN_FLIGHT = 512;
 
-    struct Region
+    struct UploadRegion
     {
         U32 mOffset;
         U32 mSize;
@@ -59,17 +59,20 @@ namespace
     GLuint sBuffer = 0;
     U8* sMapped = nullptr;
     U32 sHead = 0;
-    std::deque<Region> sInFlight;
+    std::deque<UploadRegion> sInFlight;
     FSTextureUpload::Stats sStats;
 
     bool is_supported()
     {
-        return gGLManager.mGLVersion >= 4.39f &&
-            glBufferStorage != nullptr &&
-            glMapBufferRange != nullptr &&
-            glFenceSync != nullptr &&
-            glClientWaitSync != nullptr &&
-            glDeleteSync != nullptr;
+        return gGLManager.mGLVersion >= 4.39f
+#if LL_WINDOWS
+            && glBufferStorage != nullptr
+            && glMapBufferRange != nullptr
+            && glFenceSync != nullptr
+            && glClientWaitSync != nullptr
+            && glDeleteSync != nullptr
+#endif
+            ;
     }
 
     bool ensure_buffer()
@@ -115,7 +118,7 @@ namespace
     {
         while (!sInFlight.empty())
         {
-            const Region& r = sInFlight.front();
+            const UploadRegion& r = sInFlight.front();
             if (glClientWaitSync(r.mFence, 0, 0) == GL_TIMEOUT_EXPIRED)
             {
                 break;
@@ -203,7 +206,7 @@ namespace FSTextureUpload
 
     void releaseGL()
     {
-        for (const Region& r : sInFlight)
+        for (const UploadRegion& r : sInFlight)
         {
             glDeleteSync(r.mFence);
         }

@@ -171,6 +171,7 @@ class LLTextBox;
 
 class FSPanelPreferenceExperimental : public LLPanelPreference
 {
+    LOG_CLASS(FSPanelPreferenceExperimental);
 public:
     FSPanelPreferenceExperimental();
     bool postBuild() override;
