@@ -422,7 +422,10 @@ void LLRenderTarget::release()
 
 void LLRenderTarget::bindTarget()
 {
-    LL_PROFILE_GPU_ZONE("bindTarget");
+    // <FS:Trish> Tracy only, too frequent for FSRenderGPUTimings
+    //LL_PROFILE_GPU_ZONE("bindTarget");
+    LL_PROFILE_GPU_ZONE_FINE("bindTarget");
+    // </FS:Trish>
     llassert(mFBO);
     llassert(!isBoundInStack());
 
@@ -457,7 +460,10 @@ void LLRenderTarget::bindTarget()
 
 void LLRenderTarget::clear(U32 mask_in)
 {
-    LL_PROFILE_GPU_ZONE("clear");
+    // <FS:Trish> Tracy only, too frequent for FSRenderGPUTimings
+    //LL_PROFILE_GPU_ZONE("clear");
+    LL_PROFILE_GPU_ZONE_FINE("clear");
+    // </FS:Trish>
     llassert(mFBO);
     U32 mask = GL_COLOR_BUFFER_BIT;
     if (mUseDepth)
@@ -512,7 +518,10 @@ void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilt
 
 void LLRenderTarget::flush()
 {
-    LL_PROFILE_GPU_ZONE("rt flush");
+    // <FS:Trish> Tracy only, too frequent for FSRenderGPUTimings
+    //LL_PROFILE_GPU_ZONE("rt flush");
+    LL_PROFILE_GPU_ZONE_FINE("rt flush");
+    // </FS:Trish>
     gGL.flush();
     llassert(mFBO);
     llassert(sCurFBO == mFBO);
@@ -548,7 +557,10 @@ void LLRenderTarget::flush()
 void LLRenderTarget::copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1,
                                   S32 dstY1, U32 mask, U32 filter)
 {
-    LL_PROFILE_GPU_ZONE("LLRenderTarget::copyContents");
+    // <FS:Trish> Tracy only, too frequent for FSRenderGPUTimings
+    //LL_PROFILE_GPU_ZONE("LLRenderTarget::copyContents");
+    LL_PROFILE_GPU_ZONE_FINE("LLRenderTarget::copyContents");
+    // </FS:Trish>
 
     GLboolean write_depth = mask & GL_DEPTH_BUFFER_BIT ? GL_TRUE : GL_FALSE;
 
@@ -592,7 +604,10 @@ void LLRenderTarget::copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0
     }
 
     {
-        LL_PROFILE_GPU_ZONE("copyContentsToFramebuffer");
+        // <FS:Trish> Tracy only, too frequent for FSRenderGPUTimings
+        //LL_PROFILE_GPU_ZONE("copyContentsToFramebuffer");
+        LL_PROFILE_GPU_ZONE_FINE("copyContentsToFramebuffer");
+        // </FS:Trish>
         GLboolean write_depth = mask & GL_DEPTH_BUFFER_BIT ? GL_TRUE : GL_FALSE;
 
         LLGLDepthTest depth(write_depth, write_depth);

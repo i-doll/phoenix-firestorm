@@ -82,6 +82,7 @@ namespace
     U64 sFrameNs = 0;
     U32 sFrames = 0;
     U32 sDropped = 0;
+    U32 sDroppedZones = 0;                  // zones past MAX_ZONES_PER_FRAME, not timed
     LLTimer sLogTimer;
 
     GLuint takeQuery()
@@ -123,6 +124,10 @@ namespace
         }
         if (sCur.mRecs.size() >= MAX_ZONES_PER_FRAME || sStack.size() >= MAX_DEPTH)
         {
+            if (sCur.mRecs.size() >= MAX_ZONES_PER_FRAME)
+            {
+                ++sDroppedZones;
+            }
             sStack.push_back(SIZE_MAX);
             return;
         }
@@ -232,11 +237,14 @@ namespace
         }
         LL_INFOS("FSGPUTimings") << "GPU ms/frame over " << sFrames << " frames: frame " << llformat("%.2f", (F64)sFrameNs * per_frame)
                                  << "; zones, inclusive (x calls per frame): " << line
-                                 << (sDropped ? llformat("; %u frames dropped unread", sDropped) : std::string()) << LL_ENDL;
+                                 << (sDropped ? llformat("; %u frames dropped unread", sDropped) : std::string())
+                                 << (sDroppedZones ? llformat("; %u zones past the %u per frame limit untimed", sDroppedZones, (U32)MAX_ZONES_PER_FRAME) : std::string())
+                                 << LL_ENDL;
         sTotals.clear();
         sFrameNs = 0;
         sFrames = 0;
         sDropped = 0;
+        sDroppedZones = 0;
     }
 
     void closeFrame()
@@ -297,6 +305,7 @@ namespace FSGPUTimers
             sTotals.clear();
             sFrameNs = 0;
             sFrames = 0;
+            sDroppedZones = 0;
         }
         else if (enabled && !sOn)
         {
@@ -304,7 +313,7 @@ namespace FSGPUTimers
         }
 
         sOn = enabled;
-        LLFSGPUZone::sActive = enabled;
+        LLFSGPUZone::sActive.store(enabled, std::memory_order_relaxed);
         if (sOn)
         {
             sCur.mFrameBegin = takeQuery();
@@ -314,7 +323,7 @@ namespace FSGPUTimers
 
     void releaseGL()
     {
-        LLFSGPUZone::sActive = false;
+        LLFSGPUZone::sActive.store(false, std::memory_order_relaxed);
         sOn = false;
         sStack.clear();
         giveBack(sCur);

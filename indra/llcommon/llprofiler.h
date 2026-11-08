@@ -233,28 +233,24 @@ namespace LLProfiler
     // </FS:Ansariel>
 #endif // LL_PROFILER
 
-#if LL_PROFILER_ENABLE_TRACY_OPENGL
-#define LL_PROFILE_GPU_ZONE(name)         TracyGpuZone(name);
-#define LL_PROFILE_GPU_ZONEC(name,color)  TracyGpuZoneC(name,color);
-#define LL_PROFILER_GPU_COLLECT           TracyGpuCollect;
-#define LL_PROFILER_GPU_CONTEXT           TracyGpuContext;
-#define LL_PROFILER_GPU_CONTEXT_NS(name, size)           TracyGpuContext;TracyGpuContextName(name,size);
-#define LL_PROFILER_GPU_CONTEXT_NAMED     TracyGpuContextName
-#else
-#include "llpreprocessor.h" // <FS:Trish/> LL_GLUE_TOKENS
 // <FS:Trish> Without Tracy, GPU zones feed FSRenderGPUTimings (FSGPUTimers in llrender): GPU time
 // per zone from timestamp queries, logged as averages. Off, a zone costs one test of a bool.
+// Declared in every configuration, as FSGPUTimers sets the hooks whichever macros are in use;
+// with Tracy OpenGL the zones go to Tracy and the hooks are never called.
+#include "llpreprocessor.h" // LL_GLUE_TOKENS
+#include <atomic>
 namespace LLFSGPUZone
 {
-    // inline: llprofiler.cpp is only built with Tracy
-    inline bool sActive = false;                       // main thread
+    // inline: llprofiler.cpp is only built with Tracy. Written on the main thread, read by any
+    // thread opening a zone (GL worker threads too, which FSGPUTimers then ignores): atomic.
+    inline std::atomic<bool> sActive{ false };
     inline void (*sBegin)(const char* name) = nullptr; // set by FSGPUTimers
     inline void (*sEnd)() = nullptr;
 
     struct Scope
     {
         bool mOn;
-        explicit Scope(const char* name) : mOn(sActive && sBegin)
+        explicit Scope(const char* name) : mOn(sActive.load(std::memory_order_relaxed) && sBegin)
         {
             if (mOn)
             {
@@ -272,10 +268,25 @@ namespace LLFSGPUZone
         Scope& operator=(const Scope&) = delete;
     };
 }
+// </FS:Trish>
+
+#if LL_PROFILER_ENABLE_TRACY_OPENGL
+#define LL_PROFILE_GPU_ZONE(name)         TracyGpuZone(name);
+#define LL_PROFILE_GPU_ZONEC(name,color)  TracyGpuZoneC(name,color);
+#define LL_PROFILE_GPU_ZONE_FINE(name)    TracyGpuZone(name); // <FS:Trish/> see below
+#define LL_PROFILER_GPU_COLLECT           TracyGpuCollect;
+#define LL_PROFILER_GPU_CONTEXT           TracyGpuContext;
+#define LL_PROFILER_GPU_CONTEXT_NS(name, size)           TracyGpuContext;TracyGpuContextName(name,size);
+#define LL_PROFILER_GPU_CONTEXT_NAMED     TracyGpuContextName
+#else
+// <FS:Trish>
 //#define LL_PROFILE_GPU_ZONE(name)           (void)name;
 //#define LL_PROFILE_GPU_ZONEC(name,color)    (void)name;(void)color;
 #define LL_PROFILE_GPU_ZONE(name)           LLFSGPUZone::Scope LL_GLUE_TOKENS(fs_gpu_zone_, __LINE__)(name);
 #define LL_PROFILE_GPU_ZONEC(name,color)    LLFSGPUZone::Scope LL_GLUE_TOKENS(fs_gpu_zone_, __LINE__)(name); (void)color;
+// Tracy only: zones opened hundreds of times a frame (render target binds, clears, flushes)
+// would use up FSGPUTimers' per-frame zone budget and hide the passes it is meant to time
+#define LL_PROFILE_GPU_ZONE_FINE(name)      (void)name;
 // </FS:Trish>
 #define LL_PROFILER_GPU_COLLECT
 #define LL_PROFILER_GPU_CONTEXT

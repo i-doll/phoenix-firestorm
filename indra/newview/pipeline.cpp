@@ -45,6 +45,7 @@
 #include "llui.h"
 #include "llglheaders.h"
 #include "llrender.h"
+#include "fsgputimers.h" // <FS:Trish/> FSRenderGPUTimings
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
 
@@ -1528,6 +1529,7 @@ void LLPipeline::releaseGLBuffers()
     LLDrawPoolWater::fsReleaseFoamDepth(); // <FS:Trish/> shoreline foam depth
     fs_release_dust_points(); // <FS:Trish/> dust motes
     fs_release_ui_buffer(); // <FS:Trish/> FSRenderUICap
+    FSGPUTimers::releaseGL(); // <FS:Trish/> FSRenderGPUTimings: query names die with the context
 
     if (mNoiseMap)
     {
