@@ -789,6 +789,7 @@ void GLTFSceneManager::bindTexture(Asset& asset, TextureType texture_type, Textu
             if (tex)
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_GLTF("gl bind texture");
+                LLImageGL::fsUnlockTexture(tex->getTexName()); // <FS:Trish/> its parameters are set below (FSPerfGPUDrivenPBRBindless)
                 glBindTexture(GL_TEXTURE_2D, tex->getTexName());
 
                 if (channel != -1 && texture.mSampler != -1)

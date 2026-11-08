@@ -31,6 +31,7 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 #include "gltfscenemanager.h"
+#include "fsgpudrivenpbr.h" // <FS:Trish/> FSPerfGPUDrivenPBR
 
 LLDrawPoolGLTFPBR::LLDrawPoolGLTFPBR(U32 type) :
     LLRenderPass(type)
@@ -60,7 +61,13 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
     }
 
     gDeferredPBROpaqueProgram.bind();
-    pushGLTFBatches(mRenderType);
+    // <FS:Trish> FSPerfGPUDrivenPBR: the batches as multi-draws out of a vertex arena, in the same order
+    //pushGLTFBatches(mRenderType);
+    if (!fsGDDDrawPBR(mRenderType))
+    {
+        pushGLTFBatches(mRenderType);
+    }
+    // </FS:Trish>
 
     LL::GLTFSceneManager::instance().render(true, true);
 

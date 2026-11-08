@@ -104,6 +104,10 @@ public:
     bool mHasParallelShaderCompile = false; // <FS:Trish/> GL_KHR/ARB_parallel_shader_compile
     S32 mFSVertexViewportIndex = 0; // <FS:Trish/> gl_ViewportIndex from the vertex shader (FSPerfShadowSinglePass): 0 none, 1 ARB, 2 NV, 3 AMD
     bool mFSHasGPUDrivenDraws = false; // <FS:Trish/> multi-draw indirect, vertex shader storage blocks (FSPerfGPUDrivenDraws)
+    // <FS:Trish> GL_ARB_bindless_texture (FSPerfGPUDrivenPBRBindless): glGetTextureSamplerHandleARB,
+    // glMakeTextureHandleResidentARB, glMakeTextureHandleNonResidentARB, in that order; null without it
+    void* mFSBindlessProcs[3] = { nullptr, nullptr, nullptr };
+    // </FS:Trish>
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;

@@ -23,6 +23,10 @@
  * $/LicenseInfo$
  */
 
+#ifdef FS_GDD
+#extension GL_ARB_shader_storage_buffer_object : require
+#endif
+
 #ifdef RIGGED_PRECISE_MATH
 invariant gl_Position;
 precise gl_Position;
@@ -33,6 +37,40 @@ precise gl_Position;
 
 //deferred opaque implementation
 
+#ifdef FS_GDD
+// FSPerfGPUDrivenPBR: static opaque batches drawn with glMultiDrawElementsIndirect out of a vertex arena.
+// Every draw command has a record, an instanced attribute the command's base instance selects, naming
+// its matrices and its material in the storage buffers below. They hold exactly the values the stock
+// path puts in the uniforms of the same names for that batch, computed the same way on the CPU.
+layout(std430) readonly buffer FSGDDPBRMatrices
+{
+    mat4 fs_gdd_matrix[];   // per model matrix: modelview, modelview projection, normal matrix; texture matrices
+};
+
+struct FSGDDMaterial
+{
+    vec4 transform[8];      // texture_base_color/normal/metallic_roughness/emissive_transform, two each
+    vec4 factors;           // minimum_alpha, roughnessFactor, metallicFactor
+    vec4 emissive;          // emissiveColor
+    uvec4 tex01;            // bindless handles: diffuseMap, bumpMap
+    uvec4 tex23;            // specularMap, emissiveMap
+};
+
+layout(std430) readonly buffer FSGDDPBRMaterials
+{
+    FSGDDMaterial fs_gdd_material[];
+};
+
+in uvec4 fs_gdd_draw;       // x: first of the three model matrices, y: texture matrix, z: material
+
+// the material's constants (and textures) for the fragment shader, which reads them in place of its uniforms
+flat out vec4 fs_gdd_factors;
+flat out vec3 fs_gdd_emissive;
+#ifdef FS_GDD_BINDLESS
+flat out uvec4 fs_gdd_tex01;
+flat out uvec4 fs_gdd_tex23;
+#endif
+#else
 uniform mat4 modelview_matrix;
 
 #ifdef HAS_SKIN
@@ -50,6 +88,7 @@ uniform vec4[2] texture_base_color_transform;
 uniform vec4[2] texture_normal_transform;
 uniform vec4[2] texture_metallic_roughness_transform;
 uniform vec4[2] texture_emissive_transform;
+#endif
 
 in vec3 position;
 in vec4 diffuse_color;
@@ -74,6 +113,24 @@ vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] kh
 
 void main()
 {
+#ifdef FS_GDD
+    mat4 modelview_matrix = fs_gdd_matrix[fs_gdd_draw.x];
+    mat4 modelview_projection_matrix = fs_gdd_matrix[fs_gdd_draw.x + 1u];
+    mat3 normal_matrix = mat3(fs_gdd_matrix[fs_gdd_draw.x + 2u]);
+    mat4 texture_matrix0 = fs_gdd_matrix[fs_gdd_draw.y];
+    FSGDDMaterial fs_mat = fs_gdd_material[fs_gdd_draw.z];
+    vec4[2] texture_base_color_transform = vec4[2](fs_mat.transform[0], fs_mat.transform[1]);
+    vec4[2] texture_normal_transform = vec4[2](fs_mat.transform[2], fs_mat.transform[3]);
+    vec4[2] texture_metallic_roughness_transform = vec4[2](fs_mat.transform[4], fs_mat.transform[5]);
+    vec4[2] texture_emissive_transform = vec4[2](fs_mat.transform[6], fs_mat.transform[7]);
+    fs_gdd_factors = fs_mat.factors;
+    fs_gdd_emissive = fs_mat.emissive.rgb;
+#ifdef FS_GDD_BINDLESS
+    fs_gdd_tex01 = fs_mat.tex01;
+    fs_gdd_tex23 = fs_mat.tex23;
+#endif
+#endif
+
 #ifdef HAS_SKIN
     mat3x4 skin = getSkinBlend();
     vec3 pos = skinTransformH(skin, position.xyz, modelview_matrix).xyz;

@@ -188,6 +188,7 @@ bool LLImageGL::sGlobalUseAnisotropic   = false;
 F32 LLImageGL::sLastFrameTime           = 0.f;
 LLImageGL* LLImageGL::sDefaultGLTexture = NULL ;
 bool LLImageGL::sCompressTextures = false;
+LLImageGL::fs_texture_unlock_t LLImageGL::sFSTextureUnlock = nullptr; // <FS:Trish/> FSPerfGPUDrivenPBRBindless
 std::unordered_set<LLImageGL*> LLImageGL::sImageList;
 
 
@@ -798,6 +799,7 @@ void LLImageGL::setImage(const LLImageRaw* imageraw)
 bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32 usename /* = 0 */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    fsUnlockTexture(usename ? (U32)usename : mTexName); // <FS:Trish/> respecified below
     FSTextureUpload::UploadScope pbo_upload_scope; // <FS:Trish/> FSPerfTextureUploadPBO: levels below may stream through the upload ring
 
     const bool is_compressed = isCompressed();
@@ -1189,6 +1191,7 @@ void sub_image_lines(U32 target, LLGLuint texname, S32 miplevel, S32 x_offset, S
 
 bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update /* = false */, LLGLuint use_name)
 {
+    fsUnlockTexture(use_name ? (U32)use_name : mTexName); // <FS:Trish/> may rebuild mipmaps below
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     if (!width || !height)
     {
@@ -1374,6 +1377,15 @@ void LLImageGL::updateClass()
 
     if (!sFreeList[idx].empty())
     {
+        // <FS:Trish> FSPerfGPUDrivenPBRBindless: forget the handles of textures going away, their names get reused
+        if (sFSTextureUnlock)
+        {
+            for (U32 name : sFreeList[idx])
+            {
+                fsUnlockTexture(name);
+            }
+        }
+        // </FS:Trish>
         free_tex_images((GLsizei) sFreeList[idx].size(), sFreeList[idx].data());
         glDeleteTextures((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
         // <FS:Trish> Deleting a bound texture silently unbinds it and its name can be reused,
@@ -2532,6 +2544,8 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     }
 
     S32 mip = desired_discard - mCurrentDiscardLevel;
+
+    fsUnlockTexture(mTexName); // <FS:Trish/> respecified below
 
     S32 desired_width = getWidth(desired_discard);
     S32 desired_height = getHeight(desired_discard);

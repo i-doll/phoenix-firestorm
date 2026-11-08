@@ -25,19 +25,46 @@
 
 /*[EXTRA_CODE_HERE]*/
 
+#ifdef FS_GDD_BINDLESS
+#extension GL_ARB_bindless_texture : require
+#endif
+
 
 #ifndef IS_HUD
 
 // deferred opaque implementation
 
-uniform sampler2D diffuseMap;  //always in sRGB space
+#ifdef FS_GDD
+// FSPerfGPUDrivenPBR (pbropaqueV.glsl): each draw's material constants, and with FS_GDD_BINDLESS its
+// textures, arrive as flat inputs holding what the stock path puts in these uniforms
+flat in vec4 fs_gdd_factors;
+flat in vec3 fs_gdd_emissive;
+#define minimum_alpha fs_gdd_factors.x
+#define roughnessFactor fs_gdd_factors.y
+#define metallicFactor fs_gdd_factors.z
+#define emissiveColor fs_gdd_emissive
+#ifdef FS_GDD_BINDLESS
+flat in uvec4 fs_gdd_tex01;
+flat in uvec4 fs_gdd_tex23;
+#define diffuseMap sampler2D(fs_gdd_tex01.xy)
+#define bumpMap sampler2D(fs_gdd_tex01.zw)
+#define specularMap sampler2D(fs_gdd_tex23.xy)
+#define emissiveMap sampler2D(fs_gdd_tex23.zw)
+#endif
+#endif
 
-uniform float metallicFactor;
-uniform float roughnessFactor;
-uniform vec3 emissiveColor;
+#ifndef FS_GDD_BINDLESS
+uniform sampler2D diffuseMap;  //always in sRGB space
 uniform sampler2D bumpMap;
 uniform sampler2D emissiveMap;
 uniform sampler2D specularMap; // Packed: Occlusion, Metal, Roughness
+#endif
+
+#ifndef FS_GDD
+uniform float metallicFactor;
+uniform float roughnessFactor;
+uniform vec3 emissiveColor;
+#endif
 
 out vec4 frag_data[4];
 
@@ -52,7 +79,9 @@ in vec2 normal_texcoord;
 in vec2 metallic_roughness_texcoord;
 in vec2 emissive_texcoord;
 
+#ifndef FS_GDD
 uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
+#endif
 
 vec3 linear_to_srgb(vec3 c);
 vec3 srgb_to_linear(vec3 c);

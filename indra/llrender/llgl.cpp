@@ -1608,6 +1608,23 @@ void LLGLManager::initExtensions()
     }
     LL_INFOS("RenderInit") << "GPU-driven draws available: " << mFSHasGPUDrivenDraws << LL_ENDL;
     // </FS:Trish>
+    // <FS:Trish> Bindless textures for the GPU-driven PBR pass (FSPerfGPUDrivenPBRBindless)
+    for (void*& proc : mFSBindlessProcs)
+    {
+        proc = nullptr;
+    }
+    if (mFSHasGPUDrivenDraws && mGLExtensions.contains("GL_ARB_bindless_texture"))
+    {
+        mFSBindlessProcs[0] = (void*)LL_GET_PROC_ADDRESS("glGetTextureSamplerHandleARB");
+        mFSBindlessProcs[1] = (void*)LL_GET_PROC_ADDRESS("glMakeTextureHandleResidentARB");
+        mFSBindlessProcs[2] = (void*)LL_GET_PROC_ADDRESS("glMakeTextureHandleNonResidentARB");
+        if (!mFSBindlessProcs[0] || !mFSBindlessProcs[1] || !mFSBindlessProcs[2])
+        {
+            mFSBindlessProcs[0] = mFSBindlessProcs[1] = mFSBindlessProcs[2] = nullptr;
+        }
+    }
+    LL_INFOS("RenderInit") << "Bindless textures available: " << (mFSBindlessProcs[0] != nullptr) << LL_ENDL;
+    // </FS:Trish>
 
     mInited = true;
 

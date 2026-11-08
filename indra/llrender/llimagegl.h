@@ -101,6 +101,17 @@ public:
 
     static bool checkSize(S32 width, S32 height);
 
+    // <FS:Trish> Bindless textures (FSPerfGPUDrivenPBRBindless, newview/fsgpudrivenpbr.cpp). A texture with a
+    // bindless handle may not be respecified or have its parameters changed; while set, this is called with a
+    // texture's GL name right before LLImageGL or LLTexUnit does either, and drops the texture's handles so it
+    // becomes mutable again. Null while the feature is off.
+    typedef void (*fs_texture_unlock_t)(U32 tex_name);
+    static fs_texture_unlock_t sFSTextureUnlock;
+    static void fsUnlockTexture(U32 tex_name)   { if (sFSTextureUnlock && tex_name) sFSTextureUnlock(tex_name); }
+    bool getFSHasMipMaps() const                { return mHasMipMaps; }
+    bool getFSTexOptionsDirty() const           { return mTexOptionsDirty; }
+    // </FS:Trish>
+
     //for server side use only.
     // Not currently necessary for LLImageGL, but required in some derived classes,
     // so include for compatability

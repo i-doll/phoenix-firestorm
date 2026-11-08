@@ -57,6 +57,7 @@
 #include "fsgpudrivendraws.h"
 
 #include "fsgddarena.h"
+#include "fsgpudrivenpbr.h"
 
 #include "fsshadowsinglepass.h"
 #include "lldrawpool.h"
@@ -117,6 +118,7 @@ namespace
 
 void fsGDDReleaseGL()
 {
+    fsGDDPBRReleaseGL();
     sArena.releaseGL();
     GLuint buffers[3] = { sIndirectBuffer, sDrawBuffer, sMatrixBuffer };
     for (GLuint buffer : buffers)
@@ -142,6 +144,7 @@ void fsGDDUnloadShaders()
     gFSGDDShadowSPProgram.unload();
     sInputsReady[0] = 0;
     sInputsReady[1] = 0;
+    fsGDDPBRUnloadShaders();
     fsGDDReleaseGL();
 }
 
@@ -180,6 +183,9 @@ namespace
 bool fsGDDLoadShaders(S32 shader_level, bool use_shadow)
 {
     fsGDDUnloadShaders();
+
+    // the PBR pass (FSPerfGPUDrivenPBR) has its own setting and doesn't need shadows
+    fsGDDPBRLoadShaders();
 
     static LLCachedControl<bool> enabled(gSavedSettings, "FSPerfGPUDrivenDraws", false);
     if (!enabled || !use_shadow)

@@ -42,10 +42,11 @@ class LLGLSLShader;
 extern LLGLSLShader gFSGDDShadowProgram;
 extern LLGLSLShader gFSGDDShadowSPProgram;
 
+// Also builds (or not) the GPU-driven PBR programs, fsgpudrivenpbr.h.
 bool fsGDDLoadShaders(S32 shader_level, bool use_shadow);
 void fsGDDUnloadShaders();
 
-// Frees the position arenas and the per draw buffers (GL context loss, shader reloads).
+// Frees the arenas and the per draw buffers (GL context loss, shader reloads), the PBR ones too.
 void fsGDDReleaseGL();
 
 // FSPerfGPUDrivenDraws is on and the program for this kind of pass is built.

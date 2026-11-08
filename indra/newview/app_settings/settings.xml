@@ -28199,6 +28199,61 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>1.0</real>
     </map>
+    <key>FSPerfGPUDrivenPBR</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Draw the static (not rigged) opaque PBR (GLTF material) surfaces of the deferred pass with glMultiDrawElementsIndirect instead of one draw call per batch: their vertex data (position, normal, tangent, texture coordinates, colour) and indices are copied, on the GPU, into a shared arena once and reused while they don't change, and each batch's matrices, texture animation and material constants come from storage buffers. Batches keep their order; runs that share a material (or, with FSPerfGPUDrivenPBRBindless, any material) and face culling go out as one call. Everything else (rigged, media, 32 bit indices, arena full) is drawn as before, in its place. The image is the same; saves main thread CPU time in busy scenes with many PBR objects. Needs OpenGL 4.3 with GL_ARB_multi_draw_indirect and GL_ARB_shader_storage_buffer_object; otherwise, and on macOS, nothing changes. Uses up to FSPerfGPUDrivenPBRArenaMB of video memory. Rebuilds shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfGPUDrivenPBRBindless</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. With FSPerfGPUDrivenPBR: give PBR textures bindless handles (GL_ARB_bindless_texture), so batches with different materials go out in the same multi-draw call and no textures are bound between them. A texture keeps its handle only while it doesn't change: the handle is dropped before the viewer reloads, rescales or changes the filtering of the texture, and made again later. Media faces and textures that can't have a handle (not fully loaded, one or two channel, not yet set up) use bound textures as with FSPerfGPUDrivenPBR alone. Checked once at startup: drivers that keep textures locked after their handles are gone don't use it. Rebuilds shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfGPUDrivenPBRArenaMB</key>
+    <map>
+      <key>Comment</key>
+      <string>FSPerfGPUDrivenPBR: most video memory (MB, 16 to 2048) the PBR vertex arena may grow to; seven eighths for vertex data (60 bytes a vertex), an eighth for indices. Batches that don't fit are drawn the old way.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>512</integer>
+    </map>
+    <key>FSPerfGPUDrivenPBRVerify</key>
+    <map>
+      <key>Comment</key>
+      <string>Debug for FSPerfGPUDrivenPBR: after each GPU-driven PBR pass, draws the same batches again the old way with colour and depth writes off and counts (occlusion query) the samples the old way would have put nearer than the multi-draws did; reads back a couple of arena copies per pass to compare them with their vertex buffers; checks for GL errors. Mismatches are logged (Rendering, at most every 5 seconds); also logs statistics every 10 seconds. Stalls the GPU: slow, for testing only.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfGPUDrivenPBRStats</key>
+    <map>
+      <key>Comment</key>
+      <string>Debug for FSPerfGPUDrivenPBR: every 10 seconds, log (FSGPUDrivenPBR) how many PBR batches went out in how many multi-draw calls, why batches were drawn the old way or with bound textures, the arena size and the number of bindless texture handles. No verification and no stalls.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>
       <key>Comment</key>

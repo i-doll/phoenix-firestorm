@@ -155,6 +155,7 @@ set(viewer_SOURCE_FILES
     fsfoginterior.cpp
     fsgddarena.cpp
     fsgpudrivendraws.cpp
+    fsgpudrivenpbr.cpp
     fsinventorycustomtabs.cpp
     # <ID:i.doll> [Received inventory destination controls]
     idfloaterinventorydestinationconfig.cpp
@@ -1069,6 +1070,7 @@ set(viewer_HEADER_FILES
     fsfoginterior.h
     fsgddarena.h
     fsgpudrivendraws.h
+    fsgpudrivenpbr.h
     fsinventorycustomtabs.h
     # <ID:i.doll> [Received inventory destination controls]
     idfloaterinventorydestinationconfig.h

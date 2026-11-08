@@ -4651,7 +4651,7 @@
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
-                         parameter="FSPerfGPUDrivenDraws,FSPerfGPUDrivenDrawsVerify,FSPerfGPUDrivenDrawsArenaMB" />
+                         parameter="FSPerfGPUDrivenDraws,FSPerfGPUDrivenDrawsVerify,FSPerfGPUDrivenDrawsArenaMB,FSPerfGPUDrivenPBR,FSPerfGPUDrivenPBRBindless,FSPerfGPUDrivenPBRArenaMB" />
                     </button>
                     <check_box
                      control_name="FSPerfGPUDrivenDraws"
@@ -4702,6 +4702,55 @@
                      name="fs_fsperfgpudrivendrawsarenamb"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
                      top="1380"
+                     width="100" />
+                    <check_box
+                     control_name="FSPerfGPUDrivenPBR"
+                     follows="left|top"
+                     height="20"
+                     label="GPU-driven PBR surfaces"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfgpudrivenpbr"
+                     tool_tip="EXPERIMENTAL. Draws static opaque PBR (GLTF material) surfaces with a few large multi-draw calls out of a shared vertex arena instead of one draw call each. Looks the same; saves CPU time in busy scenes. Needs OpenGL 4.3. Uses up to the arena size below of video memory. Rebuilds shaders."
+                     top="1412"
+                     width="475" />
+                    <check_box
+                     control_name="FSPerfGPUDrivenPBRBindless"
+                     enabled_control="FSPerfGPUDrivenPBR"
+                     follows="left|top"
+                     height="20"
+                     label="Bindless PBR textures"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfgpudrivenpbrbindless"
+                     tool_tip="EXPERIMENTAL. With GPU-driven PBR surfaces: uses bindless textures (GL_ARB_bindless_texture) so surfaces with different materials share one draw call. Looks the same; saves more CPU time. Not used where the driver doesn't support it properly. Rebuilds shaders."
+                     top="1438"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfgpudrivenpbrarenamb_label"
+                     tool_tip="EXPERIMENTAL. Most video memory the GPU-driven PBR surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
+                     top="1466"
+                     width="285">
+                        PBR vertex arena (MB)
+                    </text>
+                    <spinner
+                     control_name="FSPerfGPUDrivenPBRArenaMB"
+                     decimal_digits="0"
+                     enabled_control="FSPerfGPUDrivenPBR"
+                     follows="left|top"
+                     height="20"
+                     increment="64"
+                     layout="topleft"
+                     left="330"
+                     max_val="2048"
+                     min_val="16"
+                     name="fs_fsperfgpudrivenpbrarenamb"
+                     tool_tip="EXPERIMENTAL. Most video memory the GPU-driven PBR surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
+                     top="1464"
                      width="100" />
                 </panel>
             </scroll_container>

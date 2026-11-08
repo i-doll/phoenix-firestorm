@@ -500,6 +500,12 @@ void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
 
 void LLTexUnit::setTextureAddressModeFast(eTextureAddressMode mode, eTextureType tex_type)
 {
+    // <FS:Trish> FSPerfGPUDrivenPBRBindless: a texture with a bindless handle can't take new parameters
+    if (LLImageGL::sFSTextureUnlock)
+    {
+        LLImageGL::fsUnlockTexture(gGL.getTexUnit(gGL.getCurrentTexUnitIndex())->mCurrTexture);
+    }
+    // </FS:Trish>
     glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_S, sGLAddressMode[mode]);
     glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
     if (tex_type == TT_CUBE_MAP || tex_type == TT_CUBE_MAP_ARRAY || tex_type == TT_TEXTURE_3D)
@@ -519,6 +525,12 @@ void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions optio
 
 void LLTexUnit::setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type)
 {
+    // <FS:Trish> FSPerfGPUDrivenPBRBindless: a texture with a bindless handle can't take new parameters
+    if (LLImageGL::sFSTextureUnlock)
+    {
+        LLImageGL::fsUnlockTexture(gGL.getTexUnit(gGL.getCurrentTexUnitIndex())->mCurrTexture);
+    }
+    // </FS:Trish>
     if (option == TFO_POINT)
     {
         glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
