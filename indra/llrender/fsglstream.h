@@ -119,6 +119,7 @@ namespace FSGLStream
         std::string mTopSyncs;      // "glGetError x12, ..." most frequent synchronous calls
         std::string mTopCalls;      // "glUniformMatrix4fv 812 (50 KB), ..." most recorded calls, per frame
         std::string mTopSkips;      // "glBindTexture 340, ..." calls dropped as redundant, per frame
+        std::string mTopZones;      // "shadow simple 4100 (draws 900, texture binds 20), ..." calls per GPU zone, per frame
         U64 mSkippedCalls = 0;      // calls dropped as redundant (they would set state to what it is)
     };
     // Main thread. Returns the counters since the last call and resets them.

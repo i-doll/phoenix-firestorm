@@ -246,12 +246,17 @@ namespace LLFSGPUZone
     inline std::atomic<bool> sActive{ false };
     inline void (*sBegin)(const char* name) = nullptr; // set by FSGPUTimers
     inline void (*sEnd)() = nullptr;
+    // The innermost open zone of this thread, always kept: FSGLStream's stats count the GL
+    // calls recorded inside each zone
+    inline thread_local const char* tZone = nullptr;
 
     struct Scope
     {
         bool mOn;
-        explicit Scope(const char* name) : mOn(sActive.load(std::memory_order_relaxed) && sBegin)
+        const char* mOuter;
+        explicit Scope(const char* name) : mOn(sActive.load(std::memory_order_relaxed) && sBegin), mOuter(tZone)
         {
+            tZone = name;
             if (mOn)
             {
                 sBegin(name);
@@ -259,6 +264,7 @@ namespace LLFSGPUZone
         }
         ~Scope()
         {
+            tZone = mOuter;
             if (mOn && sEnd)
             {
                 sEnd();

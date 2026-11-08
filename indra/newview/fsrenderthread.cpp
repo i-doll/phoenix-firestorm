@@ -99,6 +99,10 @@ namespace
         {
             LL_INFOS("FSRenderThread") << "Redundant calls dropped per frame: " << s.mTopSkips << LL_ENDL;
         }
+        if (!s.mTopZones.empty())
+        {
+            LL_INFOS("FSRenderThread") << "Calls per frame by GPU zone: " << s.mTopZones << LL_ENDL;
+        }
         sFrames = 0;
         sFrameSeconds = 0.0;
     }

@@ -43,6 +43,7 @@
 #include <cstring>
 #include <deque>
 #include <immintrin.h>
+#include <map>
 #include <mutex>
 #include <string>
 #include <new>
@@ -90,6 +91,54 @@ namespace
     U32 sCallCount[FSGL_COUNT] = {};            // main thread: calls recorded, per entry point
     U64 sCallBytes[FSGL_COUNT] = {};            // main thread: what they recorded
     U32 sSkipCount[FSGL_COUNT] = {};            // main thread: calls dropped as changing nothing
+
+    // Main thread: recorded calls per GPU zone (LL_PROFILE_GPU_ZONE, innermost), to find which
+    // passes make the most calls. Zone names are literals, so keyed by pointer; the last zone's
+    // counters are cached, as consecutive calls nearly always share it.
+    struct ZoneCalls
+    {
+        U32 mCalls = 0;
+        U32 mDraws = 0;
+        U32 mBinds = 0;     // texture binds
+    };
+    std::unordered_map<const char*, ZoneCalls> sZoneCalls;
+    const char* sLastZone = nullptr;
+    ZoneCalls* sLastZoneCalls = nullptr;
+
+    constexpr bool isDraw(int id)
+    {
+        return id == FSGL_ID_glDrawArrays || id == FSGL_ID_glDrawElements || id == FSGL_ID_glDrawRangeElements ||
+               id == FSGL_ID_glDrawArraysInstanced || id == FSGL_ID_glDrawElementsInstanced ||
+               id == FSGL_ID_glDrawElementsBaseVertex || id == FSGL_ID_glDrawRangeElementsBaseVertex ||
+               id == FSGL_ID_glDrawElementsInstancedBaseVertex || id == FSGL_ID_glDrawArraysInstancedBaseInstance ||
+               id == FSGL_ID_glDrawElementsInstancedBaseInstance || id == FSGL_ID_glDrawElementsInstancedBaseVertexBaseInstance ||
+               id == FSGL_ID_glMultiDrawArraysIndirect || id == FSGL_ID_glMultiDrawElementsIndirect ||
+               id == FSGL_ID_glMultiDrawArraysIndirectCount || id == FSGL_ID_glMultiDrawElementsIndirectCount ||
+               id == FSGL_ID_glMultiDrawArrays || id == FSGL_ID_glMultiDrawElements ||
+               id == FSGL_ID_glMultiDrawElementsBaseVertex || id == FSGL_ID_glDrawArraysIndirect ||
+               id == FSGL_ID_glDrawElementsIndirect;
+    }
+
+    template <int ID>
+    inline void noteCall()
+    {
+        ++sCallCount[ID];
+        const char* zone = LLFSGPUZone::tZone;
+        if (zone != sLastZone || !sLastZoneCalls)
+        {
+            sLastZone = zone;
+            sLastZoneCalls = &sZoneCalls[zone];
+        }
+        ++sLastZoneCalls->mCalls;
+        if constexpr (isDraw(ID))
+        {
+            ++sLastZoneCalls->mDraws;
+        }
+        if constexpr (ID == FSGL_ID_glBindTexture || ID == FSGL_ID_glBindTextureUnit || ID == FSGL_ID_glBindTextures)
+        {
+            ++sLastZoneCalls->mBinds;
+        }
+    }
     U64 sStatSkips = 0;                         // main thread
 
     // A call that would set state to what it already is: not recorded at all
@@ -154,8 +203,9 @@ namespace
 
     // Chunks are handed over at SUBMIT_BYTES or at every wait, so most are only partly used: a
     // small size keeps the pool's memory in use. Records larger than a chunk (texture and media
-    // uploads, buffer data) get a chunk of their own, rounded up to a power of two and kept for
-    // reuse, as allocating and first touching megabytes for every media frame is costly.
+    // uploads, buffer data) get a chunk of their own, rounded up to a multiple of CHUNK_SIZE (a
+    // power of two would waste up to half of it) and kept for reuse, as allocating and first
+    // touching megabytes for every media frame is costly.
     constexpr size_t CHUNK_SIZE = 64 * 1024;
     constexpr size_t SUBMIT_BYTES = 32 * 1024;   // hand chunks over early so replay overlaps recording
     constexpr size_t MAX_FREE_CHUNKS = 256;
@@ -172,12 +222,7 @@ namespace
 
     size_t largeChunkSize(size_t min_cap)
     {
-        size_t cap = CHUNK_SIZE * 2;
-        while (cap < min_cap)
-        {
-            cap <<= 1;
-        }
-        return cap;
+        return std::max(CHUNK_SIZE * 2, (min_cap + CHUNK_SIZE - 1) / CHUNK_SIZE * CHUNK_SIZE);
     }
 
     Chunk* allocChunk(size_t min_cap)
@@ -434,7 +479,7 @@ namespace
         {
             U8* p = allocRecord(&execTuple<ID, Fn, T>, sizeof(T));
             new (p) T(a...);
-            ++sCallCount[ID];
+            noteCall<ID>();
             sCallBytes[ID] += sizeof(RecHdr) + align16(sizeof(T));
             commitRecord();
         }
@@ -495,7 +540,7 @@ namespace
             {
                 memcpy(p + align16(sizeof(T)), src, blob);
             }
-            ++sCallCount[ID];
+            noteCall<ID>();
             sCallBytes[ID] += sizeof(RecHdr) + align16(align16(sizeof(T)) + blob);
             commitRecord();
         }
@@ -569,6 +614,278 @@ namespace
         }
     }
 
+    // The shadow's hot lookups are arrays for what the viewer uses (texture units and targets,
+    // sampler units, capabilities), with a map for anything else, so the calls made per draw
+    // don't hash.
+
+    constexpr GLuint TEX_UNITS = 32;
+    constexpr int NUM_TEX_TARGETS = 11;
+
+    int texTargetIndex(GLenum target)
+    {
+        switch (target)
+        {
+        case GL_TEXTURE_2D: return 0;
+        case GL_TEXTURE_CUBE_MAP: return 1;
+        case GL_TEXTURE_2D_ARRAY: return 2;
+        case GL_TEXTURE_3D: return 3;
+        case GL_TEXTURE_2D_MULTISAMPLE: return 4;
+        case GL_TEXTURE_RECTANGLE: return 5;
+        case GL_TEXTURE_1D: return 6;
+        case GL_TEXTURE_CUBE_MAP_ARRAY: return 7;
+        case GL_TEXTURE_BUFFER: return 8;
+        case GL_TEXTURE_2D_MULTISAMPLE_ARRAY: return 9;
+        case GL_TEXTURE_1D_ARRAY: return 10;
+        default: return -1;
+        }
+    }
+
+    // Texture bound per unit and target, where known
+    struct TexBindings
+    {
+        GLuint mTex[TEX_UNITS][NUM_TEX_TARGETS] = {};
+        U16 mKnown[TEX_UNITS] = {};                 // a bit per target index
+        std::unordered_map<U64, GLuint> mOther;     // (unit << 32 | target) -> texture
+
+        static U64 key(GLuint unit, GLenum target)
+        {
+            return ((U64)unit << 32) | (U64)target;
+        }
+
+        bool find(GLuint unit, GLenum target, GLuint& texture) const
+        {
+            const int t = texTargetIndex(target);
+            if (unit < TEX_UNITS && t >= 0)
+            {
+                if (mKnown[unit] & (1u << t))
+                {
+                    texture = mTex[unit][t];
+                    return true;
+                }
+                return false;
+            }
+            auto it = mOther.find(key(unit, target));
+            if (it == mOther.end())
+            {
+                return false;
+            }
+            texture = it->second;
+            return true;
+        }
+
+        void set(GLuint unit, GLenum target, GLuint texture)
+        {
+            const int t = texTargetIndex(target);
+            if (unit < TEX_UNITS && t >= 0)
+            {
+                mTex[unit][t] = texture;
+                mKnown[unit] |= (U16)(1u << t);
+            }
+            else
+            {
+                mOther[key(unit, target)] = texture;
+            }
+        }
+
+        void forgetUnit(GLuint unit)
+        {
+            if (unit < TEX_UNITS)
+            {
+                mKnown[unit] = 0;
+            }
+            for (auto it = mOther.begin(); it != mOther.end();)
+            {
+                it = (GLuint)(it->first >> 32) == unit ? mOther.erase(it) : std::next(it);
+            }
+        }
+
+        void clear()
+        {
+            memset(mKnown, 0, sizeof(mKnown));
+            mOther.clear();
+        }
+
+        // a deleted texture leaves 0 bound wherever it was
+        void deleted(GLuint texture)
+        {
+            for (GLuint u = 0; u < TEX_UNITS; ++u)
+            {
+                const U32 known = mKnown[u];
+                if (!known)
+                {
+                    continue;
+                }
+                for (int t = 0; t < NUM_TEX_TARGETS; ++t)
+                {
+                    if ((known & (1u << t)) && mTex[u][t] == texture)
+                    {
+                        mTex[u][t] = 0;
+                    }
+                }
+            }
+            for (auto& [k, bound] : mOther)
+            {
+                if (bound == texture)
+                {
+                    bound = 0;
+                }
+            }
+        }
+    };
+
+    // Sampler bound per unit, where known
+    struct SamplerBindings
+    {
+        GLuint mSampler[TEX_UNITS] = {};
+        U32 mKnown = 0;                                 // a bit per unit
+        std::unordered_map<GLuint, GLuint> mOther;      // unit -> sampler
+
+        bool find(GLuint unit, GLuint& sampler) const
+        {
+            if (unit < TEX_UNITS)
+            {
+                if (mKnown & (1u << unit))
+                {
+                    sampler = mSampler[unit];
+                    return true;
+                }
+                return false;
+            }
+            auto it = mOther.find(unit);
+            if (it == mOther.end())
+            {
+                return false;
+            }
+            sampler = it->second;
+            return true;
+        }
+
+        void set(GLuint unit, GLuint sampler)
+        {
+            if (unit < TEX_UNITS)
+            {
+                mSampler[unit] = sampler;
+                mKnown |= 1u << unit;
+            }
+            else
+            {
+                mOther[unit] = sampler;
+            }
+        }
+
+        void forget(GLuint unit)
+        {
+            if (unit < TEX_UNITS)
+            {
+                mKnown &= ~(1u << unit);
+            }
+            else
+            {
+                mOther.erase(unit);
+            }
+        }
+
+        void deleted(GLuint sampler)
+        {
+            for (GLuint u = 0; u < TEX_UNITS; ++u)
+            {
+                if ((mKnown & (1u << u)) && mSampler[u] == sampler)
+                {
+                    mSampler[u] = 0;
+                }
+            }
+            for (auto& [unit, bound] : mOther)
+            {
+                if (bound == sampler)
+                {
+                    bound = 0;
+                }
+            }
+        }
+    };
+
+    // glIsEnabled answers we know
+    constexpr int NUM_CAPS = 20;
+
+    int capIndex(GLenum cap)
+    {
+        switch (cap)
+        {
+        case GL_BLEND: return 0;
+        case GL_DEPTH_TEST: return 1;
+        case GL_CULL_FACE: return 2;
+        case GL_SCISSOR_TEST: return 3;
+        case GL_STENCIL_TEST: return 4;
+        case GL_POLYGON_OFFSET_FILL: return 5;
+        case GL_POLYGON_OFFSET_LINE: return 6;
+        case GL_LINE_SMOOTH: return 7;
+        case GL_MULTISAMPLE: return 8;
+        case GL_SAMPLE_ALPHA_TO_COVERAGE: return 9;
+        case GL_DEPTH_CLAMP: return 10;
+        case GL_TEXTURE_CUBE_MAP_SEAMLESS: return 11;
+        case GL_FRAMEBUFFER_SRGB: return 12;
+        case GL_PROGRAM_POINT_SIZE: return 13;
+        case GL_DITHER: return 14;
+        case GL_CLIP_DISTANCE0: return 15;
+        case GL_PRIMITIVE_RESTART: return 16;
+        case GL_RASTERIZER_DISCARD: return 17;
+        case GL_SAMPLE_COVERAGE: return 18;
+        case GL_POLYGON_SMOOTH: return 19;
+        default: return -1;
+        }
+    }
+
+    struct CapStates
+    {
+        bool mKnown[NUM_CAPS] = {};
+        bool mOn[NUM_CAPS] = {};
+        std::unordered_map<GLenum, bool> mOther;
+
+        bool find(GLenum cap, bool& on) const
+        {
+            const int i = capIndex(cap);
+            if (i >= 0)
+            {
+                on = mOn[i];
+                return mKnown[i];
+            }
+            auto it = mOther.find(cap);
+            if (it == mOther.end())
+            {
+                return false;
+            }
+            on = it->second;
+            return true;
+        }
+
+        void set(GLenum cap, bool on)
+        {
+            const int i = capIndex(cap);
+            if (i >= 0)
+            {
+                mOn[i] = on;
+                mKnown[i] = true;
+            }
+            else
+            {
+                mOther[cap] = on;
+            }
+        }
+
+        void forget(GLenum cap)
+        {
+            const int i = capIndex(cap);
+            if (i >= 0)
+            {
+                mKnown[i] = false;
+            }
+            else
+            {
+                mOther.erase(cap);
+            }
+        }
+    };
+
     struct Shadow
     {
         bool mViewportOk = false;
@@ -599,24 +916,68 @@ namespace
         GLenum mDepthFunc = GL_LESS;
         bool mCullFaceOk = false;
         GLenum mCullFace = GL_BACK;
-        std::unordered_map<U64, GLuint> mTex;      // (unit << 32 | target) -> texture, where known
-        std::unordered_map<GLuint, GLuint> mSampler; // unit -> sampler, where known
+        TexBindings mTex;
+        SamplerBindings mSampler;
         bool mPixelStoreOk[NUM_PIXEL_STORE] = {};
         GLint mPixelStore[NUM_PIXEL_STORE] = {};
         bool mBindOk[B_COUNT] = {};
         GLuint mBind[B_COUNT] = {};
         bool mVAOOk = false;
         GLuint mVAO = 0;
-        std::unordered_map<GLuint, GLuint> mEBO;    // element buffer of each VAO we know
-        std::unordered_map<GLenum, bool> mCaps;     // glIsEnabled answers we know
+        // Element buffer of each VAO we know. The bound VAO's is held in mCurEBO instead (its map
+        // entry is stale while mCurEBODirty), so draws and binds don't look it up.
+        std::unordered_map<GLuint, GLuint> mEBO;
+        bool mCurEBOOk = false;
+        bool mCurEBODirty = false;
+        GLuint mCurEBO = 0;
+        CapStates mCaps;
         bool mClientArrays = false;                 // a vertex attribute was set without an array buffer
     };
     Shadow sSh;     // main thread
+    bool sCoreProfile = false;  // main thread: no client-side vertex arrays in this context
+
+    // The bound VAO's element buffer: set (known) or forget (unknown)
+    void setCurEBO(GLuint buffer)
+    {
+        sSh.mCurEBO = buffer;
+        sSh.mCurEBOOk = true;
+        sSh.mCurEBODirty = true;
+    }
+
+    void forgetCurEBO()
+    {
+        sSh.mCurEBOOk = false;
+        sSh.mCurEBODirty = true;
+    }
+
+    // Main thread: another VAO is bound. What we know of the old one's element buffer goes back
+    // into the map, the new one's comes out of it.
+    void switchVAO(GLuint vao)
+    {
+        if (sSh.mVAOOk && sSh.mCurEBODirty)
+        {
+            if (sSh.mCurEBOOk)
+            {
+                sSh.mEBO[sSh.mVAO] = sSh.mCurEBO;
+            }
+            else
+            {
+                sSh.mEBO.erase(sSh.mVAO);
+            }
+        }
+        sSh.mVAO = vao;
+        sSh.mVAOOk = true;
+        auto it = sSh.mEBO.find(vao);
+        sSh.mCurEBOOk = it != sSh.mEBO.end();
+        sSh.mCurEBO = sSh.mCurEBOOk ? it->second : 0;
+        sSh.mCurEBODirty = false;
+    }
 
     // Main thread, direct mode, context current: read what the shadow tracks.
     void snapshotState()
     {
         sSh = Shadow();
+        sCoreProfile = false;
         auto getI = FSGL_REAL(glGetIntegerv);
         auto getF = FSGL_REAL(glGetFloatv);
         auto getB = FSGL_REAL(glGetBooleanv);
@@ -624,6 +985,12 @@ namespace
         if (!getI || !getF || !getB)
         {
             return;
+        }
+        if (sGLVersion >= 3.2f)
+        {
+            GLint profile = 0;
+            getI(GL_CONTEXT_PROFILE_MASK, &profile);
+            sCoreProfile = (profile & GL_CONTEXT_CORE_PROFILE_BIT) != 0;
         }
         getI(GL_VIEWPORT, sSh.mViewport);
         sSh.mViewportOk = true;
@@ -685,9 +1052,8 @@ namespace
         GLint vao = 0, ebo = 0;
         getI(GL_VERTEX_ARRAY_BINDING, &vao);
         getI(GL_ELEMENT_ARRAY_BUFFER_BINDING, &ebo);
-        sSh.mVAO = (GLuint)vao;
-        sSh.mVAOOk = true;
-        sSh.mEBO[sSh.mVAO] = (GLuint)ebo;
+        switchVAO((GLuint)vao);
+        setCurEBO((GLuint)ebo);
         if (getErr)
         {
             while (getErr() != GL_NO_ERROR)
@@ -710,12 +1076,7 @@ namespace
 
     bool eboBound()
     {
-        if (!sSh.mVAOOk)
-        {
-            return false;
-        }
-        auto it = sSh.mEBO.find(sSh.mVAO);
-        return it != sSh.mEBO.end() && it->second != 0;
+        return sSh.mVAOOk && sSh.mCurEBOOk && sSh.mCurEBO != 0;
     }
 
     bool slotBound(int slot)
@@ -785,9 +1146,11 @@ namespace
     {
         if (h.mVAO >= 0 && h.mEBO >= 0)
         {
-            sSh.mVAO = (GLuint)h.mVAO;
-            sSh.mVAOOk = true;
-            sSh.mEBO[sSh.mVAO] = (GLuint)h.mEBO;
+            if (!sSh.mVAOOk || sSh.mVAO != (GLuint)h.mVAO)
+            {
+                switchVAO((GLuint)h.mVAO);
+            }
+            setCurEBO((GLuint)h.mEBO);
         }
         for (int i = 0; i < B_COUNT; ++i)
         {
@@ -799,10 +1162,19 @@ namespace
         }
         if (kind == K_ARRAY && sSh.mBindOk[B_ARRAY] && sSh.mBind[B_ARRAY] == 0 && !sSh.mClientArrays)
         {
-            // Client-side vertex arrays: draws read client memory when they
-            // run, so from now on every draw is synchronous.
-            sSh.mClientArrays = true;
-            LL_WARNS("FSRenderThread") << "Client-side vertex arrays in use; draws are no longer deferred" << LL_ENDL;
+            // Client-side vertex arrays exist only in a compatibility context with vertex array 0
+            // bound. Anywhere else the call was a GL error (it ran synchronously above) and must not
+            // make every later draw synchronous; the viewer never uses client arrays.
+            if (!sCoreProfile && (!sSh.mVAOOk || sSh.mVAO == 0))
+            {
+                // draws read client memory when they run, so from now on every draw is synchronous
+                sSh.mClientArrays = true;
+                LL_WARNS("FSRenderThread") << "Client-side vertex arrays in use; draws are no longer deferred" << LL_ENDL;
+            }
+            else
+            {
+                LL_WARNS_ONCE("FSRenderThread") << "A vertex attribute pointer was set without an array buffer bound (GL error)" << LL_ENDL;
+            }
         }
     }
 
@@ -963,7 +1335,9 @@ namespace
         static void APIENTRY call(GLfloat factor, GLfloat units, GLfloat clamp)
         {
             if (!tRecording) { P::passthrough(factor, units, clamp); return; }
-            sSh.mPoly[0] = factor; sSh.mPoly[1] = units; sSh.mPolyOk = true;
+            // the shadow has no clamp: a later glPolygonOffset with the same factor and units
+            // resets it to 0 and must not be dropped
+            sSh.mPolyOk = false;
             P::record(factor, units, clamp);
         }
     FSGL_END
@@ -1028,7 +1402,8 @@ namespace
     FSGL_BEGIN(glColorMaski)
         static void APIENTRY call(GLuint i, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
         {
-            if (tRecording && i == 0) { sSh.mColorMaskOk = false; }
+            // any draw buffer: glColorMask sets them all, so it can't be dropped while one differs
+            if (tRecording) { sSh.mColorMaskOk = false; }
             P::generic(i, r, g, b, a);
         }
     FSGL_END
@@ -1086,13 +1461,13 @@ namespace
         static void APIENTRY call(GLenum cap)
         {
             if (!tRecording) { P::passthrough(cap); return; }
-            auto it = sSh.mCaps.find(cap);
-            if (sFilter && (it != sSh.mCaps.end() && it->second))
+            bool on = false;
+            if (sFilter && (sSh.mCaps.find(cap, on) && on))
             {
                 noteSkip(FSGL_ID_glEnable);
                 return;
             }
-            sSh.mCaps[cap] = true;
+            sSh.mCaps.set(cap, true);
             P::record(cap);
         }
     FSGL_END
@@ -1101,13 +1476,13 @@ namespace
         static void APIENTRY call(GLenum cap)
         {
             if (!tRecording) { P::passthrough(cap); return; }
-            auto it = sSh.mCaps.find(cap);
-            if (sFilter && (it != sSh.mCaps.end() && !it->second))
+            bool on = true;
+            if (sFilter && (sSh.mCaps.find(cap, on) && !on))
             {
                 noteSkip(FSGL_ID_glDisable);
                 return;
             }
-            sSh.mCaps[cap] = false;
+            sSh.mCaps.set(cap, false);
             P::record(cap);
         }
     FSGL_END
@@ -1115,7 +1490,7 @@ namespace
     FSGL_BEGIN(glEnablei)
         static void APIENTRY call(GLenum cap, GLuint i)
         {
-            if (tRecording) { sSh.mCaps.erase(cap); }
+            if (tRecording) { sSh.mCaps.forget(cap); }
             P::generic(cap, i);
         }
     FSGL_END
@@ -1123,7 +1498,7 @@ namespace
     FSGL_BEGIN(glDisablei)
         static void APIENTRY call(GLenum cap, GLuint i)
         {
-            if (tRecording) { sSh.mCaps.erase(cap); }
+            if (tRecording) { sSh.mCaps.forget(cap); }
             P::generic(cap, i);
         }
     FSGL_END
@@ -1132,13 +1507,13 @@ namespace
         static GLboolean APIENTRY call(GLenum cap)
         {
             if (!tRecording) { return P::passthrough(cap); }
-            auto it = sSh.mCaps.find(cap);
-            if (it != sSh.mCaps.end())
+            bool on = false;
+            if (sSh.mCaps.find(cap, on))
             {
-                return it->second ? GL_TRUE : GL_FALSE;
+                return on ? GL_TRUE : GL_FALSE;
             }
             GLboolean r = P::sync(cap);
-            sSh.mCaps[cap] = (r != GL_FALSE);
+            sSh.mCaps.set(cap, r != GL_FALSE);
             return r;
         }
     FSGL_END
@@ -1151,13 +1526,12 @@ namespace
             {
                 if (sSh.mVAOOk)
                 {
-                    auto it = sSh.mEBO.find(sSh.mVAO);
-                    if (sFilter && (it != sSh.mEBO.end() && it->second == buffer))
+                    if (sFilter && (sSh.mCurEBOOk && sSh.mCurEBO == buffer))
                     {
                         noteSkip(FSGL_ID_glBindBuffer);
                         return;
                     }
-                    sSh.mEBO[sSh.mVAO] = buffer;
+                    setCurEBO(buffer);
                 }
             }
             else
@@ -1187,8 +1561,7 @@ namespace
                 noteSkip(FSGL_ID_glBindVertexArray);
                 return;
             }
-            sSh.mVAO = vao;
-            sSh.mVAOOk = true;
+            switchVAO(vao);
             P::record(vao);
         }
     FSGL_END
@@ -1197,7 +1570,14 @@ namespace
         static void APIENTRY call(GLuint vao, GLuint buffer)
         {
             if (!tRecording) { P::passthrough(vao, buffer); return; }
-            sSh.mEBO[vao] = buffer;
+            if (sSh.mVAOOk && sSh.mVAO == vao)
+            {
+                setCurEBO(buffer);
+            }
+            else
+            {
+                sSh.mEBO[vao] = buffer;
+            }
             P::record(vao, buffer);
         }
     FSGL_END
@@ -1222,25 +1602,20 @@ namespace
         }
     FSGL_END
 
-    inline U64 texKey(GLuint unit, GLenum target)
-    {
-        return ((U64)unit << 32) | (U64)target;
-    }
-
     FSGL_BEGIN(glBindTexture)
         static void APIENTRY call(GLenum target, GLuint texture)
         {
             if (!tRecording) { P::passthrough(target, texture); return; }
             if (sSh.mActiveTexOk)
             {
-                const U64 key = texKey((GLuint)(sSh.mActiveTex - GL_TEXTURE0), target);
-                auto it = sSh.mTex.find(key);
-                if (sFilter && (it != sSh.mTex.end() && it->second == texture))
+                const GLuint unit = (GLuint)(sSh.mActiveTex - GL_TEXTURE0);
+                GLuint bound = 0;
+                if (sFilter && (sSh.mTex.find(unit, target, bound) && bound == texture))
                 {
                     noteSkip(FSGL_ID_glBindTexture);
                     return;
                 }
-                sSh.mTex[key] = texture;
+                sSh.mTex.set(unit, target, texture);
             }
             else
             {
@@ -1253,10 +1628,7 @@ namespace
     // The target of a DSA bind is the texture's own, which isn't known here: forget the unit
     void forgetTextureUnit(GLuint unit)
     {
-        for (auto it = sSh.mTex.begin(); it != sSh.mTex.end();)
-        {
-            it = (GLuint)(it->first >> 32) == unit ? sSh.mTex.erase(it) : std::next(it);
-        }
+        sSh.mTex.forgetUnit(unit);
     }
 
     FSGL_BEGIN(glBindTextureUnit)
@@ -1308,13 +1680,13 @@ namespace
         static void APIENTRY call(GLuint unit, GLuint sampler)
         {
             if (!tRecording) { P::passthrough(unit, sampler); return; }
-            auto it = sSh.mSampler.find(unit);
-            if (sFilter && (it != sSh.mSampler.end() && it->second == sampler))
+            GLuint bound = 0;
+            if (sFilter && (sSh.mSampler.find(unit, bound) && bound == sampler))
             {
                 noteSkip(FSGL_ID_glBindSampler);
                 return;
             }
-            sSh.mSampler[unit] = sampler;
+            sSh.mSampler.set(unit, sampler);
             P::record(unit, sampler);
         }
     FSGL_END
@@ -1325,7 +1697,7 @@ namespace
             if (!tRecording) { P::passthrough(first, count, samplers); return; }
             for (GLsizei i = 0; i < count; ++i)
             {
-                sSh.mSampler.erase(first + (GLuint)i);
+                sSh.mSampler.forget(first + (GLuint)i);
             }
             FSGL_BLOB(glBindSamplers, 2)::record(size_t(count > 0 ? count : 0) * sizeof(GLuint), first, count, samplers);
         }
@@ -1400,10 +1772,77 @@ namespace
 
     struct UniformValue
     {
-        U8 mSize = 0;
+        U8 mSize = 0;           // 0: not known
         U8 mBytes[72] = {};
     };
-    std::unordered_map<GLuint, std::unordered_map<GLint, UniformValue>> sUniformValues; // main
+
+    // A program's values: a vector indexed by location (locations are small and dense), a map for
+    // any beyond DENSE_LOCATIONS
+    struct ProgramUniforms
+    {
+        static constexpr GLint DENSE_LOCATIONS = 1024;
+        std::vector<UniformValue> mDense;
+        std::unordered_map<GLint, UniformValue> mSparse;
+
+        UniformValue& get(GLint loc)
+        {
+            if (loc < DENSE_LOCATIONS)
+            {
+                if ((size_t)loc >= mDense.size())
+                {
+                    mDense.resize((size_t)loc + 1);
+                }
+                return mDense[loc];
+            }
+            return mSparse[loc];
+        }
+
+        void forget(GLint loc)
+        {
+            if (loc < DENSE_LOCATIONS)
+            {
+                if ((size_t)loc < mDense.size())
+                {
+                    mDense[loc].mSize = 0;
+                }
+            }
+            else
+            {
+                mSparse.erase(loc);
+            }
+        }
+    };
+    std::unordered_map<GLuint, ProgramUniforms> sUniformValues; // main
+
+    // The current program's entry, looked up once per program change rather than per uniform.
+    // Map nodes don't move; forgetProgram and clearUniformValues drop the pointer with the node.
+    ProgramUniforms* sCurUniforms = nullptr;    // main
+    GLuint sCurUniformsProgram = 0;             // main
+
+    ProgramUniforms& currentUniforms()
+    {
+        if (!sCurUniforms || sCurUniformsProgram != sSh.mProgram)
+        {
+            sCurUniforms = &sUniformValues[sSh.mProgram];
+            sCurUniformsProgram = sSh.mProgram;
+        }
+        return *sCurUniforms;
+    }
+
+    void clearUniformValues()
+    {
+        sUniformValues.clear();
+        sCurUniforms = nullptr;
+    }
+
+    void eraseUniformValues(GLuint program)
+    {
+        sUniformValues.erase(program);
+        if (sCurUniformsProgram == program)
+        {
+            sCurUniforms = nullptr;
+        }
+    }
 
     // An array set as a whole: its elements are locations of their own, set one by one elsewhere,
     // so the whole array isn't cached and every element it covers is forgotten
@@ -1418,7 +1857,7 @@ namespace
         {
             for (GLsizei i = 0; i < count; ++i)
             {
-                it->second.erase(loc + i);
+                it->second.forget(loc + i);
             }
         }
     }
@@ -1431,13 +1870,13 @@ namespace
         {
             return false;
         }
-        auto& per_program = sUniformValues[sSh.mProgram];
+        ProgramUniforms& per_program = currentUniforms();
         if (!data || bytes == 0 || bytes > 64)
         {
-            per_program.erase(loc);
+            per_program.forget(loc);
             return false;
         }
-        UniformValue& v = per_program[loc];
+        UniformValue& v = per_program.get(loc);
         const U8 size = (U8)(bytes + 1);
         if (v.mSize == size && v.mBytes[bytes] == extra && memcmp(v.mBytes, data, bytes) == 0)
         {
@@ -1550,6 +1989,97 @@ namespace
     FSGL_UNIFORMMATRIXV(glUniformMatrix4x2fv, 8)
     FSGL_UNIFORMMATRIXV(glUniformMatrix3x4fv, 12)
     FSGL_UNIFORMMATRIXV(glUniformMatrix4x3fv, 12)
+
+    // Uniform setters the cache doesn't compare still change what a location holds: forget it
+    // (glProgramUniform*: in the named program's cache), or a later set to the cached value
+    // would be dropped
+    void forgetUniformsOf(GLuint program, GLint loc, GLsizei count)
+    {
+        if (loc < 0)
+        {
+            return;
+        }
+        auto it = sUniformValues.find(program);
+        if (it == sUniformValues.end())
+        {
+            return;
+        }
+        count = std::min<GLsizei>(std::max<GLsizei>(count, 1), 4096);
+        for (GLsizei i = 0; i < count; ++i)
+        {
+            it->second.forget(loc + i);
+        }
+    }
+
+    // PROG, LOC and COUNT: argument indices of the program, location and element count (-1: none)
+    template <int ID, typename PFN, int PROG, int LOC, int COUNT> struct ForgetUniformCall;
+
+    template <int ID, typename R, typename... A, int PROG, int LOC, int COUNT>
+    struct ForgetUniformCall<ID, R (APIENTRY*)(A...), PROG, LOC, COUNT>
+    {
+        static constexpr bool kHas = true;
+        using P = Proxy<ID, R (APIENTRY*)(A...)>;
+
+        static R APIENTRY call(A... a)
+        {
+            if (tRecording)
+            {
+                const std::tuple<A...> t(a...);
+                const GLint loc = (GLint)std::get<LOC>(t);
+                GLsizei count = 1;
+                if constexpr (COUNT >= 0)
+                {
+                    count = (GLsizei)std::get<COUNT>(t);
+                }
+                if constexpr (PROG >= 0)
+                {
+                    forgetUniformsOf((GLuint)std::get<PROG>(t), loc, count);
+                }
+                else if (sSh.mProgramOk)
+                {
+                    forgetUniformsOf(sSh.mProgram, loc, count);
+                }
+                else
+                {
+                    clearUniformValues();   // the program in use isn't known
+                }
+            }
+            return P::generic(a...);
+        }
+    };
+
+#define FSGL_FORGET_UNIFORM(name, prog, loc, count) \
+    template <> struct Custom<FSGL_ID_##name> : ForgetUniformCall<FSGL_ID_##name, decltype(::name), prog, loc, count> {};
+#define FSGL_FORGET_UNIFORM4(prefix, suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##1##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##2##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##3##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##4##suffix, prog, loc, count)
+#define FSGL_FORGET_UNIFORM_MATRICES(prefix, suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##2##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##3##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##4##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##2x3##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##3x2##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##2x4##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##4x2##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##3x4##suffix, prog, loc, count) \
+    FSGL_FORGET_UNIFORM(prefix##4x3##suffix, prog, loc, count)
+
+    FSGL_FORGET_UNIFORM4(glUniform, ui, -1, 0, -1)
+    FSGL_FORGET_UNIFORM4(glUniform, d, -1, 0, -1)
+    FSGL_FORGET_UNIFORM4(glUniform, dv, -1, 0, 1)
+    FSGL_FORGET_UNIFORM_MATRICES(glUniformMatrix, dv, -1, 0, 1)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, i, 0, 1, -1)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, f, 0, 1, -1)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, d, 0, 1, -1)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, ui, 0, 1, -1)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, iv, 0, 1, 2)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, fv, 0, 1, 2)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, dv, 0, 1, 2)
+    FSGL_FORGET_UNIFORM4(glProgramUniform, uiv, 0, 1, 2)
+    FSGL_FORGET_UNIFORM_MATRICES(glProgramUniformMatrix, fv, 0, 1, 2)
+    FSGL_FORGET_UNIFORM_MATRICES(glProgramUniformMatrix, dv, 0, 1, 2)
 
     FSGL_BEGIN(glVertexAttrib4fv)
         static void APIENTRY call(GLuint index, const GLfloat* v)
@@ -1823,7 +2353,12 @@ namespace
     //------------------------------------------------------------------------
     // Object names: reserved in batches on the render thread
 
-    template <int ID, typename PFN, bool VAO>
+    // glGen* only reserve names, so a pool may grow to many; glCreate* make real objects, each of
+    // which costs driver memory until the pool hands it out: those batches stay small
+    constexpr GLsizei NAME_BATCH_MAX = 4096;
+    constexpr GLsizei OBJECT_BATCH_MAX = 256;
+
+    template <int ID, typename PFN, bool VAO, GLsizei MAX_BATCH>
     struct PoolCall
     {
         static constexpr bool kHas = true;
@@ -1848,10 +2383,10 @@ namespace
             {
                 // Each refill waits for the render thread to work through everything queued,
                 // which in a busy scene is tens of milliseconds: a pool that keeps running dry
-                // refills in growing batches (to 4096 names) so a burst costs a few waits
-                static GLsizei s_batch = 256;
+                // refills in growing batches (to MAX_BATCH names) so a burst costs a few waits
+                static GLsizei s_batch = std::min<GLsizei>(256, MAX_BATCH);
                 const GLsizei batch = std::max<GLsizei>(n, s_batch);
-                s_batch = std::min<GLsizei>(s_batch * 2, 4096);
+                s_batch = std::min<GLsizei>(s_batch * 2, MAX_BATCH);
                 std::vector<GLuint> fresh((size_t)batch);
                 syncCall<void>(ID, [&]() { P::real()(batch, fresh.data()); });
                 sPool.insert(sPool.end(), fresh.rbegin(), fresh.rend());
@@ -1862,27 +2397,35 @@ namespace
                 sPool.pop_back();
                 if constexpr (VAO)
                 {
-                    sSh.mEBO[out[i]] = 0;   // a new vertex array has no element buffer
+                    // a new vertex array has no element buffer
+                    if (sSh.mVAOOk && sSh.mVAO == out[i])
+                    {
+                        setCurEBO(0);
+                    }
+                    else
+                    {
+                        sSh.mEBO[out[i]] = 0;
+                    }
                 }
             }
         }
     };
-    template <int ID, typename PFN, bool VAO>
-    std::vector<GLuint> PoolCall<ID, PFN, VAO>::sPool;
+    template <int ID, typename PFN, bool VAO, GLsizei MAX_BATCH>
+    std::vector<GLuint> PoolCall<ID, PFN, VAO, MAX_BATCH>::sPool;
 
-#define FSGL_POOL(name, vao) template <> struct Custom<FSGL_ID_##name> : PoolCall<FSGL_ID_##name, decltype(::name), vao> {};
+#define FSGL_POOL(name, vao, max_batch) template <> struct Custom<FSGL_ID_##name> : PoolCall<FSGL_ID_##name, decltype(::name), vao, max_batch> {};
 
-    FSGL_POOL(glGenBuffers, false)
-    FSGL_POOL(glCreateBuffers, false)
-    FSGL_POOL(glGenTextures, false)
-    FSGL_POOL(glGenFramebuffers, false)
-    FSGL_POOL(glGenRenderbuffers, false)
-    FSGL_POOL(glGenSamplers, false)
-    FSGL_POOL(glGenVertexArrays, true)
-    FSGL_POOL(glCreateFramebuffers, false)
-    FSGL_POOL(glCreateRenderbuffers, false)
-    FSGL_POOL(glCreateSamplers, false)
-    FSGL_POOL(glCreateVertexArrays, true)
+    FSGL_POOL(glGenBuffers, false, NAME_BATCH_MAX)
+    FSGL_POOL(glCreateBuffers, false, OBJECT_BATCH_MAX)
+    FSGL_POOL(glGenTextures, false, NAME_BATCH_MAX)
+    FSGL_POOL(glGenFramebuffers, false, NAME_BATCH_MAX)
+    FSGL_POOL(glGenRenderbuffers, false, NAME_BATCH_MAX)
+    FSGL_POOL(glGenSamplers, false, NAME_BATCH_MAX)
+    FSGL_POOL(glGenVertexArrays, true, NAME_BATCH_MAX)
+    FSGL_POOL(glCreateFramebuffers, false, OBJECT_BATCH_MAX)
+    FSGL_POOL(glCreateRenderbuffers, false, OBJECT_BATCH_MAX)
+    FSGL_POOL(glCreateSamplers, false, OBJECT_BATCH_MAX)
+    FSGL_POOL(glCreateVertexArrays, true, OBJECT_BATCH_MAX)
 
     // glCreateTextures and glCreateQueries make objects of a given target, so
     // they are reserved per target.
@@ -1910,11 +2453,12 @@ namespace
             std::vector<GLuint>& pool = sPools[target];
             if (pool.size() < (size_t)n)
             {
-                // As PoolCall: batches grow while the pool keeps running dry (one per target)
+                // As PoolCall: batches grow while the pool keeps running dry (one per target), to
+                // OBJECT_BATCH_MAX as these are real objects
                 static std::unordered_map<GLenum, GLsizei> s_batches;
                 GLsizei& next_batch = s_batches.emplace(target, 64).first->second;
                 const GLsizei batch = std::max<GLsizei>(n, next_batch);
-                next_batch = std::min<GLsizei>(next_batch * 2, 1024);
+                next_batch = std::min<GLsizei>(next_batch * 2, OBJECT_BATCH_MAX);
                 std::vector<GLuint> fresh((size_t)batch);
                 syncCall<void>(ID, [&]() { P::real()(target, batch, fresh.data()); });
                 pool.insert(pool.end(), fresh.rbegin(), fresh.rend());
@@ -1975,10 +2519,22 @@ namespace
                 {
                     if (sSh.mBind[s] == id) sSh.mBind[s] = 0;
                 }
-                if (sSh.mVAOOk)
+                // GL detaches a deleted buffer only from the bound vertex array. The others keep
+                // the orphan attached under a name that is free again: what they hold is unknown.
+                for (auto it = sSh.mEBO.begin(); it != sSh.mEBO.end();)
                 {
-                    auto it = sSh.mEBO.find(sSh.mVAO);
-                    if (it != sSh.mEBO.end() && it->second == id) it->second = 0;
+                    if (it->second == id && !(sSh.mVAOOk && it->first == sSh.mVAO))
+                    {
+                        it = sSh.mEBO.erase(it);
+                    }
+                    else
+                    {
+                        ++it;   // the bound VAO's entry is mCurEBO's business
+                    }
+                }
+                if (sSh.mVAOOk && sSh.mCurEBOOk && sSh.mCurEBO == id)
+                {
+                    setCurEBO(0);
                 }
             });
             FSGL_BLOB(glDeleteBuffers, 1)::record(size_t(n > 0 ? n : 0) * sizeof(GLuint), n, ids);
@@ -1992,10 +2548,15 @@ namespace
             recordDeleted(n, ids, [](GLuint id)
             {
                 if (id == 0) return;
-                sSh.mEBO.erase(id);
                 if (sSh.mVAOOk && sSh.mVAO == id)
                 {
-                    sSh.mVAO = 0;
+                    sSh.mCurEBODirty = false;   // nothing to keep: the object is gone
+                    sSh.mEBO.erase(id);
+                    switchVAO(0);
+                }
+                else
+                {
+                    sSh.mEBO.erase(id);
                 }
             });
             FSGL_BLOB(glDeleteVertexArrays, 1)::record(size_t(n > 0 ? n : 0) * sizeof(GLuint), n, ids);
@@ -2018,13 +2579,7 @@ namespace
             if (!tRecording) { P::passthrough(n, ids); return; }
             recordDeleted(n, ids, [](GLuint id)
             {
-                for (auto& [key, texture] : sSh.mTex)
-                {
-                    if (texture == id)
-                    {
-                        texture = 0;
-                    }
-                }
+                sSh.mTex.deleted(id);
             });
             FSGL_BLOB(glDeleteTextures, 1)::record(size_t(n > 0 ? n : 0) * sizeof(GLuint), n, ids);
         }
@@ -2055,13 +2610,7 @@ namespace
             if (!tRecording) { P::passthrough(n, ids); return; }
             recordDeleted(n, ids, [](GLuint id)
             {
-                for (auto& [unit, sampler] : sSh.mSampler)
-                {
-                    if (sampler == id)
-                    {
-                        sampler = 0;
-                    }
-                }
+                sSh.mSampler.deleted(id);
             });
             FSGL_BLOB(glDeleteSamplers, 1)::record(size_t(n > 0 ? n : 0) * sizeof(GLuint), n, ids);
         }
@@ -2125,10 +2674,28 @@ namespace
     std::unordered_map<GLuint, U64> sQueryIssued;           // main: id -> generation of its latest end
     std::unordered_map<GLenum, GLuint> sQueryActive;        // main: target -> open query
     U64 sQueryGen = 0;                                      // main
+    struct QueryResult
+    {
+        U64 mGen;
+        U64 mValue;
+        bool mDropped;      // never came in: reads of this generation ask the driver
+    };
+    struct PendingQuery
+    {
+        GLuint mId;
+        U64 mGen;
+        U64 mEndNs;         // when its end was replayed
+    };
     std::mutex sQueryResultMutex;
-    std::unordered_map<GLuint, std::pair<U64, U64>> sQueryResults;  // id -> (generation, value)
-    std::deque<std::pair<GLuint, U64>> sQueryPending;       // render: ended, not collected
+    std::unordered_map<GLuint, QueryResult> sQueryResults;  // id -> result of its latest collected generation
+    std::deque<PendingQuery> sQueryPending;                 // render: ended, not collected
     std::unordered_map<GLuint, U64> sQueryRenderGen;        // render: id -> latest ended generation (0 while open)
+
+    // A result not in after this long is given up on (a query whose begin failed never becomes
+    // available), so it can't keep the poll from reaching the ones behind it
+    constexpr U64 QUERY_GIVE_UP_NS = 2000000000ull;
+    // Results come in about in order: after this many in a row that aren't in yet, stop looking
+    constexpr U32 QUERY_SCAN_MISSES = 4;
 
     struct QueryRec
     {
@@ -2151,7 +2718,7 @@ namespace
         if (r.mId)
         {
             sQueryRenderGen[r.mId] = r.mGen;
-            sQueryPending.emplace_back(r.mId, r.mGen);
+            sQueryPending.push_back({ r.mId, r.mGen, nowNs() });
         }
     }
 
@@ -2160,7 +2727,7 @@ namespace
         const QueryRec& r = *reinterpret_cast<QueryRec*>(p);
         FSGL_REAL(glQueryCounter)(r.mId, r.mTarget);
         sQueryRenderGen[r.mId] = r.mGen;
-        sQueryPending.emplace_back(r.mId, r.mGen);
+        sQueryPending.push_back({ r.mId, r.mGen, nowNs() });
     }
 
     void execDeleteQueries(U8* p)
@@ -2190,7 +2757,9 @@ namespace
         commitRecord();
     }
 
-    // Render thread: collect what the GPU has finished, oldest first.
+    // Render thread: collect what the GPU has finished, oldest first. One result that isn't in
+    // doesn't hold back the ones behind it (the scan goes on past it, a few misses deep), and one
+    // that never comes in is dropped after QUERY_GIVE_UP_NS.
     void pollQueries()
     {
         if (sQueryPending.empty())
@@ -2199,38 +2768,53 @@ namespace
         }
         auto avail_fn = FSGL_REAL(glGetQueryObjectuiv);
         auto res64_fn = FSGL_REAL(glGetQueryObjectui64v);
-        while (!sQueryPending.empty())
+        const U64 now = nowNs();
+        const size_t count = sQueryPending.size();
+        size_t keep = 0;    // entries still pending are moved down to here, in order
+        size_t r = 0;
+        U32 misses = 0;
+        for (; r < count && misses < QUERY_SCAN_MISSES; ++r)
         {
-            const auto [id, gen] = sQueryPending.front();
-            auto it = sQueryRenderGen.find(id);
-            if (it == sQueryRenderGen.end() || it->second != gen)
+            const PendingQuery q = sQueryPending[r];
+            auto it = sQueryRenderGen.find(q.mId);
+            if (it == sQueryRenderGen.end() || it->second != q.mGen)
             {
-                sQueryPending.pop_front();  // re-issued or deleted since
-                continue;
+                continue;   // re-issued or deleted since
             }
             GLuint avail = 0;
-            avail_fn(id, GL_QUERY_RESULT_AVAILABLE, &avail);
+            avail_fn(q.mId, GL_QUERY_RESULT_AVAILABLE, &avail);
             if (!avail)
             {
-                break;
+                if (now > q.mEndNs && now - q.mEndNs > QUERY_GIVE_UP_NS)
+                {
+                    std::lock_guard<std::mutex> lock(sQueryResultMutex);
+                    sQueryResults[q.mId] = { q.mGen, 0, true };
+                    continue;
+                }
+                ++misses;
+                sQueryPending[keep++] = q;
+                continue;
             }
+            misses = 0;
             GLuint64 value = 0;
             if (res64_fn)
             {
-                res64_fn(id, GL_QUERY_RESULT, &value);
+                res64_fn(q.mId, GL_QUERY_RESULT, &value);
             }
             else
             {
                 GLuint v32 = 0;
-                avail_fn(id, GL_QUERY_RESULT, &v32);
+                avail_fn(q.mId, GL_QUERY_RESULT, &v32);
                 value = v32;
             }
-            {
-                std::lock_guard<std::mutex> lock(sQueryResultMutex);
-                sQueryResults[id] = std::make_pair(gen, (U64)value);
-            }
-            sQueryPending.pop_front();
+            std::lock_guard<std::mutex> lock(sQueryResultMutex);
+            sQueryResults[q.mId] = { q.mGen, (U64)value, false };
         }
+        for (; r < count; ++r)
+        {
+            sQueryPending[keep++] = sQueryPending[r];
+        }
+        sQueryPending.resize(keep);
     }
 
     FSGL_BEGIN(glBeginQuery)
@@ -2306,7 +2890,7 @@ namespace
         }
     FSGL_END
 
-    FSGL_POOL(glGenQueries, false)
+    FSGL_POOL(glGenQueries, false, NAME_BATCH_MAX)
 
     // Answers a query object read on the main thread if the cache can.
     template <typename T>
@@ -2322,10 +2906,14 @@ namespace
         {
             std::lock_guard<std::mutex> lock(sQueryResultMutex);
             auto r = sQueryResults.find(id);
-            if (r != sQueryResults.end() && r->second.first == it->second)
+            if (r != sQueryResults.end() && r->second.mGen == it->second)
             {
+                if (r->second.mDropped)
+                {
+                    return false;   // the render thread gave up on it: let the driver answer
+                }
                 have = true;
-                value = r->second.second;
+                value = r->second.mValue;
             }
         }
         if (!have && sQueryEndUnsubmitted)
@@ -2552,11 +3140,7 @@ namespace
                 if (sSh.mVAOOk) { *data = (GLint)sSh.mVAO; return; }
                 break;
             case GL_ELEMENT_ARRAY_BUFFER_BINDING:
-                if (sSh.mVAOOk)
-                {
-                    auto it = sSh.mEBO.find(sSh.mVAO);
-                    if (it != sSh.mEBO.end()) { *data = (GLint)it->second; return; }
-                }
+                if (sSh.mVAOOk && sSh.mCurEBOOk) { *data = (GLint)sSh.mCurEBO; return; }
                 break;
             default:
                 break;
@@ -2695,7 +3279,7 @@ namespace
     {
         sUniformLocs.erase(program);
         sAttribLocs.erase(program);
-        sUniformValues.erase(program);
+        eraseUniformValues(program);
     }
 
     template <typename P>
@@ -2732,10 +3316,21 @@ namespace
         }
     FSGL_END
 
+    // Relinking or loading a binary into the program in use: whether its new executable is
+    // installed depends on the outcome, so don't drop the next glUseProgram of it
+    void forgetRelinked(GLuint program)
+    {
+        forgetProgram(program);
+        if (sSh.mProgramOk && sSh.mProgram == program)
+        {
+            sSh.mProgramOk = false;
+        }
+    }
+
     FSGL_BEGIN(glLinkProgram)
         static void APIENTRY call(GLuint program)
         {
-            if (tRecording) { forgetProgram(program); }
+            if (tRecording) { forgetRelinked(program); }
             P::generic(program);
         }
     FSGL_END
@@ -2751,8 +3346,28 @@ namespace
     FSGL_BEGIN(glProgramBinary)
         static void APIENTRY call(GLuint program, GLenum format, const void* binary, GLsizei length)
         {
-            if (tRecording) { forgetProgram(program); }
+            if (tRecording) { forgetRelinked(program); }
             P::generic(program, format, binary, length);
+        }
+    FSGL_END
+
+    // A program deleted while in use lives on until it is no longer current, and its name may be
+    // handed out again: whatever was cached for the name is not the new program's
+    FSGL_BEGIN(glCreateProgram)
+        static GLuint APIENTRY call()
+        {
+            const GLuint program = P::generic();
+            if (tRecording && program) { forgetProgram(program); }
+            return program;
+        }
+    FSGL_END
+
+    FSGL_BEGIN(glCreateShaderProgramv)
+        static GLuint APIENTRY call(GLenum type, GLsizei count, const GLchar* const* strings)
+        {
+            const GLuint program = P::generic(type, count, strings);
+            if (tRecording && program) { forgetProgram(program); }
+            return program;
         }
     FSGL_END
 
@@ -3027,7 +3642,7 @@ namespace FSGLStream
     {
         if (filter && !sFilter)
         {
-            sUniformValues.clear(); // not kept up to date while off
+            clearUniformValues(); // not kept up to date while off
         }
         sFilter = filter;
     }
@@ -3140,6 +3755,28 @@ namespace FSGLStream
             const int id = calls[i].second;
             s.mTopCalls += llformat("%s%s %.0f (%.0f KB)", i ? ", " : "", sNames[id], (F64)calls[i].first / frames,
                                     (F64)sCallBytes[id] / frames / 1024.0);
+        }
+        // Which passes make them: the same name may be several literals, so merged by text
+        {
+            std::map<std::string, ZoneCalls> zones;
+            for (const auto& [name, counts] : sZoneCalls)
+            {
+                ZoneCalls& z = zones[name ? name : "(outside any zone)"];
+                z.mCalls += counts.mCalls;
+                z.mDraws += counts.mDraws;
+                z.mBinds += counts.mBinds;
+            }
+            std::vector<std::pair<std::string, ZoneCalls>> top_zones(zones.begin(), zones.end());
+            std::sort(top_zones.begin(), top_zones.end(), [](const auto& a, const auto& b) { return a.second.mCalls > b.second.mCalls; });
+            for (size_t i = 0; i < top_zones.size() && i < 16; ++i)
+            {
+                const ZoneCalls& z = top_zones[i].second;
+                s.mTopZones += llformat("%s%s %.0f (draws %.0f, texture binds %.0f)", i ? ", " : "", top_zones[i].first.c_str(),
+                                        (F64)z.mCalls / frames, (F64)z.mDraws / frames, (F64)z.mBinds / frames);
+            }
+            sZoneCalls.clear();
+            sLastZone = nullptr;
+            sLastZoneCalls = nullptr;
         }
         for (size_t i = 0; i < skips.size() && i < 10; ++i)
         {
