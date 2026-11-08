@@ -200,14 +200,21 @@ void LLTexUnit::bindFast(LLTexture* texture)
 {
     LLImageGL* gl_tex = texture->getGLTexture();
     texture->setActive();
-    // <FS:Trish> Same active unit tracking activate() relies on, pushBatch binds up to 16 units per draw
+    // <FS:Trish> Switch the active unit only when something is bound or set on it: pushBatch
+    // binds up to 16 units per draw, most of them already holding their texture, and the switch
+    // before each skipped bind was a GL call for nothing. The unit is only recorded as active
+    // when it was made active.
     //glActiveTexture(GL_TEXTURE0 + mIndex);
-    if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
+    //gGL.mCurrTextureUnitIndex = mIndex;
+    auto activate_unit = [this]()
     {
-        glActiveTexture(GL_TEXTURE0 + mIndex);
-    }
+        if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
+        {
+            glActiveTexture(GL_TEXTURE0 + mIndex);
+            gGL.mCurrTextureUnitIndex = mIndex;
+        }
+    };
     // </FS:Trish>
-    gGL.mCurrTextureUnitIndex = mIndex;
     mCurrTexture = gl_tex->getTexName();
     mCurrTexType = gl_tex->getTarget();
     if (!mCurrTexture)
@@ -216,6 +223,7 @@ void LLTexUnit::bindFast(LLTexture* texture)
         //if deleted, will re-generate it immediately
         texture->forceImmediateUpdate();
         gl_tex->forceUpdateBindStats();
+        activate_unit(); // <FS:Trish/>
         texture->bindDefaultImage(mIndex);
     }
     // <FS:Trish> Skip the bind when bindFast already bound this texture here and nothing
@@ -223,6 +231,7 @@ void LLTexUnit::bindFast(LLTexture* texture)
     //glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
     if (mCurrTexture == 0 || mCurrTexture != mFastBoundTex || mCurrTexType != mFastBoundType || gGL.mDirty)
     {
+        activate_unit();
         glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
         // the missing texture path above may have rebound through bind(), so only trust a real name
         mFastBoundTex = (gl_tex->getTexName() != 0) ? mCurrTexture : 0;
@@ -232,6 +241,7 @@ void LLTexUnit::bindFast(LLTexture* texture)
     mHasMipMaps = gl_tex->mHasMipMaps;
     if (gl_tex->mTexOptionsDirty)
     {
+        activate_unit(); // <FS:Trish/> the parameters go to the active unit's texture
         gl_tex->mTexOptionsDirty = false;
         setTextureAddressModeFast(gl_tex->mAddressMode, gl_tex->getTarget());
         setTextureFilteringOptionFast(gl_tex->mFilterOption, gl_tex->getTarget());
