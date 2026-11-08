@@ -62,7 +62,8 @@ LLDragHandle::LLDragHandle(const LLDragHandle::Params& p)
     mDragShadowColor(p.drag_shadow_color()),
     mFont(p.font),
     mFontShadow(p.font_shadow),     // <FS:Zi> Allow skins to override drag handle font shadow
-    mLabelVPad(p.label_vpad())
+    mLabelVPad(p.label_vpad()),
+    mLabelHPad(p.label_hpad.isProvided() ? std::make_optional<S32>(p.label_hpad) : std::nullopt) // <ID:MaterialTheme/>
 
 {
     static LLUICachedControl<S32> snap_margin ("SnapMargin", 0);
@@ -248,11 +249,18 @@ void LLDragHandleTop::reshapeTitleBox()
     }
     const LLFontGL* font = LLFontGL::getFontSansSerif();
     S32 title_width = getRect().getWidth();
-    title_width -= LEFT_PAD + 2 * BORDER_PAD + getButtonsRect().getWidth();
+    // <ID:MaterialTheme>
+    const S32 left_pad = mLabelHPad.value_or(LEFT_PAD);
+    title_width -= left_pad + 2 * BORDER_PAD + getButtonsRect().getWidth();
+    if (mLabelHPad && getButtonsRect().notEmpty())
+    {
+        title_width = llmin(title_width, getButtonsRect().mLeft - left_pad);
+    }
+    // </ID:MaterialTheme>
     S32 title_height = font->getLineHeight();
     LLRect title_rect;
     title_rect.setLeftTopAndSize(
-        LEFT_PAD,
+        left_pad, // <ID:MaterialTheme/>
         getRect().getHeight() - mLabelVPad,
         title_width,
         title_height);

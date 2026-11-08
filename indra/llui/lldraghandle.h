@@ -34,6 +34,8 @@
 #include "llrect.h"
 #include "llcoord.h"
 
+#include <optional>
+
 class LLTextBox;
 
 class LLDragHandle : public LLView
@@ -44,6 +46,7 @@ public:
     {
         Optional<std::string> label;
         Optional<S32> label_vpad;
+        Optional<S32> label_hpad; // <ID:MaterialTheme/>
         Optional<LLUIColor> drag_highlight_color;
         Optional<LLUIColor> drag_shadow_color;
         Optional<const LLFontGL*> font;
@@ -52,6 +55,7 @@ public:
         Params()
         :   label("label"),
             label_vpad("label_vpad", 7),
+            label_hpad("label_hpad"), // <ID:MaterialTheme/>
             drag_highlight_color("drag_highlight_color", LLUIColorTable::instance().getColor("DefaultHighlightLight")),
             drag_shadow_color("drag_shadow_color", LLUIColorTable::instance().getColor("DefaultShadowDark")),
             font_shadow("font_shadow", LLFontGL::NO_SHADOW),    // <FS:Zi> Allow skins to override drag handle font shadow
@@ -90,6 +94,7 @@ protected:
     LLTextBox*      mTitleBox;
     const LLFontGL* mFont;
     S32             mLabelVPad;
+    std::optional<S32> mLabelHPad; // <ID:MaterialTheme/>
 
 private:
     LLRect          mButtonsRect;

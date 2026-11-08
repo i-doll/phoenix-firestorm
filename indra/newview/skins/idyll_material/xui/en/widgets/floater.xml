@@ -16,6 +16,8 @@
  header_font_shadow="soft"
  header_height="25"
  header_vpad="5"
+ header_hpad="18"
+ header_buttons_hpad="12"
  close_image="Icon_Close_Foreground"
  snooze_image="Icon_Snooze_Foreground"
  restore_image="Icon_Restore_Foreground"

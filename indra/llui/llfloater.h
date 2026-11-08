@@ -202,6 +202,10 @@ public:
                                 dock_pressed_image,
                                 help_pressed_image;
         Optional<LLUIColor>     title_button_image_color; // <ID:MaterialTheme/>
+        // <ID:MaterialTheme>
+        Optional<S32>           header_hpad,
+                                header_buttons_hpad;
+        // </ID:MaterialTheme>
 
         Optional<CommitCallbackParam> open_callback,
                                       close_callback;
@@ -534,6 +538,7 @@ private:
     S32             mMinHeight;
     S32             mHeaderHeight;      // height in pixels of header for title, drag bar
     S32             mLegacyHeaderHeight;// HACK see initFloaterXML()
+    S32             mHeaderButtonsHPad = LLPANEL_BORDER_WIDTH; // <ID:MaterialTheme/>
 
     bool            mMinimized;
     bool            mForeground;

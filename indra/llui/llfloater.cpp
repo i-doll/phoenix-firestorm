@@ -214,6 +214,10 @@ LLFloater::Params::Params()
     dock_pressed_image("dock_pressed_image"),
     help_pressed_image("help_pressed_image"),
     title_button_image_color("title_button_image_color"), // <ID:MaterialTheme/>
+    // <ID:MaterialTheme>
+    header_hpad("header_hpad"),
+    header_buttons_hpad("header_buttons_hpad", LLPANEL_BORDER_WIDTH),
+    // </ID:MaterialTheme>
     open_callback("open_callback"),
     close_callback("close_callback"),
     follows("follows"),
@@ -313,6 +317,7 @@ LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
     memset(mButtonsEnabled, 0, BUTTON_COUNT * sizeof(bool));
     memset(mButtons, 0, BUTTON_COUNT * sizeof(LLButton*));
 
+    mHeaderButtonsHPad = p.header_buttons_hpad; // <ID:MaterialTheme/>
     addDragHandle(p);
     addResizeCtrls();
 
@@ -390,6 +395,12 @@ void LLFloater::addDragHandle(const LLFloater::Params& floater_params)
             p.font(floater_params.header_font);
             p.font_shadow(floater_params.header_font_shadow);      // <FS:Zi> Allow skins to override drag handle font shadow
             p.label_vpad(floater_params.header_vpad);
+            // <ID:MaterialTheme>
+            if (floater_params.header_hpad.isProvided())
+            {
+                p.label_hpad(floater_params.header_hpad);
+            }
+            // </ID:MaterialTheme>
             mDragHandle = LLUICtrlFactory::create<LLDragHandleTop>(p);
         }
         addChild(mDragHandle);
@@ -2410,7 +2421,7 @@ void LLFloater::updateTitleButtons()
             else
             {
                 btn_rect.setLeftTopAndSize(
-                    getRect().getWidth() - LLPANEL_BORDER_WIDTH - (floater_close_box_size + 1) * button_count,
+                    getRect().getWidth() - mHeaderButtonsHPad - (floater_close_box_size + 1) * button_count, // <ID:MaterialTheme/>
                     getRect().getHeight() - close_box_from_top,
                     ll_round((F32)floater_close_box_size * mButtonScale),
                     ll_round((F32)floater_close_box_size * mButtonScale));
@@ -3692,6 +3703,7 @@ void LLFloater::initFromParams(const LLFloater::Params& p)
     mDragOnLeft = p.can_drag_on_left;
     mHeaderHeight = p.header_height;
     mLegacyHeaderHeight = p.legacy_header_height;
+    mHeaderButtonsHPad = p.header_buttons_hpad; // <ID:MaterialTheme/>
     mSingleInstance = p.single_instance;
     mReuseInstance = p.reuse_instance.isProvided() ? p.reuse_instance : p.single_instance;
 
