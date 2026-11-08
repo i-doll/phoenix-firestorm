@@ -259,6 +259,7 @@ public: //aligned members
 
 private:
     friend class LLViewerTextureList;
+    friend class FSParallelTexture; // <FS:Trish/> calcPixelArea on workers (FSPerfParallelTexturePriority)
     F32         adjustPartialOverlapPixelArea(F32 cos_angle_to_view_dir, F32 radius );
     bool        calcPixelArea(F32& cos_angle_to_view_dir, F32& radius) ;
 public:

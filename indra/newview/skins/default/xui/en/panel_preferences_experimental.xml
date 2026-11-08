@@ -4294,7 +4294,7 @@
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
-                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify,FSPerfParallelGeometry,FSPerfParallelGeometryVerify,FSPerfParallelGeometryMinVerts,FSPerfParallelAvatarUpdate,FSPerfParallelAvatarUpdateVerify,FSPerfParallelMainCull,FSPerfParallelMainCullVerify,FSPerfParallelPostSort,FSPerfParallelPostSortVerify,FSPerfParallelPostSortMinGroups" />
+                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify,FSPerfParallelGeometry,FSPerfParallelGeometryVerify,FSPerfParallelGeometryMinVerts,FSPerfParallelAvatarUpdate,FSPerfParallelAvatarUpdateVerify,FSPerfParallelMainCull,FSPerfParallelMainCullVerify,FSPerfParallelPostSort,FSPerfParallelPostSortVerify,FSPerfParallelPostSortMinGroups,FSPerfParallelTexturePriority,FSPerfParallelTexturePriorityVerify" />
                     </button>
                     <check_box
                      control_name="FSPerfParallelShadowCull"
@@ -4464,6 +4464,29 @@
                      tool_tip="EXPERIMENTAL. Views with fewer visible groups than this build their render lists on the main thread, where the worker hand-off would cost more than it saves."
                      top="1216"
                      width="100" />
+                    <check_box
+                     control_name="FSPerfParallelTexturePriority"
+                     follows="left|top"
+                     height="20"
+                     label="Texture priorities on worker threads"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfparalleltexturepriority"
+                     tool_tip="EXPERIMENTAL. Computes how sharp each texture needs to be (face screen areas and texture virtual sizes) on worker threads instead of the main thread. Helps in busy places with many textures loaded."
+                     top="1248"
+                     width="475" />
+                    <check_box
+                     control_name="FSPerfParallelTexturePriorityVerify"
+                     enabled_control="FSPerfParallelTexturePriority"
+                     follows="left|top"
+                     height="20"
+                     label="Verify parallel texture priorities"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfparalleltexturepriorityverify"
+                     tool_tip="EXPERIMENTAL. Debug: also computes texture priorities the old way and logs any difference. Costs more than either alone."
+                     top="1274"
+                     width="455" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
@@ -4471,7 +4494,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_gpu_driven_draws"
-                     top="1250"
+                     top="1302"
                      width="340">
                         GPU-driven draws
                     </text>
@@ -4483,7 +4506,7 @@
                      left="370"
                      name="reset_fs_heading_gpu_driven_draws"
                      tool_tip="Set every option in &quot;GPU-driven draws&quot; back to its default value."
-                     top="1249"
+                     top="1301"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -4499,7 +4522,7 @@
                      left="15"
                      name="fs_fsperfgpudrivendraws"
                      tool_tip="EXPERIMENTAL. Sends the opaque buildings and objects of each shadow map to the graphics card as one multi-draw call instead of one call per object batch, from a copy of their positions kept in video memory. Shadows look the same; saves CPU time in busy scenes. Works together with 'Draw sun shadow cascades in one pass'. Needs OpenGL 4.3 (most NVIDIA, AMD and Intel cards with current drivers; not macOS); otherwise nothing changes."
-                     top="1276"
+                     top="1328"
                      width="475" />
                     <check_box
                      control_name="FSPerfGPUDrivenDrawsVerify"
@@ -4511,7 +4534,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsverify"
                      tool_tip="Debug. Draws the shadow casters a second time the old way and logs any place where the result would differ, plus draw statistics every 10 seconds. Slows rendering down; for testing only."
-                     top="1302"
+                     top="1354"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4520,7 +4543,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsarenamb_label"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1330"
+                     top="1382"
                      width="285">
                         Shadow caster memory (MB)
                     </text>
@@ -4537,7 +4560,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivendrawsarenamb"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1328"
+                     top="1380"
                      width="100" />
                 </panel>
             </scroll_container>

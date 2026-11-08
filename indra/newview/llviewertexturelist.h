@@ -49,7 +49,9 @@ const bool IMMEDIATE_NO = false;
 
 class LLImageJ2C;
 class LLMessageSystem;
+class LLViewerObject;
 class LLTextureView;
+struct FSTexturePriorityFaces; // <FS:Trish/> FSPerfParallelTexturePriority
 
 typedef void (*LLImageCallback)(bool success,
                                 LLViewerFetchedTexture *src_vi,
@@ -84,6 +86,8 @@ struct LLTextureKey
         }
     }
 };
+
+bool idIsOwnAttachment(LLViewerObject* objp); // <ID:i.doll/> [Full-res own avatar textures]
 
 class LLViewerTextureList
 {
@@ -149,7 +153,12 @@ public:
     // - updates decode priority
     // - updates desired discard level
     // - cleans up textures that haven't been referenced in awhile
-    void updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images = true);
+    // <FS:Trish> FSPerfParallelTexturePriority: optionally take the face pass precomputed on
+    // workers (fs_pre), or report the serial face pass (fs_out) for the verify mode
+    //void updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images = true);
+    void updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images = true,
+                                   const FSTexturePriorityFaces* fs_pre = nullptr, FSTexturePriorityFaces* fs_out = nullptr);
+    // </FS:Trish>
 
 private:
     F32  updateImagesCreateTextures(F32 max_time);

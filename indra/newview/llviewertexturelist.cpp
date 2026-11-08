@@ -67,6 +67,7 @@
 #include "llviewertextureanim.h" // <FS:Trish/> animated texture resolution
 #include "llvovolume.h" // <FS:Trish/> animated texture resolution
 #include "fstextureupload.h" // <FS:Trish/> FSPerfTextureUploadPBO
+#include "fsparalleltexture.h" // <FS:Trish/> FSPerfParallelTexturePriority
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -983,7 +984,7 @@ extern bool gCubeSnapshot;
 // roots carry an attachment state, but linked child prims do not, so walk the parent
 // chain rather than trusting isAttachment() alone. Note that LLViewerObject::getAvatar()
 // is no good here: for animesh it answers with the control avatar, not the wearer.
-static bool is_own_attachment(LLViewerObject* objp)
+bool idIsOwnAttachment(LLViewerObject* objp)
 {
     if (!isAgentAvatarValid())
     {
@@ -1003,7 +1004,11 @@ static bool is_own_attachment(LLViewerObject* objp)
 }
 // </ID:i.doll>
 
-void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images)
+// <FS:Trish> FSPerfParallelTexturePriority
+//void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images)
+void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images,
+                                                    const FSTexturePriorityFaces* fs_pre, FSTexturePriorityFaces* fs_out)
+// </FS:Trish>
 {
     llassert(!gCubeSnapshot);
 
@@ -1024,6 +1029,15 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         U32 face_count = 0;
         U32 max_faces_to_check = 1024;
 
+        // <FS:Trish> FSPerfParallelTexturePriority: face pass already done on workers
+        if (fs_pre)
+        {
+            max_vsize = fs_pre->mMaxVSize;
+            on_screen = fs_pre->mOnScreen;
+            face_count = fs_pre->mFaceCount;
+        }
+        // </FS:Trish>
+
         // get adjusted bias based on image resolution
         LLImageGL* img = imagep->getGLTexture();
         F32 max_discard = F32(img ? img->getMaxDiscardLevel() : MAX_DISCARD_LEVEL);
@@ -1033,7 +1047,10 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         bias = (F32) llroundf(powf(4, bias - 1.f));
 
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-        for (U32 i = 0; i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
+        // <FS:Trish> FSPerfParallelTexturePriority
+        //for (U32 i = 0; i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
+        for (U32 i = 0; !fs_pre && i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
+        // </FS:Trish>
         {
             face_count += imagep->getNumFaces(i);
             S32 faces_to_check = (face_count > max_faces_to_check) ? 0 : imagep->getNumFaces(i);
@@ -1103,7 +1120,7 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                     // Anything we are wearing is pinned at its native resolution, whatever the
                     // camera is doing. Distance, frustum and memory bias are all bypassed here;
                     // the RenderMaxTextureResolution clamp in processTextureStats still applies.
-                    if (self_full_res && is_own_attachment(objp))
+                    if (self_full_res && idIsOwnAttachment(objp))
                     {
                         vsize = (F32)MAX_IMAGE_AREA;
                     }
@@ -1126,6 +1143,15 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                 break;
             }
         }
+
+        // <FS:Trish> FSPerfParallelTexturePriorityVerify: report the serial face pass
+        if (fs_out)
+        {
+            fs_out->mMaxVSize = max_vsize;
+            fs_out->mOnScreen = on_screen;
+            fs_out->mFaceCount = face_count;
+        }
+        // </FS:Trish>
 
         if (face_count > max_faces_to_check)
         { // this texture is used in so many places we should just boost it and not bother checking its vsize
@@ -1846,13 +1872,35 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
         }
     }
 
+    // <FS:Trish> FSPerfParallelTexturePriority: face pass of the whole sweep on workers
+    LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - sweep");
+    const bool fs_parallel = FSParallelTexture::prepare(entries, urgent_updates);
+    size_t fs_index = 0;
+    // </FS:Trish>
     for (auto& imagep : entries)
     {
         mLastUpdateKey = LLTextureKey(imagep->getID(), (ETexListType)imagep->getTextureListType());
 
+        // <FS:Trish> FSPerfParallelTexturePriority
+        const FSTexturePriorityFaces* fs_pre = fs_parallel ? FSParallelTexture::result(fs_index, imagep.get()) : nullptr;
+        ++fs_index;
+        // </FS:Trish>
         if (imagep->getNumRefs() > 1 && !urgent_updates.count(imagep.get()))
         {
-            updateImageDecodePriority(imagep);
+            // <FS:Trish> FSPerfParallelTexturePriority
+            //updateImageDecodePriority(imagep);
+            if (fs_pre && FSParallelTexture::verifying())
+            {
+                FSTexturePriorityFaces fs_serial;
+                fs_serial.mFaceCount = U32_MAX; // stays so when the face pass is skipped (boosted meanwhile)
+                updateImageDecodePriority(imagep, true, nullptr, &fs_serial);
+                FSParallelTexture::verify(imagep.get(), *fs_pre, fs_serial);
+            }
+            else
+            {
+                updateImageDecodePriority(imagep, true, fs_pre);
+            }
+            // </FS:Trish>
             // Pruning can remove the image during the priority update.
             if (imagep->isInImageList())
             {
@@ -1865,6 +1913,7 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
             break;
         }
     }
+    FSParallelTexture::finish(); // <FS:Trish/> FSPerfParallelTexturePriority
 
     return timer.getElapsedTimeF32();
 }
