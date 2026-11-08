@@ -1312,12 +1312,101 @@ LLPointer<LLControlVariable> setting_get_control(LLControlGroup& group, const st
     return cntrl_ptr;
 }
 
+// <FS:Trish> Shader settings revert on a failed load. Settings that reload the shaders are noted
+// with the value they had before the change, so a reload that fails on a driver (a required shader
+// phase not compiling or linking) can put them back and load again instead of exiting.
+namespace
+{
+    // FS settings that reload the shaders, for the startup case (no change to revert)
+    std::vector<LLPointer<LLControlVariable>> sFSShaderControls;
+    // changes not yet loaded: control and value before the first change
+    std::vector<std::pair<LLPointer<LLControlVariable>, LLSD>> sFSPendingShaderChanges;
+    bool sFSRevertingShaderSettings = false;
+
+    bool fs_is_shader_reload(const std::function<void(const LLSD&)>& callback)
+    {
+        using handler_t = bool (*)(const LLSD&);
+        const handler_t* target = callback.target<handler_t>();
+        return target && *target == &handleSetShaderChanged;
+    }
+
+    void fs_note_shader_change(LLControlVariable* control, const LLSD& old_val)
+    {
+        if (sFSRevertingShaderSettings || !control)
+        {
+            return;
+        }
+        for (const auto& change : sFSPendingShaderChanges)
+        {
+            if (change.first.get() == control)
+            {
+                return; // keep the value from before the first change
+            }
+        }
+        sFSPendingShaderChanges.emplace_back(control, old_val);
+    }
+}
+
+void fs_shader_load_succeeded()
+{
+    sFSPendingShaderChanges.clear();
+}
+
+bool fs_revert_shader_settings_after_failure(const char* phase)
+{
+    std::vector<std::pair<LLPointer<LLControlVariable>, LLSD>> changes;
+    changes.swap(sFSPendingShaderChanges);
+    if (changes.empty())
+    {
+        // Nothing changed at runtime (startup, or the saved settings): fall back on the defaults
+        // of the FS shader options that are not at theirs. FS options are off by default.
+        for (auto& control : sFSShaderControls)
+        {
+            if (!control->isDefault())
+            {
+                changes.emplace_back(control, control->getDefault());
+            }
+        }
+        if (changes.empty())
+        {
+            return false;
+        }
+    }
+    sFSRevertingShaderSettings = true;
+    for (auto& change : changes)
+    {
+        LL_WARNS("Shader") << "Failed to load " << phase << " shaders (see the preceding compile/link errors): setting "
+                           << change.first->getName() << " back to " << change.second << " and loading again." << LL_ENDL;
+        change.first->setValue(change.second);
+    }
+    sFSRevertingShaderSettings = false;
+    sFSPendingShaderChanges.clear();
+    return true;
+}
+// </FS:Trish>
+
 void setting_setup_signal_listener(LLControlGroup& group, const std::string& setting, std::function<void(const LLSD& newvalue)> callback)
 {
-    setting_get_control(group, setting)->getSignal()->connect([callback](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+    // <FS:Trish> Shader settings revert on a failed load
+    //setting_get_control(group, setting)->getSignal()->connect([callback](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+    //{
+    //    callback(new_val);
+    //});
+    LLPointer<LLControlVariable> fs_control = setting_get_control(group, setting);
+    const bool fs_shader_reload = fs_is_shader_reload(callback);
+    if (fs_shader_reload && setting.compare(0, 2, "FS") == 0)
     {
+        sFSShaderControls.push_back(fs_control);
+    }
+    fs_control->getSignal()->connect([callback, fs_shader_reload](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+    {
+        if (fs_shader_reload)
+        {
+            fs_note_shader_change(control, old_val);
+        }
         callback(new_val);
     });
+    // </FS:Trish>
 }
 
 void setting_setup_signal_listener(LLControlGroup& group, const std::string& setting, std::function<void()> callback)

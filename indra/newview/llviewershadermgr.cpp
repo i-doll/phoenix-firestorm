@@ -789,6 +789,16 @@ static bool hashShaderSources(HBXXH128& hash, const std::string& root, const std
     return true;
 }
 
+// <FS:Trish> A required shader phase failed: when a shader option changed since the last good load
+// (or, at startup, an FS shader option is on), some drivers (e.g. AMD) may reject its code. Put
+// those options back and let the caller load everything again, instead of exiting. Returns true
+// when the caller should retry; each retry reverts more, so this ends.
+static bool fsRecoverFromShaderFailure(const char* phase)
+{
+    return fs_revert_shader_settings_after_failure(phase);
+}
+// </FS:Trish>
+
 void LLViewerShaderMgr::setShaders()
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -952,6 +962,14 @@ void LLViewerShaderMgr::setShaders()
     }
     else
     {
+        // <FS:Trish> Shader settings revert on a failed load: retry without the new options rather than exit
+        if (fsRecoverFromShaderFailure("water"))
+        {
+            reentrance = false;
+            setShaders();
+            return;
+        }
+        // </FS:Trish>
         LL_ERRS("Shader") << "Failed to load required water shaders. See preceding shader compilation/link errors." << LL_ENDL;
     }
 
@@ -967,6 +985,14 @@ void LLViewerShaderMgr::setShaders()
         }
         else
         {
+            // <FS:Trish> Shader settings revert on a failed load: retry without the new options rather than exit
+            if (fsRecoverFromShaderFailure("effects"))
+            {
+                reentrance = false;
+                setShaders();
+                return;
+            }
+            // </FS:Trish>
             LL_ERRS("Shader") << "Failed to load required effects shaders. See preceding shader compilation/link errors." << LL_ENDL;
         }
     }
@@ -983,6 +1009,14 @@ void LLViewerShaderMgr::setShaders()
         }
         else
         {
+            // <FS:Trish> Shader settings revert on a failed load: retry without the new options rather than exit
+            if (fsRecoverFromShaderFailure("interface"))
+            {
+                reentrance = false;
+                setShaders();
+                return;
+            }
+            // </FS:Trish>
             LL_ERRS("Shader") << "Failed to load required interface shaders. See preceding shader compilation/link errors." << LL_ENDL;
         }
     }
@@ -1010,6 +1044,14 @@ void LLViewerShaderMgr::setShaders()
             // </FS:Trish>
             if (!loaded)
             {
+                // <FS:Trish> Shader settings revert on a failed load: retry without the new options rather than exit
+                if (fsRecoverFromShaderFailure("avatar"))
+                {
+                    reentrance = false;
+                    setShaders();
+                    return;
+                }
+                // </FS:Trish>
                 LL_ERRS("Shader") << "Failed to load required avatar shaders. See preceding shader compilation/link errors." << LL_ENDL;
             }
         }
@@ -1018,6 +1060,14 @@ void LLViewerShaderMgr::setShaders()
             // SHOULD NOT BE POSSIBLE
             // Hardware skinning not possible, neither is deferred rendering
             // but both are a hard requirement, viewer will crash without them
+            // <FS:Trish> Shader settings revert on a failed load: retry without the new options rather than exit
+            if (fsRecoverFromShaderFailure("object"))
+            {
+                reentrance = false;
+                setShaders();
+                return;
+            }
+            // </FS:Trish>
             LL_ERRS() << "Failed to load object shaders, cannot continue." << LL_ENDL;
         }
     }
@@ -1031,11 +1081,20 @@ void LLViewerShaderMgr::setShaders()
     // </FS:Trish>
     if (!loaded)
     {
+        // <FS:Trish> Shader settings revert on a failed load: retry without the new options rather than exit
+        if (fsRecoverFromShaderFailure("deferred"))
+        {
+            reentrance = false;
+            setShaders();
+            return;
+        }
+        // </FS:Trish>
         LL_ERRS("Shader") << "Failed to load required deferred shaders. See preceding shader compilation/link errors." << LL_ENDL;
         reentrance = false;
         return;
     }
     gPipeline.mShadersLoaded = true;
+    fs_shader_load_succeeded(); // <FS:Trish/> shader settings revert on a failed load
 
     if (!LLAppViewer::instance()->isSecondInstance())
     {

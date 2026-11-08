@@ -52,6 +52,12 @@ bool handleSetShaderChanged(const LLSD& newvalue);
 // <FS:Trish> Runs a shader reload that handleSetShaderChanged deferred, once settings have
 // stopped changing; called every frame from display()
 void process_deferred_shader_reload();
+// A required shader phase failed to load: puts back the shader settings changed since the last
+// successful load (or, with none, the FS shader options that differ from their defaults). True
+// when anything was reverted and the caller should load again.
+bool fs_revert_shader_settings_after_failure(const char* phase);
+// The shaders loaded: the settings changed so far are now part of a working load
+void fs_shader_load_succeeded();
 // </FS:Trish>
 
 // saved at end of session
