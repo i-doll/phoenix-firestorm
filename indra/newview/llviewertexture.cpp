@@ -32,6 +32,7 @@
 // Library includes
 #include "llmath.h"
 #include <deque> // <FS:Trish/>
+#include "llcallbacklist.h" // <FS:Trish/> asynchronous readbacks
 #include "llerror.h"
 #include "llgl.h"
 #include "llglheaders.h"
@@ -3446,7 +3447,45 @@ void LLViewerFetchedTexture::forceToSaveRawImage(S32 desired_discard, F32 kept_t
     }
 }
 
-void LLViewerFetchedTexture::readbackRawImage()
+// <FS:Trish> Textures whose readback is in flight, polled once a frame (gIdleCallbacks) until it lands
+namespace
+{
+    std::vector<LLPointer<LLViewerFetchedTexture>> sFSPendingReadbacks;
+    bool sFSReadbackPollAdded = false;
+}
+
+//static
+void LLViewerFetchedTexture::fsPollReadbacks(void*)
+{
+    if (sFSPendingReadbacks.empty())
+    {
+        return;
+    }
+    std::vector<LLPointer<LLViewerFetchedTexture>> pending;
+    pending.swap(sFSPendingReadbacks);
+    for (LLPointer<LLViewerFetchedTexture>& tex : pending)
+    {
+        // take the result if nobody has (doLoadedCallbacks may have); never ask for a new one from here
+        if (tex->mGLTexturep.notNull() && tex->mGLTexturep->fsHasReadback() && !tex->readbackRawImage())
+        {
+            continue;   // still in flight: it put itself back on the list
+        }
+        // landed (or gone): sculpt() kept the old shape while it waited, so rebuild, as postCreateTexture does
+        for (U32 i = 0; i < tex->mNumVolumes[LLRender::SCULPT_TEX]; ++i)
+        {
+            LLVOVolume* volume = tex->mVolumeList[LLRender::SCULPT_TEX][i];
+            if (volume)
+            {
+                volume->mSculptChanged = true;
+                gPipeline.markRebuild(volume->mDrawable);
+            }
+        }
+    }
+}
+// </FS:Trish>
+
+//void LLViewerFetchedTexture::readbackRawImage() // <FS:Trish/>
+bool LLViewerFetchedTexture::readbackRawImage()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
@@ -3454,12 +3493,34 @@ void LLViewerFetchedTexture::readbackRawImage()
     if (mGLTexturep.notNull() && mGLTexturep->getTexName() != 0 &&
         (mRawImage.isNull() || mRawImage->getWidth() < mGLTexturep->getWidth() || mRawImage->getHeight() < mGLTexturep->getHeight() ))
     {
+        // <FS:Trish> With the render thread a synchronous readback waits for its whole queue: ask for it
+        // asynchronously, and leave the raw image as it is until it lands
+        LLPointer<LLImageRaw> raw = new LLImageRaw();
+        const LLImageGL::EFSReadback result = mGLTexturep->fsReadBackRawAsync(-1, raw);
+        if (result == LLImageGL::FS_READBACK_PENDING)
+        {
+            if (std::find(sFSPendingReadbacks.begin(), sFSPendingReadbacks.end(), this) == sFSPendingReadbacks.end())
+            {
+                sFSPendingReadbacks.push_back(this);
+            }
+            if (!sFSReadbackPollAdded)
+            {
+                sFSReadbackPollAdded = true;
+                gIdleCallbacks.addFunction(&LLViewerFetchedTexture::fsPollReadbacks, nullptr);
+            }
+            return false;
+        }
+        // </FS:Trish>
         if (mRawImage.isNull())
         {
             sRawCount++;
         }
-        mRawImage = new LLImageRaw();
-        if (!mGLTexturep->readBackRaw(-1, mRawImage, false))
+        // <FS:Trish>
+        //mRawImage = new LLImageRaw();
+        //if (!mGLTexturep->readBackRaw(-1, mRawImage, false))
+        mRawImage = raw;
+        if (result != LLImageGL::FS_READBACK_DONE)
+        // </FS:Trish>
         {
             mRawImage = nullptr;
             mIsRawImageValid = false;
@@ -3472,6 +3533,7 @@ void LLViewerFetchedTexture::readbackRawImage()
             mRawDiscardLevel = mGLTexturep->getDiscardLevel();
         }
     }
+    return true; // <FS:Trish/>
 }
 
 void LLViewerFetchedTexture::destroySavedRawImage()

@@ -40,6 +40,7 @@
 #include "threadpool.h"
 #include "workqueue.h"
 #include <unordered_set>
+#include <memory> // <FS:Trish/>
 
 #define LL_IMAGEGL_THREAD_CHECK 0 //set to 1 to enable thread debugging for ImageGL
 
@@ -60,6 +61,8 @@ namespace LLImageGLMemory
     void free_tex_images(U32 count, const U32* texNames);
     void free_cur_tex_image();
 }
+
+struct FSImageReadback; // <FS:Trish/> see LLImageGL::fsReadBackRawAsync
 
 //============================================================================
 class LLImageGL : public LLRefCount
@@ -161,6 +164,15 @@ public:
 
     // Read back a raw image for this discard level, if it exists
     bool readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const;
+    // <FS:Trish> readBackRaw (uncompressed) without the main thread waiting for the render thread: with
+    // FSRenderThread on, the level is copied into a pixel pack buffer in stream order and read by the render
+    // thread once a fence says the GPU is done. FS_READBACK_PENDING: ask again later, imageraw is untouched.
+    // Without the render thread (or for formats it doesn't handle) this is readBackRaw. Main thread.
+    enum EFSReadback { FS_READBACK_FAILED = 0, FS_READBACK_DONE, FS_READBACK_PENDING };
+    EFSReadback fsReadBackRawAsync(S32 discard_level, LLImageRaw* imageraw);
+    // a readback was asked for and its result not taken yet
+    bool fsHasReadback() const { return (bool)mFSReadback; }
+    // </FS:Trish>
     void destroyGLTexture();
     void forceToInvalidateGLTexture();
 
@@ -344,6 +356,11 @@ private:
 //****************************************************************************************************
 private:
     S32 mCategory ;
+    // <FS:Trish> fsReadBackRawAsync: the request in flight or not taken yet, and the last one that failed
+    std::shared_ptr<FSImageReadback> mFSReadback;
+    U32 mFSReadbackFailedName = 0;
+    S32 mFSReadbackFailedDiscard = -1;
+    // </FS:Trish>
 public:
     void setCategory(S32 category) {mCategory = category;}
     S32  getCategory()const {return mCategory;}

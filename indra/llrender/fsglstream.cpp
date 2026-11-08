@@ -3406,6 +3406,14 @@ namespace
     bool sRunning = false;                  // main
     std::atomic<U64> sPresented{ 0 };
     U64 sRecordedFrames = 0;                // main
+    std::atomic<bool (*)(bool)> sRenderPoll{ nullptr };  // FSGLStream::setRenderPoll
+
+    // Render thread: true while the poll hook has work left
+    bool runRenderPoll()
+    {
+        bool (*fn)(bool) = sRenderPoll.load(std::memory_order_acquire);
+        return fn && fn(false);
+    }
 
     void execPresent(U8* p)
     {
@@ -3432,6 +3440,7 @@ namespace
         }
 
         bool flushed_for_queries = false;
+        bool poll_pending = false;  // the poll hook has work left (readbacks waiting on fences)
         for (;;)
         {
             Chunk* c = nullptr;
@@ -3444,7 +3453,7 @@ namespace
                 U32 poll_wait_us = 500;
                 while (sQueue.empty())
                 {
-                    if (!sQueryPending.empty())
+                    if (!sQueryPending.empty() || poll_pending)
                     {
                         // Nothing to replay: make sure the GPU sees the queries
                         // and keep collecting their results while we wait.
@@ -3456,6 +3465,10 @@ namespace
                         }
                         const size_t pending_before = sQueryPending.size();
                         pollQueries();
+                        if (poll_pending)
+                        {
+                            poll_pending = runRenderPoll();
+                        }
                         if (sQueryPending.size() < pending_before)
                         {
                             poll_wait_us = 500;
@@ -3489,6 +3502,7 @@ namespace
                 LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("FSRT replay");
                 execChunk(c);
                 pollQueries();
+                poll_pending = runRenderPoll();
             }
             flushed_for_queries = false;
             freeChunk(c);
@@ -3591,6 +3605,11 @@ namespace FSGLStream
         tRecording = false;
         sRunning = false;
         sOps.mAcquireOnMain();
+        // what the render thread still waited on completes here, with the context
+        if (bool (*fn)(bool) = sRenderPoll.load(std::memory_order_acquire))
+        {
+            fn(true);
+        }
         resetStreamState();
         LL_INFOS("FSRenderThread") << "Render thread stopped; GL is back on the main thread" << LL_ENDL;
     }
@@ -3636,6 +3655,11 @@ namespace FSGLStream
         }, sizeof(Rec));
         new (p) Rec{ fn, value };
         commitRecord();
+    }
+
+    void setRenderPoll(bool (*fn)(bool finish))
+    {
+        sRenderPoll.store(fn, std::memory_order_release);
     }
 
     void setFilter(bool filter)

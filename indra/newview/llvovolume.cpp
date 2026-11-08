@@ -1813,7 +1813,14 @@ void LLVOVolume::sculpt()
         if (!raw_image || raw_image->getWidth() < mSculptTexture->getWidth() || raw_image->getHeight() < mSculptTexture->getHeight())
         {
             // last resort, read back from GL
-            mSculptTexture->readbackRawImage();
+            // <FS:Trish> asynchronous with the render thread: keep the current shape while it is in
+            // flight, the texture rebuilds its sculpts once it lands
+            //mSculptTexture->readbackRawImage();
+            if (!mSculptTexture->readbackRawImage())
+            {
+                return;
+            }
+            // </FS:Trish>
             raw_image = mSculptTexture->getRawImage();
             discard_level = mSculptTexture->getRawImageLevel();
         }

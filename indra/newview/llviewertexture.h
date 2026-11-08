@@ -418,7 +418,13 @@ public:
     void        forceToSaveRawImage(S32 desired_discard = 0, F32 kept_time = 0.f) ;
 
     // readback the raw image from OpenGL if mRawImage is not valid
-    void        readbackRawImage();
+    // <FS:Trish> With the render thread the readback is asynchronous: false while it is in flight (the
+    // raw image is as it was; ask again later). Once it lands the texture's sculpts are rebuilt.
+    //void        readbackRawImage();
+    bool        readbackRawImage();
+    // idle callback: takes the readbacks that landed
+    static void fsPollReadbacks(void*);
+    // </FS:Trish>
 
     void        destroySavedRawImage() ;
     LLImageRaw* getSavedRawImage() ;

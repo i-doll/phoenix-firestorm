@@ -89,6 +89,13 @@ namespace FSGLStream
     // recording). For GL calls made outside the proxies that return nothing.
     void recordCall(void (*fn)(U64), U64 value);
 
+    // Render thread work that waits on the GPU (fences of asynchronous readbacks). fn runs on the
+    // render thread after each replayed chunk and while it waits for work, and returns true while
+    // it still has work, which keeps the waiting thread polling. stop() calls it once more on the
+    // main thread with finish = true, once the context is back there: it must then complete
+    // everything, waiting if it has to. One function; main thread.
+    void setRenderPoll(bool (*fn)(bool finish));
+
     // Clears the GL error flags without waiting: in stream order while recording, directly
     // otherwise. For code that only wants a clean slate before its own glGetError check.
     void clearErrors();

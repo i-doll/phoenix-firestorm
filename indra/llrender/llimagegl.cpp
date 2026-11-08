@@ -42,6 +42,9 @@
 #include "llwindow.h"
 #include "llframetimer.h"
 #include "fstextureupload.h" // <FS:Trish/> FSPerfTextureUploadPBO
+#include "fsglstream.h" // <FS:Trish/> asynchronous readbacks
+#include "llthread.h" // <FS:Trish/> on_main_thread
+#include <atomic> // <FS:Trish/>
 #include <unordered_set>
 
 extern LL_COMMON_API bool on_main_thread();
@@ -2068,9 +2071,280 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     return true ;
 }
 
+// <FS:Trish> Asynchronous readbacks, see fsReadBackRawAsync(). The render thread is Windows only.
+#if LL_WINDOWS
+struct FSImageReadback
+{
+    enum { PENDING = 0, DONE = 1, FAILED = -1 };
+
+    // the request: set on the main thread before it is recorded, read only afterwards
+    GLuint mTexName = 0;
+    S32 mDiscard = 0;           // the LLImageGL discard level asked for
+    S32 mLevel = 0;             // its GL level
+    S32 mWidth = 0;
+    S32 mHeight = 0;
+    S32 mComponents = 0;
+    GLenum mFormat = 0;
+    GLenum mType = 0;
+    size_t mBytes = 0;          // what readBackRaw would read: width * height * components
+    size_t mBufBytes = 0;       // the pack buffer: rows padded to 8 bytes, whatever GL_PACK_ALIGNMENT is
+    U32 mFrame = 0;             // LLImageGL::sFrameCount when asked
+
+    // render thread
+    GLuint mPBO = 0;
+    GLsync mFence = 0;
+    bool mFlushed = false;
+
+    // written by the render thread before mState leaves PENDING (release), read by the main thread after
+    std::vector<U8> mData;
+    std::atomic<S32> mState{ PENDING };
+};
+
+namespace
+{
+    // a result not taken within this many frames may no longer match the texture: it is asked for again
+    constexpr U32 FS_READBACK_MAX_AGE = 30;
+
+    std::vector<std::shared_ptr<FSImageReadback>> sFSReadbacksInFlight;   // render thread (main after stop)
+
+    // bytes per pixel glGetTexImage writes, 0 for anything the asynchronous path doesn't handle
+    S32 fs_readback_pixel_bytes(GLenum format, GLenum type)
+    {
+        S32 comps = 0;
+        switch (format)
+        {
+        case GL_RED: case GL_ALPHA: case GL_LUMINANCE: comps = 1; break;
+        case GL_RG: case GL_LUMINANCE_ALPHA: comps = 2; break;
+        case GL_RGB: case GL_BGR: comps = 3; break;
+        case GL_RGBA: case GL_BGRA: comps = 4; break;
+        default: return 0;
+        }
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE: return comps;
+        case GL_UNSIGNED_INT_8_8_8_8: case GL_UNSIGNED_INT_8_8_8_8_REV: return comps == 4 ? 4 : 0;
+        default: return 0;
+        }
+    }
+
+    void fs_readback_release(FSImageReadback& rb)
+    {
+        if (rb.mFence)
+        {
+            glDeleteSync(rb.mFence);
+            rb.mFence = 0;
+        }
+        if (rb.mPBO)
+        {
+            glDeleteBuffers(1, &rb.mPBO);
+            rb.mPBO = 0;
+        }
+    }
+
+    // Render thread, in stream order: copy the level into a new pack buffer and fence it. Only GL state
+    // this changes is put back, so the main thread's trackers stay right.
+    void fs_readback_start(U64 value)
+    {
+        std::unique_ptr<std::shared_ptr<FSImageReadback>> holder(reinterpret_cast<std::shared_ptr<FSImageReadback>*>(value));
+        std::shared_ptr<FSImageReadback> rb = std::move(*holder);
+
+        GLint prev_texture = 0;
+        GLint prev_pack = 0;
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_texture);
+        glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prev_pack);
+        glBindTexture(GL_TEXTURE_2D, rb->mTexName);
+
+        // as readBackRaw: no such level, or smaller than the texture says
+        GLint glwidth = 0;
+        GLint glheight = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, rb->mLevel, GL_TEXTURE_WIDTH, &glwidth);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, rb->mLevel, GL_TEXTURE_HEIGHT, &glheight);
+        bool ok = glwidth != 0;
+        // the level must fit the buffer: a larger one makes GL fail the copy, which would otherwise be
+        // handed over as finished with whatever the new buffer held
+        if (ok && (rb->mWidth < glwidth || rb->mHeight < glheight))
+        {
+            LL_WARNS() << "texture size is smaller than it should be." << LL_ENDL;
+            LL_WARNS() << "width: " << rb->mWidth << " glwidth: " << glwidth << " height: " << rb->mHeight
+                       << " glheight: " << glheight << " discard_level: " << rb->mDiscard << LL_ENDL;
+            ok = false;
+        }
+        if (ok)
+        {
+            for (U32 i = 0; i < 8 && glGetError() != GL_NO_ERROR; ++i)
+            {   // errors of earlier calls aren't the copy's
+            }
+            glGenBuffers(1, &rb->mPBO);
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, rb->mPBO);
+            glBufferData(GL_PIXEL_PACK_BUFFER, (GLsizeiptr)rb->mBufBytes, nullptr, GL_STREAM_READ);
+            glGetTexImage(GL_TEXTURE_2D, rb->mLevel, rb->mFormat, rb->mType, nullptr);
+            const bool copied = glGetError() == GL_NO_ERROR;
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prev_pack);
+            rb->mFence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            ok = copied && rb->mPBO != 0 && rb->mFence != 0;
+        }
+        glBindTexture(GL_TEXTURE_2D, (GLuint)prev_texture);
+
+        if (!ok)
+        {
+            fs_readback_release(*rb);
+            rb->mState.store(FSImageReadback::FAILED, std::memory_order_release);
+            return;
+        }
+        sFSReadbacksInFlight.push_back(std::move(rb));
+    }
+
+    // Render thread (FSGLStream's poll hook): take the copies the GPU has finished. True while some aren't.
+    bool fs_readback_poll(bool finish)
+    {
+        for (size_t i = 0; i < sFSReadbacksInFlight.size();)
+        {
+            FSImageReadback& rb = *sFSReadbacksInFlight[i];
+            const GLenum wait = glClientWaitSync(rb.mFence, rb.mFlushed ? 0 : GL_SYNC_FLUSH_COMMANDS_BIT,
+                                                 finish ? 1000000000ull : 0);
+            rb.mFlushed = true;
+            if (wait == GL_TIMEOUT_EXPIRED && !finish)
+            {
+                ++i;
+                continue;
+            }
+            const bool ok = wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED;
+            if (ok)
+            {
+                GLint prev_pack = 0;
+                glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prev_pack);
+                glBindBuffer(GL_PIXEL_PACK_BUFFER, rb.mPBO);
+                rb.mData.resize(rb.mBytes);
+                glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)rb.mBytes, rb.mData.data());
+                glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prev_pack);
+            }
+            fs_readback_release(rb);
+            rb.mState.store(ok ? FSImageReadback::DONE : FSImageReadback::FAILED, std::memory_order_release);
+            sFSReadbacksInFlight.erase(sFSReadbacksInFlight.begin() + i);
+        }
+        return !sFSReadbacksInFlight.empty();
+    }
+}
+#endif // LL_WINDOWS
+
+LLImageGL::EFSReadback LLImageGL::fsReadBackRawAsync(S32 discard_level, LLImageRaw* imageraw)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+#if LL_WINDOWS
+    if (!FSGLStream::isRecording())
+    {   // without the render thread there is no queue to wait for
+        mFSReadback.reset();
+        return readBackRaw(discard_level, imageraw, false) ? FS_READBACK_DONE : FS_READBACK_FAILED;
+    }
+
+    if (discard_level < 0)
+    {
+        discard_level = mCurrentDiscardLevel;
+    }
+    if (mTexName == 0 || discard_level < mCurrentDiscardLevel || discard_level > mMaxDiscardLevel)
+    {
+        mFSReadback.reset();
+        return FS_READBACK_FAILED;
+    }
+    const S32 width = getWidth(discard_level);
+    const S32 height = getHeight(discard_level);
+    const S32 ncomponents = getComponents();
+    if (ncomponents == 0)
+    {
+        mFSReadback.reset();
+        return FS_READBACK_FAILED;
+    }
+    if (mTarget != GL_TEXTURE_2D || mBindTarget != LLTexUnit::TT_TEXTURE ||
+        width <= 0 || width > 2048 || height <= 0 || height > 2048 || ncomponents > 4 ||
+        fs_readback_pixel_bytes(mFormatPrimary, mFormatType) != ncomponents)
+    {   // anything unusual keeps the synchronous path, with its checks and messages
+        mFSReadback.reset();
+        return readBackRaw(discard_level, imageraw, false) ? FS_READBACK_DONE : FS_READBACK_FAILED;
+    }
+
+    if (mFSReadback)
+    {
+        std::shared_ptr<FSImageReadback> rb = mFSReadback;
+        const bool same = rb->mTexName == mTexName && rb->mDiscard == discard_level && rb->mWidth == width &&
+                          rb->mHeight == height && rb->mComponents == ncomponents && rb->mFormat == mFormatPrimary &&
+                          rb->mType == mFormatType;
+        const S32 state = rb->mState.load(std::memory_order_acquire);
+        if (same && state == FSImageReadback::PENDING)
+        {
+            return FS_READBACK_PENDING;
+        }
+        mFSReadback.reset();    // the render thread lets go of it once it is no longer pending
+        if (same && sFrameCount - rb->mFrame <= FS_READBACK_MAX_AGE)
+        {
+            if (state != FSImageReadback::DONE || rb->mData.size() != rb->mBytes)
+            {
+                // the same request would fail again: don't keep asking while the texture stays as it is
+                mFSReadbackFailedName = mTexName;
+                mFSReadbackFailedDiscard = discard_level;
+                return FS_READBACK_FAILED;
+            }
+            LLImageDataLock lock(imageraw);
+            if (!imageraw->allocateDataSize(width, height, ncomponents))
+            {   // as readBackRaw
+                constexpr F32 MAX_IMAGE_SIZE = 2048 * 2048;
+                F32 size = (F32)width * (F32)height * (F32)ncomponents;
+                if (size > 0 && size <= MAX_IMAGE_SIZE)
+                {
+                    LLError::LLUserWarningMsg::showOutOfMemory();
+                    LL_ERRS() << "Memory allocation failed for reading back texture. Data size: " << size << LL_ENDL;
+                }
+                else
+                {
+                    LL_WARNS() << "Memory allocation failed for reading back texture." << LL_ENDL;
+                    LL_WARNS() << "width: " << width << "height: " << height << "components: " << ncomponents << LL_ENDL;
+                }
+                return FS_READBACK_FAILED;
+            }
+            memcpy(imageraw->getData(), rb->mData.data(), rb->mBytes);
+            return FS_READBACK_DONE;
+        }
+        // for another level or too old: ask again
+    }
+
+    if (mFSReadbackFailedName == mTexName && mFSReadbackFailedDiscard == discard_level)
+    {
+        return FS_READBACK_FAILED;
+    }
+
+    std::shared_ptr<FSImageReadback> rb = std::make_shared<FSImageReadback>();
+    rb->mTexName = mTexName;
+    rb->mDiscard = discard_level;
+    rb->mLevel = discard_level - mCurrentDiscardLevel;
+    rb->mWidth = width;
+    rb->mHeight = height;
+    rb->mComponents = ncomponents;
+    rb->mFormat = mFormatPrimary;
+    rb->mType = mFormatType;
+    rb->mBytes = (size_t)width * (size_t)height * (size_t)ncomponents;
+    rb->mBufBytes = (((size_t)width * (size_t)ncomponents + 7) & ~(size_t)7) * (size_t)height;
+    rb->mFrame = sFrameCount;
+    FSGLStream::setRenderPoll(&fs_readback_poll);
+    FSGLStream::recordCall(&fs_readback_start, (U64)(uintptr_t)new std::shared_ptr<FSImageReadback>(rb));
+    mFSReadback = std::move(rb);
+    return FS_READBACK_PENDING;
+#else
+    return readBackRaw(discard_level, imageraw, false) ? FS_READBACK_DONE : FS_READBACK_FAILED;
+#endif
+}
+// </FS:Trish>
+
 void LLImageGL::destroyGLTexture()
 {
     checkActiveThread();
+
+    // <FS:Trish> a readback of the old texture must not be taken for one of a new texture with the same name
+    // (main thread only: that is where fsReadBackRawAsync reads them)
+    if (on_main_thread())
+    {
+        mFSReadback.reset();
+        mFSReadbackFailedName = 0;
+    }
+    // </FS:Trish>
 
     if (mTexName != 0)
     {
