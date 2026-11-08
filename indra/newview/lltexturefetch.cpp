@@ -3251,6 +3251,42 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
     mHttpSemaphore = 0;
     mSelfHealEnabled = false; // <FS:Trish/>
 
+    // <FS:Trish> HTTP completions were only delivered by commonUpdate(), which
+    // the main thread schedules once per frame, so texture replies (and the
+    // next request on the freed slot) waited for the frame. When a reply is
+    // queued, schedule one extra commonUpdate() on the fetch thread itself,
+    // which is where update() must run. The notifier is called on the HTTP
+    // thread and only posts work, coalesced by the pending flag.
+    if (mThreaded)
+    {
+        auto pending = std::make_shared<std::atomic<bool>>(false);
+        mHttpRequest->setReplyNotifier([this, pending]()
+            {
+                if (isQuitting() || pending->exchange(true))
+                {
+                    // Shutting down, or an update is already queued
+                    return;
+                }
+                bool posted = mRequestQueue.tryPost([this, pending]()
+                    {
+                        pending->store(false);
+                        if (!isQuitting())
+                        {
+                            LL_PROFILE_ZONE_NAMED_CATEGORY_THREAD("tf - http reply");
+                            mIdleThread = false;
+                            commonUpdate();
+                            mIdleThread = true;
+                        }
+                    });
+                if (!posted)
+                {
+                    // Queue full or closed: the per-frame update picks it up
+                    pending->store(false);
+                }
+            });
+    }
+    // </FS:Trish>
+
     // If that test log has ben requested but not yet created, create it
     if (LLMetricPerformanceTesterBasic::isMetricLogRequested(sTesterName) && !LLMetricPerformanceTesterBasic::getTester(sTesterName))
     {
@@ -3276,6 +3312,12 @@ LLTextureFetch::~LLTextureFetch()
 
     mHttpWaitResource.clear();
 
+    // <FS:Trish> Replies still in flight would otherwise post work for a deleted object
+    if (mHttpRequest)
+    {
+        mHttpRequest->setReplyNotifier(nullptr);
+    }
+    // </FS:Trish>
     delete mHttpRequest;
     mHttpRequest = NULL;
 
