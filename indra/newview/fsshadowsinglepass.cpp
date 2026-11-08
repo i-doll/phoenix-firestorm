@@ -418,7 +418,7 @@ bool LLPipeline::fsShadowSinglePassRecord(U32 kind, bool rigged, const U32* type
             {
                 continue;
             }
-            list.push_back({ params, bit });
+            list.push_back({ params, params->mVertexBuffer, bit });
         }
     }
     return true;
@@ -433,6 +433,16 @@ bool LLPipeline::fsShadowSinglePassDeferColored()
         return false;
     }
     mFSShadowSPColored |= 1u << mFSShadowSPCascade;
+    std::vector<FSShadowSPEntry>& held = mFSShadowSPColoredCasters[mFSShadowSPCascade];
+    held.clear();
+    for (LLCullResult::drawinfo_iterator i = beginRenderMap(LLRenderPass::PASS_ALPHA), end = endRenderMap(LLRenderPass::PASS_ALPHA); i != end; ++i)
+    {
+        LLDrawInfo* params = *i;
+        if (params && params->mCount && params->mVertexBuffer.notNull())
+        {
+            held.push_back({ params, params->mVertexBuffer, 0 });
+        }
+    }
     return true;
 }
 
@@ -473,12 +483,12 @@ void LLPipeline::fsShadowSinglePassFinish()
             }
             std::sort(list.begin(), list.end(), [](const FSShadowSPEntry& a, const FSShadowSPEntry& b)
             {
-                return a.mParams < b.mParams;
+                return a.mParams.get() < b.mParams.get();
             });
             size_t out = 0;
             for (size_t i = 0; i < list.size(); ++i)
             {
-                if (out && list[out - 1].mParams == list[i].mParams)
+                if (out && list[out - 1].mParams.get() == list[i].mParams.get())
                 {
                     list[out - 1].mMask |= list[i].mMask;
                 }
@@ -488,6 +498,10 @@ void LLPipeline::fsShadowSinglePassFinish()
                 }
             }
             list.resize(out);
+            list.erase(std::remove_if(list.begin(), list.end(), [](const FSShadowSPEntry& e)
+            {
+                return !e.mParams->mCount || e.mParams->mVertexBuffer.get() != e.mBuffer.get();
+            }), list.end());
 
             // grouped by cascade set, then by what saves state changes: model matrix and buffer (opaque, where
             // runs of index ranges merge), skin palette (rigged), texture (alpha masked)
@@ -499,8 +513,8 @@ void LLPipeline::fsShadowSinglePassFinish()
                 {
                     return a.mMask < b.mMask;
                 }
-                const LLDrawInfo* lhs = a.mParams;
-                const LLDrawInfo* rhs = b.mParams;
+                const LLDrawInfo* lhs = a.mParams.get();
+                const LLDrawInfo* rhs = b.mParams.get();
                 if (rigged)
                 {
                     if (lhs->mAvatar.get() != rhs->mAvatar.get())
@@ -658,7 +672,7 @@ void LLPipeline::fsShadowSinglePassFinish()
                         size_t next = i + 1;
                         for (; next < count; ++next)
                         {
-                            const LLDrawInfo* other = list[next].mParams;
+                            const LLDrawInfo* other = list[next].mParams.get();
                             if (list[next].mMask != mask || other->mModelMatrix != params.mModelMatrix || other->mVertexBuffer.get() != buffer)
                             {
                                 break;
@@ -754,11 +768,19 @@ void LLPipeline::fsShadowSinglePassFinish()
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadMatrix(glm::value_ptr(mFSShadowSPView[c]));
             gGLLastMatrix = NULL;
-            grabReferences(*mFSShadowSPCull[c]);
-            const S32 saved_cascade = mColoredShadowCascade;
-            mColoredShadowCascade = (S32)c;
-            renderColoredShadowCasters();
-            mColoredShadowCascade = saved_cascade;
+            // a later cascade's cull can rebuild or free the casters this cascade's render map listed
+            std::vector<LLDrawInfo*> casters;
+            for (const FSShadowSPEntry& e : mFSShadowSPColoredCasters[c])
+            {
+                if (e.mParams->mCount && e.mParams->mVertexBuffer.get() == e.mBuffer.get())
+                {
+                    casters.push_back(e.mParams.get());
+                }
+            }
+            if (c < FS_COLORED_SHADOW_CASCADES && !casters.empty() && drawColoredShadowCasters(mColoredShadowTarget[c], casters.data(), casters.data() + casters.size()))
+            {
+                mColoredShadowFrame[c] = LLFrameTimer::getFrameCount();
+            }
             gGL.setColorMask(false, false);
         }
         shadow.flush();
@@ -789,6 +811,10 @@ void LLPipeline::fsShadowSinglePassFinish()
     mFSShadowSPRecorded = 0;
     mFSShadowSPColored = 0;
     mFSShadowSPLastCull = nullptr;
+    for (auto& held : mFSShadowSPColoredCasters)
+    {
+        held.clear();
+    }
 
     if (batch_stats)
     {   // recorded counts each cascade a batch went to, as the per cascade passes would draw it

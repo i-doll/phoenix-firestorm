@@ -5263,10 +5263,10 @@ void LLPipeline::renderColoredShadowCasters()
 
 // Draws the source-over alpha-blended casters of the current shadow pass into target, whose
 // depth is the pass's shadow depth. False when there are none (the map then reads as white).
-bool LLPipeline::drawColoredShadowCasters(LLRenderTarget& target)
+bool LLPipeline::drawColoredShadowCasters(LLRenderTarget& target, LLDrawInfo** casters_begin, LLDrawInfo** casters_end)
 {
-    auto* begin = beginRenderMap(LLRenderPass::PASS_ALPHA);
-    auto* end = endRenderMap(LLRenderPass::PASS_ALPHA);
+    auto* begin = casters_begin ? casters_begin : beginRenderMap(LLRenderPass::PASS_ALPHA);
+    auto* end = casters_begin ? casters_end : endRenderMap(LLRenderPass::PASS_ALPHA);
     if (begin == end || !target.isComplete())
     {   // nothing translucent in this pass: its map isn't marked as drawn and reads as white
         return false;

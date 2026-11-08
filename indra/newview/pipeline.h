@@ -328,8 +328,9 @@ public:
                            FS_SHADOW_SP_MATERIAL_MASK, FS_SHADOW_SP_KINDS };
     struct FSShadowSPEntry
     {
-        LLDrawInfo* mParams;
-        U32         mMask;                          // cascades that recorded it, one bit each
+        LLPointer<LLDrawInfo>     mParams;
+        LLPointer<LLVertexBuffer> mBuffer;          // the buffer at record time; a later cascade's cull can rebuild the group
+        U32                       mMask;            // cascades that recorded it, one bit each
     };
     std::vector<FSShadowSPEntry> mFSShadowSPEntries[FS_SHADOW_SP_KINDS][2];  // [kind][rigged]
     LLRenderTarget          mFSShadowAtlas;
@@ -340,6 +341,7 @@ public:
     LLCullResult*           mFSShadowSPLastCull = nullptr;
     U32                     mFSShadowSPRecorded = 0;        // cascades that recorded this update
     U32                     mFSShadowSPColored = 0;         // cascades whose coloured casters wait for the merge
+    std::vector<FSShadowSPEntry> mFSShadowSPColoredCasters[4];  // their casters, held until the merge draws them
     S32                     mFSShadowSPCascade = -1;        // cascade renderShadow records for, -1 to draw as usual
     bool                    mFSShadowSPActive = false;
     void fsShadowSinglePassBegin();
@@ -965,7 +967,7 @@ public:
     void                    fsEndSpotColoredShadow();
     void                    fsBindSpotColoredShadow(LLGLSLShader& shader, S32 slot);    // setupSpotLight, -1 for an unshadowed light
     void                    fsReleaseSpotColoredTargets();
-    bool                    drawColoredShadowCasters(LLRenderTarget& target);          // shared by sun cascades and projectors
+    bool                    drawColoredShadowCasters(LLRenderTarget& target, LLDrawInfo** casters_begin = nullptr, LLDrawInfo** casters_end = nullptr);          // shared by sun cascades and projectors
     // </FS:Trish>
 
     // exposure map for getting average color in scene
