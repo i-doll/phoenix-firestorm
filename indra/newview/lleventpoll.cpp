@@ -186,6 +186,18 @@ namespace Details
         }
 #endif
         // </FS:Ansariel>
+        // <FS:Trish> The SL server holds the poll for about 30 s, the same as
+        // the default client timeout. When the client times out first, curl
+        // drops the connection and every poll needs a new TCP+TLS handshake.
+        // Wait a bit longer so the server's "no events" reply arrives first
+        // and the connection is reused.
+#ifdef OPENSIM
+        if (!LLGridManager::instance().isInOpenSim())
+#endif
+        {
+            httpOpts->setTransferTimeout(45);
+        }
+        // </FS:Trish>
 
         LL::WorkQueue::ptr_t main_queue = nullptr;
 
