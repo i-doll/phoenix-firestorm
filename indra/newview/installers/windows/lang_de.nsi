@@ -78,7 +78,7 @@ LangString CheckNetworkConnectionDP ${LANG_GERMAN} "Prüfe Netzwerkverbindung...
 
 ; error during installation
 LangString ErrorSecondLifeInstallRetry ${LANG_GERMAN} "Idyll konnte nicht korrekt installiert werden, einige Dateien wurden eventuell nicht korrekt von der Installationroutine kopiert."
-LangString ErrorSecondLifeInstallSupport ${LANG_GERMAN} "Bitte laden Sie den Viewer erneut von https://www.firestormviewer.org/downloads/ und versuchen Sie die Installation erneut. Sollte das Problem weiterhin bestehen, dann kontaktieren Sie unseren Support unter https://www.firestormviewer.org/support/."
+LangString ErrorSecondLifeInstallSupport ${LANG_GERMAN} "Bitte installieren Sie Idyll erneut. Sollte das Problem weiterhin bestehen, dann kontaktieren Sie unseren Support unter https://www.firestormviewer.org/support/."
 
 ; ask to remove user's data files
 LangString RemoveDataFilesMB ${LANG_GERMAN} "Einstellungs- und Cache-Dateien in Dokumente und Einstellungen löschen?"
@@ -102,7 +102,7 @@ LangString CreateStartMenuEntry ${LANG_GERMAN} "Eintrag im Startmenü erstellen?
 LangString ForOpenSimSuffix ${LANG_GERMAN} "für OpenSimulator"
 
 LangString DeleteDocumentAndSettingsDP ${LANG_GERMAN} 'Dateien unterhalb von "Dokumente und Einstellungen werden gelöscht.'
-LangString UnChatlogsNoticeMB ${LANG_GERMAN} "Diese Deinstallation löscht NICHT die Idyll-Chatprotokolle und andere private Dateien. Sollen diese gelöscht werden, muss das Idyll-Verzeichnis im Anwendungsdaten-Verzeichnis manuell gelöscht werden."
+LangString UnChatlogsNoticeMB ${LANG_GERMAN} "Diese Deinstallation löscht NICHT die Idyll-Chatprotokolle und andere private Dateien. Sollen diese gelöscht werden, muss das Verzeichnis Idyll_x64 im Anwendungsdaten-Verzeichnis manuell gelöscht werden."
 LangString UnRemovePasswordsDP ${LANG_GERMAN} "Lösche gespeicherte Idyll-Passwörter."
 
 LangString MUI_TEXT_LICENSE_TITLE ${LANG_GERMAN} "VivoxVoice System Lizenz-Vereinbarung"

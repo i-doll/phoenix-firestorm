@@ -3246,7 +3246,7 @@ Si la mémoire vive de votre ordinateur est faible, quittez les applications lou
 	<string name="MBMissingFile">
 		[APP_NAME] n'a pas pu accéder ou trouver certains des fichiers dont il a besoin et sera fermé.
 
-Veuillez réinstaller la le clientuse à partir de [DOWNLOAD_URL] et contacter [SUPPORT_SITE] si le problème persiste après la réinstallation.
+Veuillez réinstaller [APP_NAME] et contacter [SUPPORT_SITE] si le problème persiste après la réinstallation.
 	</string>
 	<string name="5 O'Clock Shadow">
 		Ombre de 5 heures

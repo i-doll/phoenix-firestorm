@@ -3114,7 +3114,7 @@ Se houver pouca memória disponível no seu computador, feche outros aplicativos
 	</string>
 	<string name="MBMissingFile">
 		[APP_NAME] não conseguiu encontrar ou acessar alguns arquivos necessários e precisa ser encerrado.
-Reinstale o Viewer de [DOWNLOAD_URL] e entre em contato com [SUPPORT_SITE] se o problema continuar após a reinstalação.
+Reinstale o [APP_NAME] e entre em contato com [SUPPORT_SITE] se o problema continuar após a reinstalação.
 	</string>
 	<string name="5 O'Clock Shadow">
 		Barba por fazer

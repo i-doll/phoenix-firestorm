@@ -82,7 +82,7 @@ Detalhes do erro: a notificação chamada &apos;[_NAME]&apos; não foi encontrad
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
 	<notification name="BadInstallation">
-		A instalação de [APP_NAME] está com defeito. Por favor [https://www.firestormviewer.org/downloads baixe uma nova cópia do viewer] e reinstale.
+		A instalação de [APP_NAME] está com defeito. Por favor, reinstale [APP_NAME].
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
 	<notification name="LoginFailedNoNetwork">
@@ -5632,8 +5632,7 @@ Erro na expressão regular:
 	</notification>
 
 	<notification name="NoHavok">
-Alguns recursos como [FEATURE] não estão incluídos nesta versão de [APP_NAME]. Se você quiser usar [FEATURE], baixe uma versão de [APP_NAME] com suporte Havok aqui:
-[DOWNLOAD_URL]
+Alguns recursos como [FEATURE] não estão incluídos nesta versão de [APP_NAME].
 		<form name="form">
 			<ignore name="ignore" text="Aviso de ausência de Havok"/>
 		</form>

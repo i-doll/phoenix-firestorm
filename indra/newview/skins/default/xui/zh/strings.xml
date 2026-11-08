@@ -3475,7 +3475,7 @@ support@secondlife.com.
 	<string name="MBMissingFile">
 		[APP_NAME] 無法存取或找到所需的某些檔案，將被關閉。
 
-請從 [DOWNLOAD_URL] 重新安裝檢視器，如果重新安裝後問題仍然存在，請聯絡 [SUPPORT_SITE]。
+請重新安裝 [APP_NAME]，如果重新安裝後問題仍然存在，請聯絡 [SUPPORT_SITE]。
 	</string>
 	<!-- Avatar Shape Information -->
 	<string name="5 O'Clock Shadow">

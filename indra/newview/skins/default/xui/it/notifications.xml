@@ -31,7 +31,7 @@ Dettagli errore: La notifica denominata &apos;[_NAME]&apos; non è stata trovata
 		<usetemplate name="okcancelbuttons" notext="Annulla" yestext="Si"/>
 	</notification>
 	<notification name="BadInstallation">
-		Il programma [APP_NAME] ha riscontrato un&apos;errore durante il tentativo di aggiornamento.  [https://www.firestormviewer.org/downloads Scarica l&apos;ultima versione] del viewer.
+		Il programma [APP_NAME] ha riscontrato un&apos;errore durante il tentativo di aggiornamento.  Reinstalla [APP_NAME].
 	</notification>
 	<notification name="LoginFailedNoNetwork">
 		Non è possibile collegarsi alla [CURRENT_GRID].
@@ -4963,8 +4963,7 @@ Simulatore precedente: [OLDVERSION]
 [EWHAT]
 	</notification>
 	<notification name="NoHavok">
-		Alcune funzioni come [FEATURE] non sono incluse in questa versione di [APP_NAME]. Se desideri utilizzare [FEATURE], scarica una versione di [APP_NAME] contenente il supporto Havok da
-[DOWNLOAD_URL]
+		Alcune funzioni come [FEATURE] non sono incluse in questa versione di [APP_NAME].
 		<form name="form">
 			<ignore name="ignore" text="Avviso sul supporto Havok mancante"/>
 		</form>

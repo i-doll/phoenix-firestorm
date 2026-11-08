@@ -3294,7 +3294,7 @@ www.secondlife.com から最新バージョンをダウンロードしてくだ�
 	<string name="MBMissingFile">
 		[APP_NAME]は、実行に必要なファイルの一部にアクセスできないか、ファイルが見つからなかったため閉じられます。
 
-[DOWNLOAD_URL] からビューアを再インストールてください。再インストール後も問題が解決しない場合は[SUPPORT_SITE] に連絡してください。
+[APP_NAME]を再インストールしてください。再インストール後も問題が解決しない場合は[SUPPORT_SITE] に連絡してください。
 	</string>
 	<!-- Avatar Shape Information -->
 	<string name="5 O'Clock Shadow">

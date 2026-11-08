@@ -31,7 +31,7 @@ Szczegóły błędu: Błąd o nazwie &apos;[_NAME]&apos; nie został odnaleziony
 		<usetemplate name="okcancelbuttons" notext="Anuluj" yestext="Tak"/>
 	</notification>
 	<notification name="BadInstallation">
-		Instalacja [APP_NAME] jest uszkodzona. Proszę [https://www.firestormviewer.org/downloads pobrać nową kopię] przeglądarki i ponownie ją zainstalować.
+		Instalacja [APP_NAME] jest uszkodzona. Proszę ponownie zainstalować [APP_NAME].
 	</notification>
 	<notification name="FoundLegacyNsisInstallation">
 		Program [APP_NAME] wykrył zainstalowaną starszą wersję [VERSION]. Aby odinstalować starszą wersję, postępuj zgodnie z [https://community.secondlife.com/knowledgebase/english/how-to-uninstall-and-reinstall-second-life-r524/ tymi instrukcjami].
@@ -5157,8 +5157,7 @@ Poprzedni symulator: [OLDVERSION]
 [EWHAT]
 	</notification>
 	<notification name="NoHavok">
-		Niektóre funkcje, takie jak [FEATURE], nie są obsługiwane przez [APP_NAME] w obecnej wersji. Jeśli chcesz używać '[FEATURE]', to prosimy o pobranie [APP_NAME] w wersji ze wsparciem dla Havoka z:
-[DOWNLOAD_URL]
+		Niektóre funkcje, takie jak [FEATURE], nie są obsługiwane przez [APP_NAME] w obecnej wersji.
 		<form name="form">
 			<ignore name="ignore" text="Ostrzeżenie o braku Havoka"/>
 		</form>

@@ -1643,7 +1643,7 @@ namespace LLError
         // Files Are missing, likely can't localize.
         const std::string error_string =
             "Idyll couldn't access some of the files it needs and will be closed."
-            "\n\nPlease reinstall viewer from https://www.firestormviewer.org/download and "
+            "\n\nPlease reinstall Idyll and "
             "contact https://www.firestormviewer.org/support if issue persists after reinstall.";
         sHandler("Missing Files", error_string, ERROR_MISSING_FILES);
     }

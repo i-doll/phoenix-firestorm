@@ -79,7 +79,7 @@ Detalles del error: la notificación de nombre &apos;[_NAME]&apos; no se ha enco
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
 	<notification name="BadInstallation">
-		Ha habido un error actualizando [APP_NAME]. Por favor, [https://www.firestormviewer.org/downloads descarga la última versión] del Visor.
+		Ha habido un error actualizando [APP_NAME]. Por favor, reinstala [APP_NAME].
 		<usetemplate name="okbutton" yestext="Aceptar"/>
 	</notification>
 	<notification name="LoginFailedNoNetwork">
@@ -4923,8 +4923,7 @@ Simulador anterior: [OLDVERSION]
 [EWHAT]
 	</notification>
 	<notification name="NoHavok">
-		Algunas funciones como [FEATURE] no están incluídas en [APP_NAME] para OpenSimulator. Si quieres usar [FEATURE], por favor descarga [APP_NAME] para Second Life de
-[DOWNLOAD_URL]
+		Algunas funciones como [FEATURE] no están incluídas en [APP_NAME] para OpenSimulator.
 		<form name="form">
 			<ignore name="ignore" text="Alerta de No Havok"/>
 		</form>

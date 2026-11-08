@@ -41,7 +41,7 @@
 		<usetemplate name="okbutton" yestext="確定"/>
 	</notification>
 	<notification name="BadInstallation">
-		[APP_NAME] 更新時出錯。請在 [https://www.firestormviewer.org/downloads 下載] 最新版本的檢視器。
+		[APP_NAME] 更新時出錯。請重新安裝 [APP_NAME]。
 		<usetemplate name="okbutton" yestext="確定"/>
 	</notification>
 	<notification name="FoundLegacyNsisInstallation">
@@ -5392,8 +5392,7 @@ switch語句在沒有預設標籤情況下的行為不正確已被修正。
 [EWHAT]
 	</notification>
 	<notification name="NoHavok">
-		一些功能，如[FEATURE]，不包含在[APP_NAME]的這個版本中。如果您想使用[FEATURE]，請從以下鏈接下載包含Havok支援的[APP_NAME]版本：
-[DOWNLOAD_URL]
+		一些功能，如[FEATURE]，不包含在[APP_NAME]的這個版本中。
 		<form name="form">
 			<ignore name="ignore" text="無Havok警告"/>
 		</form>

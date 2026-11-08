@@ -39,7 +39,7 @@
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="BadInstallation">
-		[APP_NAME]のアップデート時にエラーが発生しました。[https://www.firestormviewer.org/downloads 最新バージョンのビューアをダウンロード]してください。
+		[APP_NAME]のアップデート時にエラーが発生しました。[APP_NAME]を再インストールしてください。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="FoundLegacyNsisInstallation">
@@ -5297,8 +5297,7 @@ http://opensimulator.org/wiki/inventory を使用して問題を修正できま�
 [EWHAT]
 	</notification>
 	<notification name="NoHavok">
-		[FEATURE] などの一部の機能は、このバージョンの[APP_NAME]には含まれていません。[FEATURE]を使用する場合は、Havokサポートを含むバージョンの[APP_NAME]をダウンロードしてください：
-[DOWNLOAD_URL]
+		[FEATURE] などの一部の機能は、このバージョンの[APP_NAME]には含まれていません。
 		<form name="form">
 			<ignore name="ignore" text="Havokが動作しない"/>
 		</form>

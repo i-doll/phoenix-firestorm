@@ -37,7 +37,7 @@
 		[MESSAGE]
 	</notification>
 	<notification name="BadInstallation">
-		Произошла ошибка при обновлении [APP_NAME]. [https://www.firestormviewer.org/downloads Загрузите последнюю версию] клиента.
+		Произошла ошибка при обновлении [APP_NAME]. Переустановите [APP_NAME].
 	</notification>
 	<notification name="LoginFailedNoNetwork">
 		Не удалось подключиться к [CURRENT_GRID].
@@ -5182,8 +5182,7 @@ https://wiki.firestormviewer.org/fs_voice
 [EWHAT]
 	</notification>
 	<notification name="NoHavok">
-		Некоторые функции, такие как [FEATURE] не включены в [APP_NAME] с OpenSimulator. Если вы хотели бы использовать [FEATURE], пожалуйста, скачайте [APP_NAME] для Second Life.
-[DOWNLOAD_URL]
+		Некоторые функции, такие как [FEATURE] не включены в [APP_NAME] с OpenSimulator.
 		<form name="form">
 			<ignore name="ignore" text="Предупреждение Havok"/>
 		</form>

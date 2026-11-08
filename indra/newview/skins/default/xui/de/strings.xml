@@ -3319,7 +3319,7 @@ Falls wenig Arbeitsspeicher auf Ihrem Computers verfügbar ist, beenden Sie ande
 	<string name="MBMissingFile">
 		[APP_NAME] konnte einige der benötigten Dateien nicht finden oder auf sie zugreifen und muss daher beendet werden.
 
-Bitte installieren Sie den Viewer von [DOWNLOAD_URL] erneut und wenden Sie sich an [SUPPORT_SITE] falls das Problem nach einer Neuinstallation weiterhin besteht.
+Bitte installieren Sie [APP_NAME] erneut und wenden Sie sich an [SUPPORT_SITE] falls das Problem nach einer Neuinstallation weiterhin besteht.
 	</string>
 	<string name="5 O'Clock Shadow">
 		Bartschatten

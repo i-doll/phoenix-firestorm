@@ -31,7 +31,7 @@ Xəta təfərrüatları: &quot;[_NAME]&quot; adlı bildiriş notifications.xml f
 		<usetemplate name="okcancelbuttons" notext="Ləğv et" yestext="Bəli"/>
 	</notification>
 	<notification name="BadInstallation">
-		[APP_NAME] yenilənərkən xəta baş verdi. Klientin [https://www.firestormviewer.org/downloads ən son versiyasını yükləyin].
+		[APP_NAME] yenilənərkən xəta baş verdi. [APP_NAME] tətbiqini yenidən quraşdırın.
 	</notification>
 	<notification name="LoginFailedNoNetwork">
 		[CURRENT_GRID] şəbəkəsinə qoşulmaq alınmadı.
@@ -4959,8 +4959,7 @@ Cari simulyator: [NEWVERSION]
 [EWHAT]
 	</notification>
 	<notification name="NoHavok">
-		[FEATURE] kimi bəzi funksiyalar [APP_NAME] tətbiqinin bu versiyasına daxil edilməyib. [FEATURE] istifadə etmək istəyirsinizsə, aşağıdakı ünvandan Havok dəstəyini ehtiva edən [APP_NAME] versiyasını endirin.
-[DOWNLOAD_URL]
+		[FEATURE] kimi bəzi funksiyalar [APP_NAME] tətbiqinin bu versiyasına daxil edilməyib.
 		<form name="form">
 			<ignore name="ignore" text="Havok xəbərdarlığı"/>
 		</form>
