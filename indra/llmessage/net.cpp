@@ -76,8 +76,16 @@ static U32 gsnReceivingIFAddr = INVALID_HOST_IP_ADDRESS; // Address to which dat
 const char* LOOPBACK_ADDRESS_STRING = "127.0.0.1";
 const char* BROADCAST_ADDRESS_STRING = "255.255.255.255";
 
-const int   SEND_BUFFER_SIZE    = 200000;
-const int   RECEIVE_BUFFER_SIZE = 800000;
+// <FS:Trish> Larger socket buffers so a long frame (teleport, region
+// crossing, shader compile) doesn't overflow the OS queue and drop packets.
+//const int   SEND_BUFFER_SIZE    = 200000;
+//const int   RECEIVE_BUFFER_SIZE = 800000;
+const int   SEND_BUFFER_SIZE    = 512 * 1024;
+const int   RECEIVE_BUFFER_SIZE = 8 * 1024 * 1024;
+// Fallback sizes if the OS refuses the large request.
+const int   SEND_BUFFER_SIZE_FALLBACK    = 200000;
+const int   RECEIVE_BUFFER_SIZE_FALLBACK = 800000;
+// </FS:Trish>
 
 // universal functions (cross-platform)
 
@@ -275,12 +283,26 @@ S32 start_net(S32& socket_out, int& nPort)
 
     // set a large receive buffer
     nRet = setsockopt(hSocket, SOL_SOCKET, SO_RCVBUF, (char *)&rec_size, buff_size);
+    // <FS:Trish> Retry with the old size if the large one is refused
+    if (nRet)
+    {
+        rec_size = RECEIVE_BUFFER_SIZE_FALLBACK;
+        nRet = setsockopt(hSocket, SOL_SOCKET, SO_RCVBUF, (char *)&rec_size, buff_size);
+    }
+    // </FS:Trish>
     if (nRet)
     {
         LL_INFOS("AppInit") << "Can't set receive buffer size!" << LL_ENDL;
     }
 
     nRet = setsockopt(hSocket, SOL_SOCKET, SO_SNDBUF, (char *)&snd_size, buff_size);
+    // <FS:Trish> Retry with the old size if the large one is refused
+    if (nRet)
+    {
+        snd_size = SEND_BUFFER_SIZE_FALLBACK;
+        nRet = setsockopt(hSocket, SOL_SOCKET, SO_SNDBUF, (char *)&snd_size, buff_size);
+    }
+    // </FS:Trish>
     if (nRet)
     {
         LL_INFOS("AppInit") << "Can't set send buffer size!" << LL_ENDL;
@@ -289,8 +311,12 @@ S32 start_net(S32& socket_out, int& nPort)
     getsockopt(hSocket, SOL_SOCKET, SO_RCVBUF, (char *)&rec_size, &buff_size);
     getsockopt(hSocket, SOL_SOCKET, SO_SNDBUF, (char *)&snd_size, &buff_size);
 
-    LL_DEBUGS("AppInit") << "startNet - receive buffer size : " << rec_size << LL_ENDL;
-    LL_DEBUGS("AppInit") << "startNet - send buffer size    : " << snd_size << LL_ENDL;
+    // <FS:Trish> Log the granted sizes, useful when diagnosing packet loss
+    //LL_DEBUGS("AppInit") << "startNet - receive buffer size : " << rec_size << LL_ENDL;
+    //LL_DEBUGS("AppInit") << "startNet - send buffer size    : " << snd_size << LL_ENDL;
+    LL_INFOS("AppInit") << "startNet - receive buffer size : " << rec_size << LL_ENDL;
+    LL_INFOS("AppInit") << "startNet - send buffer size    : " << snd_size << LL_ENDL;
+    // </FS:Trish>
 
     //  Setup a destination address
     stDstAddr.sin_family =      AF_INET;
@@ -468,11 +494,25 @@ S32 start_net(S32& socket_out, int& nPort)
     fcntl(hSocket, F_SETFL, O_NONBLOCK);
     // set a large receive buffer
     nRet = setsockopt(hSocket, SOL_SOCKET, SO_RCVBUF, (char *)&rec_size, buff_size);
+    // <FS:Trish> Retry with the old size if the large one is refused
+    if (nRet)
+    {
+        rec_size = RECEIVE_BUFFER_SIZE_FALLBACK;
+        nRet = setsockopt(hSocket, SOL_SOCKET, SO_RCVBUF, (char *)&rec_size, buff_size);
+    }
+    // </FS:Trish>
     if (nRet)
     {
         LL_INFOS() << "Can't set receive size!" << LL_ENDL;
     }
     nRet = setsockopt(hSocket, SOL_SOCKET, SO_SNDBUF, (char *)&snd_size, buff_size);
+    // <FS:Trish> Retry with the old size if the large one is refused
+    if (nRet)
+    {
+        snd_size = SEND_BUFFER_SIZE_FALLBACK;
+        nRet = setsockopt(hSocket, SOL_SOCKET, SO_SNDBUF, (char *)&snd_size, buff_size);
+    }
+    // </FS:Trish>
     if (nRet)
     {
         LL_INFOS() << "Can't set send size!" << LL_ENDL;

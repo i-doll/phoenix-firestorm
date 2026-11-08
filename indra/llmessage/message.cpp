@@ -984,6 +984,15 @@ S32 LLMessageSystem::bufferInboundPacket()
     LLPacketBuffer pkt(invalid_host, nullptr, 0);
     S32 packet_size = 0;
 
+    // <FS:Trish> A full ring would overwrite a packet that was already acked, which the sim then never
+    // resends. Leave the rest in the socket buffer, unacked, until the rings have room (the 8 MB receive
+    // buffer can hold far more than a ring after a long stall).
+    if (mHighPriorityInbound.isFull() || mLowPriorityInbound.isFull())
+    {
+        return 0;
+    }
+    // </FS:Trish>
+
     if (LLProxy::isSOCKSProxyEnabled())
     {
         char buffer[NET_BUFFER_SIZE + SOCKS_HEADER_SIZE];   /* Flawfinder ignore */

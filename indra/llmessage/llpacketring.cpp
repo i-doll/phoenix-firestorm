@@ -59,6 +59,13 @@ LLPacketRing::~LLPacketRing()
     mHeadIndex = 0;
 }
 
+// <FS:Trish>
+bool LLPacketRing::isFull() const
+{
+    return mNumBufferedPackets >= MAX_BUFFER_RING_SIZE;
+}
+// </FS:Trish>
+
 void LLPacketRing::pushPacket(const LLPacketBuffer& packet)
 {
     S16 ring_size = (S16)mRing.size();

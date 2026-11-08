@@ -56,6 +56,7 @@ public:
     bool popPacket(LLPacketBuffer& packet);
 
     S32 getNumBufferedPackets() const { return (S32)(mNumBufferedPackets); }
+    bool isFull() const; // <FS:Trish/> at the ceiling: the next push would drop an already acked packet
     S32 getNumBufferedBytes()   const { return mNumBufferedBytes; }
 
     // Ratio of buffered packets to DEFAULT_BUFFER_RING_SIZE (0 = empty, 1 = nominal full).
