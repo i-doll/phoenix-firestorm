@@ -1078,9 +1078,11 @@ bool idCopyFirestormUserData(const std::string& idyll_dir_in, const std::string&
         return false;
     }
 
+    const bool final_attempt = attempts + 1 >= ID_MIGRATION_MAX_ATTEMPTS;
     bool ok = true;
     size_t copied = 0;
     size_t failed = 0;
+    size_t skipped_settings = 0;
     fs::recursive_directory_iterator it(src, fs::directory_options::skip_permission_denied, ec);
     for (; ok && !ec && it != fs::recursive_directory_iterator(); it.increment(ec))
     {
@@ -1120,8 +1122,15 @@ bool idCopyFirestormUserData(const std::string& idyll_dir_in, const std::string&
             sIdyllMigrationWarn += "Could not copy " + fsyspath(it->path()).string() + ": " + op_ec.message() + "\n";
             if (idFailureNeedsRetry(rel))
             {
-                ok = false;
-                sIdyllMigrationWarn += "The copy is retried on the next launch.\n";
+                if (final_attempt)
+                {
+                    ++skipped_settings;
+                }
+                else
+                {
+                    ok = false;
+                    sIdyllMigrationWarn += "The copy is retried on the next launch.\n";
+                }
             }
         }
         else
@@ -1133,6 +1142,10 @@ bool idCopyFirestormUserData(const std::string& idyll_dir_in, const std::string&
     {
         sIdyllMigrationWarn += "Stopped reading " + firestorm_dir + ": " + ec.message() + "\n";
         ok = false;
+    }
+    if (ok && skipped_settings > 0)
+    {
+        sIdyllMigrationWarn += "This was the last attempt, so the copy completed without the " + std::to_string(skipped_settings) + " settings file(s) listed above.\n";
     }
 
     if (ok)
@@ -1167,7 +1180,7 @@ bool idCopyFirestormUserData(const std::string& idyll_dir_in, const std::string&
         if (!ok)
         {
             sIdyllMigrationWarn += "Could not move " + fsyspath(tmp).string() + " to " + idyll_dir + (ec ? ": " + ec.message() : "")
-                + ". The copy is retried on the next launch.\n";
+                + (final_attempt ? ". This was the last attempt, so the copy is not retried.\n" : ". The copy is retried on the next launch.\n");
         }
     }
 
