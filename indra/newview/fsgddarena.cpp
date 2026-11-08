@@ -132,7 +132,8 @@ const char* FSGDDArena::failName(U32 reason)
     return reason < FAIL_COUNT ? names[reason] : "?";
 }
 
-FSGDDArena::FSGDDArena(const char* name, const std::vector<U32>& types, const char* budget_setting, S32 default_mb, U32 index_share)
+FSGDDArena::FSGDDArena(const char* name, const std::vector<U32>& types, const char* budget_setting, S32 default_mb, U32 index_share,
+                       U32 optional_mask)
     : mName(name)
     , mTypes(types)
     , mBudgetSetting(budget_setting)
@@ -144,7 +145,10 @@ FSGDDArena::FSGDDArena(const char* name, const std::vector<U32>& types, const ch
     mVBs.resize(mTypes.size(), 0);
     for (U32 type : mTypes)
     {
-        mTypeMask |= 1u << type;
+        if (!(optional_mask & (1u << type)))
+        {
+            mTypeMask |= 1u << type;
+        }
         mStride += LLVertexBuffer::sTypeSize[type];
     }
 }
@@ -375,7 +379,8 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
     }
 
     const U32 serial = vb->getFSContentSerial();
-    // The entry the buffer remembers (map nodes don't move, and any erase moves the epoch on)
+    // The entry the buffer remembers (map nodes don't move; evicting moves the epoch on, and dropping a
+    // changed copy below clears the pointer of the one buffer that holds it)
     if (FSGDDArenaEntry* cached = static_cast<FSGDDArenaEntry*>(vb->getFSArenaEntry(mSlot, mEpoch)))
     {
         if (cached->mSerial == serial && cached->mNumVerts == vb->getNumVerts() && cached->mNumIndices == vb->getNumIndices())
@@ -394,11 +399,13 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
             vb->setFSArenaEntry(mSlot, &entry, mEpoch);
             return &entry;
         }
-        // changed since it was copied (or another buffer at the same address)
+        // changed since it was copied (or another buffer at the same address). Only this buffer can
+        // remember the node (it is the key), so clear its pointer rather than moving the epoch on, which
+        // would make every buffer look its entry up in the map again.
         mVerts.release(entry.mVertex, entry.mNumVerts);
         mIndices.release(entry.mIndex, entry.mNumIndices);
         mEntries.erase(it);
-        ++mEpoch;
+        vb->setFSArenaEntry(mSlot, nullptr, mEpoch);
     }
 
     if (mCopies >= FS_GDD_COPIES_PER_FRAME)
@@ -412,6 +419,10 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
     entry.mNumVerts = vb->getNumVerts();
     entry.mNumIndices = vb->getNumIndices();
     entry.mLastFrame = frame;
+    for (U32 type : mTypes)
+    {
+        entry.mTypeMask |= vb->getTypeMask() & (1u << type);
+    }
     if (!allocate(entry.mNumVerts, entry.mNumIndices, frame, entry.mVertex, entry.mIndex))
     {
         LL_WARNS_ONCE("Rendering") << mName << ": the arena is full (" << vertexMB() << " MB vertices, " << indexMB()
@@ -427,6 +438,10 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
         for (size_t i = 0; i < mTypes.size(); ++i)
         {
             const LLVertexBuffer::AttributeType type = (LLVertexBuffer::AttributeType)mTypes[i];
+            if (!(entry.mTypeMask & (1u << type)))
+            {   // optional and not in this buffer: its range stays as it was, nothing reads it
+                continue;
+            }
             const U32 size = LLVertexBuffer::sTypeSize[type];
             glBindBuffer(GL_COPY_WRITE_BUFFER, mVBs[i]);
             glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, vb->getOffset(type),
@@ -459,6 +474,10 @@ void FSGDDArena::bindForDraw(U32 attrib_mask)
         }
         const GLsizei stride = LLVertexBuffer::sTypeSize[type];
         glBindBuffer(GL_ARRAY_BUFFER, mVBs[i]);
+        if (type == LLVertexBuffer::TYPE_VERTEX && (attrib_mask & LLVertexBuffer::MAP_TEXTURE_INDEX))
+        {   // the texture index is the w of the position, as setupVertexBuffer reads it
+            glVertexAttribIPointer(LLVertexBuffer::TYPE_TEXTURE_INDEX, 1, GL_UNSIGNED_INT, stride, (const void*)12);
+        }
         switch (type)
         {   // as LLVertexBuffer::setupVertexBuffer
         case LLVertexBuffer::TYPE_VERTEX:
@@ -493,6 +512,10 @@ bool FSGDDArena::verifyEntry(const LLVertexBuffer* vb, FSGDDArenaEntry& entry)
     for (size_t i = 0; i < mTypes.size() && ok; ++i)
     {
         const LLVertexBuffer::AttributeType type = (LLVertexBuffer::AttributeType)mTypes[i];
+        if (!(entry.mTypeMask & (1u << type)))
+        {
+            continue;
+        }
         const U32 size = LLVertexBuffer::sTypeSize[type];
         std::vector<U8> src((size_t)entry.mNumVerts * size);
         std::vector<U8> dst(src.size());

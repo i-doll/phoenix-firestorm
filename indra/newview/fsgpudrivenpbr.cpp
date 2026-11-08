@@ -727,6 +727,45 @@ void fsGDDPBRReleaseGL()
 }
 
 //-----------------------------------------------------------------------------
+// Bindless handles for FSPerfGPUDrivenLegacy (fsgpudrivenlegacy.cpp), shared with the PBR pass
+
+bool fsGDDBindlessSetup()
+{
+    if (!gGLManager.mIsNVIDIA)
+    {   // as FSPerfGPUDrivenPBRBindless: only tested on NVIDIA
+        return false;
+    }
+    if (!sBindlessTested)
+    {
+        sBindlessTested = bindless_self_test() ? 1 : -1;
+        LL_INFOS("ShaderLoading") << "GPU-driven draws: bindless textures "
+                                  << (sBindlessTested > 0 ? "usable" : "not usable (missing, or the driver keeps textures "
+                                                                       "immutable after their handles are gone)")
+                                  << LL_ENDL;
+    }
+    if (sBindlessTested > 0)
+    {
+        LLImageGL::sFSTextureUnlock = &unlock_texture;  // stays set; does nothing while there are no handles
+    }
+    return sBindlessTested > 0;
+}
+
+bool fsGDDBindlessReady()
+{
+    return sBindlessTested > 0;
+}
+
+U64 fsGDDTextureHandle(LLViewerTexture* tex, U32 frame)
+{
+    return (U64)texture_handle(tex, frame);
+}
+
+void fsGDDSweepHandles(U32 frame)
+{
+    sweep_handles(frame);
+}
+
+//-----------------------------------------------------------------------------
 // The pass
 
 namespace
@@ -956,6 +995,8 @@ namespace
     // the arena, the record attribute and the storage buffers for program `which` (bound)
     void setup_inputs(U32 which)
     {
+        // the record attribute goes into the global vertex array object, never a buffer's own
+        LLVertexBuffer::fsUseDefaultVAO();
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, FS_GDD_PBR_MATRIX_BINDING, sMatrixBuffer);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, FS_GDD_PBR_MATERIAL_BINDING, sMaterialBuffer);
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, sIndirectBuffer);
@@ -995,6 +1036,7 @@ namespace
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+        LLVertexBuffer::sGLRenderBuffer = 0;    // or the next setBuffer of the buffer it named skips binding it
 
         LLGLSLShader* stock = &gDeferredPBROpaqueProgram;
         S32 current = -1;                       // GPU-driven program bound: 0 bound textures, 1 bindless, -1 stock

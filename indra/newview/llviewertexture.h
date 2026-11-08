@@ -186,6 +186,12 @@ public:
     typedef std::vector<MaterialEntry> material_list_t;
     material_list_t   mMaterialList;  // reverse pointer pointing to LL::GLTF::Materials using this image as texture
 
+    // <FS:Trish> FSPerfGPUDrivenLegacy: this texture's bindless handle in the pass being built (valid while
+    // mFSGDDPass is that pass's number), so a texture in many batches is looked up once per pass
+    mutable U32 mFSGDDPass = 0;
+    mutable U64 mFSGDDHandle = 0;
+    // </FS:Trish>
+
 protected:
     void cleanup() ;
     void init(bool firstinit) ;

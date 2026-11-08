@@ -23,14 +23,40 @@
  * $/LicenseInfo$
  */
 
+#ifdef FS_GDD_LEGACY
+#extension GL_ARB_shader_storage_buffer_object : require
+#endif
+
 #ifdef RIGGED_PRECISE_MATH
 invariant gl_Position;
 precise gl_Position;
 #endif
 
+#ifdef FS_GDD_LEGACY
+// FSPerfGPUDrivenLegacy (fsgpudrivenlegacy.cpp): static batches drawn with glMultiDrawElementsIndirect out
+// of a vertex arena. Every draw command has a record, an instanced attribute its base instance selects,
+// naming its matrices and its textures in the storage buffers below, which hold exactly what the stock
+// path puts in the uniforms of the same names and binds on the texture units for that batch.
+layout(std430) readonly buffer FSGDDLegacyMatrices
+{
+    mat4 fs_gdd_matrix[];   // per model matrix: modelview, modelview projection, normal matrix; texture matrices
+};
+
+layout(std430) readonly buffer FSGDDLegacyTextures
+{
+    uvec2 fs_gdd_tex[];     // per draw: (minimum_alpha bits, texture count), then a bindless handle per texture
+};
+
+in uvec4 fs_gdd_draw;       // x: first of the three model matrices, y: texture matrix, z: first entry in fs_gdd_tex
+in int texture_index;       // the unit diffuseLookup would pick (indexedTextureV.glsl)
+
+flat out uvec2 fs_gdd_diffuse;
+flat out float fs_gdd_minimum_alpha;
+#else
 uniform mat4 texture_matrix0;
 uniform mat4 modelview_matrix;
 uniform mat4 modelview_projection_matrix;
+#endif
 
 
 in vec3 position;
@@ -56,6 +82,17 @@ uniform mat4 projection_matrix;
 
 void main()
 {
+#ifdef FS_GDD_LEGACY
+    mat4 modelview_matrix = fs_gdd_matrix[fs_gdd_draw.x];
+    mat4 modelview_projection_matrix = fs_gdd_matrix[fs_gdd_draw.x + 1u];
+    mat4 texture_matrix0 = fs_gdd_matrix[fs_gdd_draw.y];
+    uvec2 fs_gdd_head = fs_gdd_tex[fs_gdd_draw.z];
+    // an index past the draw's textures samples a unit left from an earlier draw on the stock path; the last one here
+    uint fs_gdd_index = min(uint(max(texture_index, 0)), fs_gdd_head.y - 1u);
+    fs_gdd_diffuse = fs_gdd_tex[fs_gdd_draw.z + 1u + fs_gdd_index];
+    fs_gdd_minimum_alpha = uintBitsToFloat(fs_gdd_head.x);
+#endif
+
     //transform vertex
     vec4 vert = vec4(position.xyz, 1.0);
     passTextureIndex();

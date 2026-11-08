@@ -57,6 +57,7 @@
 #include "fsgpudrivendraws.h"
 
 #include "fsgddarena.h"
+#include "fsgpudrivenlegacy.h"
 #include "fsgpudrivenpbr.h"
 
 #include "fsshadowsinglepass.h"
@@ -152,6 +153,7 @@ namespace
 
 void fsGDDReleaseGL()
 {
+    fsGDDLegacyReleaseGL();
     fsGDDPBRReleaseGL();
     release_shadow_gl();
 }
@@ -159,6 +161,7 @@ void fsGDDReleaseGL()
 void fsGDDUnloadShaders()
 {
     unload_shadow_shaders();
+    fsGDDLegacyUnloadShaders(); // releases the legacy GL objects too
     fsGDDPBRUnloadShaders();    // releases the PBR GL objects too
 }
 
@@ -200,6 +203,8 @@ bool fsGDDLoadShaders(S32 shader_level, bool use_shadow)
 
     // the PBR pass (FSPerfGPUDrivenPBR) has its own setting and doesn't need shadows; it unloads its own first
     fsGDDPBRLoadShaders();
+    // so do the legacy passes (FSPerfGPUDrivenLegacy); after the PBR load, which tests bindless textures again
+    fsGDDLegacyLoadShaders();
 
     static LLCachedControl<bool> enabled(gSavedSettings, "FSPerfGPUDrivenDraws", false);
     if (!enabled || !use_shadow)
@@ -416,7 +421,9 @@ namespace
         upload(sMatrixBuffer, GL_SHADER_STORAGE_BUFFER, sMatrices.data(), sMatrices.size() * sizeof(glm::mat4));
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, FS_GDD_MATRIX_BINDING, sMatrixBuffer);
 
-        // the per command records, an instanced attribute stepped by the commands' base instances
+        // the per command records, an instanced attribute stepped by the commands' base instances; it goes
+        // into the global vertex array object, never a buffer's own
+        LLVertexBuffer::fsUseDefaultVAO();
         const GLuint record = (GLuint)sRecordAttrib[single_pass ? 1 : 0];
         upload(sDrawBuffer, GL_ARRAY_BUFFER, sDraws.data(), sDraws.size() * sizeof(U32));
         glEnableVertexAttribArray(record);

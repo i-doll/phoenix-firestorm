@@ -37,6 +37,7 @@
 #include "llviewershadermgr.h"
 #include "llrender.h"
 #include "gltfscenemanager.h"
+#include "fsgpudrivenlegacy.h" // <FS:Trish/> FSPerfGPUDrivenLegacy
 
 static LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE_DEFERRED("Deferred Simple");
 static LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS_DEFERRED("Deferred Grass");
@@ -103,7 +104,13 @@ void LLDrawPoolSimple::renderDeferred(S32 pass)
 
     //render static
     gDeferredDiffuseProgram.bind();
-    pushBatches(LLRenderPass::PASS_SIMPLE, true, true);
+    // <FS:Trish> FSPerfGPUDrivenLegacy: the batches as multi-draws out of a vertex arena, in the same order
+    //pushBatches(LLRenderPass::PASS_SIMPLE, true, true);
+    if (!fsGDDDrawLegacy(*this, LLRenderPass::PASS_SIMPLE))
+    {
+        pushBatches(LLRenderPass::PASS_SIMPLE, true, true);
+    }
+    // </FS:Trish>
 
     //render rigged
     gDeferredDiffuseProgram.bind(true);
@@ -120,7 +127,13 @@ void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
 
     //render static
     shader->bind();
-    pushMaskBatches(LLRenderPass::PASS_ALPHA_MASK, true, true);
+    // <FS:Trish> FSPerfGPUDrivenLegacy
+    //pushMaskBatches(LLRenderPass::PASS_ALPHA_MASK, true, true);
+    if (!fsGDDDrawLegacy(*this, LLRenderPass::PASS_ALPHA_MASK))
+    {
+        pushMaskBatches(LLRenderPass::PASS_ALPHA_MASK, true, true);
+    }
+    // </FS:Trish>
 
     //render rigged
     shader->bind(true);
@@ -171,7 +184,13 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
 
     // render static
     shader->bind();
-    pushBatches(LLRenderPass::PASS_FULLBRIGHT, true, true);
+    // <FS:Trish> FSPerfGPUDrivenLegacy (not for the HUD program, it checks the bound one)
+    //pushBatches(LLRenderPass::PASS_FULLBRIGHT, true, true);
+    if (!fsGDDDrawLegacy(*this, LLRenderPass::PASS_FULLBRIGHT))
+    {
+        pushBatches(LLRenderPass::PASS_FULLBRIGHT, true, true);
+    }
+    // </FS:Trish>
 
     if (!LLPipeline::sRenderingHUDs)
     {
@@ -203,7 +222,13 @@ void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
 
     // render static
     shader->bind();
-    pushMaskBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true);
+    // <FS:Trish> FSPerfGPUDrivenLegacy (not for the HUD program, it checks the bound one)
+    //pushMaskBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true);
+    if (!fsGDDDrawLegacy(*this, LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK))
+    {
+        pushMaskBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true);
+    }
+    // </FS:Trish>
 
     if (!LLPipeline::sRenderingHUDs)
     {

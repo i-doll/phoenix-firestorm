@@ -51,4 +51,17 @@ void fsGDDPBRReleaseGL();
 // here; the caller then draws the pass the stock way. gDeferredPBROpaqueProgram is bound again on return.
 bool fsGDDDrawPBR(U32 type);
 
+// The bindless texture handles (one sampler per texture state, dropped when LLImageGL changes the texture),
+// shared with FSPerfGPUDrivenLegacy (fsgpudrivenlegacy.cpp).
+class LLViewerTexture;
+// At shader load: NVIDIA only; tests once per GL context that handles can be dropped again, installs the
+// LLImageGL hook. True when handles can be used.
+bool fsGDDBindlessSetup();
+bool fsGDDBindlessReady();
+// The resident handle of tex as LLTexUnit would sample it, or 0 if it can't have one (not fetched, not
+// loaded, one or two channels, options pending, media). Main thread.
+U64 fsGDDTextureHandle(LLViewerTexture* tex, U32 frame);
+// Idle handles go non resident, later away; does something every 120 frames.
+void fsGDDSweepHandles(U32 frame);
+
 #endif // FS_GPUDRIVENPBR_H

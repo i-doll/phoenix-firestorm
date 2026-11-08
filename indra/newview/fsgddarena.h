@@ -66,6 +66,7 @@ struct FSGDDArenaEntry
     U32 mIndex = 0;         // first index of the copy in the index arena
     U32 mNumIndices = 0;
     U32 mLastFrame = 0;
+    U32 mTypeMask = 0;      // the held types this copy has (1 << LLVertexBuffer::AttributeType)
     bool mVerified = false; // a verify mode read it back already
 };
 
@@ -92,8 +93,10 @@ public:
     static const char* failName(U32 reason);
 
     // types: the LLVertexBuffer::AttributeType values held. budget_setting: the S32 setting with the size
-    // limit in MB; index_share: the part of it for indices is 1 / index_share.
-    FSGDDArena(const char* name, const std::vector<U32>& types, const char* budget_setting, S32 default_mb, U32 index_share);
+    // limit in MB; index_share: the part of it for indices is 1 / index_share. optional_mask: held types
+    // (1 << type) a buffer may lack; they are copied when it has them (FSGDDArenaEntry::mTypeMask says which).
+    FSGDDArena(const char* name, const std::vector<U32>& types, const char* budget_setting, S32 default_mb, U32 index_share,
+               U32 optional_mask = 0);
 
     // The entry of vb, copied in now if needed and possible; nullptr (and why in reason) otherwise.
     FSGDDArenaEntry* find(LLVertexBuffer* vb, U32 frame, U32* reason = nullptr);
@@ -102,6 +105,7 @@ public:
     void beginFrame(U32 frame);
     // Points the attribute locations of the held types (formats as LLVertexBuffer::setupVertexBuffer) at the
     // arena and binds the index buffer. Only the types in attrib_mask (LLVertexBuffer::MAP_*) are set up.
+    // MAP_TEXTURE_INDEX reads the w of the held positions, as setupVertexBuffer does.
     void bindForDraw(U32 attrib_mask);
     // Reads back an entry and its source buffer and compares them. Stalls; verify modes only.
     bool verifyEntry(const LLVertexBuffer* vb, FSGDDArenaEntry& entry);
@@ -126,7 +130,7 @@ private:
     std::string mName;
     std::vector<U32> mTypes;
     std::vector<GLuint> mVBs;       // one per type
-    U32 mTypeMask = 0;
+    U32 mTypeMask = 0;              // the types a buffer must have
     U32 mStride = 0;                // sum of the types' sizes
     std::string mBudgetSetting;
     S32 mDefaultMB = 256;
@@ -143,7 +147,7 @@ private:
     U32 mEvictFrame = U32_MAX;      // frame an allocation last evicted, at most once per frame
     U32 mLimitsFrame = U32_MAX;     // frame mMaxVerts and mMaxIndices were read from the setting
     U32 mSlot = U32_MAX;            // this arena's slot in LLVertexBuffer's entry cache
-    U32 mEpoch = 1;                 // moves on whenever entries are dropped (buffers' cached entries go stale)
+    U32 mEpoch = 1;                 // moves on when entries are evicted or released (buffers' cached entries go stale)
     U32 mMaxVerts = 0;
     U32 mMaxIndices = 0;
     U32 mUploads = 0;               // since clearCounts

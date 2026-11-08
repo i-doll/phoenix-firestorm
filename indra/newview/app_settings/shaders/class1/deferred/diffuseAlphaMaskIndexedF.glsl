@@ -25,12 +25,29 @@
 
 /*[EXTRA_CODE_HERE]*/
 
+#ifdef FS_GDD_LEGACY
+#extension GL_ARB_bindless_texture : require
+// FSPerfGPUDrivenLegacy (diffuseV.glsl, fullbrightV.glsl): the texture the stock diffuseLookup would pick,
+// as a bindless handle, and the batch's minimum_alpha
+flat in uvec2 fs_gdd_diffuse;
+flat in float fs_gdd_minimum_alpha;
+#define HAS_DIFFUSE_LOOKUP
+vec4 diffuseLookup(vec2 texcoord)
+{
+    return texture(sampler2D(fs_gdd_diffuse), texcoord);
+}
+#endif
+
 out vec4 frag_data[4];
 
 in vec3 vary_normal;
 in vec3 vary_position;
 
+#ifdef FS_GDD_LEGACY
+#define minimum_alpha fs_gdd_minimum_alpha
+#else
 uniform float minimum_alpha;
+#endif
 
 in vec4 vertex_color;
 in vec2 vary_texcoord0;

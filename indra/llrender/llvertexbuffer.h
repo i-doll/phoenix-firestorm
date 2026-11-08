@@ -352,7 +352,7 @@ public:
     // <FS:Trish> The GPU-driven arenas (newview/fsgddarena.cpp) remember this buffer's entry here, so
     // a lookup is a pointer read instead of a hash map search. The arena's epoch moves on whenever it
     // drops entries, which makes every remembered one stale.
-    static constexpr U32 FS_ARENA_SLOTS = 2;
+    static constexpr U32 FS_ARENA_SLOTS = 3;    // the shadow, PBR and legacy (FSPerfGPUDrivenLegacy) arenas
     void* getFSArenaEntry(U32 slot, U32 epoch) const
     {
         return slot < FS_ARENA_SLOTS && mFSArenaEpoch[slot] == epoch ? mFSArenaEntry[slot] : nullptr;
