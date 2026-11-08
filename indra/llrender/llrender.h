@@ -481,6 +481,12 @@ public:
 
     // applies blend func to both color and alpha
     void blendFunc(eBlendFactor sfactor, eBlendFactor dfactor);
+    // <FS:Trish> FSRenderUICap: while on, the two factor blendFunc blends alpha as coverage
+    // (one, one minus source alpha), so a UI drawn into a cleared buffer comes out premultiplied
+    // and composites over the scene exactly as drawing it there directly would
+    void fsSetPremultipliedAlpha(bool on);
+    bool mFSPremultipliedAlpha = false;
+    // </FS:Trish>
     // applies separate blend functions to color and alpha
     void blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
                eBlendFactor alpha_sfactor, eBlendFactor alpha_dfactor);

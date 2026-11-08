@@ -28364,6 +28364,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>FSRenderUICap</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Draw the 2D UI into a buffer of its own and composite it every frame, redrawing it only when needed: every frame while it is being used (the mouse moved, clicked or scrolled over it or keys typed into it in the last quarter second, or a window or scroll bar being dragged), at most this many times a second while something marks it changed, otherwise FSRenderUIIdleRate times a second. 0: the UI is drawn every frame as before.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderUIIdleRate</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. With FSRenderUICap on, how many times a second the UI is redrawn while nothing is using or marking it (0.5 to 120). Most changes, such as text, counters and chat, mark nothing, so this is how late they can appear.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>10.0</real>
+    </map>
     <key>FSRenderGPUTimings</key>
     <map>
       <key>Comment</key>

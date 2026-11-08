@@ -75,6 +75,8 @@
 #include "lluuid.h"
 #include "llversioninfo.h"
 #include "llviewercamera.h"
+#include "llviewermedia.h" // <FS:Trish/> FSRenderUICap
+#include "llprogressview.h" // <FS:Trish/> FSRenderUICap
 #include "llviewercontrol.h"
 #include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
@@ -1936,6 +1938,163 @@ void render_ui_3d()
     stop_glerror();
 }
 
+// <FS:Trish> FSRenderUICap: the 2D UI is drawn into a buffer of its own, only as often as it
+// needs, and the buffer is composited over the frame every frame. Redrawn every frame while the
+// UI is being used (mouse moved, clicked or scrolled over it, keys typed into it, in the last
+// quarter second, or a UI element holding the mouse), at most FSRenderUICap times a second while something marks it dirty, and
+// otherwise FSRenderUIIdleRate times a second: most changes (text, counters, chat) mark nothing,
+// so that rate is how late they can show. 0 for the cap draws the UI every frame as before.
+namespace
+{
+    LLRenderTarget* sFSUIBuffer = nullptr;      // never destroyed at exit: released with the GL buffers
+    F64 sFSUILastDraw = -1.0;
+
+    bool fs_ui_cap_active()
+    {
+        static LLCachedControl<U32> cap(gSavedSettings, "FSRenderUICap", 0);
+        // Not in mouselook: the crosshair, IFF markers and range text there move with the
+        // camera every frame. Not while a progress screen is up (teleport, the fade into the world
+        // after login, logout, GL restore): its bar, text and fades change every frame and mark
+        // nothing dirty.
+        if (cap == 0 || gSnapshot || gCubeSnapshot || LLPipeline::RenderUIBuffer || !gViewerWindow ||
+            gAgentCamera.cameraMouselook())
+        {
+            return false;
+        }
+        const LLProgressView* progress = gViewerWindow->getProgressView();
+        return !gTeleportDisplay && !gRestoreGL && !LLAppViewer::instance()->logoutRequestSent() &&
+               !(progress && progress->getVisible());
+    }
+
+    // Something in the UI changes every frame without any input aimed at it
+    bool fs_ui_animating(LLMouseHandler* captor)
+    {
+        // A tool holding the mouse (drag-select rectangle and other tool overlays); orbiting the
+        // camera draws nothing in 2D and stays capped
+        if (captor && !dynamic_cast<LLView*>(captor) && LLToolMgr::getInstance()->getCurrentTool() != LLToolCamera::getInstance())
+        {
+            return true;
+        }
+        // Media playing in a visible UI control (web or video floaters, profiles)
+        if (!LLViewerMedia::instanceExists())
+        {
+            return false;
+        }
+        for (LLViewerMediaImpl* impl : LLViewerMedia::getInstance()->getPriorityList())
+        {
+            if (impl && impl->getUsedInUI() && impl->getVisible() && impl->hasMedia() && impl->isMediaPlaying())
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool fs_ui_redraw_due(bool resized)
+    {
+        static LLCachedControl<U32> cap(gSavedSettings, "FSRenderUICap", 0);
+        static LLCachedControl<F32> idle_rate(gSavedSettings, "FSRenderUIIdleRate", 10.f);
+        constexpr F64 INPUT_HOLD = 0.25;    // seconds of every frame redraws after an input event
+
+        const F64 now = LLFrameTimer::getElapsedSeconds();
+        const F64 since = now - sFSUILastDraw;
+        // In use: input aimed at the UI just now, or a UI element holding the mouse (a floater or
+        // scroll bar being dragged). Flying, walking and orbiting the camera don't count.
+        LLMouseHandler* captor = gFocusMgr.getMouseCapture();
+        const bool interacting = now - gViewerWindow->getFSLastUIInput() < INPUT_HOLD ||
+                                 (captor && dynamic_cast<LLView*>(captor) != nullptr);
+        if (resized || sFSUILastDraw < 0.0 || interacting || fs_ui_animating(captor))
+        {
+            return true;
+        }
+        if (LLView::sIsRectDirty && since >= 1.0 / (F64)llmax((U32)cap, 1u))
+        {
+            return true;
+        }
+        return since >= 1.0 / (F64)llclamp((F32)idle_rate, 0.5f, 120.f);
+    }
+
+    void fs_render_ui_cached()
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+        const U32 width = (U32)gViewerWindow->getWindowWidthRaw();
+        const U32 height = (U32)gViewerWindow->getWindowHeightRaw();
+        if (!sFSUIBuffer)
+        {
+            sFSUIBuffer = new LLRenderTarget();
+        }
+        bool resized = false;
+        if (!sFSUIBuffer->isComplete() || sFSUIBuffer->getWidth() != width || sFSUIBuffer->getHeight() != height)
+        {
+            sFSUIBuffer->release();
+            if (!sFSUIBuffer->allocate(width, height, GL_RGBA, false))
+            {
+                sFSUIBuffer->release();
+                gViewerWindow->draw(); // no buffer: draw it directly
+                return;
+            }
+            resized = true;
+        }
+
+        if (fs_ui_redraw_due(resized))
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("fs ui redraw");
+            sFSUILastDraw = LLFrameTimer::getElapsedSeconds();
+            LLView::sIsRectDirty = false;
+            sFSUIBuffer->bindTarget();
+            gGL.setColorMask(true, true);
+            glClearColor(0.f, 0.f, 0.f, 0.f);
+            sFSUIBuffer->clear(GL_COLOR_BUFFER_BIT);
+            gGL.fsSetPremultipliedAlpha(true);
+            gViewerWindow->draw();
+            gGL.flush();
+            gGL.fsSetPremultipliedAlpha(false);
+            sFSUIBuffer->flush();
+            gGL.setColorMask(true, false);
+        }
+
+        // Over the frame: the buffer holds premultiplied colour
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("fs ui composite");
+        gUIProgram.bind();
+        LLGLDisable cull(GL_CULL_FACE);
+        LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+        LLGLEnable blend(GL_BLEND);
+        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
+        gGL.matrixMode(LLRender::MM_PROJECTION);
+        gGL.pushMatrix();
+        gGL.loadIdentity();
+        gGL.matrixMode(LLRender::MM_MODELVIEW);
+        gGL.pushMatrix();
+        gGL.loadIdentity();
+        gGL.getTexUnit(0)->bind(sFSUIBuffer);
+        gGL.color4f(1.f, 1.f, 1.f, 1.f);
+        gGL.begin(LLRender::TRIANGLE_STRIP);
+        gGL.texCoord2f(0.f, 0.f); gGL.vertex2f(-1.f, -1.f);
+        gGL.texCoord2f(1.f, 0.f); gGL.vertex2f(1.f, -1.f);
+        gGL.texCoord2f(0.f, 1.f); gGL.vertex2f(-1.f, 1.f);
+        gGL.texCoord2f(1.f, 1.f); gGL.vertex2f(1.f, 1.f);
+        gGL.end();
+        gGL.flush();
+        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.popMatrix();
+        gGL.matrixMode(LLRender::MM_PROJECTION);
+        gGL.popMatrix();
+        gGL.matrixMode(LLRender::MM_MODELVIEW);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        gUIProgram.unbind();
+    }
+}
+
+void fs_release_ui_buffer()
+{
+    if (sFSUIBuffer)
+    {
+        sFSUIBuffer->release();
+    }
+    sFSUILastDraw = -1.0;
+}
+// </FS:Trish>
+
 void render_ui_2d()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
@@ -1990,6 +2149,13 @@ void render_ui_2d()
     }
 
 
+    // <FS:Trish> FSRenderUICap
+    if (fs_ui_cap_active())
+    {
+        fs_render_ui_cached();
+    }
+    else
+    // </FS:Trish>
     if (LLPipeline::RenderUIBuffer)
     {
         if (LLView::sIsRectDirty)

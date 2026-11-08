@@ -1548,10 +1548,44 @@ void LLRender::setSceneBlendType(eBlendType type)
     }
 }
 
+// <FS:Trish>
+void LLRender::fsSetPremultipliedAlpha(bool on)
+{
+    if (mFSPremultipliedAlpha != on)
+    {
+        flush();
+        mFSPremultipliedAlpha = on;
+        // the next blendFunc must reach GL whatever it asks for
+        mCurrBlendColorSFactor = mCurrBlendColorDFactor = BF_UNDEF;
+        mCurrBlendAlphaSFactor = mCurrBlendAlphaDFactor = BF_UNDEF;
+        // and GL must not keep the old func until then: draws that rely on the current blend
+        // state would use the wrong form, so issue BT_ALPHA (premultiplied or not) right away
+        blendFunc(BF_SOURCE_ALPHA, BF_ONE_MINUS_SOURCE_ALPHA);
+    }
+}
+// </FS:Trish>
+
 void LLRender::blendFunc(eBlendFactor sfactor, eBlendFactor dfactor)
 {
     llassert(sfactor < BF_UNDEF);
     llassert(dfactor < BF_UNDEF);
+    // <FS:Trish> FSRenderUICap: the UI buffer keeps coverage in alpha, so it stays premultiplied
+    // over the frame. Additive types (BT_ADD, BT_ADD_WITH_ALPHA) leave alpha alone: covering it
+    // would darken the scene behind the added light. BT_MULT* can't be expressed premultiplied
+    // (the result depends on the scene under the buffer) and composites approximately.
+    if (mFSPremultipliedAlpha)
+    {
+        if (dfactor == BF_ONE)
+        {
+            blendFunc(sfactor, dfactor, BF_ZERO, BF_ONE);
+        }
+        else
+        {
+            blendFunc(sfactor, dfactor, BF_ONE, BF_ONE_MINUS_SOURCE_ALPHA);
+        }
+        return;
+    }
+    // </FS:Trish>
     if (mCurrBlendColorSFactor != sfactor || mCurrBlendColorDFactor != dfactor ||
         mCurrBlendAlphaSFactor != sfactor || mCurrBlendAlphaDFactor != dfactor)
     {

@@ -295,6 +295,12 @@ public:
     bool            getLeftMouseDown()  const   { return mLeftMouseDown; }
     bool            getMiddleMouseDown()    const   { return mMiddleMouseDown; }
     bool            getRightMouseDown() const   { return mRightMouseDown; }
+    // <FS:Trish> FSRenderUICap: seconds (LLFrameTimer) of the last input aimed at the UI (mouse or
+    // wheel over a UI view, keys with a UI control focused), and whether the mouse is over the UI
+    F64             getFSLastUIInput() const    { return mFSLastUIInput; }
+    bool            getFSUIHover() const        { return mFSUIHover; }
+    void            fsNoteUIInput()             { mFSLastUIInput = LLFrameTimer::getElapsedSeconds(); }
+    // </FS:Trish>
 
     const LLPickInfo&   getLastPick() const { return mLastPick; }
 
@@ -526,6 +532,8 @@ private:
 
     LLCoordGL       mCurrentMousePoint;         // last mouse position in GL coords
     LLCoordGL       mLastMousePoint;        // Mouse point at last frame.
+    F64             mFSLastUIInput = 0.0;   // <FS:Trish/> see getFSLastUIInput()
+    bool            mFSUIHover = false;     // <FS:Trish/> see getFSUIHover()
     LLCoordGL       mCurrentMouseDelta;     //amount mouse moved this frame
     bool            mLeftMouseDown;
     bool            mMiddleMouseDown;

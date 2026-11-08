@@ -1109,6 +1109,7 @@ void LLViewerWindow::handlePieMenu(S32 x, S32 y, MASK mask)
 
 bool LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK mask, EMouseClickType clicktype, bool down, bool& is_toolmgr_action)
 {
+    if (mFSUIHover) { fsNoteUIInput(); } // <FS:Trish/> FSRenderUICap
     const char* buttonname = "";
     const char* buttonstatestr = "";
     S32 x = pos.mX;
@@ -1515,6 +1516,7 @@ bool LLViewerWindow::handleOtherMouseUp(LLWindow *window, LLCoordGL pos, MASK ma
 // WARNING: this is potentially called multiple times per frame
 void LLViewerWindow::handleMouseMove(LLWindow *window,  LLCoordGL pos, MASK mask)
 {
+    if (mFSUIHover) { fsNoteUIInput(); } // <FS:Trish/> FSRenderUICap
     S32 x = pos.mX;
     S32 y = pos.mY;
 
@@ -1834,11 +1836,13 @@ bool LLViewerWindow::handlePaint(LLWindow *window,  S32 x,  S32 y, S32 width,  S
 
 void LLViewerWindow::handleScrollWheel(LLWindow *window,  S32 clicks)
 {
+    if (mFSUIHover) { fsNoteUIInput(); } // <FS:Trish/> FSRenderUICap
     handleScrollWheel( clicks );
 }
 
 void LLViewerWindow::handleScrollHWheel(LLWindow *window,  S32 clicks)
 {
+    if (mFSUIHover) { fsNoteUIInput(); } // <FS:Trish/> FSRenderUICap
     handleScrollHWheel(clicks);
 }
 
@@ -3285,6 +3289,10 @@ bool LLViewerWindow::handleKeyUp(KEY key, MASK mask)
 // Takes a single keydown event, usually when UI is visible
 bool LLViewerWindow::handleKey(KEY key, MASK mask)
 {
+    // <FS:Trish> FSRenderUICap: only keys the UI actually handled count as UI input (noted where
+    // the focused control or a menu took the key), not movement keys passed on to the avatar
+    //if (gFocusMgr.getKeyboardFocus()) { fsNoteUIInput(); }
+    // </FS:Trish>
     // hide tooltips on keypress
     LLToolTipMgr::instance().blockToolTips();
 
@@ -3362,7 +3370,12 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
                 // We have keyboard focus, and it's not an accelerator
                 if (keyboard_focus && keyboard_focus->wantsKeyUpKeyDown())
                 {
-                    return keyboard_focus->handleKey(key, mask, false);
+                    // <FS:Trish> FSRenderUICap
+                    //return keyboard_focus->handleKey(key, mask, false);
+                    const bool fs_handled = keyboard_focus->handleKey(key, mask, false);
+                    if (fs_handled) { fsNoteUIInput(); }
+                    return fs_handled;
+                    // </FS:Trish>
                 }
                 else if (key < 0x80)
                 {
@@ -3380,6 +3393,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     {
         LL_DEBUGS() << "LLviewerWindow::handleKey handle nav keys for nav" << LL_ENDL;
         LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+        fsNoteUIInput(); // <FS:Trish/> FSRenderUICap
         return true;
     }
 
@@ -3394,6 +3408,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
             && keyboard_focus->handleKey(key,mask,false))
         {
             LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+            fsNoteUIInput(); // <FS:Trish/> FSRenderUICap
             return true;
         }
 
@@ -3513,6 +3528,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 
             LL_DEBUGS() << "LLviewerWindow::handleKey - in 'traverse up' - no loops seen... just called keyboard_focus->handleKey an it returned true" << LL_ENDL;
             LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+            fsNoteUIInput(); // <FS:Trish/> FSRenderUICap
             return true;
         } else {
             LL_DEBUGS() << "LLviewerWindow::handleKey - in 'traverse up' - no loops seen... just called keyboard_focus->handleKey an it returned false" << LL_ENDL;
@@ -3619,6 +3635,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 
 bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 {
+    //if (gFocusMgr.getKeyboardFocus()) { fsNoteUIInput(); } // <FS:Trish/> FSRenderUICap: noted below once handled
     // HACK:  We delay processing of return keys until they arrive as a Unicode char,
     // so that if you're typing chat text at low frame rate, we don't send the chat
     // until all keystrokes have been entered. JC
@@ -3646,6 +3663,7 @@ bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
     {
         if (keyboard_focus->handleUnicodeChar(uni_char, false))
         {
+            fsNoteUIInput(); // <FS:Trish/> FSRenderUICap
             return true;
         }
 
@@ -4142,6 +4160,10 @@ void LLViewerWindow::updateUI()
             S32 local_y;
             mouse_captor->screenPointToLocal( x, y, &local_x, &local_y );
             handled = mouse_captor->handleHover(local_x, local_y, mask);
+            // <FS:Trish> FSRenderUICap: a tool (not a view) holding the mouse is world input; a
+            // stale value from before the capture kept counting it as UI hover
+            mFSUIHover = handled && dynamic_cast<LLView*>(mouse_captor) != nullptr;
+            // </FS:Trish>
             if (LLView::sDebugMouseHandling)
             {
                 LL_INFOS() << "Hover handled by captor " << mouse_captor->getName() << LL_ENDL;
@@ -4184,6 +4206,9 @@ void LLViewerWindow::updateUI()
                 }
             }
 
+            // <FS:Trish> FSRenderUICap: the hover went to the UI, not to a world tool
+            mFSUIHover = handled && !(mouse_captor && !dynamic_cast<LLView*>(mouse_captor));
+            // </FS:Trish>
             if (!handled)
             {
                 LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();

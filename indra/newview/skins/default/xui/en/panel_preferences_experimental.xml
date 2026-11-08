@@ -4940,6 +4940,82 @@
                      tool_tip="Debug. Writes OpenGL calls made from the wrong thread, and calls that make the main thread wait for the render thread, to the log. Only for testing."
                      top="1558"
                      width="455" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_user_interface"
+                     top="1598"
+                     width="340">
+                        User interface
+                    </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_user_interface"
+                     tool_tip="Set every option in &quot;User interface&quot; back to its default value."
+                     top="1597"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderUICap,FSRenderUIIdleRate" />
+                    </button>
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderuicap_label"
+                     tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
+                     top="1626"
+                     width="285">
+                        UI redraw cap (per second, 0 = every frame)
+                    </text>
+                    <spinner
+                     control_name="FSRenderUICap"
+                     decimal_digits="0"
+                     follows="left|top"
+                     height="20"
+                     increment="5"
+                     layout="topleft"
+                     left="330"
+                     max_val="120"
+                     min_val="0"
+                     name="fs_fsrenderuicap"
+                     tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
+                     top="1624"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderuiidlerate_label"
+                     tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
+                     top="1654"
+                     width="285">
+                        UI idle refresh (per second)
+                    </text>
+                    <spinner
+                     control_name="FSRenderUIIdleRate"
+                     decimal_digits="1"
+                     enabled_control="FSRenderUICap"
+                     follows="left|top"
+                     height="20"
+                     increment="1.0"
+                     layout="topleft"
+                     left="330"
+                     max_val="60.0"
+                     min_val="0.5"
+                     name="fs_fsrenderuiidlerate"
+                     tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
+                     top="1652"
+                     width="100" />
                 </panel>
             </scroll_container>
         </panel>
