@@ -12,6 +12,7 @@ hand          widgets/combo_box.xml
 hand          widgets/drop_down.xml
 hand          widgets/floater.xml
 hand          widgets/flyout_button.xml
+hand          widgets/fs_nearby_chat_control.xml
 hand          widgets/hint_popup.xml
 hand          widgets/icon.xml
 hand          widgets/inspector.xml

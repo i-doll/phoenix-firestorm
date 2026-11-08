@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<chat_editor
+  background_pad="0"
+  background_image="TextField_Off"
+  background_image_disabled="TextField_Disabled"
+  background_image_focused="TextField_Active"
+  bg_image_color="TextBgWriteableColor"
+  rounded_focus_border="true"
+  text_pad_left="6"
+  h_pad="2"
+  max_length="3070"
+  v_pad="0"
+  valign="center"
+  text_valign="center">
+</chat_editor>

@@ -52,7 +52,9 @@ FSNearbyChatControl::FSNearbyChatControl(const FSNearbyChatControl::Params& p) :
     mBackgroundPad(p.background_pad),
     mBgImage(p.background_image),
     mBgImageDisabled(p.background_image_disabled),
-    mBgImageFocused(p.background_image_focused)
+    mBgImageFocused(p.background_image_focused),
+    mBgImageColor(p.bg_image_color()), // <ID:MaterialTheme/>
+    mRoundedFocusBorder(p.rounded_focus_border) // <ID:MaterialTheme/>
 {
     //<FS:TS> FIRE-11373: Autoreplace doesn't work in nearby chat bar
     setAutoreplaceCallback(boost::bind(&LLAutoReplace::autoreplaceCallback, LLAutoReplace::getInstance(), _1, _2, _3, _4, _5));
@@ -187,13 +189,27 @@ void FSNearbyChatControl::drawBackground()
     }
 
     const F32 alpha = getCurrentTransparency();
-    LLColor4 image_color = LLColor4::white;
-    image_color.setAlpha(alpha);
+    // <ID:MaterialTheme>
+    if (mRoundedFocusBorder && hasFocus())
+    {
+        LLColor4 focus_color = gFocusMgr.getFocusColor();
+        focus_color.setAlpha(focus_color.mV[VALPHA] * alpha);
+        image->drawBorder(background_rect, focus_color, gFocusMgr.getFocusFlashWidth());
+    }
+    LLColor4 image_color = mBgImageColor.get();
+    image_color.setAlpha(image_color.mV[VALPHA] * alpha);
+    // </ID:MaterialTheme>
     image->draw(background_rect, image_color);
 }
 
 void FSNearbyChatControl::drawBorderOverlay()
 {
+    // <ID:MaterialTheme>
+    if (mRoundedFocusBorder)
+    {
+        return;
+    }
+    // </ID:MaterialTheme>
 
     LLRect background_rect = getLocalRect();
     background_rect.stretch(-mBackgroundPad);

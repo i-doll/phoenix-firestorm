@@ -46,6 +46,8 @@ public:
         Optional<LLUIImage*> background_image;
         Optional<LLUIImage*> background_image_disabled;
         Optional<LLUIImage*> background_image_focused;
+        Optional<LLUIColor> bg_image_color; // <ID:MaterialTheme/>
+        Optional<bool> rounded_focus_border; // <ID:MaterialTheme/>
 
         Params()
             : is_default("default", false),
@@ -54,7 +56,9 @@ public:
               background_pad("background_pad", 1),
               background_image("background_image"),
               background_image_disabled("background_image_disabled"),
-              background_image_focused("background_image_focused")
+              background_image_focused("background_image_focused"),
+              bg_image_color("bg_image_color", LLColor4::white), // <ID:MaterialTheme/>
+              rounded_focus_border("rounded_focus_border", false) // <ID:MaterialTheme/>
         {}
     };
 
@@ -97,6 +101,8 @@ private:
     LLUIImage*                  mBgImage;
     LLUIImage*                  mBgImageDisabled;
     LLUIImage*                  mBgImageFocused;
+    LLUIColor                   mBgImageColor; // <ID:MaterialTheme/>
+    bool                        mRoundedFocusBorder; // <ID:MaterialTheme/>
     boost::signals2::connection mRlvBehaviorCallbackConnection;
     boost::signals2::connection mEmojiHelperSettingConnection;
 };
