@@ -10,6 +10,7 @@ hand          widgets/accordion_tab.xml
 hand          widgets/button.xml
 hand          widgets/check_box.xml
 hand          widgets/combo_box.xml
+hand          widgets/context_menu.xml
 hand          widgets/drop_down.xml
 hand          widgets/floater.xml
 hand          widgets/flyout_button.xml
@@ -18,6 +19,7 @@ hand          widgets/hint_popup.xml
 hand          widgets/icon.xml
 hand          widgets/inspector.xml
 hand          widgets/line_editor.xml
+hand          widgets/menu.xml
 hand          widgets/progress_bar.xml
 hand          widgets/radio_item.xml
 hand          widgets/scroll_bar.xml
@@ -29,6 +31,7 @@ hand          widgets/split_button.xml
 hand          widgets/tab_container.xml
 hand          widgets/talk_button.xml
 hand          widgets/time.xml
+hand          widgets/toggleable_menu.xml
 hand          widgets/toolbar_vertical.xml
 hand          widgets/toolbar.xml
 hand          widgets/tool_tip.xml

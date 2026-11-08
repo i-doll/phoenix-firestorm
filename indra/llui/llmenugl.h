@@ -210,6 +210,8 @@ protected:
     LLUIColor mHighlightForeground;
 
     bool mHighlight;
+
+    void idDrawHighlightBackground() const; // <ID:MaterialTheme/>
 private:
     // Keyboard and mouse variables
     bool mAllowKeyRepeat;
@@ -391,6 +393,7 @@ public:
         Optional<U32>                   max_scrollable_items;
         Optional<U32>                   preferred_width;
         Optional<LLUIColor>             bg_color;
+        Optional<LLUIImage*>            bg_image; // <ID:MaterialTheme/>
         Optional<S32>                   shortcut_pad;
 
         Params()
@@ -402,6 +405,7 @@ public:
             create_jump_keys("create_jump_keys", false),
             keep_fixed_size("keep_fixed_size", false),
             bg_color("bg_color",  LLUIColorTable::instance().getColor( "MenuDefaultBgColor" )),
+            bg_image("bg_image"), // <ID:MaterialTheme/>
             scrollable("scrollable", false),
             max_scrollable_items("max_scrollable_items", U32_MAX),
             preferred_width("preferred_width", U32_MAX),
@@ -467,6 +471,7 @@ public:
     // background colors
     void setBackgroundColor( const LLUIColor& color ) { mBackgroundColor = color; }
     const LLUIColor& getBackgroundColor() const { return mBackgroundColor; }
+    LLUIImage* getBgImage() const { return mBgImage; } // <ID:MaterialTheme/>
     void setBackgroundVisible( bool b ) { mBgVisible = b; }
     void setCanTearOff(bool tear_off);
 
@@ -612,6 +617,7 @@ private:
     bool            mAlwaysShowMenu;
 
     LLUIColor       mBackgroundColor;
+    LLPointer<LLUIImage> mBgImage; // <ID:MaterialTheme/>
     bool            mBgVisible;
     LLHandle<LLView> mParentMenuItem;
     LLUIString      mLabel;

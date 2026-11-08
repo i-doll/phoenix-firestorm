@@ -325,6 +325,8 @@ add("Toast_Over", "windows/Toast_Over.png", 48, 48, filled(48, 48, 12), (12, 12,
 add("hint_background", "windows/hint_background.png", 48, 48, filled(48, 48, 12), (12, 12, 36, 36), "bg_opaque_image_overlay HintBg")
 add("Rounded_Square", "rounded_square.png", 48, 48, filled(48, 48, 8), (8, 8, 40, 40),
     "caller colour (selection, multi-slider track, toolbar overlay BottomTrayOpaqueColor)", entry_file=True)
+add("IDMenu_Background", "widgets/IDMenu_Background.png", 24, 24, filled(24, 24, 8), (8, 8, 16, 16),
+    "menu bg_color MenuDefaultBgColor; item highlight MenuItemHighlightBgColor")
 
 for n in ("ProgressBar", "ProgressBarSolid"):
     add(n, f"widgets/{n}.png", 25, 13, filled(25, 13, 6.5), (6, 6, 19, 7), "color_bar EmphasisColor (Primary)")

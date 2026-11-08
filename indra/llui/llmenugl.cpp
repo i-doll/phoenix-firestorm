@@ -371,6 +371,20 @@ LLMenuGL* LLMenuItemGL::getMenu() const
     return (LLMenuGL*) getParent();
 }
 
+// <ID:MaterialTheme>
+void LLMenuItemGL::idDrawHighlightBackground() const
+{
+    const LLMenuGL* menu = dynamic_cast<const LLMenuGL*>(getParent());
+    if (menu && menu->getBgImage())
+    {
+        menu->getBgImage()->draw(getLocalRect(), mHighlightBackground.get());
+        return;
+    }
+    gGL.color4fv( mHighlightBackground.get().mV );
+    gl_rect_2d( 0, getRect().getHeight(), getRect().getWidth(), 0 );
+}
+// </ID:MaterialTheme>
+
 
 // getNominalWidth() - returns the normal width of this control in
 // pixels - this is used for calculating the widest item, as well as
@@ -508,9 +522,7 @@ void LLMenuItemGL::draw( void )
     // let disabled items be highlighted, just don't draw them as such
     if( getEnabled() && getHighlight() && !mBriefItem)
     {
-        gGL.color4fv( mHighlightBackground.get().mV );
-
-        gl_rect_2d( 0, getRect().getHeight(), getRect().getWidth(), 0 );
+        idDrawHighlightBackground(); // <ID:MaterialTheme/>
     }
 
     LLColor4 color;
@@ -781,8 +793,7 @@ void LLMenuItemTearOffGL::draw()
     // disabled items can be highlighted, but shouldn't render as such
     if( getEnabled() && getHighlight() && !isBriefItem())
     {
-        gGL.color4fv( mHighlightBackground.get().mV );
-        gl_rect_2d( 0, getRect().getHeight(), getRect().getWidth(), 0 );
+        idDrawHighlightBackground(); // <ID:MaterialTheme/>
     }
 
     if (getEnabled())
@@ -1794,6 +1805,7 @@ void LLMenuScrollItem::onCommit( void )
 LLMenuGL::LLMenuGL(const LLMenuGL::Params& p)
 :   LLUICtrl(p),
     mBackgroundColor( p.bg_color() ),
+    mBgImage( p.bg_image() ), // <ID:MaterialTheme/>
     mBgVisible( p.bg_visible ),
     mDropShadowed( p.drop_shadow ),
     mHasSelection(false),
@@ -2472,6 +2484,7 @@ void LLMenuGL::createSpilloverBranch()
         p.name("More");
         p.label(label);
         p.bg_color(mBackgroundColor);
+        p.bg_image(mBgImage); // <ID:MaterialTheme/>
         p.bg_visible(true);
         p.can_tear_off(false);
         mSpilloverMenu = new LLMenuGL(p);
@@ -3284,6 +3297,11 @@ void LLMenuGL::draw( void )
         static LLUICachedControl<F32> menu_bg_alpha("FSMenuBackgroundAlpha");
         LLColor4 bg_color = mBackgroundColor.get();
         bg_color.mV[VALPHA] *= menu_bg_alpha;
+        // <ID:MaterialTheme>
+        if (mBgImage)
+            mBgImage->draw(getLocalRect(), bg_color);
+        else
+        // </ID:MaterialTheme>
         gl_rect_2d(0, getRect().getHeight(), getRect().getWidth(), 0, bg_color);
         // </FS:PP>
     }
@@ -3293,8 +3311,15 @@ void LLMenuGL::draw( void )
 void LLMenuGL::drawBackground(LLMenuItemGL* itemp, F32 alpha)
 {
     LLColor4 color = itemp->getHighlightBgColor() % alpha;
-    gGL.color4fv( color.mV );
     LLRect item_rect = itemp->getRect();
+    // <ID:MaterialTheme>
+    if (mBgImage)
+    {
+        mBgImage->draw(0, 0, item_rect.getWidth(), item_rect.getHeight(), color);
+        return;
+    }
+    // </ID:MaterialTheme>
+    gGL.color4fv( color.mV );
     gl_rect_2d( 0, item_rect.getHeight(), item_rect.getWidth(), 0);
 }
 

@@ -105,6 +105,7 @@
   <texture name="Toast_Over" file_name="windows/Toast_Over.png" scale.left="12" scale.top="36" scale.right="36" scale.bottom="12" />
   <texture name="hint_background" file_name="windows/hint_background.png" scale.left="12" scale.top="36" scale.right="36" scale.bottom="12" />
   <texture name="Rounded_Square" file_name="rounded_square.png" preload="true" scale.left="8" scale.top="40" scale.right="40" scale.bottom="8" />
+  <texture name="IDMenu_Background" file_name="widgets/IDMenu_Background.png" preload="true" scale.left="8" scale.top="16" scale.right="16" scale.bottom="8" />
   <texture name="ProgressBar" file_name="widgets/ProgressBar.png" scale.left="6" scale.top="7" scale.right="19" scale.bottom="6" />
   <texture name="ProgressBarSolid" file_name="widgets/ProgressBarSolid.png" scale.left="6" scale.top="7" scale.right="19" scale.bottom="6" />
   <texture name="ProgressTrack" file_name="widgets/ProgressTrack.png" scale.left="6" scale.top="7" scale.right="19" scale.bottom="6" />
