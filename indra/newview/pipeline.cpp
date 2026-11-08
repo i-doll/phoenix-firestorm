@@ -1508,11 +1508,23 @@ void LLPipeline::refreshCachedSettings()
     LLFontWidthBuffer::enableBufferCollection(enable_buffers);
 }
 
+// <FS:Trish> Dust motes: one point per grid cell around the camera (renderDustMotes)
+static LLPointer<LLVertexBuffer> sFSDustPoints;
+static S32 sFSDustPointsRadius = -1;
+
+static void fs_release_dust_points()
+{
+    sFSDustPoints = nullptr;
+    sFSDustPointsRadius = -1;
+}
+// </FS:Trish>
+
 void LLPipeline::releaseGLBuffers()
 {
     assertInitialized();
 
     LLDrawPoolWater::fsReleaseFoamDepth(); // <FS:Trish/> shoreline foam depth
+    fs_release_dust_points(); // <FS:Trish/> dust motes
 
     if (mNoiseMap)
     {
@@ -14476,12 +14488,43 @@ void LLPipeline::renderDustMotes()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("dust motes");
 
-    // The grid: cells sized so a walk to the range crosses a bounded number of them (at most
-    // sqrt(3) * 24 + 3 = 45 for any range), one mote at most per cell
+    // The grid: cells sized so the range spans at most 24 of them, one mote at most per cell
     const F32 dust_range = llclamp((F32)range, 2.f, 30.f);
     const F32 cell = llclamp(dust_range / 24.f, 0.25f, 1.25f);
-    const S32 max_cells = llclamp((S32)ceilf(dust_range / cell * 1.7321f) + 3, 4, 64);
     const F32 probability = llclamp((F32)density * cell * cell * cell, 0.f, 1.f);
+
+    // The points: every cell whose mote can be within the range, as offsets from the camera's
+    // cell. Built once per grid radius (at most 51^3 points).
+    const S32 radius = (S32)ceilf(dust_range / cell) + 1;
+    if (sFSDustPoints.isNull() || sFSDustPointsRadius != radius)
+    {
+        fs_release_dust_points();
+        const S32 side = 2 * radius + 1;
+        const U32 count = (U32)(side * side * side);
+        LLPointer<LLVertexBuffer> vb = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
+        if (vb->allocateBuffer(count, 0))
+        {
+            LLStrider<LLVector3> vert;
+            vb->getVertexStrider(vert);
+            for (S32 z = -radius; z <= radius; ++z)
+            {
+                for (S32 y = -radius; y <= radius; ++y)
+                {
+                    for (S32 x = -radius; x <= radius; ++x)
+                    {
+                        (vert++)->set((F32)x, (F32)y, (F32)z);
+                    }
+                }
+            }
+            vb->unmapBuffer();
+            sFSDustPoints = vb;
+            sFSDustPointsRadius = radius;
+        }
+    }
+    if (sFSDustPoints.isNull())
+    {
+        return;
+    }
 
     // Time, wrapped in double precision: no shared wind moves the grid, each mote drifts on its
     // own, and all its motion runs on whole turns of the shader's 960 second cycle, so the wrap is
@@ -14508,7 +14551,6 @@ void LLPipeline::renderDustMotes()
     }
 
     const glm::mat4 view_to_world = glm::mat4(glm::transpose(glm::mat3(get_current_modelview()))); // rotation only
-    const F32 pixel_angle = 2.f * tanf(camera->getView() * 0.5f) / (F32)llmax(mRT->screen.getHeight(), 1u);
 
     // Colours scaled so brightness 1 makes a backlit mote about as bright as a sunlit surface
     const F32 gain = (F32)brightness * 0.15f;
@@ -14532,8 +14574,7 @@ void LLPipeline::renderDustMotes()
         spot_color[i * 4 + 3] = spot.mColor.mV[3];
     }
 
-    static LLStaticHashedString s_sun_rays("dust_sun_rays");
-    static LLStaticHashedString s_spot_volume("dust_spot_volume");
+    static LLStaticHashedString s_proj("dust_proj");
     static LLStaticHashedString s_spot_shadow[FS_DUST_MAX_SPOTS] = {
         LLStaticHashedString("dust_spot_shadow0"), LLStaticHashedString("dust_spot_shadow1"),
         LLStaticHashedString("dust_spot_shadow2"), LLStaticHashedString("dust_spot_shadow3") };
@@ -14550,10 +14591,8 @@ void LLPipeline::renderDustMotes()
     static LLStaticHashedString s_cell_base("dust_cell_base");
     static LLStaticHashedString s_cell_size("dust_cell_size");
     static LLStaticHashedString s_range("dust_range");
-    static LLStaticHashedString s_max_cells("dust_max_cells");
     static LLStaticHashedString s_probability("dust_probability");
     static LLStaticHashedString s_size("dust_size");
-    static LLStaticHashedString s_pixel_angle("dust_pixel_angle");
     static LLStaticHashedString s_time("dust_time");
     static LLStaticHashedString s_turbulence("dust_turbulence");
 
@@ -14570,7 +14609,7 @@ void LLPipeline::renderDustMotes()
 
     // The shader's own samplers go on the units after the ones the program reserved, as
     // fsBeginExtraSpotShadows does
-    S32 units[2 + FS_DUST_MAX_SPOTS];
+    S32 units[FS_DUST_MAX_SPOTS];
     S32 unit_count = 0;
     S32 next = shader.mActiveTextureChannels;
     const S32 limit = llmin(gGLManager.mNumTextureImageUnits, (S32)LL_NUM_TEXTURE_LAYERS);
@@ -14585,36 +14624,10 @@ void LLPipeline::renderDustMotes()
         return next++;
     };
 
-    // The volumetric maps, filtered so one tap covers the 2x2 reduced texels around a pixel. The
-    // composites set their own point filtering again when they bind them.
-    const S32 sun_unit = take_unit(s_sun_rays);
-    const bool sun_mask = sun_on && sun_unit > -1 && mSunRayMap.isComplete();
-    if (sun_unit > -1)
-    {
-        if (sun_mask)
-        {
-            gGL.getTexUnit(sun_unit)->bind(&mSunRayMap);
-            gGL.getTexUnit(sun_unit)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-        }
-        else
-        {
-            gGL.getTexUnit(sun_unit)->bind(LLViewerFetchedTexture::sWhiteImagep.get());
-        }
-    }
-    const S32 spot_unit = take_unit(s_spot_volume);
-    const bool spot_mask = spot_count > 0 && spot_unit > -1 && mSpotVolumeMap.isComplete();
-    if (spot_unit > -1)
-    {
-        if (spot_mask)
-        {
-            gGL.getTexUnit(spot_unit)->bind(&mSpotVolumeMap);
-            gGL.getTexUnit(spot_unit)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-        }
-        else
-        {
-            gGL.getTexUnit(spot_unit)->bind(LLViewerFetchedTexture::sWhiteImagep.get());
-        }
-    }
+    // Each mote is lit where it is (one shadow tap), so the volumetric passes only say whether
+    // there is light this frame
+    const bool sun_mask = sun_on;
+    const bool spot_mask = spot_count > 0;
 
     // Each projector's shadow map. Unused samplers still get a depth map, so a shadow sampler's
     // unit never holds another kind of texture.
@@ -14652,20 +14665,23 @@ void LLPipeline::renderDustMotes()
     shader.uniform4fv(s_spot_origin, FS_DUST_MAX_SPOTS, spot_origin);
     shader.uniform4fv(s_spot_color, FS_DUST_MAX_SPOTS, spot_color);
     shader.uniformMatrix4fv(s_view_to_world, 1, GL_FALSE, glm::value_ptr(view_to_world));
+    shader.uniformMatrix4fv(s_proj, 1, GL_FALSE, glm::value_ptr(get_current_projection()));
     shader.uniform3fv(s_cam_cell, 1, cam_cell);
     shader.uniform3fv(s_cell_base, 1, cell_base);
     shader.uniform1f(s_cell_size, cell);
     shader.uniform1f(s_range, dust_range);
-    shader.uniform1i(s_max_cells, max_cells);
     shader.uniform1f(s_probability, probability);
     shader.uniform1f(s_size, llclamp((F32)mote_size, 0.25f, 6.f));
-    shader.uniform1f(s_pixel_angle, pixel_angle);
     shader.uniform1f(s_time, drift_time);
     shader.uniform1f(s_turbulence, llclamp((F32)turbulence, 0.f, 2.f) * 0.07f); // cells, at most 0.14
 
     if (sun_mask || spot_mask)
     {
-        fs_draw_screen_triangle(mScreenTriangleVB);
+        // Point sizes come from the vertex shader
+        glEnable(GL_PROGRAM_POINT_SIZE);
+        sFSDustPoints->setBuffer();
+        sFSDustPoints->drawArrays(LLRender::POINTS, 0, sFSDustPoints->getNumVerts());
+        glDisable(GL_PROGRAM_POINT_SIZE);
     }
 
     for (S32 i = 0; i < unit_count; ++i)

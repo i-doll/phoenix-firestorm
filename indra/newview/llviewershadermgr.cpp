@@ -3348,7 +3348,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             post.mShader->mFeatures.isDeferred = post.mDeferred;
             post.mShader->mShaderFiles.clear();
             post.mShader->clearPermutations();
-            post.mShader->mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+            // Dust motes are points, one per grid cell, with their own vertex shader
+            post.mShader->mShaderFiles.push_back(make_pair(post.mShader == &gFSDustMotesProgram ? "deferred/fsDustMotesV.glsl" : "deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
             post.mShader->mShaderFiles.push_back(make_pair(post.mFile, GL_FRAGMENT_SHADER));
             if (post.mShader == &gFSDynResUpscaleProgram)
             {
