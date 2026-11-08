@@ -45,8 +45,16 @@ using namespace LLOldEvents;
 const F32 MAX_FRACTIONAL = 1.5f;
 const F32 MIN_FRACTIONAL = 0.2f;
 
-const F32 MIN_BANDWIDTH = 50.f;   // Kbps
-const F32 MAX_BANDWIDTH = 6000.f; // Kbps
+// <FS:Trish> One set of limits for the user value. The internal value may go
+// MAX_FRACTIONAL above it, so the old 6000 cap clipped users above 4000 and
+// ignored anything above 6000 that getMaxBandwidthKbps() allowed.
+//const F32 MIN_BANDWIDTH = 50.f;   // Kbps
+//const F32 MAX_BANDWIDTH = 6000.f; // Kbps
+const F32 MIN_BANDWIDTH = 50.f;     // Kbps, matches the preferences slider
+const F32 MAX_BANDWIDTH = 10000.f;  // Kbps
+const F32 MIN_INTERNAL_BANDWIDTH = MIN_BANDWIDTH * MIN_FRACTIONAL;
+const F32 MAX_INTERNAL_BANDWIDTH = MAX_BANDWIDTH * MAX_FRACTIONAL;
+// </FS:Trish>
 const F32 STEP_FRACTIONAL = 0.1f;
 const F32 HIGH_BUFFER_LOAD_TRESHOLD = 1.f;
 const F32 LOW_BUFFER_LOAD_TRESHOLD = 0.8f;
@@ -246,8 +254,10 @@ F32 LLViewerThrottle::getMaxBandwidthKbps()
 {
     // Why are thse different than the constants with the same names higher up?
     // Anybody know? -- Leviathan
-    constexpr F32 MIN_BANDWIDTH = 100.0f; // 100 Kbps
-    constexpr F32 MAX_BANDWIDTH = 10000.0f; // 10 Mbps
+    // <FS:Trish> Use the shared limits above
+    //constexpr F32 MIN_BANDWIDTH = 100.0f; // 100 Kbps
+    //constexpr F32 MAX_BANDWIDTH = 10000.0f; // 10 Mbps
+    // </FS:Trish>
 
     static LLCachedControl<F32> bandwidth(gSavedSettings, "ThrottleBandwidthKBPS", 3000.0);
     return llclamp(bandwidth(), MIN_BANDWIDTH, MAX_BANDWIDTH);
@@ -257,7 +267,10 @@ F32 LLViewerThrottle::getMaxBandwidthKbps()
 LLViewerThrottleGroup LLViewerThrottle::getThrottleGroup(const F32 bandwidth_kbps)
 {
     //Clamp the bandwidth users can set.
-    F32 set_bandwidth = llclamp(bandwidth_kbps, MIN_BANDWIDTH, MAX_BANDWIDTH);
+    // <FS:Trish> bandwidth_kbps is the user value times the dynamic fraction
+    //F32 set_bandwidth = llclamp(bandwidth_kbps, MIN_BANDWIDTH, MAX_BANDWIDTH);
+    F32 set_bandwidth = llclamp(bandwidth_kbps, MIN_INTERNAL_BANDWIDTH, MAX_INTERNAL_BANDWIDTH);
+    // </FS:Trish>
 
     auto count = mPresets.size();
 
@@ -338,30 +351,40 @@ void LLViewerThrottle::updateDynamicThrottle()
         || mBufferLoadRate >= HIGH_BUFFER_LOAD_TRESHOLD // let viewer sort through the backlog before it starts dropping packets
         )
     {
-        if (mThrottleFrac <= MIN_FRACTIONAL || mCurrentBandwidth / 1024.0f <= MIN_BANDWIDTH)
+        // <FS:Trish> Don't return early: mBufferLoadRate must still be reset below
+        //if (mThrottleFrac <= MIN_FRACTIONAL || mCurrentBandwidth / 1024.0f <= MIN_BANDWIDTH)
+        //{
+        //    return;
+        //}
+        if (mThrottleFrac > MIN_FRACTIONAL && mCurrentBandwidth / 1024.0f > MIN_INTERNAL_BANDWIDTH)
         {
-            return;
-        }
         mThrottleFrac -= STEP_FRACTIONAL;
         mThrottleFrac = llmax(MIN_FRACTIONAL, mThrottleFrac);
         mCurrentBandwidth = mMaxBandwidth * mThrottleFrac;
         mCurrent = getThrottleGroup(mCurrentBandwidth / 1024.0f);
         mCurrent.sendToSim();
         LL_INFOS() << "Tightening network throttle to " << mCurrentBandwidth << LL_ENDL;
+        }
+        // </FS:Trish>
     }
     else if (mean_packets_lost <= EASE_THROTTLE_THRESHOLD
              && mBufferLoadRate < LOW_BUFFER_LOAD_TRESHOLD)
     {
-        if (mThrottleFrac >= MAX_FRACTIONAL || mCurrentBandwidth / 1024.0f >= MAX_BANDWIDTH)
+        // <FS:Trish> Don't return early: mBufferLoadRate must still be reset below
+        //if (mThrottleFrac >= MAX_FRACTIONAL || mCurrentBandwidth / 1024.0f >= MAX_BANDWIDTH)
+        //{
+        //    return;
+        //}
+        if (mThrottleFrac < MAX_FRACTIONAL && mCurrentBandwidth / 1024.0f < MAX_INTERNAL_BANDWIDTH)
         {
-            return;
-        }
         mThrottleFrac += STEP_FRACTIONAL;
         mThrottleFrac = llmin(MAX_FRACTIONAL, mThrottleFrac);
         mCurrentBandwidth = mMaxBandwidth * mThrottleFrac;
         mCurrent = getThrottleGroup(mCurrentBandwidth/1024.0f);
         mCurrent.sendToSim();
         LL_INFOS() << "Easing network throttle to " << mCurrentBandwidth << LL_ENDL;
+        }
+        // </FS:Trish>
     }
 
     // Now that we've used mBufferLoadRate we reset it to zero because otherwise it only
