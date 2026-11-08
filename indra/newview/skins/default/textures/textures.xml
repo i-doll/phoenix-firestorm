@@ -916,6 +916,7 @@ with the same filename but different name
   <texture name="Stop_Animations_Icon" file_name="toolbar_icons/stop_animations.png" preload="true" />
   <texture name="omnifilter" file_name="toolbar_icons/omnifilter.png" preload="true" />
 
+  <texture name="skin idyll default" file_name="skinspreview/idyll_material.jpg" preload="true" />
   <texture name="skin ansastorm blood" file_name="skinspreview/ansa_blood.jpg" preload="true" />
   <texture name="skin ansastorm bright blue" file_name="skinspreview/ansa_blue.jpg" preload="true" />
   <texture name="skin ansastorm classic brown" file_name="skinspreview/ansa_brown.jpg" preload="true" />

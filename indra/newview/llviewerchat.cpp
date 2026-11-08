@@ -46,6 +46,21 @@
 #include "idsenderhighlight.h" // <ID> Sender-based chat highlighting
 #include "idkeywordhighlight.h" // <ID> Keyword-based chat highlighting
 
+// <ID:MaterialTheme>
+static LLUIColor colorizeChat(const LLUUID& id, const LLUIColor& color, ContactSetType type)
+{
+    const LLColor4 colorized = LGGContactSets::getInstance()->colorize(id, color, type);
+    if (colorized == color.get())
+        return color;
+    for (const char* name : { "UserChatColor", "FriendsChatColor", "MutedChatColor", "LindenChatColor", "FirestormChatColor" })
+    {
+        if (LLUIColor named = LLUIColorTable::instance().getColor(name); named.get() == colorized)
+            return named;
+    }
+    return colorized;
+}
+// </ID:MaterialTheme>
+
 
 // LLViewerChat
 LLViewerChat::font_change_signal_t LLViewerChat::sChatFontChangedSignal;
@@ -101,14 +116,16 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLUIColor& r_color, F32& r_c
                         r_color = LLUIColorTable::instance().getColor("AgentChatColor");
                     }
 
+                    // <ID:MaterialTheme>
                     if (chat.mChatType == CHAT_TYPE_IM || chat.mChatType == CHAT_TYPE_IM_GROUP)
                     {
-                        r_color = LGGContactSets::getInstance()->colorize(chat.mFromID, r_color, ContactSetType::IM);
+                        r_color = colorizeChat(chat.mFromID, r_color, ContactSetType::IM);
                     }
                     else
                     {
-                        r_color = LGGContactSets::getInstance()->colorize(chat.mFromID, r_color, ContactSetType::CHAT);
+                        r_color = colorizeChat(chat.mFromID, r_color, ContactSetType::CHAT);
                     }
+                    // </ID:MaterialTheme>
                     // </FS:CR>
 
                     //color based on contact sets prefs

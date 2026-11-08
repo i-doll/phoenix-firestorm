@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<inspector name="inspector"
+           max_width="300"
+           bg_opaque_color="FloaterFocusBackgroundColor"
+           background_visible="true"
+           bg_opaque_image="Inspector_Hover"
+           bg_opaque_image_overlay="FloaterFocusBackgroundColor"
+           background_opaque="true"
+           bg_alpha_image="none"
+           mouse_opaque="true" 
+           text_color="InspectorTipTextColor"/>

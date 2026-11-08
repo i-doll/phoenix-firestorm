@@ -101,6 +101,7 @@ public:
         // colors
         Optional<LLUIColor>             cursor_color,
                                         bg_color,
+                                        bg_image_color, // <ID:MaterialTheme/>
                                         text_color,
                                         text_readonly_color,
                                         text_tentative_color,
@@ -407,6 +408,7 @@ protected:
 
     LLUIColor   mCursorColor;
     LLUIColor   mBgColor;
+    LLUIColor   mBgImageColor; // <ID:MaterialTheme/>
     LLUIColor   mFgColor;
     LLUIColor   mReadOnlyFgColor;
     LLUIColor   mTentativeFgColor;

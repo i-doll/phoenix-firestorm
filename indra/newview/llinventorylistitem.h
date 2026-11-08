@@ -69,6 +69,10 @@ public:
         Optional<LLUIImage*>        hover_image,
                                     selected_image,
                                     separator_image;
+        // <ID:MaterialTheme>
+        Optional<LLUIColor>         hover_image_color,
+                                    selected_image_color;
+        // </ID:MaterialTheme>
         Optional<LLIconCtrl::Params>    item_icon;
         Optional<LLTextBox::Params>     item_name;
         Params();
@@ -226,6 +230,10 @@ private:
     LLUIImagePtr    mHoverImage;
     LLUIImagePtr    mSelectedImage;
     LLUIImagePtr    mSeparatorImage;
+    // <ID:MaterialTheme>
+    LLUIColor       mHoverImageColor;
+    LLUIColor       mSelectedImageColor;
+    // </ID:MaterialTheme>
 
     bool            mSelected = false;
     bool            mSeparatorVisible = false;

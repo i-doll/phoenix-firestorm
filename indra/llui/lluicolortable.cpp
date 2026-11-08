@@ -174,10 +174,26 @@ void LLUIColorTable::clear()
 {
     clearTable(mLoadedColors);
     clearTable(mUserSetColors);
+    clearTable(mOverrideColors); // <ID:MaterialTheme>
 }
 
 LLUIColor LLUIColorTable::getColor(std::string_view name, const LLColor4& default_color) const
 {
+    // <ID:MaterialTheme>
+    if (!mOverrideColors.empty())
+    {
+        string_color_map_t::const_iterator override_iter = mOverrideColors.find(name);
+        if (override_iter != mOverrideColors.end())
+        {
+            return LLUIColor(&override_iter->second);
+        }
+    }
+    return getUserOrSkinColor(name, default_color);
+}
+
+LLUIColor LLUIColorTable::getUserOrSkinColor(std::string_view name, const LLColor4& default_color) const
+{
+    // </ID:MaterialTheme>
     string_color_map_t::const_iterator iter = mUserSetColors.find(name);
 
     if(iter != mUserSetColors.end())
@@ -254,6 +270,33 @@ void LLUIColorTable::resetToDefault(std::string_view name)
         }
     }
 }
+
+// <ID:MaterialTheme>
+void LLUIColorTable::setOverrideColor(std::string_view name, const LLColor4& color)
+{
+    setColor(name, color, mOverrideColors);
+}
+
+bool LLUIColorTable::hasOverrideColor(std::string_view name) const
+{
+    return mOverrideColors.find(name) != mOverrideColors.end();
+}
+
+void LLUIColorTable::setSkinColor(std::string_view name, const LLColor4& color)
+{
+    setColor(name, color, mLoadedColors);
+}
+
+void LLUIColorTable::followSkinColor(std::string_view name)
+{
+    string_color_map_t::iterator user_iter = mUserSetColors.find(name);
+    string_color_map_t::const_iterator skin_iter = mLoadedColors.find(name);
+    if (user_iter != mUserSetColors.end() && skin_iter != mLoadedColors.end())
+    {
+        user_iter->second.set(&skin_iter->second);
+    }
+}
+// </ID:MaterialTheme>
 
 bool LLUIColorTable::loadFromSettings()
 {

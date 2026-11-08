@@ -50,6 +50,15 @@ public:
         SCALE_OUTER
     };
 
+    // <ID:MaterialTheme>
+    enum ETintRole
+    {
+        TINT_ROLE_NONE,
+        TINT_ROLE_GLYPH,
+        TINT_ROLE_ART
+    };
+    // </ID:MaterialTheme>
+
     typedef boost::signals2::signal<void (void)> image_loaded_signal_t;
 
     LLUIImage(const std::string& name, LLPointer<LLTexture> image);
@@ -69,6 +78,11 @@ public:
     {
         mScaleStyle = style;
     }
+
+    // <ID:MaterialTheme>
+    LL_FORCE_INLINE void setTintRole(ETintRole role) { mTintRole = role; }
+    LL_FORCE_INLINE ETintRole getTintRole() const { return mTintRole; }
+    // </ID:MaterialTheme>
 
     LL_FORCE_INLINE LLPointer<LLTexture> getImage() { return mImage; }
     LL_FORCE_INLINE const LLPointer<LLTexture>& getImage() const { return mImage; }
@@ -110,6 +124,7 @@ protected:
     EScaleStyle             mScaleStyle;
     mutable S32             mCachedW;
     mutable S32             mCachedH;
+    ETintRole               mTintRole = TINT_ROLE_NONE; // <ID:MaterialTheme/>
 };
 
 #include "lluiimage.inl"

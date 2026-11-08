@@ -49,6 +49,7 @@ public:
                              padding;
 
         Optional<LLUIImage*> selected_image;
+        Optional<LLUIColor>  selected_image_color; // <ID:MaterialTheme/>
 
         Params();
     };
@@ -92,6 +93,7 @@ protected:
     const size_t    mMaxVisible;
     const S32       mPadding;
     const LLUIImagePtr mSelectedImage;
+    const LLUIColor mSelectedImageColor; // <ID:MaterialTheme/>
     const LLFontGL* mIconFont;
     const LLFontGL* mTextFont;
 

@@ -50,6 +50,7 @@ LLPanelEmojiComplete::Params::Params()
     , max_visible("max_visible")
     , padding("padding", DEF_PADDING)
     , selected_image("selected_image")
+    , selected_image_color("selected_image_color", LLColor4::white) // <ID:MaterialTheme/>
 {
 }
 
@@ -61,6 +62,7 @@ LLPanelEmojiComplete::LLPanelEmojiComplete(const LLPanelEmojiComplete::Params& p
     , mMaxVisible(p.max_visible)
     , mPadding(p.padding)
     , mSelectedImage(p.selected_image)
+    , mSelectedImageColor(p.selected_image_color()) // <ID:MaterialTheme/>
     // , mIconFont(LLFontGL::getFontEmojiHuge()) // <FS:Beq/> Add B&W emoji font support
     , mTextFont(LLFontGL::getFontSansSerifBig())
     , mScrollbar(nullptr)
@@ -113,7 +115,7 @@ void LLPanelEmojiComplete::draw()
             width = mEmojiWidth;
             height = mRenderRect.getHeight();
         }
-        mSelectedImage->draw(x, y, width, height);
+        mSelectedImage->draw(x, y, width, height, mSelectedImageColor.get()); // <ID:MaterialTheme/>
     }
 
     F32 iconCenterX = mRenderRect.mLeft + (F32)mEmojiWidth / 2;

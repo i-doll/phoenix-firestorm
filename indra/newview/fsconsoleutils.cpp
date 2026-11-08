@@ -29,6 +29,8 @@
 
 #include "fsconsoleutils.h"
 
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
+
 #include "fscommon.h"
 #include "llagent.h"
 #include "llavatarnamecache.h"
@@ -94,7 +96,7 @@ bool FSConsoleUtils::ProcessChatMessage(const LLChat& chat_msg, const LLSD &args
         F32 alpha = 1.f;
         LLUIColor chatcolor;
         LLViewerChat::getChatColor(chat_msg, chatcolor, alpha);
-        gConsole->addConsoleLine(console_chat, chatcolor % alpha);
+        gConsole->addConsoleLine(console_chat, IDMaterialTheme::worldChatColor(chatcolor) % alpha); // <ID:MaterialTheme/>
     }
     else
     {
@@ -117,7 +119,7 @@ bool FSConsoleUtils::ProcessChatMessage(const LLChat& chat_msg, const LLSD &args
         F32 alpha = 1.f;
         LLUIColor chatcolor;
         LLViewerChat::getChatColor(chat_msg, chatcolor, alpha);
-        gConsole->addConsoleLine(console_chat, chatcolor % alpha);
+        gConsole->addConsoleLine(console_chat, IDMaterialTheme::worldChatColor(chatcolor) % alpha); // <ID:MaterialTheme/>
     }
 
     return true;
@@ -162,7 +164,7 @@ void FSConsoleUtils::onProcessChatAvatarNameLookup(const LLUUID& agent_id, const
     F32 alpha = 1.f;
     LLUIColor chatcolor;
     LLViewerChat::getChatColor(chat_msg, chatcolor, alpha);
-    gConsole->addConsoleLine(console_chat, chatcolor % alpha);
+    gConsole->addConsoleLine(console_chat, IDMaterialTheme::worldChatColor(chatcolor) % alpha); // <ID:MaterialTheme/>
 }
 
 //static
@@ -245,5 +247,5 @@ void FSConsoleUtils::onProccessInstantMessageNameLookup(const LLUUID& agent_id, 
     LLUIColor textcolor;
     LLViewerChat::getChatColor(chat, textcolor, alpha, LLSD().with("is_local", false).with("for_console", true));
 
-    gConsole->addConsoleLine("IM: " + sender_name + delimiter + message, textcolor % alpha, session_id);
+    gConsole->addConsoleLine("IM: " + sender_name + delimiter + message, IDMaterialTheme::worldChatColor(textcolor) % alpha, session_id); // <ID:MaterialTheme/>
 }

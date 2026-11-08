@@ -44,6 +44,7 @@ static LLDefaultChildRegistry::Register<LLIconCtrl> r("icon");
 LLIconCtrl::Params::Params()
 :   image("image_name"),
     color("color"),
+    glyph_color("glyph_color"), // <ID:MaterialTheme/>
     use_draw_context_alpha("use_draw_context_alpha", true),
     interactable("interactable", false),
     scale_image("scale_image"),
@@ -55,6 +56,7 @@ LLIconCtrl::LLIconCtrl(const LLIconCtrl::Params& p)
 :   LLUICtrl(p),
     mColor(p.color()),
     mImagep(p.image),
+    mGlyphColor(p.glyph_color.isProvided() ? std::make_optional(p.glyph_color()) : std::nullopt), // <ID:MaterialTheme/>
     mUseDrawContextAlpha(p.use_draw_context_alpha),
     mInteractable(p.interactable),
     mPriority(0),
@@ -80,7 +82,14 @@ void LLIconCtrl::draw()
     if( mImagep.notNull() )
     {
         const F32 alpha = mUseDrawContextAlpha ? getDrawContext().mAlpha : getCurrentTransparency();
-        mImagep->draw(getLocalRect(), mColor.get() % alpha );
+        // <ID:MaterialTheme>
+        LLColor4 color = mColor.get();
+        if (mGlyphColor && mImagep->getTintRole() == LLUIImage::TINT_ROLE_GLYPH)
+        {
+            color = mGlyphColor->get() % color.mV[VALPHA];
+        }
+        mImagep->draw(getLocalRect(), color % alpha );
+        // </ID:MaterialTheme>
     }
 
     LLUICtrl::draw();

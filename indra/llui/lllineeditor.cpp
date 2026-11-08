@@ -101,6 +101,7 @@ LLLineEditor::Params::Params()
     cursor_color("cursor_color"),
     use_bg_color("use_bg_color", false),
     bg_color("bg_color"),
+    bg_image_color("bg_image_color", LLColor4::white), // <ID:MaterialTheme/>
     text_color("text_color"),
     text_readonly_color("text_readonly_color"),
     text_tentative_color("text_tentative_color"),
@@ -170,6 +171,7 @@ LLLineEditor::LLLineEditor(const LLLineEditor::Params& p)
     mLabel(p.label),
     mCursorColor(p.cursor_color()),
     mBgColor(p.bg_color()),
+    mBgImageColor(p.bg_image_color()), // <ID:MaterialTheme/>
     mFgColor(p.text_color()),
     mReadOnlyFgColor(p.text_readonly_color()),
     mTentativeFgColor(p.text_tentative_color()),
@@ -1889,8 +1891,8 @@ void LLLineEditor::drawBackground()
                 tmp_color,
                 gFocusMgr.getFocusFlashWidth());
         }
-        LLColor4 tmp_color = UI_VERTEX_COLOR;
-        tmp_color.setAlpha(alpha);
+        LLColor4 tmp_color = mBgImageColor.get(); // <ID:MaterialTheme/>
+        tmp_color.setAlpha(tmp_color.mV[VALPHA] * alpha);
         image->draw(getLocalRect(), tmp_color);
     }
 }

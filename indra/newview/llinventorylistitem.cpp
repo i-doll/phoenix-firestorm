@@ -68,6 +68,10 @@ LLPanelInventoryListItemBase::Params::Params()
     hover_image("hover_image"),
     selected_image("selected_image"),
     separator_image("separator_image"),
+    // <ID:MaterialTheme>
+    hover_image_color("hover_image_color", LLColor4::white),
+    selected_image_color("selected_image_color", LLColor4::white),
+    // </ID:MaterialTheme>
     item_icon("item_icon"),
     item_name("item_name")
 {};
@@ -103,7 +107,7 @@ void LLPanelInventoryListItemBase::draw()
     LLRect local_rect = getLocalRect();
     if (mHovered && mHoverImage)
     {
-        mHoverImage->draw(local_rect);
+        mHoverImage->draw(local_rect, mHoverImageColor.get()); // <ID:MaterialTheme/>
     }
     else if (mIsFavorite && draw_star())
     {
@@ -116,7 +120,7 @@ void LLPanelInventoryListItemBase::draw()
 
     if (mSelected && mSelectedImage)
     {
-        mSelectedImage->draw(local_rect);
+        mSelectedImage->draw(local_rect, mSelectedImageColor.get()); // <ID:MaterialTheme/>
     }
 
     if (mSeparatorVisible && mSeparatorImage)
@@ -329,7 +333,11 @@ LLPanelInventoryListItemBase::LLPanelInventoryListItemBase(LLViewerInventoryItem
     mIsFavorite(false),
     mHoverImage(params.hover_image),
     mSelectedImage(params.selected_image),
-    mSeparatorImage(params.separator_image)
+    mSeparatorImage(params.separator_image),
+    // <ID:MaterialTheme>
+    mHoverImageColor(params.hover_image_color()),
+    mSelectedImageColor(params.selected_image_color())
+    // </ID:MaterialTheme>
 {
     LLIconCtrl::Params icon_params(params.item_icon);
     applyXUILayout(icon_params, this);

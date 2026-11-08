@@ -213,6 +213,7 @@ LLFloater::Params::Params()
     tear_off_pressed_image("tear_off_pressed_image"),
     dock_pressed_image("dock_pressed_image"),
     help_pressed_image("help_pressed_image"),
+    title_button_image_color("title_button_image_color"), // <ID:MaterialTheme/>
     open_callback("open_callback"),
     close_callback("close_callback"),
     follows("follows"),
@@ -2563,6 +2564,14 @@ void LLFloater::buildButtons(const Params& floater_params)
         p.tool_tip = getButtonTooltip(floater_params, (EFloaterButton)i, getIsChrome());
         p.scale_image(true);
         p.chrome(true);
+        // <ID:MaterialTheme>
+        if (floater_params.title_button_image_color.isProvided())
+        {
+            p.image_color(floater_params.title_button_image_color());
+            p.image_color_disabled(floater_params.title_button_image_color());
+            p.image_color_selected(floater_params.title_button_image_color());
+        }
+        // </ID:MaterialTheme>
 
         LLButton* buttonp = LLUICtrlFactory::create<LLButton>(p);
         addChild(buttonp);

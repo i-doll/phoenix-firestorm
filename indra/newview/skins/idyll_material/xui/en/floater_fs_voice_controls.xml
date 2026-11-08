@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ positioning="cascading"
+ can_resize="true"
+ can_minimize="true"
+ can_close="true"
+ chrome="true"
+ height="205"
+ layout="topleft"
+ min_height="124"
+ min_width="190"
+ name="floater_voice_controls"
+ help_topic="floater_voice_controls"
+ title="Voice Controls"
+ save_visibility="true"
+ save_rect="true"
+ single_instance="true"
+ width="282">
+    <string
+     name="title_nearby">
+        Nearby Voice
+    </string>
+    <string
+     name="title_group">
+        Group Call with [GROUP]
+    </string>
+    <string
+     name="title_adhoc">
+        Conference Call
+    </string>
+    <string
+     name="title_peer_2_peer">
+        Call with [NAME]
+    </string>
+    <string
+     name="no_one_near">
+        No one near has voice enabled
+    </string>
+    <layout_stack
+     clip="false"
+     follows="top|left|right"
+     height="20"
+     layout="topleft"
+     left="10"
+     mouse_opaque="false"
+     name="my_call_stack"
+     orientation="horizontal"
+     width="263">
+        <layout_panel
+         follows="top|left|right"
+         auto_resize="true"
+         layout="topleft"
+         min_height="20"
+         height="20"
+         name="my_panel">
+            <avatar_icon
+             enabled="false"
+             follows="left|top"
+             height="18"
+             default_icon_name="Generic_Person"
+             layout="topleft"
+             left="5"
+             name="user_icon"
+             top="0"
+             width="18" />
+            <text
+             follows="top|left|right"
+             font="SansSerifSmallBold"
+             height="16"
+             layout="topleft"
+             left_pad="10"
+             name="user_text"
+             text_color="LabelTextColor"
+             top="4"
+             use_ellipses="true"
+             value="My Avatar:"
+             width="210" />
+            <output_monitor
+             auto_update="true"
+             draw_border="false"
+             follows="top|right"
+             height="16"
+             layout="topleft"
+             right="-5"
+             name="speaking_indicator"
+             left_pad="5"
+             visible="true"
+             width="20" />
+        </layout_panel>
+        <layout_panel
+         name="leave_call_btn_panel"
+         height="26"
+         min_height="26"
+         width="25"
+         auto_resize="false">
+            <button
+             follows="right|top"
+             height="22"
+             top="0"
+             image_overlay="call_end_icon_24x24"
+             tool_tip="Leave Call"
+             right="-3"
+             name="leave_call_btn"
+             width="22" />
+        </layout_panel>
+    </layout_stack>
+    <avatar_list
+     follows="all"
+     height="170"
+     ignore_online_status="true"
+     layout="topleft"
+     multi_select="true"
+     name="speakers_list"
+     show_voice_volume="true"
+     left="2"
+     right="-2" />
+    <text
+     follows="all"
+     font="SansSerif"
+     top_delta="0"
+     height="170"
+     layout="topleft"
+     left="10"
+     name="rlv_restricted"
+     right="-10"
+     wrap="true"/>
+</floater>

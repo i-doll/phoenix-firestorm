@@ -96,7 +96,13 @@ public:
                                 label_color_disabled,
                                 label_color_disabled_selected,
                                 image_color,
+                                image_color_selected, // <ID:MaterialTheme/>
                                 image_color_disabled,
+                                // <ID:MaterialTheme>
+                                glyph_image_color,
+                                glyph_image_color_selected,
+                                glyph_image_color_disabled,
+                                // </ID:MaterialTheme>
                                 image_overlay_color,
                                 image_overlay_selected_color,
                                 image_overlay_disabled_color,
@@ -378,6 +384,12 @@ protected:
 
     LLUIColor                   mImageColor;
     LLUIColor                   mDisabledImageColor;
+    std::optional<LLUIColor>    mSelectedImageColor; // <ID:MaterialTheme/>
+    // <ID:MaterialTheme>
+    std::optional<LLUIColor>    mGlyphImageColor;
+    LLUIColor                   mGlyphSelectedImageColor;
+    LLUIColor                   mGlyphDisabledImageColor;
+    // </ID:MaterialTheme>
 
     bool                        mIsToggle;
     bool                        mScaleImage;

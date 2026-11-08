@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<textures version="101">
+  <texture name="PushButton_Off" file_name="widgets/PushButton_Off.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_Over" file_name="widgets/PushButton_Over.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_Press" file_name="widgets/PushButton_Press.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_Disabled" file_name="widgets/PushButton_Disabled.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_Selected" file_name="widgets/PushButton_Selected.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_On" file_name="widgets/PushButton_On.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_On_Selected" file_name="widgets/PushButton_On_Selected.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_Selected_Press" file_name="widgets/PushButton_Selected_Press.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="PushButton_Selected_Disabled" file_name="widgets/PushButton_Selected_Disabled.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Off" file_name="widgets/SegmentedBtn_Left_Off.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Over" file_name="widgets/SegmentedBtn_Left_Over.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Press" file_name="widgets/SegmentedBtn_Left_Press.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Disabled" file_name="widgets/SegmentedBtn_Left_Disabled.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Selected" file_name="widgets/SegmentedBtn_Left_Selected.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Selected_Over" file_name="widgets/SegmentedBtn_Left_Selected_Over.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Selected_Press" file_name="widgets/SegmentedBtn_Left_Selected_Press.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Left_Selected_Disabled" file_name="widgets/SegmentedBtn_Left_Selected_Disabled.png" scale.left="12" scale.top="13" scale.right="28" scale.bottom="12" />
+  <texture name="SegmentedBtn_Right_Off" file_name="widgets/SegmentedBtn_Right_Off.png" scale.left="13" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Right_Over" file_name="widgets/SegmentedBtn_Right_Over.png" scale.left="13" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Right_Press" file_name="widgets/SegmentedBtn_Right_Press.png" scale.left="13" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Right_Disabled" file_name="widgets/SegmentedBtn_Right_Disabled.png" scale.left="13" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Right_Selected" file_name="widgets/SegmentedBtn_Right_Selected.png" scale.left="13" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Right_Selected_Press" file_name="widgets/SegmentedBtn_Right_Selected_Press.png" scale.left="13" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Right_Selected_Disabled" file_name="widgets/SegmentedBtn_Right_Selected_Disabled.png" scale.left="13" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="SegmentedBtn_Middle_Disabled" file_name="widgets/SegmentedBtn_Middle_Disabled.png" scale.left="4" scale.top="21" scale.right="37" scale.bottom="4" />
+  <texture name="SegmentedBtn_Middle_Selected" file_name="widgets/SegmentedBtn_Middle_Selected.png" scale.left="4" scale.top="21" scale.right="37" scale.bottom="4" />
+  <texture name="SegmentedBtn_Middle_Selected_Press" file_name="widgets/SegmentedBtn_Middle_Selected_Press.png" scale.left="4" scale.top="21" scale.right="37" scale.bottom="4" />
+  <texture name="SegmentedBtn_Middle_Selected_Disabled" file_name="widgets/SegmentedBtn_Middle_Selected_Disabled.png" scale.left="4" scale.top="21" scale.right="37" scale.bottom="4" />
+  <texture name="ComboButton_Off" file_name="widgets/ComboButton_Off.png" scale.left="1" scale.top="13" scale.right="10" scale.bottom="12" />
+  <texture name="ComboButton_On" file_name="widgets/ComboButton_On.png" scale.left="1" scale.top="13" scale.right="10" scale.bottom="12" />
+  <texture name="ComboButton_Selected" file_name="widgets/ComboButton_Selected.png" scale.left="1" scale.top="13" scale.right="10" scale.bottom="12" />
+  <texture name="ComboButton_Disabled" file_name="widgets/ComboButton_Disabled.png" scale.left="1" scale.top="13" scale.right="10" scale.bottom="12" />
+  <texture name="ComboButton_UpOff" file_name="widgets/ComboButton_UpOff.png" scale.left="1" scale.top="13" scale.right="10" scale.bottom="12" />
+  <texture name="ComboButton_UpSelected" file_name="widgets/ComboButton_UpSelected.png" scale.left="1" scale.top="13" scale.right="10" scale.bottom="12" />
+  <texture name="DropDown_Off" file_name="widgets/DropDown_Off.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="DropDown_On" file_name="widgets/DropDown_On.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="DropDown_Press" file_name="widgets/DropDown_Press.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="DropDown_Disabled" file_name="widgets/DropDown_Disabled.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="Combobox_Over" file_name="widgets/Combobox_Over.png" preload="true" />
+  <texture name="IDChevron_Up" file_name="widgets/IDChevron_Up.png" preload="true" />
+  <texture name="TextField_Off" file_name="widgets/TextField_Off.png" scale.left="8" scale.top="17" scale.right="33" scale.bottom="8" />
+  <texture name="TextField_Active" file_name="widgets/TextField_Active.png" scale.left="8" scale.top="17" scale.right="33" scale.bottom="8" />
+  <texture name="TextField_Disabled" file_name="widgets/TextField_Disabled.png" scale.left="8" scale.top="17" scale.right="33" scale.bottom="8" />
+  <texture name="TextField_Highlight" file_name="widgets/TextField_Highlight.png" scale.left="8" scale.top="17" scale.right="33" scale.bottom="8" />
+  <texture name="TextField_Search_Off" file_name="widgets/TextField_Search_Off.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="TextField_Search_Active" file_name="widgets/TextField_Search_Active.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="TextField_Search_Disabled" file_name="widgets/TextField_Search_Disabled.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="TextField_Search_Highlight" file_name="widgets/TextField_Search_Highlight.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="TabTop_Left_Off" file_name="containers/TabTop_Left_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Left_Selected" file_name="containers/TabTop_Left_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Middle_Off" file_name="containers/TabTop_Middle_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Middle_Selected" file_name="containers/TabTop_Middle_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Right_Off" file_name="containers/TabTop_Right_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Right_Selected" file_name="containers/TabTop_Right_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Right_Flashing" file_name="containers/TabTop_Right_Flashing.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_First_Flat_Off" file_name="containers/TabTop_First_Flat_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_First_Flat_Selected" file_name="containers/TabTop_First_Flat_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Middle_Flat_Off" file_name="containers/TabTop_Middle_Flat_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Middle_Flat_Selected" file_name="containers/TabTop_Middle_Flat_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Last_Flat_Off" file_name="containers/TabTop_Last_Flat_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabTop_Last_Flat_Selected" file_name="containers/TabTop_Last_Flat_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Left_Off" file_name="containers/Toolbar_Left_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Left_Selected" file_name="containers/Toolbar_Left_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Left_Over" file_name="containers/Toolbar_Left_Over.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Left_Flash" file_name="containers/Toolbar_Left_Flash.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Left_IM_Unselected" file_name="containers/Toolbar_Left_IM_Unselected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Middle_Off" file_name="containers/Toolbar_Middle_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Middle_Selected" file_name="containers/Toolbar_Middle_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Middle_Over" file_name="containers/Toolbar_Middle_Over.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Middle_Flash" file_name="containers/Toolbar_Middle_Flash.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Middle_IM_Unselected" file_name="containers/Toolbar_Middle_IM_Unselected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Right_Off" file_name="containers/Toolbar_Right_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Right_Selected" file_name="containers/Toolbar_Right_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Right_Over" file_name="containers/Toolbar_Right_Over.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Right_Flash" file_name="containers/Toolbar_Right_Flash.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="Toolbar_Right_IM_Unselected" file_name="containers/Toolbar_Right_IM_Unselected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabLeft_Flat_Off" file_name="containers/TabLeft_Flat_Off.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="TabLeft_Flat_Selected" file_name="containers/TabLeft_Flat_Selected.png" scale.left="14" scale.top="13" scale.right="31" scale.bottom="12" />
+  <texture name="SliderTrack_Horiz" file_name="widgets/SliderTrack_Horiz.png" scale.left="2" scale.top="3" scale.right="30" scale.bottom="1" />
+  <texture name="SliderTrack_Vert" file_name="widgets/SliderTrack_Vert.png" scale.left="1" scale.top="30" scale.right="3" scale.bottom="2" />
+  <texture name="ScrollThumb_Vert" file_name="widgets/ScrollThumb_Vert.png" scale.left="7" scale.top="34" scale.right="8" scale.bottom="6" />
+  <texture name="ScrollThumb_Horiz" file_name="widgets/ScrollThumb_Horiz.png" scale.left="6" scale.top="8" scale.right="34" scale.bottom="7" />
+  <texture name="ScrollTrack_Vert" file_name="widgets/ScrollTrack_Vert.png" scale.left="7" scale.top="34" scale.right="8" scale.bottom="6" />
+  <texture name="ScrollTrack_Horiz" file_name="widgets/ScrollTrack_Horiz.png" scale.left="6" scale.top="8" scale.right="34" scale.bottom="7" />
+  <texture name="ScrollArrow_Up" file_name="widgets/ScrollArrow_Up.png" scale.left="0" scale.top="15" scale.right="15" scale.bottom="0" />
+  <texture name="ScrollArrow_Down" file_name="widgets/ScrollArrow_Down.png" scale.left="0" scale.top="15" scale.right="15" scale.bottom="0" />
+  <texture name="ScrollArrow_Left" file_name="widgets/ScrollArrow_Left.png" scale.left="0" scale.top="15" scale.right="15" scale.bottom="0" />
+  <texture name="ScrollArrow_Right" file_name="widgets/ScrollArrow_Right.png" scale.left="0" scale.top="15" scale.right="15" scale.bottom="0" />
+  <texture name="ListItem_Over" file_name="widgets/ListItem_Over.png" scale.left="8" scale.top="16" scale.right="33" scale.bottom="8" />
+  <texture name="ListItem_Select" file_name="widgets/ListItem_Select.png" scale.left="8" scale.top="16" scale.right="33" scale.bottom="8" />
+  <texture name="Accordion_Off" file_name="containers/Accordion_Off.png" scale.left="8" scale.top="16" scale.right="33" scale.bottom="8" />
+  <texture name="Accordion_Over" file_name="containers/Accordion_Over.png" scale.left="8" scale.top="16" scale.right="33" scale.bottom="8" />
+  <texture name="Accordion_Press" file_name="containers/Accordion_Press.png" scale.left="8" scale.top="16" scale.right="33" scale.bottom="8" />
+  <texture name="Accordion_Selected" file_name="containers/Accordion_Selected.png" scale.left="8" scale.top="16" scale.right="33" scale.bottom="8" />
+  <texture name="Window_Background" file_name="windows/Window_Background.png" scale.left="20" scale.top="44" scale.right="44" scale.bottom="20" />
+  <texture name="Window_Foreground" file_name="windows/Window_Foreground.png" scale.left="20" scale.top="44" scale.right="44" scale.bottom="20" />
+  <texture name="Window_NoTitle_Background" file_name="windows/Window_NoTitle_Background.png" scale.left="20" scale.top="44" scale.right="44" scale.bottom="20" />
+  <texture name="Window_NoTitle_Foreground" file_name="windows/Window_NoTitle_Foreground.png" scale.left="20" scale.top="44" scale.right="44" scale.bottom="20" />
+  <texture name="Tooltip" file_name="widgets/Tooltip.png" scale.left="4" scale.top="12" scale.right="12" scale.bottom="4" />
+  <texture name="Inspector_Hover" file_name="windows/Inspector_Hover.png" scale.left="12" scale.top="36" scale.right="36" scale.bottom="12" />
+  <texture name="Inspector_Background" file_name="windows/Inspector_Background.png" scale.left="12" scale.top="36" scale.right="36" scale.bottom="12" />
+  <texture name="Toast_Background" file_name="windows/Toast_Background.png" scale.left="12" scale.top="36" scale.right="36" scale.bottom="12" />
+  <texture name="Toast_Over" file_name="windows/Toast_Over.png" scale.left="12" scale.top="36" scale.right="36" scale.bottom="12" />
+  <texture name="hint_background" file_name="windows/hint_background.png" scale.left="12" scale.top="36" scale.right="36" scale.bottom="12" />
+  <texture name="Rounded_Square" file_name="rounded_square.png" preload="true" scale.left="8" scale.top="40" scale.right="40" scale.bottom="8" />
+  <texture name="ProgressBar" file_name="widgets/ProgressBar.png" scale.left="6" scale.top="7" scale.right="19" scale.bottom="6" />
+  <texture name="ProgressBarSolid" file_name="widgets/ProgressBarSolid.png" scale.left="6" scale.top="7" scale.right="19" scale.bottom="6" />
+  <texture name="ProgressTrack" file_name="widgets/ProgressTrack.png" scale.left="6" scale.top="7" scale.right="19" scale.bottom="6" />
+  <texture name="Badge_Background" file_name="widgets/Badge_Background.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <texture name="Badge_Border" file_name="widgets/Badge_Border.png" scale.left="12" scale.top="13" scale.right="29" scale.bottom="12" />
+  <!-- tint roles -->
+  <texture name="Accordion_ArrowClosed_Off" tint_role="glyph" />
+  <texture name="Accordion_ArrowOpened_Off" tint_role="glyph" />
+  <texture name="Activate_Checkmark" tint_role="glyph" />
+  <texture name="AddItem_Disabled" tint_role="glyph" />
+  <texture name="AddItem_Menu" tint_role="art" />
+  <texture name="AddItem_Off" tint_role="glyph" />
+  <texture name="AddItem_Press" tint_role="glyph" />
+  <texture name="Arrow_Down" tint_role="glyph" />
+  <texture name="arrow_down.tga" tint_role="glyph" />
+  <texture name="Arrow_Left" tint_role="glyph" />
+  <texture name="Arrow_Left_Off" tint_role="glyph" />
+  <texture name="Arrow_Left_Unscaled" tint_role="glyph" />
+  <texture name="Arrow_Right" tint_role="glyph" />
+  <texture name="Arrow_Right_Off" tint_role="glyph" />
+  <texture name="Arrow_Right_Unscaled" tint_role="glyph" />
+  <texture name="Arrow_Small_Left" tint_role="glyph" />
+  <texture name="Arrow_Small_Right" tint_role="glyph" />
+  <texture name="Arrow_Up" tint_role="glyph" />
+  <texture name="arrow_up.tga" tint_role="glyph" />
+  <texture name="Audio_Off" tint_role="glyph" />
+  <texture name="Audio_Press" tint_role="glyph" />
+  <texture name="AudioMute_Off" tint_role="art" />
+  <texture name="AudioMute_Over" tint_role="art" />
+  <texture name="AudioMute_Press" tint_role="art" />
+  <texture name="BackArrow_Off" tint_role="glyph" />
+  <texture name="button_anim_pause.tga" tint_role="art" />
+  <texture name="button_anim_pause_selected.tga" tint_role="art" />
+  <texture name="button_anim_play.tga" tint_role="art" />
+  <texture name="button_anim_play_selected.tga" tint_role="art" />
+  <texture name="call_end_icon_24x24" tint_role="art" />
+  <texture name="call_icon_24x24" tint_role="glyph" />
+  <texture name="Cam_Avatar_Off" tint_role="glyph" />
+  <texture name="Cam_FreeCam_Off" tint_role="glyph" />
+  <texture name="Cam_Load_Pos" tint_role="glyph" />
+  <texture name="Cam_Store_Pos" tint_role="glyph" />
+  <texture name="Camera_Off" tint_role="glyph" />
+  <texture name="Camera_Press" tint_role="glyph" />
+  <texture name="Chat_History" tint_role="glyph" />
+  <texture name="ClipboardSmallMenu_Disabled" tint_role="glyph" />
+  <texture name="ClipboardSmallMenu_Off" tint_role="glyph" />
+  <texture name="ClipboardSmallMenu_Press" tint_role="glyph" />
+  <texture name="Command_Destinations_Icon" tint_role="glyph" />
+  <texture name="Command_FaceNearest_Icon" tint_role="glyph" />
+  <texture name="Command_Flickr_Icon" tint_role="glyph" />
+  <texture name="Command_Map_Icon" tint_role="glyph" />
+  <texture name="Command_Primfeed_Icon" tint_role="glyph" />
+  <texture name="Command_Search_Icon" tint_role="glyph" />
+  <texture name="Command_Speak_Icon" tint_role="glyph" />
+  <texture name="Conv_expand_one_line" tint_role="glyph" />
+  <texture name="Conv_toolbar_add_person" tint_role="glyph" />
+  <texture name="Conv_toolbar_arrow_ne" tint_role="glyph" />
+  <texture name="Conv_toolbar_close" tint_role="glyph" />
+  <texture name="Conv_toolbar_collapse" tint_role="glyph" />
+  <texture name="Conv_toolbar_expand" tint_role="glyph" />
+  <texture name="Conv_toolbar_open_call" tint_role="glyph" />
+  <texture name="Conv_toolbar_plus" tint_role="glyph" />
+  <texture name="Conv_toolbar_sort" tint_role="glyph" />
+  <texture name="Copy" tint_role="glyph" />
+  <texture name="CopyBright" tint_role="glyph" />
+  <texture name="DisclosureArrow_Opened_Off" tint_role="glyph" />
+  <texture name="DownArrow_Off" tint_role="glyph" />
+  <texture name="Edit_Flip_X" tint_role="glyph" />
+  <texture name="Edit_Wrench" tint_role="glyph" />
+  <texture name="Emoji_Picker_Icon" tint_role="glyph" />
+  <texture name="ExternalBrowser_Off" tint_role="glyph" />
+  <texture name="eye_button_active.tga" tint_role="glyph" />
+  <texture name="eye_button_inactive.tga" tint_role="glyph" />
+  <texture name="Favorite_Star_Over" tint_role="art" />
+  <texture name="ForwardArrow_Off" tint_role="glyph" />
+  <texture name="ForwardArrow_Press" tint_role="glyph" />
+  <texture name="friends_icon_24x24" tint_role="glyph" />
+  <texture name="gift_icon_24x24" tint_role="glyph" />
+  <texture name="Group_Notices" tint_role="glyph" />
+  <texture name="Hierarchy_View_Disabled" tint_role="glyph" />
+  <texture name="Hierarchy_View_On" tint_role="glyph" />
+  <texture name="Home_Off" tint_role="glyph" />
+  <texture name="Icon_Close_Foreground" tint_role="glyph" />
+  <texture name="Icon_Close_Press" tint_role="glyph" />
+  <texture name="Icon_Close_Toast" tint_role="glyph" />
+  <texture name="Icon_Copy" tint_role="glyph" />
+  <texture name="Icon_Delete" tint_role="glyph" />
+  <texture name="Icon_DialogStack" tint_role="art" />
+  <texture name="Icon_Dock_Foreground" tint_role="glyph" />
+  <texture name="Icon_File_Upload" tint_role="glyph" />
+  <texture name="Icon_Gear" tint_role="glyph" />
+  <texture name="Icon_Gear_Background" tint_role="glyph" />
+  <texture name="Icon_Gear_Foreground" tint_role="glyph" />
+  <texture name="Icon_Gear_Press" tint_role="glyph" />
+  <texture name="Icon_Paste" tint_role="glyph" />
+  <texture name="Icon_Snapshot" tint_role="glyph" />
+  <texture name="Icon_Snooze_Foreground" tint_role="glyph" />
+  <texture name="Icon_Undock_Foreground" tint_role="glyph" />
+  <texture name="Icon_Use_Texture" tint_role="glyph" />
+  <texture name="Info_Off" tint_role="glyph" />
+  <texture name="Info_Over" tint_role="art" />
+  <texture name="Info_Press" tint_role="glyph" />
+  <texture name="Inv_FolderOpen" tint_role="art" />
+  <texture name="Inv_Mesh" tint_role="art" />
+  <texture name="Inv_Object" tint_role="art" />
+  <texture name="Inv_Physics" tint_role="art" />
+  <texture name="Inv_Toolbar_SearchVisibility" tint_role="glyph" />
+  <texture name="Inv_TrashOpen" tint_role="art" />
+  <texture name="inventory_18" tint_role="glyph" />
+  <texture name="LagStatus_Critical" tint_role="art" />
+  <texture name="LagStatus_Good" tint_role="art" />
+  <texture name="LagStatus_Warning" tint_role="art" />
+  <texture name="List_View_On" tint_role="glyph" />
+  <texture name="Locked_Icon" tint_role="glyph" />
+  <texture name="map_avatar_16.tga" tint_role="art" />
+  <texture name="map_home.tga" tint_role="art" />
+  <texture name="MinusItem_Disabled" tint_role="glyph" />
+  <texture name="MinusItem_Off" tint_role="glyph" />
+  <texture name="MinusItem_Press" tint_role="glyph" />
+  <texture name="Move_Fly_Off" tint_role="glyph" />
+  <texture name="Move_Run_Off" tint_role="glyph" />
+  <texture name="Move_Walk_Off" tint_role="glyph" />
+  <texture name="Movement_Down_Off" tint_role="glyph" />
+  <texture name="Movement_Down_On" tint_role="art" />
+  <texture name="Movement_TurnLeft_Off" tint_role="glyph" />
+  <texture name="Movement_TurnLeft_On" tint_role="art" />
+  <texture name="Movement_TurnRight_Off" tint_role="glyph" />
+  <texture name="Movement_TurnRight_On" tint_role="art" />
+  <texture name="Movement_Up_Off" tint_role="glyph" />
+  <texture name="Movement_Up_On" tint_role="art" />
+  <texture name="Music_Off" tint_role="glyph" />
+  <texture name="Music_Press" tint_role="glyph" />
+  <texture name="Muted_Chat" tint_role="art" />
+  <texture name="Notices_Unread" tint_role="glyph" />
+  <texture name="Notification_Condense" tint_role="glyph" />
+  <texture name="Notification_Expand" tint_role="glyph" />
+  <texture name="Object_Cone" tint_role="glyph" />
+  <texture name="Object_Cone_Selected" tint_role="art" />
+  <texture name="Object_Cube" tint_role="glyph" />
+  <texture name="Object_Cube_Selected" tint_role="art" />
+  <texture name="Object_Cylinder" tint_role="glyph" />
+  <texture name="Object_Cylinder_Selected" tint_role="art" />
+  <texture name="Object_Grass" tint_role="glyph" />
+  <texture name="Object_Grass_Selected" tint_role="art" />
+  <texture name="Object_Hemi_Cone" tint_role="glyph" />
+  <texture name="Object_Hemi_Cone_Selected" tint_role="art" />
+  <texture name="Object_Hemi_Cylinder" tint_role="glyph" />
+  <texture name="Object_Hemi_Cylinder_Selected" tint_role="art" />
+  <texture name="Object_Hemi_Sphere" tint_role="glyph" />
+  <texture name="Object_Hemi_Sphere_Selected" tint_role="art" />
+  <texture name="Object_Prism" tint_role="glyph" />
+  <texture name="Object_Prism_Selected" tint_role="art" />
+  <texture name="Object_Pyramid" tint_role="glyph" />
+  <texture name="Object_Pyramid_Selected" tint_role="art" />
+  <texture name="Object_Ring" tint_role="glyph" />
+  <texture name="Object_Ring_Selected" tint_role="art" />
+  <texture name="Object_Sphere" tint_role="glyph" />
+  <texture name="Object_Sphere_Selected" tint_role="art" />
+  <texture name="Object_Tetrahedron" tint_role="glyph" />
+  <texture name="Object_Tetrahedron_Selected" tint_role="art" />
+  <texture name="Object_Torus" tint_role="glyph" />
+  <texture name="Object_Torus_Selected" tint_role="art" />
+  <texture name="Object_Tree" tint_role="glyph" />
+  <texture name="Object_Tree_Selected" tint_role="art" />
+  <texture name="Object_Tube" tint_role="glyph" />
+  <texture name="Object_Tube_Selected" tint_role="art" />
+  <texture name="omnifilter" tint_role="glyph" />
+  <texture name="OptionsMenu_Disabled" tint_role="glyph" />
+  <texture name="OptionsMenu_Off" tint_role="glyph" />
+  <texture name="OptionsMenu_Press" tint_role="glyph" />
+  <texture name="PanOrbit_Off" tint_role="glyph" />
+  <texture name="Parcel_ForSale_Light" tint_role="glyph" />
+  <texture name="Parcel_M_Light" tint_role="glyph" />
+  <texture name="Parcel_PG_Light" tint_role="art" />
+  <texture name="Paste" tint_role="glyph" />
+  <texture name="Pause_Off" tint_role="glyph" />
+  <texture name="Pause_Over" tint_role="glyph" />
+  <texture name="Pause_Press" tint_role="glyph" />
+  <texture name="Permission_Edit_Objects_Mine" tint_role="glyph" />
+  <texture name="Permission_Visible_Map" tint_role="glyph" />
+  <texture name="Permission_Visible_Online" tint_role="glyph" />
+  <texture name="PhysicsView_Off" tint_role="art" />
+  <texture name="PhysicsView_On" tint_role="glyph" />
+  <texture name="Play_Off" tint_role="glyph" />
+  <texture name="Play_Over" tint_role="glyph" />
+  <texture name="Popup_Caution" tint_role="art" />
+  <texture name="Poser_Visual_On" tint_role="art" />
+  <texture name="Presets_Icon_Graphic" tint_role="glyph" />
+  <texture name="Profile_Group_Visibility_Off" tint_role="glyph" />
+  <texture name="Profile_Group_Visibility_Off_Pressed" tint_role="glyph" />
+  <texture name="Profile_Group_Visibility_On" tint_role="glyph" />
+  <texture name="Profile_Group_Visibility_On_Pressed" tint_role="glyph" />
+  <texture name="profile_icon_24x24" tint_role="glyph" />
+  <texture name="Refresh_Off" tint_role="glyph" />
+  <texture name="Remove_Icon" tint_role="glyph" />
+  <texture name="sale_icon_24x24" tint_role="glyph" />
+  <texture name="Script_Config" tint_role="glyph" />
+  <texture name="Script_Copy" tint_role="glyph" />
+  <texture name="Script_Cut" tint_role="glyph" />
+  <texture name="Script_Disk_Load" tint_role="glyph" />
+  <texture name="Script_Disk_Save" tint_role="glyph" />
+  <texture name="Script_Editor" tint_role="glyph" />
+  <texture name="Script_Paste" tint_role="glyph" />
+  <texture name="Script_Redo" tint_role="glyph" />
+  <texture name="Script_Save" tint_role="glyph" />
+  <texture name="Script_Search" tint_role="glyph" />
+  <texture name="Script_Undo" tint_role="glyph" />
+  <texture name="Search" tint_role="glyph" />
+  <texture name="Search_Icon" tint_role="glyph" />
+  <texture name="Shop" tint_role="glyph" />
+  <texture name="show_filters_18" tint_role="glyph" />
+  <texture name="Sidebar_Icon_Dock_Foreground" tint_role="glyph" />
+  <texture name="Sidebar_Icon_Dock_Press" tint_role="glyph" />
+  <texture name="Sidebar_Icon_Undock_Foreground" tint_role="glyph" />
+  <texture name="Sidebar_Icon_Undock_Press" tint_role="glyph" />
+  <texture name="Single_Folder_Back" tint_role="glyph" />
+  <texture name="Single_Folder_Forward" tint_role="glyph" />
+  <texture name="Single_Folder_Mode" tint_role="glyph" />
+  <texture name="Single_Folder_Up" tint_role="glyph" />
+  <texture name="SkipBackward_Off" tint_role="glyph" />
+  <texture name="SkipForward_Off" tint_role="glyph" />
+  <texture name="Snapshot_Download" tint_role="glyph" />
+  <texture name="Snapshot_Email" tint_role="glyph" />
+  <texture name="Snapshot_Inventory" tint_role="glyph" />
+  <texture name="Snapshot_Profile" tint_role="glyph" />
+  <texture name="Stop_Off" tint_role="glyph" />
+  <texture name="StopReload_Off" tint_role="glyph" />
+  <texture name="StopReload_Over" tint_role="glyph" />
+  <texture name="TabIcon_Close_Off" tint_role="glyph" />
+  <texture name="TabIcon_Open_Off" tint_role="glyph" />
+  <texture name="teleport_menu" tint_role="glyph" />
+  <texture name="Toast_CloseBtn" tint_role="glyph" />
+  <texture name="Tool_Create" tint_role="glyph" />
+  <texture name="Tool_Dozer" tint_role="glyph" />
+  <texture name="Tool_Face" tint_role="glyph" />
+  <texture name="Tool_Grab" tint_role="glyph" />
+  <texture name="Tool_Zoom" tint_role="glyph" />
+  <texture name="TrashItem_Disabled" tint_role="glyph" />
+  <texture name="TrashItem_Menu" tint_role="glyph" />
+  <texture name="TrashItem_Off" tint_role="glyph" />
+  <texture name="TrashItem_Press" tint_role="glyph" />
+  <texture name="Unread_IM" tint_role="glyph" />
+  <texture name="UnZoom_Off" tint_role="glyph" />
+  <texture name="UpArrow_Off" tint_role="glyph" />
+  <texture name="VirtualTrackball_Rotate_Left" tint_role="glyph" />
+  <texture name="VirtualTrackball_Rotate_Left_Active" tint_role="glyph" />
+  <texture name="VirtualTrackball_Rotate_Right" tint_role="glyph" />
+  <texture name="VirtualTrackball_Rotate_Right_Active" tint_role="glyph" />
+  <texture name="VoicePTT_Off" tint_role="glyph" />
+  <texture name="Web_Profile_Off" tint_role="glyph" />
+  <texture name="Zoom_Off" tint_role="glyph" />
+</textures>

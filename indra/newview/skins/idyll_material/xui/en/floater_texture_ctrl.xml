@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ legacy_header_height="18"
+ can_minimize="false"
+ can_resize="true"
+ height="378"
+ layout="topleft"
+ min_height="350"
+ min_width="410"
+ name="texture picker"
+ help_topic="texture_picker"
+ title="Pick: Texture"
+ width="410">
+ 
+<!--  top static -->
+ <floater.string
+     name="choose_picture">
+        Click to choose a picture
+    </floater.string>
+    <floater.string
+     name="pick title">
+Pick:
+    </floater.string>
+    <floater.string
+     name="pick_material">
+Pick: Material
+    </floater.string>
+    <floater.string
+     name="pick_texture">
+Pick: Texture
+    </floater.string>
+    <!-- <ID:i.doll> [Copy selected material to inventory] -->
+    <floater.string name="material_copy_suffix" value=" Copy"/>
+    <floater.string name="new_material_copy">New Material Copy</floater.string>
+    <floater.string name="material_copy_tooltip">Copy this material to your inventory.</floater.string>
+    <floater.string name="material_copy_inventory_only">Select a material from Inventory or Library to copy it.</floater.string>
+    <floater.string name="material_copy_pending">A material copy is already in progress.</floater.string>
+    <floater.string name="material_copy_no_cap">Not connected to a materials-capable region.</floater.string>
+    <floater.string name="material_copy_loading">The selected material is still loading.</floater.string>
+    <floater.string name="material_copy_no_modify">This material cannot be copied because it is no-modify.</floater.string>
+    <floater.string name="material_copy_no_copy">This material cannot be copied because it is no-copy.</floater.string>
+    <!-- </ID:i.doll> -->
+
+    <view
+     left="4"
+     top="20"
+     name="preview_widget"
+     height="165"
+     width="165"
+     follows="left|top"
+    />
+  
+    <text
+     type="string"
+     length="1"
+     follows="left|top"
+     text_color="LabelTextColor"
+     font="SansSerifBig"
+     halign="center"
+     height="17"
+     layout="topleft"
+     left="4"
+     name="Multiple"
+     top="96"
+     width="163">
+        Multiple textures
+    </text>
+	
+	<!-- mode selector -->
+   <radio_group
+     height="20"
+     layout="topleft"
+     left="0"
+     top_pad="80"
+     name="mode_selection"
+     follows="left|top">
+        <radio_item
+         label="Inventory"
+         name="inventory"
+         top_delta="20" 
+         layout="topleft"
+         height="16" 
+         left="0" 
+         value="0"
+         width="70" />
+        <radio_item
+         label="Local"
+         left_pad="0"
+         layout="topleft"
+         top_delta="0" 
+         height="16" 
+         name="local"
+         value="1"
+         width="50" />
+       <radio_item
+         label="Bake"
+         left_pad="0"
+         layout="topleft"
+         top_delta="0"
+         height="16"
+         name="bake"
+         value="2"
+         width="50" />
+    </radio_group>
+	<!-- -->
+	
+    <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="32"
+     layout="topleft"
+     left="8"
+     name="size_lbl"
+     top_pad="1">
+        Size:
+[DIMENSIONS]
+    </text>
+    
+<!--  middle: inventory mode -->
+
+    <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="Default"
+     label_selected="Default"
+     layout="topleft"
+     name="Default"
+     width="83"
+	 left="86"
+     top="215"/>
+    <button
+     follows="left|top"
+     height="18"
+     label="Blank"
+     label_selected="Blank"
+     layout="topleft"
+     left_delta="0"
+     name="Blank"
+     top_pad="0"
+     width="83" />
+    <button
+     follows="left|top"
+     height="18"
+     label="Transparent"
+     label_selected="Transparent"
+     layout="topleft"
+     left_delta="0"
+     name="Transparent"
+     tool_tip="Note: If transparent texture is selected, or another texture with partial transperancy, light will not project."
+     top_pad="0"
+     width="83" />
+     <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="None"
+     label_selected="None"
+     layout="topleft"
+     left_delta="0"
+     name="None"
+     top_pad="0"
+     width="83" />
+    <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="Save PNG"
+     label_selected="Save PNG"
+     layout="topleft"
+     left_delta="0"
+     name="save_png_btn"
+     top_pad="0"
+     width="73" />
+    <!-- <ID:i.doll> [Copy selected material to inventory] -->
+    <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="Copy"
+     label_selected="Copy"
+     layout="topleft"
+     left_delta="0"
+     name="copy_material_btn"
+     tool_tip="Copy this material to your inventory."
+     top_delta="0"
+     visible="false"
+     width="73" />
+    <!-- </ID:i.doll> -->
+    <button
+     enabled="false"
+     follows="left|top"
+     height="18"
+     label="Copy UUID"
+     label_selected="Copy UUID"
+     layout="topleft"
+     left_delta="0"
+     name="copy_uuid_btn"
+     top_pad="0"
+     width="73" />
+    <button
+     follows="left|top"
+     height="28"
+     image_selected="eye_button_active.tga"
+     image_unselected="eye_button_inactive.tga"
+     layout="topleft"
+     left_delta="-78"
+     top_delta="-23"
+     name="Pipette"
+     width="28" />
+   <text
+     follows="left|bottom"
+     height="40"
+     layout="topleft"
+     left="8"
+     name="preview_disabled"
+     top="275"
+     value="Preview Disabled"
+     word_wrap="true"
+     visible="false"
+     width="87" />  
+    <filter_editor
+     follows="left|top|right"
+     height="23"
+     label="Filter Textures"
+     layout="topleft"
+     left="175"
+     name="inventory search editor"
+     top="20"
+     width="231" />
+    <asset_filtered_inv_panel
+     allow_multi_select="false"
+     bg_visible="true"
+     bg_alpha_color="DkGray2"
+     border="false"
+     follows="all"
+     height="256"
+     layout="topleft"
+     left_delta="0"
+     name="inventory panel"
+     top_pad="4"
+     width="231"
+     filter_asset_types="texture|material"/>
+    <text
+     bg_visible="true"
+     type="string"
+     text_color="Yellow"
+     length="1"
+     word_wrap="true"
+     follows="bottom|left|right"
+     height="56"
+     right="-1"
+     layout="topleft"
+     left_delta="0"
+     name="over_limit_lbl"
+     visible="false"
+     top_pad="-50">
+        Selected texture is [TEXDIM]. Inventory image must be square, no less than [MINTEXDIM].
+    </text>
+
+<!--  middle: local mode -->
+    <button
+     follows="left|top"
+     height="18"
+     label="Add"
+     label_selected="Add"
+     layout="topleft"
+     left="94"
+     top="215"
+     name="l_add_btn"
+     width="73"
+     visible="false"/>
+    <button
+     enabled="false"
+     follows="left|top"
+     height="20"
+     label="Remove"
+     label_selected="Remove"
+     layout="topleft"
+     left_delta="0"
+     name="l_rem_btn"
+     top_pad="5"
+     width="73"
+     visible="false"/>
+    <button
+     enabled="false"
+     follows="left|top"
+     height="20"
+     label="Upload"
+     label_selected="Upload"
+     layout="topleft"
+     left_delta="0"
+     name="l_upl_btn"
+     top_pad="5"
+     width="73"
+     visible="false"/>
+    <scroll_list
+     name="l_name_list"
+     left="175"
+     top="22"
+     width="230"
+     height="260"
+     follows="left|top|right|bottom"
+     column_padding="0"
+     draw_heading="true"
+     multi_select="true"
+     search_column="1"
+     visible="false">
+        <column name="icon" label="" width="20" />
+        <column name="unit_name" label="Name" dynamicwidth="true" />
+    </scroll_list>
+
+<!-- middle: bake mode -->
+  <combo_box
+         left="180"
+         top="30"
+			   height="19"
+			   top_delta="15"
+			   layout="topleft"
+			   follows="left|top"
+			   name="l_bake_use_texture_combo_box"
+			   tool_tip="Choose the bake texture"
+			   width="118"
+         visible="false">
+        <combo_box.item
+         label="None"
+         name="None"
+         value="-1" />
+        <combo_box.item
+         label="BAKED_HEAD"
+         name="BAKED_HEAD"
+         value="0" />
+        <combo_box.item
+         label="BAKED_UPPER"
+         name="BAKED_UPPER"
+         value="1" />
+        <combo_box.item
+         label="BAKED_LOWER"
+         name="BAKED_LOWER"
+         value="2" />
+        <combo_box.item
+         label="BAKED_EYES"
+         name="BAKED_EYES"
+         value="3" />
+        <combo_box.item
+         label="BAKED_SKIRT"
+         name="BAKED_SKIRT"
+         value="4" />
+        <combo_box.item
+         label="BAKED_HAIR"
+         name="BAKED_HAIR"
+         value="5" />
+        <combo_box.item
+          label="BAKED_LEFTARM"
+          name="BAKED_LEFTARM"
+          value="6" />
+        <combo_box.item
+          label="BAKED_LEFTLEG"
+          name="BAKED_LEFTLEG"
+          value="7" />
+        <combo_box.item
+         label="BAKED_AUX1"
+         name="BAKED_AUX1"
+         value="8" />
+        <combo_box.item
+           label="BAKED_AUX2"
+           name="BAKED_AUX2"
+           value="9" />
+        <combo_box.item
+         label="BAKED_AUX3"
+         name="BAKED_AUX3"
+         value="10" />
+  </combo_box>
+  <!-- bottom static -->
+    <line_editor
+        follows="bottom|left|right"
+        height="20"
+        left="7"
+        top="-55"
+        max_length_chars="256"
+        name="TextureKey"
+        layout="topleft"
+        label="00000000-0000-0000-0000-000000000000"
+        tool_tip="Texture Key"
+        width="292"/>
+    <button
+        follows="bottom|right"
+        name="TextureKeyApply"
+        height="20"
+        label="Apply UUID"
+        layout="topleft"
+        top_delta="0"
+        right="-8"
+        width="100"
+        tool_tip="Apply this UUID"/>
+    <check_box
+     follows="left|bottom"
+     height="20"
+     initial_value="true"
+     label="Apply now"
+     layout="topleft"
+     left="5"
+     name="apply_immediate_check"
+     top_pad="5"
+     width="150" />
+    <button
+     follows="bottom|right"
+     height="20"
+     label="OK"
+     label_selected="OK"
+     layout="topleft"
+     right="-110"
+     top="-30"
+     name="Select"
+     width="100" />
+    <button
+     follows="bottom|right"
+     height="20"
+     label="Cancel"
+     label_selected="Cancel"
+     layout="topleft"
+     right="-8"
+     top_delta="0"
+     name="Cancel"
+     width="100" />
+</floater>

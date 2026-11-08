@@ -2270,6 +2270,19 @@ namespace LLInitParam
             declare("scale_outer",  LLUIImage::SCALE_OUTER);
         }
     };
+
+    // <ID:MaterialTheme>
+    template<>
+    struct TypeValues<LLUIImage::ETintRole> : public TypeValuesHelper<LLUIImage::ETintRole>
+    {
+        static void declareValues()
+        {
+            declare("none",  LLUIImage::TINT_ROLE_NONE);
+            declare("glyph", LLUIImage::TINT_ROLE_GLYPH);
+            declare("art",   LLUIImage::TINT_ROLE_ART);
+        }
+    };
+    // </ID:MaterialTheme>
 }
 
 struct UIImageDeclaration : public LLInitParam::Block<UIImageDeclaration>
@@ -2281,6 +2294,7 @@ struct UIImageDeclaration : public LLInitParam::Block<UIImageDeclaration>
     Optional<LLRect>            clip;
     Optional<bool>              use_mips;
     Optional<LLUIImage::EScaleStyle> scale_type;
+    Optional<LLUIImage::ETintRole> tint_role; // <ID:MaterialTheme/>
 
     UIImageDeclaration()
     :   name("name"),
@@ -2289,7 +2303,8 @@ struct UIImageDeclaration : public LLInitParam::Block<UIImageDeclaration>
         scale("scale"),
         clip("clip"),
         use_mips("use_mips", false),
-        scale_type("scale_type", LLUIImage::SCALE_INNER)
+        scale_type("scale_type", LLUIImage::SCALE_INNER),
+        tint_role("tint_role", LLUIImage::TINT_ROLE_NONE) // <ID:MaterialTheme/>
     {}
 };
 
@@ -2378,7 +2393,13 @@ bool LLUIImageList::initFromFile()
             {
                 continue;
             }
-            preloadUIImage(image.name, file_name, image.use_mips, image.scale, image.clip, image.scale_type);
+            // <ID:MaterialTheme>
+            LLUIImagePtr ui_image = preloadUIImage(image.name, file_name, image.use_mips, image.scale, image.clip, image.scale_type);
+            if (ui_image)
+            {
+                ui_image->setTintRole(image.tint_role);
+            }
+            // </ID:MaterialTheme>
         }
 
         // <FS:PP> Speed optimisation

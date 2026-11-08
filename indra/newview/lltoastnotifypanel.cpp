@@ -403,7 +403,7 @@ void LLToastNotifyPanel::init( LLRect rect, bool show_images )
     // <FS:Ansariel> Script dialog colors
     if (mIsScriptDialog)
     {
-        LLColor4 script_dialog_fg_color = LLUIColorTable::instance().getColor("ScriptDialogFg", LLColor4::white).get();
+        LLUIColor script_dialog_fg_color = LLUIColorTable::instance().getColor("ScriptDialogFg", LLColor4::white); // <ID:MaterialTheme/>
         mTextBox->setColor(script_dialog_fg_color);
         mTextBox->setReadOnlyColor(script_dialog_fg_color);
     }

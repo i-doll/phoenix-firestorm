@@ -93,7 +93,13 @@ LLButton::Params::Params()
     label_color_disabled("label_color_disabled"),
     label_color_disabled_selected("label_color_disabled_selected"),
     image_color("image_color"),
+    image_color_selected("image_color_selected"), // <ID:MaterialTheme/>
     image_color_disabled("image_color_disabled"),
+    // <ID:MaterialTheme>
+    glyph_image_color("glyph_image_color"),
+    glyph_image_color_selected("glyph_image_color_selected"),
+    glyph_image_color_disabled("glyph_image_color_disabled"),
+    // </ID:MaterialTheme>
     image_overlay_color("image_overlay_color", LLColor4::white % 0.75f),
     image_overlay_disabled_color("image_overlay_disabled_color", LLColor4::white % 0.3f),
     image_overlay_selected_color("image_overlay_selected_color", LLColor4::white),
@@ -163,6 +169,12 @@ LLButton::LLButton(const LLButton::Params& p)
     mFlashBgColor(p.flash_color()),
     mFlashAltBgColor(p.flash_alt_color()), // <FS:Ansariel> [FS communication UI]
     mDisabledImageColor(p.image_color_disabled()),
+    mSelectedImageColor(p.image_color_selected.isProvided() ? std::make_optional(p.image_color_selected()) : std::nullopt), // <ID:MaterialTheme/>
+    // <ID:MaterialTheme>
+    mGlyphImageColor(p.glyph_image_color.isProvided() ? std::make_optional(p.glyph_image_color()) : std::nullopt),
+    mGlyphSelectedImageColor(p.glyph_image_color_selected.isProvided() ? p.glyph_image_color_selected() : p.glyph_image_color()),
+    mGlyphDisabledImageColor(p.glyph_image_color_disabled.isProvided() ? p.glyph_image_color_disabled() : p.glyph_image_color()),
+    // </ID:MaterialTheme>
     mImageOverlay(p.image_overlay()),
     mImageOverlayColor(p.image_overlay_color()),
     mImageOverlayDisabledColor(p.image_overlay_disabled_color()),
@@ -940,9 +952,27 @@ void LLButton::draw()
     {
         // apply automatic 50% alpha fade to disabled image
         LLColor4 disabled_color = mFadeWhenDisabled ? mDisabledImageColor.get() % 0.5f : mDisabledImageColor.get();
+        // <ID:MaterialTheme>
+        LLColor4 image_color = (selected && mSelectedImageColor) ? mSelectedImageColor->get() : mImageColor.get();
+        if (mGlyphImageColor && imagep->getTintRole() != LLUIImage::TINT_ROLE_NONE)
+        {
+            // Keep the alpha callers set through setImageColor (e.g. dimmed permission icons).
+            const F32 caller_alpha = mImageColor.get().mV[VALPHA];
+            if (imagep->getTintRole() == LLUIImage::TINT_ROLE_GLYPH)
+            {
+                image_color = (selected ? mGlyphSelectedImageColor.get() : mGlyphImageColor->get()) % caller_alpha;
+                disabled_color = mGlyphDisabledImageColor.get() % caller_alpha;
+            }
+            else
+            {
+                image_color = LLColor4::white % caller_alpha;
+                disabled_color = LLColor4::white % (caller_alpha * 0.5f);
+            }
+        }
+        // </ID:MaterialTheme>
         if ( mScaleImage)
         {
-            imagep->draw(getLocalRect(), (enabled ? mImageColor.get() : disabled_color) % alpha  );
+            imagep->draw(getLocalRect(), (enabled ? image_color : disabled_color) % alpha  );
             if (mCurGlowStrength > 0.01f)
             {
                 gGL.setSceneBlendType(glow_type);
@@ -953,7 +983,7 @@ void LLButton::draw()
         else
         {
             S32 y = getLocalRect().getHeight() - imagep->getHeight();
-            imagep->draw(0, y, (enabled ? mImageColor.get() : disabled_color) % alpha);
+            imagep->draw(0, y, (enabled ? image_color : disabled_color) % alpha);
             if (mCurGlowStrength > 0.01f)
             {
                 gGL.setSceneBlendType(glow_type);
@@ -1005,6 +1035,12 @@ void LLButton::draw()
         {
             overlay_color = mImageOverlaySelectedColor.get();
         }
+        // <ID:MaterialTheme>
+        if (mGlyphImageColor && mImageOverlay->getTintRole() == LLUIImage::TINT_ROLE_ART)
+        {
+            overlay_color = enabled ? LLColor4::white : LLColor4::white % 0.5f;
+        }
+        // </ID:MaterialTheme>
         overlay_color.mV[VALPHA] *= alpha;
 
         if (mImageOverlayRightDelta > 0)
@@ -1341,6 +1377,7 @@ void LLButton::setImageSelected(LLPointer<LLUIImage> image)
 void LLButton::setImageColor(const LLUIColor& c)
 {
     mImageColor = c;
+    mSelectedImageColor.reset(); // <ID:MaterialTheme/>
 }
 
 void LLButton::setColor(const LLUIColor& color)

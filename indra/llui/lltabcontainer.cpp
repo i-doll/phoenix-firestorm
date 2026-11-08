@@ -214,6 +214,7 @@ LLTabContainer::Params::Params()
     tab_height("tab_height"),
     label_pad_bottom("label_pad_bottom"),
     label_pad_left("label_pad_left"),
+    vertical_label_pad_left("vertical_label_pad_left"), // <ID:MaterialTheme/>
     tab_position("tab_position"),
     hide_tabs("hide_tabs", false),
     hide_scroll_arrows("hide_scroll_arrows", false),
@@ -255,6 +256,7 @@ LLTabContainer::LLTabContainer(const LLTabContainer::Params& p)
     mTabHeight(p.tab_height),
     mLabelPadBottom(p.label_pad_bottom),
     mLabelPadLeft(p.label_pad_left),
+    mVerticalLabelPadLeft(p.vertical_label_pad_left.isProvided() ? std::make_optional<S32>(p.vertical_label_pad_left) : std::nullopt), // <ID:MaterialTheme/>
     mPrevArrowBtn(NULL),
     mNextArrowBtn(NULL),
     mIsVertical( p.tab_position == LEFT ),
@@ -1246,6 +1248,12 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
         if (mIsVertical)
         {
           p.name("vtab_"+std::string(child->getName()));
+          // <ID:MaterialTheme>
+          if (mVerticalLabelPadLeft && !indent)
+          {
+              p.pad_left(*mVerticalLabelPadLeft);
+          }
+          // </ID:MaterialTheme>
           p.image_unselected(mMiddleTabParams.tab_left_image_unselected);
           p.image_selected(mMiddleTabParams.tab_left_image_selected);
           p.follows.flags = p.follows.flags() | FOLLOWS_TOP;

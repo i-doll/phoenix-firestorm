@@ -50,6 +50,7 @@ public:
     {
         Optional<LLUIImage*>    image;
         Optional<LLUIColor>     color;
+        Optional<LLUIColor>     glyph_color; // <ID:MaterialTheme/>
         Optional<bool>          use_draw_context_alpha,
                                 interactable;
         Optional<S32>           min_width,
@@ -102,6 +103,7 @@ private:
 
     LLUIColor mColor;
     LLPointer<LLUIImage> mImagep;
+    std::optional<LLUIColor> mGlyphColor; // <ID:MaterialTheme/>
 };
 
 #endif

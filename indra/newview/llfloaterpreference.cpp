@@ -118,6 +118,8 @@
 // [/RLVa:KB]
 
 #include "lllogininstance.h"        // to check if logged in yet
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
+#include <array> // <ID:MaterialTheme/>
 #include "llsdserialize.h"
 #include "llpresetsmanager.h"
 #include "llviewercontrol.h"
@@ -794,6 +796,32 @@ bool LLFloaterPreference::postBuild()
     childSetEnabled("show_grid_selection_check", !gSavedSettings.getBOOL("FSOpenSimAlwaysForceShowGrid"));
 #endif
 // </FS:AW  opensim preferences>
+
+    // <ID:MaterialTheme>
+    if (!IDMaterialTheme::isActive())
+    {
+        LLTabContainer* pref_tabs = getChild<LLTabContainer>("pref core");
+        if (LLPanel* theme_panel = pref_tabs->getPanelByName("idyll_theme"))
+        {
+            pref_tabs->removeTabPanel(theme_panel);
+            delete theme_panel;
+        }
+    }
+    else
+    {
+        for (const char* name : { "links", "ScriptDialogFb", "ScriptDialog", "preferences_search_bg_color", "preferences_search_font_color",
+                                  "notecard_editor_writable_text_color", "notecard_editor_writable_bg_color",
+                                  "notecard_editor_writable_cursor_color", "notecard_editor_writable_selection_color",
+                                  "colorswatchEditTextBackgroundColor" })
+        {
+            if (LLColorSwatchCtrl* swatch = findChild<LLColorSwatchCtrl>(name))
+            {
+                swatch->setEnabled(false);
+                swatch->setToolTip(LLTrans::getString("IDMaterialThemeSetsColor"));
+            }
+        }
+    }
+    // </ID:MaterialTheme>
 
     // <FS:Zi> Pie menu
     gSavedSettings.getControl("OverridePieColors")->getSignal()->connect(boost::bind(&LLFloaterPreference::onPieColorsOverrideChanged, this));
@@ -3245,13 +3273,13 @@ void LLFloaterPreference::updateSearchableItems()
 
 void LLFloaterPreference::applyUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
-    LLUIColorTable::instance().setColor(param.asString(), LLColor4(ctrl->getValue()));
+    IDMaterialTheme::setPreferenceColor(param.asString(), LLColor4(ctrl->getValue())); // <ID:MaterialTheme/>
 }
 
 void LLFloaterPreference::getUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
     LLColorSwatchCtrl* color_swatch = (LLColorSwatchCtrl*) ctrl;
-    color_swatch->setOriginal(LLUIColorTable::instance().getColor(param.asString()));
+    color_swatch->setOriginal(IDMaterialTheme::getPreferenceColor(param.asString())); // <ID:MaterialTheme/>
 }
 
 void LLFloaterPreference::setCacheLocation(const LLStringExplicit& location)
@@ -6537,3 +6565,109 @@ void FSPanelPreferenceSounds::updateMoapInteractionSetting()
     }
 }
 // </FS:Ansariel>
+
+// <ID:MaterialTheme>
+namespace
+{
+    constexpr U32 ID_ACCENT_PRESETS[] = { 0x66B9B5, 0x285548, 0x547E68, 0x386A20, 0x8A5100, 0xB3261E, 0xB0417A, 0x6750A4, 0x2F6DB5 };
+
+    LLColor3 id_preset_color(U32 hex)
+    {
+        return LLColor3(((hex >> 16) & 0xFF) / 255.f, ((hex >> 8) & 0xFF) / 255.f, (hex & 0xFF) / 255.f);
+    }
+
+    bool id_same_color(const LLColor3& a, const LLColor3& b)
+    {
+        for (S32 i = 0; i < 3; ++i)
+        {
+            if (ll_round(a.mV[i] * 255.f) != ll_round(b.mV[i] * 255.f))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+class IDPanelPreferenceTheme : public LLPanelPreference
+{
+public:
+    bool postBuild() override
+    {
+        mLightButton = getChild<LLButton>("mode_light");
+        mDarkButton = getChild<LLButton>("mode_dark");
+        mLightButton->setCommitCallback([](LLUICtrl*, const LLSD&) { gSavedSettings.setBOOL("IDMaterialDarkMode", false); });
+        mDarkButton->setCommitCallback([](LLUICtrl*, const LLSD&) { gSavedSettings.setBOOL("IDMaterialDarkMode", true); });
+
+        for (size_t i = 0; i < mSwatches.size(); ++i)
+        {
+            const LLColor3 color = id_preset_color(ID_ACCENT_PRESETS[i]);
+            mSwatches[i] = getChild<LLButton>("accent_swatch_" + std::to_string(i));
+            mSwatches[i]->setImageColor(LLColor4(color));
+            mSwatches[i]->setCommitCallback([color](LLUICtrl*, const LLSD&) { gSavedSettings.set<LLColor3>("IDMaterialAccent", color); });
+        }
+
+        mCustomSwatch = getChild<LLColorSwatchCtrl>("custom_accent_swatch");
+        mCustomSwatch->setCommitCallback([this](LLUICtrl*, const LLSD&)
+        {
+            gSavedSettings.set<LLColor3>("IDMaterialAccent", LLColor3(mCustomSwatch->get()));
+        });
+        getChild<LLTextBox>("custom_accent_link")->setClickedCallback([this](void*)
+        {
+            mCustomSwatch->set(LLColor4(gSavedSettings.getColor3("IDMaterialAccent")));
+            mCustomSwatch->showPicker(true);
+        });
+
+        for (const char* name : { "IDMaterialDarkMode", "IDMaterialAccent" })
+        {
+            if (LLControlVariable* control = gSavedSettings.getControl(name))
+            {
+                mSettingConnections.emplace_back(control->getSignal()->connect(
+                    [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshTheme(); }));
+            }
+        }
+        refreshTheme();
+
+        return LLPanelPreference::postBuild();
+    }
+
+    void saveSettings() override
+    {
+        mSavedDarkMode = gSavedSettings.getBOOL("IDMaterialDarkMode");
+        mSavedAccent = gSavedSettings.getColor3("IDMaterialAccent");
+        mCustomSwatch->set(LLColor4(mSavedAccent));
+        LLPanelPreference::saveSettings();
+    }
+
+    void cancel(const std::vector<std::string> settings_to_skip) override
+    {
+        LLPanelPreference::cancel(settings_to_skip);
+        gSavedSettings.setBOOL("IDMaterialDarkMode", mSavedDarkMode);
+        gSavedSettings.set<LLColor3>("IDMaterialAccent", mSavedAccent);
+    }
+
+private:
+    void refreshTheme()
+    {
+        const bool dark = gSavedSettings.getBOOL("IDMaterialDarkMode");
+        mLightButton->setToggleState(!dark);
+        mDarkButton->setToggleState(dark);
+
+        const LLColor3 accent = gSavedSettings.getColor3("IDMaterialAccent");
+        for (size_t i = 0; i < mSwatches.size(); ++i)
+        {
+            mSwatches[i]->setToggleState(id_same_color(accent, id_preset_color(ID_ACCENT_PRESETS[i])));
+        }
+    }
+
+    LLButton* mLightButton = nullptr;
+    LLButton* mDarkButton = nullptr;
+    std::array<LLButton*, std::size(ID_ACCENT_PRESETS)> mSwatches{};
+    LLColorSwatchCtrl* mCustomSwatch = nullptr;
+    std::vector<boost::signals2::scoped_connection> mSettingConnections;
+    bool mSavedDarkMode = true;
+    LLColor3 mSavedAccent;
+};
+
+static LLPanelInjector<IDPanelPreferenceTheme> t_id_panel_preference_theme("id_panel_preference_theme");
+// </ID:MaterialTheme>

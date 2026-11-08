@@ -44,6 +44,8 @@ LLSlider::Params::Params()
 :   orientation ("orientation", std::string ("horizontal")),
     thumb_outline_color("thumb_outline_color"),
     thumb_center_color("thumb_center_color"),
+    track_color("track_color", LLColor4::white),                     // <ID:MaterialTheme/>
+    track_highlight_color("track_highlight_color", LLColor4::white), // <ID:MaterialTheme/>
     thumb_image("thumb_image"),
     thumb_image_pressed("thumb_image_pressed"),
     thumb_image_disabled("thumb_image_disabled"),
@@ -61,6 +63,8 @@ LLSlider::LLSlider(const LLSlider::Params& p)
     mOrientation ((p.orientation() == "horizontal") ? HORIZONTAL : VERTICAL),
     mThumbOutlineColor(p.thumb_outline_color()),
     mThumbCenterColor(p.thumb_center_color()),
+    mTrackColor(p.track_color()),                    // <ID:MaterialTheme/>
+    mTrackHighlightColor(p.track_highlight_color()), // <ID:MaterialTheme/>
     mThumbImage(p.thumb_image),
     mThumbImagePressed(p.thumb_image_pressed),
     mThumbImageDisabled(p.thumb_image_disabled),
@@ -329,9 +333,11 @@ void LLSlider::draw()
         highlight_rect.set(track_rect.mLeft, track_rect.mTop, track_rect.mRight, track_rect.mBottom);
     }
 
-    LLColor4 color = isInEnabledChain() ? LLColor4::white % alpha : LLColor4::white % (0.6f * alpha);
-    trackImage->draw(track_rect, color);
-    trackHighlightImage->draw(highlight_rect, color);
+    // <ID:MaterialTheme>
+    const F32 track_alpha = isInEnabledChain() ? alpha : 0.6f * alpha;
+    trackImage->draw(track_rect, mTrackColor.get() % track_alpha);
+    trackHighlightImage->draw(highlight_rect, mTrackHighlightColor.get() % track_alpha);
+    // </ID:MaterialTheme>
 
     // Thumb
     if (hasFocus())

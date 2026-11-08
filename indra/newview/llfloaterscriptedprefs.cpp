@@ -35,6 +35,7 @@
 
 #include "llfloaterreg.h"
 #include "llpreviewscript.h"
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
 
 LLFloaterScriptEdPrefs::LLFloaterScriptEdPrefs(const LLSD& key)
 :   LLFloater(key)
@@ -63,7 +64,7 @@ bool LLFloaterScriptEdPrefs::postBuild()
 
 void LLFloaterScriptEdPrefs::applyUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
-    LLUIColorTable::instance().setColor(param.asString(), LLColor4(ctrl->getValue()));
+    IDMaterialTheme::setPreferenceColor(param.asString(), LLColor4(ctrl->getValue())); // <ID:MaterialTheme/>
 
     // <FS:Ansariel> FIRE-16740: Color syntax highlighting changes don't immediately appear in script window
     // This will return both LLPreviewLSL as well as LLLiveLSLEditor instances because they are grouped into "preview_script"!
@@ -82,7 +83,7 @@ void LLFloaterScriptEdPrefs::applyUIColor(LLUICtrl* ctrl, const LLSD& param)
 void LLFloaterScriptEdPrefs::getUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
     LLColorSwatchCtrl* color_swatch = dynamic_cast<LLColorSwatchCtrl*>(ctrl);
-    color_swatch->setOriginal(LLUIColorTable::instance().getColor(param.asString()));
+    color_swatch->setOriginal(IDMaterialTheme::getPreferenceColor(param.asString())); // <ID:MaterialTheme/>
 }
 
 // <FS:Ansariel> Port old FS script prefs

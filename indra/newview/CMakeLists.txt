@@ -97,6 +97,7 @@ set(viewer_SOURCE_FILES
     idvolumetriccloudsettings.cpp  # <ID> Volumetric clouds: layer model and presets
     idvolumetricclouds.cpp  # <ID> Volumetric clouds: renderer
     idfloatervolumetricclouds.cpp  # <ID> Volumetric clouds: editor floater
+    idmaterialtheme.cpp  # <ID:MaterialTheme> Material You colour table
     idmcpconnection.cpp  # <ID> Embedded MCP server: connection
     idmcprlvgate.cpp  # <ID> Embedded MCP server: RLV gate
     idmcptools_inventory.cpp  # <ID> Embedded MCP server: inventory tools
@@ -1005,6 +1006,8 @@ set(viewer_HEADER_FILES
     idvolumetriccloudsettings.h  # <ID> Volumetric clouds: layer model and presets
     idvolumetricclouds.h  # <ID> Volumetric clouds: renderer
     idfloatervolumetricclouds.h  # <ID> Volumetric clouds: editor floater
+    idmaterialpalette.h  # <ID:MaterialTheme> Material You palette generator
+    idmaterialtheme.h  # <ID:MaterialTheme> Material You colour table
     idmcpconnection.h  # <ID> Embedded MCP server: connection
     idmcptoolregistry.h  # <ID> Embedded MCP server: tool registry
     idmcprlvgate.h  # <ID> Embedded MCP server: RLV gate

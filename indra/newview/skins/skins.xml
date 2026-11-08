@@ -1,5 +1,22 @@
 <llsd>
   <array>
+
+    <map>
+      <key>name</key>
+      <string>Idyll</string>
+      <key>folder</key>
+      <string>idyll_material</string>
+      <key>themes</key>
+      <array>
+        <map>
+          <key>name</key>
+          <string>Default</string>
+          <key>folder</key>
+          <string/>
+        </map>
+      </array>
+    </map>
+
     <map>
       <key>name</key>
       <string>AnsaStorm</string>

@@ -87,6 +87,14 @@ public:
 
     void resetToDefault(std::string_view color_name);
 
+    // <ID:MaterialTheme> colours that take precedence over user and skin colours
+    void setOverrideColor(std::string_view name, const LLColor4& color);
+    bool hasOverrideColor(std::string_view name) const;
+    LLUIColor getUserOrSkinColor(std::string_view name, const LLColor4& default_color = LLColor4::magenta) const;
+    void setSkinColor(std::string_view name, const LLColor4& color);
+    void followSkinColor(std::string_view name);
+    // </ID:MaterialTheme>
+
     // loads colors from settings files
     bool loadFromSettings();
 
@@ -107,6 +115,7 @@ private:
 
     string_color_map_t mLoadedColors;
     string_color_map_t mUserSetColors;
+    string_color_map_t mOverrideColors; // <ID:MaterialTheme>
 };
 
 #endif // LL_LLUICOLORTABLE_H

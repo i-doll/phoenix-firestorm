@@ -201,6 +201,7 @@ public:
                                 tear_off_pressed_image,
                                 dock_pressed_image,
                                 help_pressed_image;
+        Optional<LLUIColor>     title_button_image_color; // <ID:MaterialTheme/>
 
         Optional<CommitCallbackParam> open_callback,
                                       close_callback;

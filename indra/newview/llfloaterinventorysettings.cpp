@@ -30,6 +30,7 @@
 
 #include "llcolorswatch.h"
 #include "llviewercontrol.h"
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
 
 LLFloaterInventorySettings::LLFloaterInventorySettings(const LLSD& key)
   : LLFloater(key)
@@ -61,12 +62,12 @@ void LLFloaterInventorySettings::updateColorSwatch()
 
 void LLFloaterInventorySettings::applyUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
-    LLUIColorTable::instance().setColor(param.asString(), LLColor4(ctrl->getValue()));
+    IDMaterialTheme::setPreferenceColor(param.asString(), LLColor4(ctrl->getValue())); // <ID:MaterialTheme/>
 }
 
 void LLFloaterInventorySettings::getUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
     LLColorSwatchCtrl* color_swatch = (LLColorSwatchCtrl*)ctrl;
-    color_swatch->setOriginal(LLUIColorTable::instance().getColor(param.asString()));
+    color_swatch->setOriginal(IDMaterialTheme::getPreferenceColor(param.asString())); // <ID:MaterialTheme/>
 }
 

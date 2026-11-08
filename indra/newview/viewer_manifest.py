@@ -92,7 +92,8 @@ class ViewerManifest(LLManifest,FSViewerManifest):
         # The emoji mapping file(s) live in the 3p package under 'packages/xui'.
         # Some codepaths search only CURRENT_SKIN XUI; ensure every shipped skin
         # has the mappings available.
-        for skin in ("default", "firestorm", "vintage", "starlight", "starlightcui", "ansastorm", "metaharper"):
+        for skin in ("default", "firestorm", "vintage", "starlight", "starlightcui", "ansastorm", "metaharper",
+                     "idyll_material"):  # <ID:MaterialTheme/>
             with self.prefix(src=pkgdir, dst=f"skins/{skin}"):
                 self.path("xui")
         # </FS:Ansariel>

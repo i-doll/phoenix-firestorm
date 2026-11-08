@@ -1,0 +1,1227 @@
+{
+ "Accordion_ArrowClosed_Off": {
+  "file": "containers/Accordion_ArrowClosed_Off.png",
+  "p95": 0.792156862745098,
+  "role": "glyph"
+ },
+ "Accordion_ArrowOpened_Off": {
+  "file": "containers/Accordion_ArrowOpened_Off.png",
+  "p95": 0.792156862745098,
+  "role": "glyph"
+ },
+ "Activate_Checkmark": {
+  "file": "taskpanel/Activate_Checkmark.png",
+  "p95": 0.9490196078431372,
+  "role": "glyph"
+ },
+ "AddItem_Disabled": {
+  "file": "icons/AddItem_Disabled.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "AddItem_Menu": {
+  "file": "icons/AddItem_Menu.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "AddItem_Off": {
+  "file": "icons/AddItem_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "AddItem_Press": {
+  "file": "icons/AddItem_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Down": {
+  "file": "widgets/Arrow_Down.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Left": {
+  "file": "widgets/Arrow_Left.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Left_Off": {
+  "file": "navbar/Arrow_Left_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Left_Unscaled": {
+  "file": "widgets/Arrow_Left.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Right": {
+  "file": "widgets/Arrow_Right.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Right_Off": {
+  "file": "navbar/Arrow_Right_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Right_Unscaled": {
+  "file": "widgets/Arrow_Right.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Arrow_Small_Left": {
+  "file": "widgets/Arrow_Small_Left.png",
+  "p95": 0.7529411764705882,
+  "role": "glyph"
+ },
+ "Arrow_Small_Right": {
+  "file": "widgets/Arrow_Small_Right.png",
+  "p95": 0.7529411764705882,
+  "role": "glyph"
+ },
+ "Arrow_Up": {
+  "file": "widgets/Arrow_Up.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "AudioMute_Off": {
+  "file": "icons/AudioMute_Off.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "AudioMute_Over": {
+  "file": "icons/AudioMute_Over.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "AudioMute_Press": {
+  "file": "icons/AudioMute_Press.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "Audio_Off": {
+  "file": "icons/Audio_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Audio_Press": {
+  "file": "icons/Audio_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "BackArrow_Off": {
+  "file": "icons/BackArrow_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Cam_Avatar_Off": {
+  "file": "bottomtray/Cam_Avatar_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Cam_FreeCam_Off": {
+  "file": "bottomtray/Cam_FreeCam_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Cam_Load_Pos": {
+  "file": "bottomtray/camera_load.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Cam_Store_Pos": {
+  "file": "bottomtray/camera_store.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Camera_Off": {
+  "file": "icons/Camera_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Camera_Press": {
+  "file": "icons/Camera_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Chat_History": {
+  "file": "icons/Chat_History.png",
+  "p95": 0.8235294117647058,
+  "role": "glyph"
+ },
+ "ClipboardSmallMenu_Disabled": {
+  "file": "icons/ClipboardSmallMenu_Disabled.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "ClipboardSmallMenu_Off": {
+  "file": "icons/ClipboardSmallMenu_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "ClipboardSmallMenu_Press": {
+  "file": "icons/ClipboardSmallMenu_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Command_Destinations_Icon": {
+  "file": "toolbar_icons/destinations.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Command_FaceNearest_Icon": {
+  "file": "toolbar_icons/facenearest.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Command_Flickr_Icon": {
+  "file": "toolbar_icons/flickr.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Command_Map_Icon": {
+  "file": "toolbar_icons/map.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Command_Primfeed_Icon": {
+  "file": "icons/primfeed_white.png",
+  "p95": 0.9176470588235294,
+  "role": "glyph"
+ },
+ "Command_Search_Icon": {
+  "file": "toolbar_icons/search.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Command_Speak_Icon": {
+  "file": "toolbar_icons/speak.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Conv_expand_one_line": {
+  "file": "icons/expand_one_liner.png",
+  "p95": 0.8235294117647058,
+  "role": "glyph"
+ },
+ "Conv_toolbar_add_person": {
+  "file": "icons/Conv_toolbar_add_person.png",
+  "p95": 0.7803921568627451,
+  "role": "glyph"
+ },
+ "Conv_toolbar_arrow_ne": {
+  "file": "icons/Conv_toolbar_arrow_ne.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Conv_toolbar_close": {
+  "file": "icons/Conv_toolbar_close.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Conv_toolbar_collapse": {
+  "file": "icons/Conv_toolbar_collapse.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Conv_toolbar_expand": {
+  "file": "icons/Conv_toolbar_expand.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Conv_toolbar_open_call": {
+  "file": "icons/Conv_toolbar_open_call.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Conv_toolbar_plus": {
+  "file": "icons/Conv_toolbar_plus.png",
+  "p95": 0.7019607843137254,
+  "role": "glyph"
+ },
+ "Conv_toolbar_sort": {
+  "file": "icons/Conv_toolbar_sort.png",
+  "p95": 0.6352941176470588,
+  "role": "glyph"
+ },
+ "Copy": {
+  "file": "icons/Copy.png",
+  "p95": 0.6705882352941176,
+  "role": "glyph"
+ },
+ "CopyBright": {
+  "file": "icons/CopyBright.png",
+  "p95": 0.8117647058823529,
+  "role": "glyph"
+ },
+ "DisclosureArrow_Opened_Off": {
+  "file": "widgets/DisclosureArrow_Opened_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "DownArrow_Off": {
+  "file": "icons/DownArrow_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Edit_Flip_X": {
+  "file": "icons/Edit_Flip_X.png",
+  "p95": 0.9764705882352941,
+  "role": "glyph"
+ },
+ "Edit_Wrench": {
+  "file": "icons/Edit_Wrench.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Emoji_Picker_Icon": {
+  "file": "icons/emoji_picker_icon.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "ExternalBrowser_Off": {
+  "file": "icons/ExternalBrowser_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Favorite_Star_Over": {
+  "file": "navbar/Favorite_Star_Over.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "ForwardArrow_Off": {
+  "file": "icons/ForwardArrow_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "ForwardArrow_Press": {
+  "file": "icons/ForwardArrow_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Group_Notices": {
+  "file": "icons/Group_Notices.png",
+  "p95": 0.8352941176470589,
+  "role": "glyph"
+ },
+ "Hierarchy_View_Disabled": {
+  "file": "icons/Hierarchy_View_Disabled.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Hierarchy_View_On": {
+  "file": "icons/Hierarchy_View_On.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Home_Off": {
+  "file": "navbar/Home_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Icon_Close_Foreground": {
+  "file": "windows/Icon_Close_Foreground.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Icon_Close_Press": {
+  "file": "windows/Icon_Close_Press.png",
+  "p95": 0.25098039215686274,
+  "role": "glyph"
+ },
+ "Icon_Close_Toast": {
+  "file": "windows/Icon_Close_Toast.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Icon_Copy": {
+  "file": "icons/copy_clipboard.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Icon_Delete": {
+  "file": "icons/delete_icon.png",
+  "p95": 0.9882352941176471,
+  "role": "glyph"
+ },
+ "Icon_DialogStack": {
+  "file": "icons/Icon_DialogStack.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "Icon_Dock_Foreground": {
+  "file": "windows/Icon_Dock_Foreground.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Icon_File_Upload": {
+  "file": "icons/file_upload.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Icon_Gear": {
+  "file": "windows/Icon_Gear.png",
+  "p95": 0.8235294117647058,
+  "role": "glyph"
+ },
+ "Icon_Gear_Background": {
+  "file": "windows/Icon_Gear_Background.png",
+  "p95": 0.5019607843137255,
+  "role": "glyph"
+ },
+ "Icon_Gear_Foreground": {
+  "file": "windows/Icon_Gear_Foreground.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Icon_Gear_Press": {
+  "file": "windows/Icon_Gear_Press.png",
+  "p95": 0.25098039215686274,
+  "role": "glyph"
+ },
+ "Icon_Paste": {
+  "file": "icons/paste_clipboard.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Icon_Snapshot": {
+  "file": "icons/snapshot_icon.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Icon_Snooze_Foreground": {
+  "file": "windows/Icon_Snooze_Foreground.png",
+  "p95": 0.6745098039215687,
+  "role": "glyph"
+ },
+ "Icon_Undock_Foreground": {
+  "file": "windows/Icon_Undock_Foreground.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Icon_Use_Texture": {
+  "file": "icons/texture_icon.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Info_Off": {
+  "file": "navbar/Info_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Info_Over": {
+  "file": "icons/Info_Over.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "Info_Press": {
+  "file": "navbar/Info_Press.png",
+  "p95": 0.6313725490196078,
+  "role": "glyph"
+ },
+ "Inv_FolderOpen": {
+  "file": "icons/Inv_FolderOpen.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "Inv_Mesh": {
+  "file": "icons/Inv_Mesh.png",
+  "p95": 0.8392156862745098,
+  "role": "art"
+ },
+ "Inv_Object": {
+  "file": "icons/Inv_Object.png",
+  "p95": 0.9411764705882353,
+  "role": "art"
+ },
+ "Inv_Physics": {
+  "file": "icons/Inv_Physics.png",
+  "p95": 0.996078431372549,
+  "role": "art"
+ },
+ "Inv_Toolbar_SearchVisibility": {
+  "file": "icons/Inv_Toolbar_SearchVisibility.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Inv_TrashOpen": {
+  "file": "icons/Inv_TrashOpen.png",
+  "p95": 0.7803921568627451,
+  "role": "art"
+ },
+ "LagStatus_Critical": {
+  "file": "icons/red_square.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "LagStatus_Good": {
+  "file": "icons/green_square.png",
+  "p95": 0.7725490196078432,
+  "role": "art"
+ },
+ "LagStatus_Warning": {
+  "file": "icons/yellow_square.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "List_View_On": {
+  "file": "icons/List_View_On.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Locked_Icon": {
+  "file": "icons/Locked_Icon.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "MinusItem_Disabled": {
+  "file": "icons/MinusItem_Disabled.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "MinusItem_Off": {
+  "file": "icons/MinusItem_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "MinusItem_Press": {
+  "file": "icons/MinusItem_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Move_Fly_Off": {
+  "file": "bottomtray/Move_Fly_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Move_Run_Off": {
+  "file": "bottomtray/Move_Run_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Move_Walk_Off": {
+  "file": "bottomtray/Move_Walk_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Movement_Down_Off": {
+  "file": "bottomtray/Movement_Down_Off.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Movement_Down_On": {
+  "file": "bottomtray/Movement_Down_On.png",
+  "p95": 0.9215686274509803,
+  "role": "art"
+ },
+ "Movement_TurnLeft_Off": {
+  "file": "bottomtray/Movement_TurnLeft_Off.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Movement_TurnLeft_On": {
+  "file": "bottomtray/Movement_TurnLeft_On.png",
+  "p95": 0.9215686274509803,
+  "role": "art"
+ },
+ "Movement_TurnRight_Off": {
+  "file": "bottomtray/Movement_TurnRight_Off.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Movement_TurnRight_On": {
+  "file": "bottomtray/Movement_TurnRight_On.png",
+  "p95": 0.9215686274509803,
+  "role": "art"
+ },
+ "Movement_Up_Off": {
+  "file": "bottomtray/Movement_Up_Off.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Movement_Up_On": {
+  "file": "bottomtray/Movement_Up_On.png",
+  "p95": 0.9215686274509803,
+  "role": "art"
+ },
+ "Music_Off": {
+  "file": "icons/Music_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Music_Press": {
+  "file": "icons/Music_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Muted_Chat": {
+  "file": "icons/Muted_Chat.png",
+  "p95": 0.8509803921568627,
+  "role": "art"
+ },
+ "Notices_Unread": {
+  "file": "bottomtray/Notices_Unread.png",
+  "p95": 0.7607843137254902,
+  "role": "glyph"
+ },
+ "Notification_Condense": {
+  "file": "icons/Icon_Notification_Condense.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Notification_Expand": {
+  "file": "icons/Icon_Notification_Expand.png",
+  "p95": 0.7529411764705882,
+  "role": "glyph"
+ },
+ "Object_Cone": {
+  "file": "build/Object_Cone.png",
+  "p95": 0.7843137254901961,
+  "role": "glyph"
+ },
+ "Object_Cone_Selected": {
+  "file": "build/Object_Cone_Selected.png",
+  "p95": 0.9058823529411765,
+  "role": "art"
+ },
+ "Object_Cube": {
+  "file": "build/Object_Cube.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Cube_Selected": {
+  "file": "build/Object_Cube_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Cylinder": {
+  "file": "build/Object_Cylinder.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Cylinder_Selected": {
+  "file": "build/Object_Cylinder_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Grass": {
+  "file": "build/Object_Grass.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Grass_Selected": {
+  "file": "build/Object_Grass_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Hemi_Cone": {
+  "file": "build/Object_Hemi_Cone.png",
+  "p95": 0.7843137254901961,
+  "role": "glyph"
+ },
+ "Object_Hemi_Cone_Selected": {
+  "file": "build/Object_Hemi_Cone_Selected.png",
+  "p95": 0.9058823529411765,
+  "role": "art"
+ },
+ "Object_Hemi_Cylinder": {
+  "file": "build/Object_Hemi_Cylinder.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Hemi_Cylinder_Selected": {
+  "file": "build/Object_Hemi_Cylinder_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Hemi_Sphere": {
+  "file": "build/Object_Hemi_Sphere.png",
+  "p95": 0.7803921568627451,
+  "role": "glyph"
+ },
+ "Object_Hemi_Sphere_Selected": {
+  "file": "build/Object_Hemi_Sphere_Selected.png",
+  "p95": 0.9058823529411765,
+  "role": "art"
+ },
+ "Object_Prism": {
+  "file": "build/Object_Prism.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Prism_Selected": {
+  "file": "build/Object_Prism_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Pyramid": {
+  "file": "build/Object_Pyramid.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Pyramid_Selected": {
+  "file": "build/Object_Pyramid_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Ring": {
+  "file": "build/Object_Ring.png",
+  "p95": 0.7411764705882353,
+  "role": "glyph"
+ },
+ "Object_Ring_Selected": {
+  "file": "build/Object_Ring_Selected.png",
+  "p95": 0.8941176470588236,
+  "role": "art"
+ },
+ "Object_Sphere": {
+  "file": "build/Object_Sphere.png",
+  "p95": 0.7725490196078432,
+  "role": "glyph"
+ },
+ "Object_Sphere_Selected": {
+  "file": "build/Object_Sphere_Selected.png",
+  "p95": 0.8980392156862745,
+  "role": "art"
+ },
+ "Object_Tetrahedron": {
+  "file": "build/Object_Tetrahedron.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Tetrahedron_Selected": {
+  "file": "build/Object_Tetrahedron_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Torus": {
+  "file": "build/Object_Torus.png",
+  "p95": 0.7372549019607844,
+  "role": "glyph"
+ },
+ "Object_Torus_Selected": {
+  "file": "build/Object_Torus_Selected.png",
+  "p95": 0.8901960784313725,
+  "role": "art"
+ },
+ "Object_Tree": {
+  "file": "build/Object_Tree.png",
+  "p95": 0.7058823529411765,
+  "role": "glyph"
+ },
+ "Object_Tree_Selected": {
+  "file": "build/Object_Tree_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "Object_Tube": {
+  "file": "build/Object_Tube.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Object_Tube_Selected": {
+  "file": "build/Object_Tube_Selected.png",
+  "p95": 0.8745098039215686,
+  "role": "art"
+ },
+ "OptionsMenu_Disabled": {
+  "file": "icons/OptionsMenu_Disabled.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "OptionsMenu_Off": {
+  "file": "icons/OptionsMenu_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "OptionsMenu_Press": {
+  "file": "icons/OptionsMenu_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "PanOrbit_Off": {
+  "file": "bottomtray/PanOrbit_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Parcel_ForSale_Light": {
+  "file": "icons/Parcel_ForSale_Light.png",
+  "p95": 0.7019607843137254,
+  "role": "glyph"
+ },
+ "Parcel_M_Light": {
+  "file": "icons/Parcel_M_Light.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Parcel_PG_Light": {
+  "file": "icons/Parcel_PG_Light.png",
+  "p95": 0.9686274509803922,
+  "role": "art"
+ },
+ "Paste": {
+  "file": "icons/Paste.png",
+  "p95": 0.8431372549019608,
+  "role": "glyph"
+ },
+ "Pause_Off": {
+  "file": "icons/Pause_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Pause_Over": {
+  "file": "icons/Pause_Over.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Pause_Press": {
+  "file": "icons/Pause_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Permission_Edit_Objects_Mine": {
+  "file": "icons/edit_mine.png",
+  "p95": 0.8313725490196079,
+  "role": "glyph"
+ },
+ "Permission_Visible_Map": {
+  "file": "icons/see_on_map.png",
+  "p95": 0.8,
+  "role": "glyph"
+ },
+ "Permission_Visible_Online": {
+  "file": "icons/see_me_online.png",
+  "p95": 0.8509803921568627,
+  "role": "glyph"
+ },
+ "PhysicsView_Off": {
+  "file": "build/PhysicsView_Off.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "PhysicsView_On": {
+  "file": "build/PhysicsView_On.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Play_Off": {
+  "file": "icons/Play_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Play_Over": {
+  "file": "icons/Play_Over.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Popup_Caution": {
+  "file": "icons/pop_up_caution.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "Poser_Visual_On": {
+  "file": "icons/visual_pose_enabled.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "Presets_Icon_Graphic": {
+  "file": "icons/Presets_Icon_Graphic.png",
+  "p95": 0.7803921568627451,
+  "role": "glyph"
+ },
+ "Profile_Group_Visibility_Off": {
+  "file": "icons/profile_group_visibility_eye_off.png",
+  "p95": 0.8509803921568627,
+  "role": "glyph"
+ },
+ "Profile_Group_Visibility_Off_Pressed": {
+  "file": "icons/profile_group_visibility_eye_off_pressed.png",
+  "p95": 0.27450980392156865,
+  "role": "glyph"
+ },
+ "Profile_Group_Visibility_On": {
+  "file": "icons/profile_group_visibility_eye_on.png",
+  "p95": 0.8509803921568627,
+  "role": "glyph"
+ },
+ "Profile_Group_Visibility_On_Pressed": {
+  "file": "icons/profile_group_visibility_eye_on_pressed.png",
+  "p95": 0.27450980392156865,
+  "role": "glyph"
+ },
+ "Refresh_Off": {
+  "file": "icons/Refresh_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Remove_Icon": {
+  "file": "icons/remove_icon.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Script_Config": {
+  "file": "icons/script_config.png",
+  "p95": 0.9725490196078431,
+  "role": "glyph"
+ },
+ "Script_Copy": {
+  "file": "icons/script_copy.png",
+  "p95": 0.9764705882352941,
+  "role": "glyph"
+ },
+ "Script_Cut": {
+  "file": "icons/script_cut.png",
+  "p95": 0.9568627450980393,
+  "role": "glyph"
+ },
+ "Script_Disk_Load": {
+  "file": "icons/script_disk_load.png",
+  "p95": 0.9921568627450981,
+  "role": "glyph"
+ },
+ "Script_Disk_Save": {
+  "file": "icons/script_disk_save.png",
+  "p95": 0.9647058823529412,
+  "role": "glyph"
+ },
+ "Script_Editor": {
+  "file": "icons/script_editor.png",
+  "p95": 0.996078431372549,
+  "role": "glyph"
+ },
+ "Script_Paste": {
+  "file": "icons/script_paste.png",
+  "p95": 0.9803921568627451,
+  "role": "glyph"
+ },
+ "Script_Redo": {
+  "file": "icons/script_redo.png",
+  "p95": 0.9803921568627451,
+  "role": "glyph"
+ },
+ "Script_Save": {
+  "file": "icons/script_save.png",
+  "p95": 0.996078431372549,
+  "role": "glyph"
+ },
+ "Script_Search": {
+  "file": "icons/script_search.png",
+  "p95": 0.9764705882352941,
+  "role": "glyph"
+ },
+ "Script_Undo": {
+  "file": "icons/script_undo.png",
+  "p95": 0.9803921568627451,
+  "role": "glyph"
+ },
+ "Search": {
+  "file": "navbar/Search.png",
+  "p95": 0.6235294117647059,
+  "role": "glyph"
+ },
+ "Search_Icon": {
+  "file": "icons/Search_Icon.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Shop": {
+  "file": "icons/Shop.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Sidebar_Icon_Dock_Foreground": {
+  "file": "taskpanel/Sidebar_Icon_Dock_Foreground.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Sidebar_Icon_Dock_Press": {
+  "file": "taskpanel/Sidebar_Icon_Dock_Press.png",
+  "p95": 0.25098039215686274,
+  "role": "glyph"
+ },
+ "Sidebar_Icon_Undock_Foreground": {
+  "file": "taskpanel/Sidebar_Icon_Undock_Foreground.png",
+  "p95": 0.7490196078431373,
+  "role": "glyph"
+ },
+ "Sidebar_Icon_Undock_Press": {
+  "file": "taskpanel/Sidebar_Icon_Undock_Press.png",
+  "p95": 0.25098039215686274,
+  "role": "glyph"
+ },
+ "Single_Folder_Back": {
+  "file": "icons/single_folder_back.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Single_Folder_Forward": {
+  "file": "icons/single_folder_forward.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Single_Folder_Mode": {
+  "file": "icons/single_folder_mode.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Single_Folder_Up": {
+  "file": "icons/single_folder_up.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "SkipBackward_Off": {
+  "file": "icons/SkipBackward_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "SkipForward_Off": {
+  "file": "icons/SkipForward_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Snapshot_Download": {
+  "file": "snapshot_download.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Snapshot_Email": {
+  "file": "snapshot_email.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Snapshot_Inventory": {
+  "file": "toolbar_icons/inventory.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Snapshot_Profile": {
+  "file": "toolbar_icons/profile.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "StopReload_Off": {
+  "file": "icons/StopReload_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "StopReload_Over": {
+  "file": "icons/StopReload_Over.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Stop_Off": {
+  "file": "icons/Stop_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "TabIcon_Close_Off": {
+  "file": "taskpanel/TabIcon_Close_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "TabIcon_Open_Off": {
+  "file": "taskpanel/TabIcon_Open_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Toast_CloseBtn": {
+  "file": "windows/Toast_CloseBtn.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Tool_Create": {
+  "file": "build/Tool_Create.png",
+  "p95": 0.8705882352941177,
+  "role": "glyph"
+ },
+ "Tool_Dozer": {
+  "file": "build/Tool_Dozer.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Tool_Face": {
+  "file": "build/Tool_Face.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Tool_Grab": {
+  "file": "build/Tool_Grab.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "Tool_Zoom": {
+  "file": "build/Tool_Zoom.png",
+  "p95": 0.6980392156862745,
+  "role": "glyph"
+ },
+ "TrashItem_Disabled": {
+  "file": "icons/TrashItem_Disabled.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "TrashItem_Menu": {
+  "file": "icons/TrashItem_Menu.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "TrashItem_Off": {
+  "file": "icons/TrashItem_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "TrashItem_Press": {
+  "file": "icons/TrashItem_Press.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "UnZoom_Off": {
+  "file": "icons/UnZoom_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Unread_IM": {
+  "file": "bottomtray/Unread_IM.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "UpArrow_Off": {
+  "file": "icons/UpArrow_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "VirtualTrackball_Rotate_Left": {
+  "file": "widgets/track_control_rotate_left_side.png",
+  "p95": 0.8352941176470589,
+  "role": "glyph"
+ },
+ "VirtualTrackball_Rotate_Left_Active": {
+  "file": "widgets/track_control_rotate_left_side_active.png",
+  "p95": 0.996078431372549,
+  "role": "glyph"
+ },
+ "VirtualTrackball_Rotate_Right": {
+  "file": "widgets/track_control_rotate_right_side.png",
+  "p95": 0.8352941176470589,
+  "role": "glyph"
+ },
+ "VirtualTrackball_Rotate_Right_Active": {
+  "file": "widgets/track_control_rotate_right_side_active.png",
+  "p95": 0.996078431372549,
+  "role": "glyph"
+ },
+ "VoicePTT_Off": {
+  "file": "bottomtray/VoicePTT_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "Web_Profile_Off": {
+  "file": "icons/Web_Profile_Off.png",
+  "p95": 0.8,
+  "role": "glyph"
+ },
+ "Zoom_Off": {
+  "file": "icons/Zoom_Off.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "arrow_down.tga": {
+  "file": "arrow_down.tga",
+  "p95": 0.9647058823529412,
+  "role": "glyph"
+ },
+ "arrow_up.tga": {
+  "file": "arrow_up.tga",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "button_anim_pause.tga": {
+  "file": "button_anim_pause.tga",
+  "p95": 0.9607843137254902,
+  "role": "art"
+ },
+ "button_anim_pause_selected.tga": {
+  "file": "button_anim_pause_selected.tga",
+  "p95": 0.9607843137254902,
+  "role": "art"
+ },
+ "button_anim_play.tga": {
+  "file": "button_anim_play.tga",
+  "p95": 0.9529411764705882,
+  "role": "art"
+ },
+ "button_anim_play_selected.tga": {
+  "file": "button_anim_play_selected.tga",
+  "p95": 0.9607843137254902,
+  "role": "art"
+ },
+ "call_end_icon_24x24": {
+  "file": "icons/call_end_icon_24x24.png",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "call_icon_24x24": {
+  "file": "icons/call_icon_24x24.png",
+  "p95": 0.9137254901960784,
+  "role": "glyph"
+ },
+ "eye_button_active.tga": {
+  "file": "eye_button_active.tga",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "eye_button_inactive.tga": {
+  "file": "eye_button_inactive.tga",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "friends_icon_24x24": {
+  "file": "icons/Friends_Icon_24x24.png",
+  "p95": 0.8235294117647058,
+  "role": "glyph"
+ },
+ "gift_icon_24x24": {
+  "file": "icons/gift_icon_24x24.png",
+  "p95": 0.9137254901960784,
+  "role": "glyph"
+ },
+ "inventory_18": {
+  "file": "bottomtray/inventory_18.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "map_avatar_16.tga": {
+  "file": "map_avatar_16.tga",
+  "p95": 1.0,
+  "role": "art"
+ },
+ "map_home.tga": {
+  "file": "map_home.tga",
+  "p95": 0.9921568627450981,
+  "role": "art"
+ },
+ "omnifilter": {
+  "file": "toolbar_icons/omnifilter.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "profile_icon_24x24": {
+  "file": "icons/profile_icon_24x24.png",
+  "p95": 0.9137254901960784,
+  "role": "glyph"
+ },
+ "sale_icon_24x24": {
+  "file": "icons/sale_icon_24x24.png",
+  "p95": 0.9215686274509803,
+  "role": "glyph"
+ },
+ "show_filters_18": {
+  "file": "bottomtray/show_filters_18.png",
+  "p95": 1.0,
+  "role": "glyph"
+ },
+ "teleport_menu": {
+  "file": "icons/teleport_menu.png",
+  "p95": 0.8666666666666667,
+  "role": "glyph"
+ }
+}

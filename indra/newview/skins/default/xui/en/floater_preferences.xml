@@ -191,6 +191,14 @@
          layout="topleft"
          help_topic="preferences_ui_extras_tab"
          name="ui" />
+        <!-- <ID:MaterialTheme> -->
+        <panel
+         class="id_panel_preference_theme"
+         filename="panel_preferences_idyll_theme.xml"
+         label="Theme"
+         layout="topleft"
+         name="idyll_theme" />
+        <!-- </ID:MaterialTheme> -->
         <panel
          class="panel_preference_skins"
          filename="panel_preferences_skins.xml"

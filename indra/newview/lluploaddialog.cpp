@@ -61,7 +61,7 @@ void LLUploadDialog::modalUploadFinished()
 LLUploadDialog::LLUploadDialog( const std::string& msg)
   : LLPanel()
 {
-    setTransparentColor(LLUIColorTable::instance().getColor("UploadDialogBackground").get()); // <FS:Ansariel> Default-Panel independent background
+    setTransparentColor(LLUIColorTable::instance().getColor("UploadDialogBackground")); // <ID:MaterialTheme/> // <FS:Ansariel> Default-Panel independent background
     setBackgroundVisible( true );
 
     if( LLUploadDialog::sDialog )

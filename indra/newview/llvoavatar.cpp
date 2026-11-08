@@ -128,6 +128,7 @@
 #include "fsdiscordconnect.h" // <FS:LO> tapping a place that happens on landing in world to start up discord
 #include "fslslbridge.h" // <FS:PP> Movelock position refresh
 #include "lfsimfeaturehandler.h"    // <FS:CR> Opensim
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
 #include "lggcontactsets.h"
 #include "llcontrol.h"
 #include "llfilepicker.h"   // <FS:CR> FIRE-8893 - Dump archetype xml to user defined location
@@ -4474,6 +4475,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
         //color based on contact sets prefs
         LGGContactSets::getInstance()->hasFriendColorThatShouldShow(getID(), ContactSetType::CHAT, new_chat);
         // </FS:CR>
+        new_chat = IDMaterialTheme::worldChatColor(new_chat); // <ID:MaterialTheme/>
 
         if (mVisibleChat)
         {

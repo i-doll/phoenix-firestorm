@@ -3392,4 +3392,5 @@ Your current position: [AVATAR_POS]
   <string name="InventoryReceivedItemsRedirectSet">Received items will be redirected to "[FOLDER]" until you stop redirecting or log out.</string>
   <string name="InventoryReceivedItemsRedirectCleared">Received items will use their normal inventory destinations again.</string>
   <!-- </ID:i.doll> -->
+  <string name="IDMaterialThemeSetsColor">The Idyll skin sets this colour.</string> <!-- <ID:MaterialTheme/> -->
 </strings>

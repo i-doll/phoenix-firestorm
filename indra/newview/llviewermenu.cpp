@@ -33,6 +33,7 @@
 
 #include "llviewermenu.h"
 #include "idfloaterwornitems.h"  // <ID>
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
 
 // linden library includes
 #include "llavatarnamecache.h" // IDEVO (I Are Not Men!)
@@ -13464,7 +13465,13 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedCheckDebugWindowProc(), "Advanced.CheckDebugWindowProc");
 
     // Advanced > XUI
-    commit.add("Advanced.ReloadColorSettings", boost::bind(&LLUIColorTable::loadFromSettings, LLUIColorTable::getInstance()));
+    // <ID:MaterialTheme>
+    commit.add("Advanced.ReloadColorSettings", [](LLUICtrl*, const LLSD&) {
+        LLUIColorTable::instance().loadFromSettings();
+        if (IDMaterialTheme::isActive())
+            IDMaterialTheme::instance().apply();
+    });
+    // </ID:MaterialTheme>
     view_listener_t::addMenu(new LLAdvancedLoadUIFromXML(), "Advanced.LoadUIFromXML");
     view_listener_t::addMenu(new LLAdvancedSaveUIToXML(), "Advanced.SaveUIToXML");
     view_listener_t::addMenu(new LLAdvancedToggleXUINames(), "Advanced.ToggleXUINames");

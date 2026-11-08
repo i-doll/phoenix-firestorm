@@ -51,6 +51,7 @@
 #include "rlvhandler.h"
 // [/RLVa:KB]
 #include "llconsole.h"
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
 
 using namespace LLNotificationsUI;
 
@@ -290,7 +291,7 @@ void LLHandlerUtil::logToNearbyChat(const LLNotificationPtr& notification, EChat
             F32 alpha = 1.f;
             LLUIColor chatcolor;
             LLViewerChat::getChatColor(chat_msg, chatcolor, alpha);
-            gConsole->addConsoleLine(chat_msg.mText, chatcolor % alpha);
+            gConsole->addConsoleLine(chat_msg.mText, IDMaterialTheme::worldChatColor(chatcolor) % alpha); // <ID:MaterialTheme/>
         }
     }
 }

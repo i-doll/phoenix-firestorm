@@ -87,6 +87,7 @@ public:
                                             tab_height,
                                             label_pad_bottom,
                                             label_pad_left;
+        Optional<S32>                       vertical_label_pad_left; // <ID:MaterialTheme/>
 
         Optional<bool>                      hide_tabs;
         Optional<bool>                      hide_scroll_arrows;
@@ -353,6 +354,7 @@ private:
     S32                             mLabelPadBottom;
     // Padding to the left of text labels of tab buttons
     S32                             mLabelPadLeft;
+    std::optional<S32>              mVerticalLabelPadLeft; // <ID:MaterialTheme/>
 
     LLFrameTimer                    mDragAndDropDelayTimer;
 

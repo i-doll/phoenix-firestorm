@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<progress_bar image_bar="ProgressTrack"
+              image_fill="ProgressBar"
+              color_bar="EmphasisColor"
+              color_bg="ScrollbarTrackColor"
+              />

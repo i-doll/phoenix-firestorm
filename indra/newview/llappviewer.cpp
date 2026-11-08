@@ -29,6 +29,7 @@
 #include "llappviewer.h"
 #include "idmcp.h" // <ID> Embedded MCP server (stable facade)
 #include "idheadless.h" // <ID> headless
+#include "idmaterialtheme.h" // <ID:MaterialTheme>
 
 // Viewer includes
 #include "llversioninfo.h"
@@ -2776,7 +2777,11 @@ bool LLAppViewer::cleanup()
 //<Firestorm Skin Cleanup>
     std::string skinSaved = gSavedSettings.getString("SkinCurrent");
     std::string themeSaved = gSavedSettings.getString("SkinCurrentTheme");
-    if ((skinSaved != mCurrentSkin) || (themeSaved != mCurrentSkinTheme))
+    // <ID:MaterialTheme> Keep user colours when entering or leaving Material You
+    //if ((skinSaved != mCurrentSkin) || (themeSaved != mCurrentSkinTheme))
+    if (((skinSaved != mCurrentSkin) || (themeSaved != mCurrentSkinTheme))
+        && mCurrentSkin != IDMaterialTheme::SKIN_FOLDER && skinSaved != IDMaterialTheme::SKIN_FOLDER)
+    // </ID:MaterialTheme>
     {
         LL_INFOS() << "Clearing skin colors." << LL_ENDL;
         // Implementation to only purge skin colors
@@ -3537,6 +3542,28 @@ bool tempSetControl(const std::string& name, const std::string& value)
     return false;
 }
 
+// <ID:MaterialTheme> Moves users still on the old default skin to Material You, once.
+static std::string idMigratedSkin(const std::string& current, bool migrated)
+{
+    return (!migrated && current == "firestorm") ? IDMaterialTheme::SKIN_FOLDER : current;
+}
+
+static void idMigrateDefaultSkinOnce()
+{
+    const bool migrated = gSavedSettings.getBOOL("IDMaterialSkinMigrated");
+    const std::string current = gSavedSettings.getString("SkinCurrent");
+    const std::string target = idMigratedSkin(current, migrated);
+    if (!migrated && target == IDMaterialTheme::SKIN_FOLDER)
+    {
+        gSavedSettings.setString("SkinCurrent", target);
+        gSavedSettings.setString("SkinCurrentTheme", "");
+        gSavedSettings.setString("FSSkinCurrentReadableName", "Idyll");
+        gSavedSettings.setString("FSSkinCurrentThemeReadableName", "Default");
+    }
+    gSavedSettings.setBOOL("IDMaterialSkinMigrated", true);
+}
+// </ID:MaterialTheme>
+
 bool LLAppViewer::initConfiguration()
 {
     // Load settings files list
@@ -3763,6 +3790,8 @@ bool LLAppViewer::initConfiguration()
     // <FS:AO> Re-read user settings again. This is a Firestorm hack to get user settings to override modes
     //Todo, find a cleaner way of doing this via the various set_default arguments.
     loadSettingsFromDirectory("User");
+
+    idMigrateDefaultSkinOnce(); // <ID:MaterialTheme> Before mCurrentSkin is captured and the skin folder is set
 
     // <FS:Ansariel> Debug setting to disable log throttle
     nd::logging::setThrottleEnabled(gSavedSettings.getBOOL("FSEnableLogThrottle"));
@@ -4124,6 +4153,7 @@ bool LLAppViewer::initConfiguration()
     gLastRunVersion = gSavedSettings.getString("LastRunVersion");
 
     loadColorSettings();
+    IDMaterialTheme::instance().initOnStartup(); // <ID:MaterialTheme>
 
     // Let anyone else who cares know that we've populated our settings
     // variables.
