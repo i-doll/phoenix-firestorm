@@ -36,7 +36,10 @@
 
 S32 LLJoint::sNumUpdates = 0;
 S32 LLJoint::sNumTouches = 0;
-U64 LLJoint::sWorldMatrixSerial = 0; // <FS:Trish/>
+// <FS:Trish> FSPerfParallelAvatarUpdate
+//U64 LLJoint::sWorldMatrixSerial = 0; // <FS:Trish/>
+std::atomic<U64> LLJoint::sWorldMatrixSerial{ 0 };
+// </FS:Trish>
 
 template <class T>
 bool attachment_map_iter_compare_key(const T& a, const T& b)
@@ -989,7 +992,10 @@ void LLJoint::updateWorldMatrix()
         sNumUpdates++;
         mXform.updateMatrix(false);
         mWorldMatrix.loadu(mXform.getWorldMatrix());
-        mWorldMatrixSerial = ++sWorldMatrixSerial; // <FS:Trish/>
+        // <FS:Trish> FSPerfParallelAvatarUpdate
+        //mWorldMatrixSerial = ++sWorldMatrixSerial; // <FS:Trish/>
+        mWorldMatrixSerial = sWorldMatrixSerial.fetch_add(1, std::memory_order_relaxed) + 1;
+        // </FS:Trish>
         mDirtyFlags = 0x0;
     }
 }

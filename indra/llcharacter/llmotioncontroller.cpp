@@ -946,6 +946,96 @@ void LLMotionController::updateMotionsMinimal()
     mHasRunOnce = true;
 }
 
+// <FS:Trish> FSPerfParallelAvatarUpdate
+//-----------------------------------------------------------------------------
+// prepareParallelUpdate()
+// First part of updateMotions(false), keep in sync with it. Main thread only.
+//-----------------------------------------------------------------------------
+void LLMotionController::prepareParallelUpdate()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    llassert(mTimeStep == 0.f);
+
+    F32 cur_time = mTimer.getElapsedTimeF32();
+    F32 delta_time = cur_time - mPrevTimerElapsed;
+    mPrevTimerElapsed = cur_time;
+    mLastTime = mAnimTime;
+
+    purgeExcessMotions();
+
+    if (!mPaused)
+    {
+        mAnimTime = mAnimTime + delta_time * mTimeFactor * mUpdateFactor;
+    }
+
+    updateLoadingMotions();
+
+    resetJointSignatures();
+}
+
+//-----------------------------------------------------------------------------
+// evaluateParallelUpdate()
+// Rest of updateMotions(false). Can run on a worker thread when
+// canUpdateOffMainThread() is true; deactivations are deferred.
+//-----------------------------------------------------------------------------
+void LLMotionController::evaluateParallelUpdate()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    mDeferDeactivations = true;
+
+    if (mPaused)
+    {
+        updateIdleActiveMotions();
+    }
+    else
+    {
+        updateAdditiveMotions();
+        resetJointSignatures();
+        updateRegularMotions();
+        mPoseBlender.blendAndApply();
+    }
+
+    mHasRunOnce = true;
+    mDeferDeactivations = false;
+}
+
+//-----------------------------------------------------------------------------
+// finishParallelUpdate()
+// Main thread. Runs the deactivations deferred by evaluateParallelUpdate(),
+// returns true if there were any.
+//-----------------------------------------------------------------------------
+bool LLMotionController::finishParallelUpdate()
+{
+    if (mDeferredDeactivations.empty())
+    {
+        return false;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    std::vector<LLMotion*> deactivations;
+    deactivations.swap(mDeferredDeactivations);
+    for (LLMotion* motionp : deactivations)
+    {
+        deactivateMotionInstance(motionp);
+    }
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// canUpdateOffMainThread()
+//-----------------------------------------------------------------------------
+bool LLMotionController::canUpdateOffMainThread() const
+{
+    for (const LLMotion* motionp : mActiveMotions)
+    {
+        if (motionp && !motionp->canUpdateOffMainThread())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+// </FS:Trish>
+
 //-----------------------------------------------------------------------------
 // activateMotionInstance()
 //-----------------------------------------------------------------------------
@@ -1016,6 +1106,17 @@ bool LLMotionController::activateMotionInstance(LLMotion *motion, F32 time)
 //-----------------------------------------------------------------------------
 bool LLMotionController::deactivateMotionInstance(LLMotion *motion)
 {
+    // <FS:Trish> FSPerfParallelAvatarUpdate: onDeactivate() and the deactivate callback may touch
+    // shared state, run them on the main thread in finishParallelUpdate()
+    if (mDeferDeactivations)
+    {
+        if (std::find(mDeferredDeactivations.begin(), mDeferredDeactivations.end(), motion) == mDeferredDeactivations.end())
+        {
+            mDeferredDeactivations.push_back(motion);
+        }
+        return true;
+    }
+    // </FS:Trish>
     motion->deactivate();
 
     motion_set_t::iterator found_it = mDeprecatedMotions.find(motion);

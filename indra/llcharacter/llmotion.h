@@ -156,6 +156,13 @@ public:
     // requires this
     virtual bool canDeprecate();
 
+    // <FS:Trish> FSPerfParallelAvatarUpdate
+    // Can onUpdate() run on a worker thread while other avatars are evaluated? Only for motions
+    // whose update touches nothing but their own character (joints, joint states, visual param
+    // weights, animation data) and read-only shared data. Unknown motions stay on the main thread.
+    virtual bool canUpdateOffMainThread() const { return false; }
+    // </FS:Trish>
+
     // optional callback routine called when animation deactivated.
     void    setDeactivateCallback( void (*cb)(void *), void* userdata );
 
@@ -262,6 +269,9 @@ public:
 
     // called when a motion is deactivated
     /*virtual*/ void onDeactivate() {}
+
+public:
+    bool canUpdateOffMainThread() const override { return true; } // <FS:Trish/> FSPerfParallelAvatarUpdate
 };
 #endif // LL_LLMOTION_H
 

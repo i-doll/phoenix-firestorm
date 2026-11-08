@@ -192,6 +192,54 @@ void LLCharacter::updateMotions(e_update_t update_type)
 }
 
 
+// <FS:Trish> FSPerfParallelAvatarUpdate
+//-----------------------------------------------------------------------------
+// prepareParallelMotionUpdate()
+// updateMotions(NORMAL_UPDATE) up to the pose evaluation, keep in sync with it.
+//-----------------------------------------------------------------------------
+bool LLCharacter::prepareParallelMotionUpdate()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    if (!mMotionController.canPrepareParallelUpdate())
+    {
+        return false;
+    }
+    // unpause if the number of outstanding pause requests has dropped to the initial one
+    if (mMotionController.isPaused() && mPauseRequest->getNumRefs() == 1)
+    {
+        mMotionController.unpauseAllMotions();
+    }
+    mMotionController.prepareParallelUpdate();
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// evaluateParallelMotionUpdate()
+//-----------------------------------------------------------------------------
+void LLCharacter::evaluateParallelMotionUpdate()
+{
+    mDeferVisualParamUpdates = true;
+    mMotionController.evaluateParallelUpdate();
+    mDeferVisualParamUpdates = false;
+}
+
+//-----------------------------------------------------------------------------
+// finishParallelMotionUpdate()
+// Main thread. Returns true if a deferred deactivation or visual param update ran.
+//-----------------------------------------------------------------------------
+bool LLCharacter::finishParallelMotionUpdate()
+{
+    bool changed = mMotionController.finishParallelUpdate();
+    if (mVisualParamUpdateDeferred)
+    {
+        mVisualParamUpdateDeferred = false;
+        updateVisualParams();
+        changed = true;
+    }
+    return changed;
+}
+// </FS:Trish>
+
 //-----------------------------------------------------------------------------
 // deactivateAllMotions()
 //-----------------------------------------------------------------------------

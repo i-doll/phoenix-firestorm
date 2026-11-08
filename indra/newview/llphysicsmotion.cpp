@@ -153,7 +153,7 @@ protected:
                 const controller_map_t::const_iterator& entry = mParamControllers.find(controller_key[param]);
                 if (entry == mParamControllers.end())
                 {
-                        return sDefaultController[controller_key[param]];
+                        return getDefaultValue(controller_key[param]); // <FS:Trish/> FSPerfParallelAvatarUpdate
                 }
                 const std::string& param_name = (*entry).second.c_str();
                 mParamCache[param] = mCharacter->getVisualParam(param_name.c_str());
@@ -165,9 +165,20 @@ protected:
             }
             else
             {
-                return sDefaultController[controller_key[param]];
+                // <FS:Trish> FSPerfParallelAvatarUpdate: operator[] may insert, look up only
+                //return sDefaultController[controller_key[param]];
+                return getDefaultValue(controller_key[param]);
+                // </FS:Trish>
             }
         }
+
+        // <FS:Trish> FSPerfParallelAvatarUpdate: read-only lookup, onUpdate() can run on several threads
+        static F32 getDefaultValue(const std::string& key)
+        {
+            default_controller_map_t::const_iterator found = sDefaultController.find(key);
+            return found != sDefaultController.end() ? found->second : 0.f;
+        }
+        // </FS:Trish>
 
 
         void setParamValue(const LLViewerVisualParam *param,
@@ -264,9 +275,19 @@ void LLPhysicsMotionController::onDeactivate()
 {
 }
 
+// <FS:Trish> FSPerfParallelAvatarUpdate: the cached control is created by onInitialize() on the
+// main thread, onUpdate() may run on a worker thread
+static bool fs_avatar_physics_enabled()
+{
+    static LLCachedControl<bool> av_physics(gSavedSettings, "AvatarPhysics");
+    return av_physics;
+}
+// </FS:Trish>
+
 LLMotion::LLMotionInitStatus LLPhysicsMotionController::onInitialize(LLCharacter *character)
 {
         mCharacter = character;
+        fs_avatar_physics_enabled(); // <FS:Trish/> FSPerfParallelAvatarUpdate
 
         mMotions.clear();
 
@@ -460,8 +481,11 @@ bool LLPhysicsMotionController::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // Skip if disabled globally.
-    static LLCachedControl<bool> av_physics(gSavedSettings, "AvatarPhysics");
-    if (!av_physics)
+    // <FS:Trish> FSPerfParallelAvatarUpdate
+    //static LLCachedControl<bool> av_physics(gSavedSettings, "AvatarPhysics");
+    //if (!av_physics)
+    if (!fs_avatar_physics_enabled())
+    // </FS:Trish>
     {
             return true;
     }

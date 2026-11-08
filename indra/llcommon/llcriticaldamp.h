@@ -41,6 +41,12 @@ public:
     // MANIPULATORS
     static void updateInterpolants();
 
+    // <FS:Trish> FSPerfParallelAvatarUpdate
+    // While true, getInterpolant() does not add new time constants to the shared cache, so several
+    // threads may call it at once. Only the main thread sets it, before handing work to the threads.
+    static void setCacheFrozen(bool frozen) { sCacheFrozen = frozen; }
+    // </FS:Trish>
+
     // ACCESSORS
     static F32 getInterpolant(F32SecondsImplicit time_constant, bool use_cache = true);
 
@@ -66,6 +72,7 @@ protected:
     typedef std::vector<Interpolant> interpolant_vec_t;
     static interpolant_vec_t    sInterpolants;
     static F32                  sTimeDelta;
+    static bool                 sCacheFrozen; // <FS:Trish/> FSPerfParallelAvatarUpdate
 };
 
 typedef LLSmoothInterpolation LLCriticalDamp;

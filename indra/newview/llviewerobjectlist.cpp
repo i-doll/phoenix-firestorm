@@ -91,6 +91,7 @@
 #include <tuple> // <FS:Beq/> FIRE-30694 DeadObject Spamming cleanup
 #include "fsassetblacklist.h"
 #include "fsparcelderender.h" // <FS:Trish/> Parcel derender
+#include "fsparallelavatar.h" // <FS:Trish/> FSPerfParallelAvatarUpdate
 #include "fsfloaterimport.h"
 #include "fscommon.h"
 #include "llfloaterreg.h"
@@ -1330,6 +1331,7 @@ void LLViewerObjectList::update(LLAgent &agent)
     }
     else
     {
+        FSParallelAvatar::beginIdle(); // <FS:Trish/> FSPerfParallelAvatarUpdate
         for (std::vector<LLViewerObject*>::iterator idle_iter = idle_list.begin();
             idle_iter != idle_end; idle_iter++)
         {
@@ -1337,6 +1339,7 @@ void LLViewerObjectList::update(LLAgent &agent)
             llassert(objectp->isActive());
                 objectp->idleUpdate(agent, frame_time);
         }
+        FSParallelAvatar::endIdle(); // <FS:Trish/> FSPerfParallelAvatarUpdate: evaluate the queued avatar poses
 
         //update flexible objects
         LLVolumeImplFlexible::updateClass();

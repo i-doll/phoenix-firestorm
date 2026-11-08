@@ -4294,7 +4294,7 @@
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
-                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify,FSPerfParallelGeometry,FSPerfParallelGeometryVerify,FSPerfParallelGeometryMinVerts" />
+                         parameter="FSPerfParallelShadowCull,FSPerfParallelShadowCullVerify,FSPerfParallelGeometry,FSPerfParallelGeometryVerify,FSPerfParallelGeometryMinVerts,FSPerfParallelAvatarUpdate,FSPerfParallelAvatarUpdateVerify" />
                     </button>
                     <check_box
                      control_name="FSPerfParallelShadowCull"
@@ -4369,6 +4369,29 @@
                      tool_tip="EXPERIMENTAL. A geometry rebuild uses the worker threads only when it has at least this many vertices; smaller ones are built on the main thread, where waking the workers would cost more than it saves."
                      top="1020"
                      width="100" />
+                    <check_box
+                     control_name="FSPerfParallelAvatarUpdate"
+                     follows="left|top"
+                     height="20"
+                     label="Animate avatars on worker threads"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsperfparallelavatarupdate"
+                     tool_tip="EXPERIMENTAL. Evaluates the animations of all visible avatars of a frame in parallel on worker threads instead of one after another on the main thread. Helps most in crowded places. Your own avatar stays on the main thread."
+                     top="1052"
+                     width="475" />
+                    <check_box
+                     control_name="FSPerfParallelAvatarUpdateVerify"
+                     enabled_control="FSPerfParallelAvatarUpdate"
+                     follows="left|top"
+                     height="20"
+                     label="Verify parallel avatar animation"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfparallelavatarupdateverify"
+                     tool_tip="EXPERIMENTAL. Debug check: recomputes the avatar joints serially after the worker threads and logs any difference. Costs extra CPU time, only for testing."
+                     top="1078"
+                     width="455" />
                 </panel>
             </scroll_container>
         </panel>

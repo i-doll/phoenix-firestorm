@@ -96,6 +96,7 @@ public:
     friend class LLVOAvatarSelf;
     friend class LLAvatarCheckImpostorMode;
     friend class LLVisualParamHint;
+    friend class FSParallelAvatar; // <FS:Trish/> FSPerfParallelAvatarUpdate
 
 /********************************************************************************
  **                                                                            **
@@ -515,6 +516,10 @@ public:
     LLVector3           mCurRootToHeadOffset;
     LLVector3           mTargetRootToHeadOffset;
     bool                mNameTagPosSkipped = false; // <FS:Trish/> idleUpdate() skipped idleCalcNameTagPosition()
+    // <FS:Trish> FSPerfParallelAvatarUpdate: pose queued for evaluation on a worker, see fsparallelavatar.cpp
+    bool                mFSPosePending = false;
+    bool                mFSPoseWasSitGround = false;
+    // </FS:Trish>
 
     S32                 mLastSkeletonSerialNum;
 

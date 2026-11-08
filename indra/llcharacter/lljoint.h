@@ -32,6 +32,7 @@
 //-----------------------------------------------------------------------------
 #include <string>
 #include <list>
+#include <atomic> // <FS:Trish/> FSPerfParallelAvatarUpdate
 
 #include "v3math.h"
 #include "v4math.h"
@@ -146,7 +147,11 @@ public:
 
     // <FS:Trish> Unique stamp of the last world matrix recompute, so a cached skin palette can tell if this joint moved
     U64             mWorldMatrixSerial;
-    static U64      sWorldMatrixSerial;
+    // <FS:Trish> FSPerfParallelAvatarUpdate: avatars recompute their joints on worker threads, a lost
+    // increment could hand a joint its previous stamp again and leave a stale cached palette
+    //static U64      sWorldMatrixSerial;
+    static std::atomic<U64> sWorldMatrixSerial;
+    // </FS:Trish>
     // </FS:Trish>
 
     // child joints

@@ -35,6 +35,7 @@
 LLFrameTimer LLSmoothInterpolation::sInternalTimer;
 std::vector<LLSmoothInterpolation::Interpolant> LLSmoothInterpolation::sInterpolants;
 F32 LLSmoothInterpolation::sTimeDelta;
+bool LLSmoothInterpolation::sCacheFrozen = false; // <FS:Trish/> FSPerfParallelAvatarUpdate
 
 // helper functors
 struct LLSmoothInterpolation::CompareTimeConstants
@@ -95,6 +96,12 @@ F32 LLSmoothInterpolation::getInterpolant(F32SecondsImplicit time_constant, bool
         {
             return find_it->mInterpolant;
         }
+        // <FS:Trish> FSPerfParallelAvatarUpdate: worker threads are reading the cache, don't grow it
+        else if (sCacheFrozen)
+        {
+            return calcInterpolant(time_constant.value());
+        }
+        // </FS:Trish>
         else
         {
             Interpolant interp;

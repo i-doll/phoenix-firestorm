@@ -158,6 +158,18 @@ public:
     enum e_update_t { NORMAL_UPDATE, HIDDEN_UPDATE, FORCE_UPDATE };
     void updateMotions(e_update_t update_type);
 
+    // <FS:Trish> FSPerfParallelAvatarUpdate
+    // updateMotions(NORMAL_UPDATE) split for fsparallelavatar.cpp. prepare (main thread) returns false
+    // and does nothing if the update can't be split; otherwise evaluate (main or worker thread, see
+    // LLMotionController::canUpdateOffMainThread()) and finish (main thread) must follow.
+    // While evaluating, updateVisualParams() requests are deferred to finish.
+    bool prepareParallelMotionUpdate();
+    void evaluateParallelMotionUpdate();
+    bool finishParallelMotionUpdate();
+    bool mDeferVisualParamUpdates = false;
+    bool mVisualParamUpdateDeferred = false;
+    // </FS:Trish>
+
     LLAnimPauseRequest requestPause();
     bool areAnimationsPaused() const { return mMotionController.isPaused(); }
     void setAnimTimeFactor(F32 factor) { mMotionController.setTimeFactor(factor); }

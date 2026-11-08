@@ -134,6 +134,19 @@ public:
     // minimal update (e.g. while hidden)
     void updateMotionsMinimal();
 
+    // <FS:Trish> FSPerfParallelAvatarUpdate
+    // updateMotions(false) in three steps, so the pose evaluation can run on a worker thread:
+    // prepareParallelUpdate() (main thread: clock, purge, loading motions), evaluateParallelUpdate()
+    // (any thread: motion updates and pose blend, deactivations are deferred) and
+    // finishParallelUpdate() (main thread: the deferred deactivations). Only valid without a time step.
+    bool canPrepareParallelUpdate() const { return mTimeStep == 0.f; }
+    void prepareParallelUpdate();
+    void evaluateParallelUpdate();
+    bool finishParallelUpdate();
+    // Do all active motions allow evaluateParallelUpdate() off the main thread?
+    bool canUpdateOffMainThread() const;
+    // </FS:Trish>
+
     void clearBlenders() { mPoseBlender.clearBlenders(); }
 
     // flush motions
@@ -218,6 +231,10 @@ protected:
     motion_set_t        mLoadedMotions;
     motion_list_t       mActiveMotions;
     motion_set_t        mDeprecatedMotions;
+    // <FS:Trish> FSPerfParallelAvatarUpdate
+    bool                mDeferDeactivations = false;
+    std::vector<LLMotion*> mDeferredDeactivations;
+    // </FS:Trish>
 
     LLFrameTimer        mTimer;
     F32                 mPrevTimerElapsed;

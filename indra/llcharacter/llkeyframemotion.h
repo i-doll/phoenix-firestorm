@@ -146,6 +146,7 @@ public:
 
     // called when a motion is deactivated
     virtual void onDeactivate();
+    bool canUpdateOffMainThread() const override { return true; } // <FS:Trish/> FSPerfParallelAvatarUpdate, see fsparallelavatar.cpp
 
     virtual void setStopTime(F32 time);
 

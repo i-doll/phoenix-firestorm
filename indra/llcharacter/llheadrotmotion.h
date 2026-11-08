@@ -100,6 +100,7 @@ public:
 
     // called when a motion is deactivated
     virtual void onDeactivate();
+    bool canUpdateOffMainThread() const override { return true; } // <FS:Trish/> FSPerfParallelAvatarUpdate, see fsparallelavatar.cpp
 
 public:
     //-------------------------------------------------------------------------
@@ -185,6 +186,7 @@ public:
 
     // called when a motion is deactivated
     virtual void onDeactivate();
+    bool canUpdateOffMainThread() const override { return true; } // <FS:Trish/> FSPerfParallelAvatarUpdate, see fsparallelavatar.cpp
 
 public:
     //-------------------------------------------------------------------------

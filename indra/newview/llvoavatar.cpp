@@ -127,6 +127,7 @@
 #include "fsdata.h"
 #include "fsdiscordconnect.h" // <FS:LO> tapping a place that happens on landing in world to start up discord
 #include "fslslbridge.h" // <FS:PP> Movelock position refresh
+#include "fsparallelavatar.h" // <FS:Trish/> FSPerfParallelAvatarUpdate
 #include "lfsimfeaturehandler.h"    // <FS:CR> Opensim
 #include "idmaterialtheme.h" // <ID:MaterialTheme>
 #include "lggcontactsets.h"
@@ -5971,6 +5972,14 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     // store data relevant to motions
     mSpeed = speed;
 
+    // <FS:Trish> FSPerfParallelAvatarUpdate: evaluate the pose together with the other avatars on
+    // worker threads, FSParallelAvatar runs the rest of this function once that is done
+    if (visible && mSpecialRenderMode != 1 && FSParallelAvatar::isCollecting() && FSParallelAvatar::queuePose(this, was_sit_ground_constrained))
+    {
+        return visible;
+    }
+    // </FS:Trish>
+
     // update animations
     if (!visible && !isSelf()) // NOTE: never do a "hidden update" for self avatar as it interrupts controller processing
     {
@@ -8445,6 +8454,14 @@ void LLVOAvatar::initAttachmentPoints(bool ignore_hud_joints)
 //-----------------------------------------------------------------------------
 void LLVOAvatar::updateVisualParams()
 {
+    // <FS:Trish> FSPerfParallelAvatarUpdate: the pose is being evaluated on a worker thread, apply
+    // the params afterwards on the main thread (LLCharacter::finishParallelMotionUpdate())
+    if (mDeferVisualParamUpdates)
+    {
+        mVisualParamUpdateDeferred = true;
+        return;
+    }
+    // </FS:Trish>
     ESex avatar_sex = (getVisualParamWeight("male") > 0.5f) ? SEX_MALE : SEX_FEMALE;
     if (getSex() != avatar_sex)
     {
