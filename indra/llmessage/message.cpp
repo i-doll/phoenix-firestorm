@@ -866,6 +866,14 @@ void LLMessageSystem::processAcks(LockMessageChecker&, F32 collect_time)
     }
 }
 
+// <FS:Trish> For drains outside the message loop (after a long frame): the packets were acked when
+// buffered, and the sim has already waited out the frame, so send those acks now rather than after idle.
+void LLMessageSystem::sendCollectedAcks()
+{
+    mCircuitInfo.sendAcks(0.f);
+}
+// </FS:Trish>
+
 S32 LLMessageSystem::drainUdpSocket()
 {
     S32 packet_size = 1;

@@ -471,6 +471,7 @@ public:
 
     // returns total number of buffered packets after the drain
     S32     drainUdpSocket();
+    void    sendCollectedAcks(); // <FS:Trish/> send the acks collected so far, as processAcks does
 
     // Inbound Packet-loss simulation controls
     void dropPackets(U32 num_to_drop);

@@ -2072,6 +2072,8 @@ bool LLAppViewer::frame()
     return ret;
 }
 
+static void drain_network_after_long_frame(); // <FS:Trish/> defined near idleNetwork()
+
 bool LLAppViewer::doFrame()
 {
     FSRenderThread::frameStart(); // <FS:Trish/> FSRenderThread: start, check setting, stats
@@ -2299,6 +2301,7 @@ bool LLAppViewer::doFrame()
                 gGLActive = true;
 
                 display();
+                drain_network_after_long_frame(); // <FS:Trish/> don't let a long render overrun the UDP buffer
 
                 if (LLStartUp::getStartupState() == STATE_STARTED) // <FS:Beq/> FIRE-34590 - Bugsplat caused by updating maps before world is loaded.
                 {
@@ -7363,6 +7366,33 @@ constexpr F32 CHECK_MESSAGES_DEFAULT_MAX_TIME = 0.020f; // 50 ms = 50 fps (just 
 #define CHECK_MESSAGES_MAX_TIME_LIMIT 1.0f // 1 second, a long time but still able to stay connected
 static F32 CheckMessagesMaxTime = CHECK_MESSAGES_DEFAULT_MAX_TIME;
 
+// <FS:Trish> Interim hitch protection until UDP is received on its own
+// thread: after a long render, copy whatever the OS has queued into the
+// message system's inbound rings so the socket buffer can't overflow
+// before the next idleNetwork(). Only reads the socket and records acks;
+// nothing is dispatched here. Skipped for normal frames so ordering
+// between the priority rings only changes when a frame was already slow.
+static LLTimer sNetworkDrainTimer;
+constexpr F32 NETWORK_DRAIN_MIN_INTERVAL = 0.1f; // seconds
+
+static void drain_network_after_long_frame()
+{
+    if (gMessageSystem && gMessageSystem->isOK()
+        && LLStartUp::getStartupState() >= STATE_WORLD_INIT
+        && !gDisconnected && !gDoDisconnect
+        && sNetworkDrainTimer.getElapsedTimeF32() >= NETWORK_DRAIN_MIN_INTERVAL)
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_NETWORK("drain udp after frame");
+        const S32 before = gMessageSystem->getNumBufferedPackets();
+        if (gMessageSystem->drainUdpSocket() > before)
+        {
+            gMessageSystem->sendCollectedAcks(); // the sim has waited out the long frame already
+        }
+        sNetworkDrainTimer.reset();
+    }
+}
+// </FS:Trish>
+
 static LLTrace::BlockTimerStatHandle FTM_IDLE_NETWORK("Idle Network");
 static LLTrace::BlockTimerStatHandle FTM_MESSAGE_ACKS("Message Acks");
 static LLTrace::BlockTimerStatHandle FTM_RETRANSMIT("Retransmit");
@@ -7436,6 +7466,7 @@ void LLAppViewer::idleNetwork()
         static LLCachedControl<F32> ack_collection_time(gSavedSettings, "AckCollectTime", 0.025f);
         // </FS:Trish>
         lmc.processAcks(ack_collection_time());
+        sNetworkDrainTimer.reset(); // <FS:Trish/> socket was serviced just now
     }
     add(LLStatViewer::NUM_NEW_OBJECTS, gObjectList.mNumNewObjects);
 
