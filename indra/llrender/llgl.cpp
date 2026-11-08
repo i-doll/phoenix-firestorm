@@ -1458,8 +1458,38 @@ void LLGLManager::shutdownGL()
     }
 }
 
+// <ID:GLBackport>
+static bool id_gl_extension_supported(const char* name)
+{
+#if LL_SDL
+    return SDL_GL_ExtensionSupported(name);
+#else
+    return gGLHExts.mSysExts && ExtensionExists(name, gGLHExts.mSysExts);
+#endif
+}
+// </ID:GLBackport>
+
 // these are used to turn software blending on. They appear in the Debug/Avatar menu
 // presence of vertex skinning/blending or vertex programs will set these to false by default.
+
+// <FS:Trish> GL_NV_shading_rate_image (FSRenderVRS)
+PFNGLBINDSHADINGRATEIMAGENVPROC fs_glBindShadingRateImageNV = nullptr;
+PFNGLSHADINGRATEIMAGEPALETTENVPROC fs_glShadingRateImagePaletteNV = nullptr;
+PFNGLSHADINGRATEIMAGEBARRIERNVPROC fs_glShadingRateImageBarrierNV = nullptr;
+// </FS:Trish>
+
+// <FS:Trish> Parallel shader compile
+static PFNGLMAXSHADERCOMPILERTHREADSKHRPROC fs_glMaxShaderCompilerThreads = nullptr;
+
+void LLGLManager::fsSetMaxShaderCompilerThreads()
+{
+    if (mHasParallelShaderCompile && fs_glMaxShaderCompilerThreads)
+    {
+        // 0xFFFFFFFF asks for the implementation's maximum
+        fs_glMaxShaderCompilerThreads(0xFFFFFFFFu);
+    }
+}
+// </FS:Trish>
 
 void LLGLManager::initExtensions()
 {
@@ -1505,6 +1535,65 @@ void LLGLManager::initExtensions()
     glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
     glGetIntegerv(GL_MAX_ELEMENTS_INDICES, (GLint*) &mGLMaxIndexRange);
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, (GLint*) &mGLMaxTextureSize);
+
+    // <FS:Trish> Representative fragment test for occlusion queries (FSPerfRepresentativeFragmentTest):
+    // NVIDIA Turing and newer. State only, no entry points.
+    mHasNVRepresentativeFragmentTest = id_gl_extension_supported("GL_NV_representative_fragment_test");
+    LL_INFOS("RenderInit") << "NV representative fragment test available: " << mHasNVRepresentativeFragmentTest << LL_ENDL;
+    // </FS:Trish>
+
+    // <FS:Trish> Variable rate shading (FSRenderVRS): NVIDIA Turing and newer
+    fs_glBindShadingRateImageNV = nullptr;
+    fs_glShadingRateImagePaletteNV = nullptr;
+    fs_glShadingRateImageBarrierNV = nullptr;
+#if LL_WINDOWS || LL_SDL
+    if (id_gl_extension_supported("GL_NV_shading_rate_image"))
+    {
+        fs_glBindShadingRateImageNV = (PFNGLBINDSHADINGRATEIMAGENVPROC)GLH_EXT_GET_PROC_ADDRESS("glBindShadingRateImageNV");
+        fs_glShadingRateImagePaletteNV = (PFNGLSHADINGRATEIMAGEPALETTENVPROC)GLH_EXT_GET_PROC_ADDRESS("glShadingRateImagePaletteNV");
+        fs_glShadingRateImageBarrierNV = (PFNGLSHADINGRATEIMAGEBARRIERNVPROC)GLH_EXT_GET_PROC_ADDRESS("glShadingRateImageBarrierNV");
+    }
+#endif
+    mHasNVShadingRateImage = fs_glBindShadingRateImageNV && fs_glShadingRateImagePaletteNV && fs_glShadingRateImageBarrierNV;
+    LL_INFOS("RenderInit") << "NV shading rate image available: " << mHasNVShadingRateImage << LL_ENDL;
+    // </FS:Trish>
+
+    // <FS:Trish> Parallel shader compile (FSPerfParallelShaderCompile)
+    fs_glMaxShaderCompilerThreads = nullptr;
+#if LL_WINDOWS || LL_SDL
+    if (id_gl_extension_supported("GL_KHR_parallel_shader_compile"))
+    {
+        fs_glMaxShaderCompilerThreads = (PFNGLMAXSHADERCOMPILERTHREADSKHRPROC)GLH_EXT_GET_PROC_ADDRESS("glMaxShaderCompilerThreadsKHR");
+    }
+    if (!fs_glMaxShaderCompilerThreads && id_gl_extension_supported("GL_ARB_parallel_shader_compile"))
+    {
+        fs_glMaxShaderCompilerThreads = (PFNGLMAXSHADERCOMPILERTHREADSKHRPROC)GLH_EXT_GET_PROC_ADDRESS("glMaxShaderCompilerThreadsARB");
+    }
+#endif
+    mHasParallelShaderCompile = fs_glMaxShaderCompilerThreads != nullptr;
+    LL_INFOS("RenderInit") << "Parallel shader compile available: " << mHasParallelShaderCompile << LL_ENDL;
+    // </FS:Trish>
+
+    // <FS:Trish> Single pass sun shadow cascades (FSPerfShadowSinglePass): the vertex shader picks the
+    // viewport (gl_ViewportIndex). Needs viewport arrays (OpenGL 4.1, loaded below) and one of these.
+    mFSVertexViewportIndex = 0;
+    if (mGLVersion >= 4.09f)
+    {
+        if (id_gl_extension_supported("GL_ARB_shader_viewport_layer_array"))
+        {
+            mFSVertexViewportIndex = 1;
+        }
+        else if (id_gl_extension_supported("GL_NV_viewport_array2"))
+        {
+            mFSVertexViewportIndex = 2;
+        }
+        else if (id_gl_extension_supported("GL_AMD_vertex_shader_viewport_index"))
+        {
+            mFSVertexViewportIndex = 3;
+        }
+    }
+    LL_INFOS("RenderInit") << "Vertex shader viewport index: " << mFSVertexViewportIndex << LL_ENDL;
+    // </FS:Trish>
 
     mInited = true;
 

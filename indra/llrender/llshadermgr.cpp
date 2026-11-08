@@ -955,6 +955,14 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         }
     }
 
+    // <FS:Trish> Parallel shader compile: inside a batch the compile status is read later
+    // (fsRunBatched), so the driver can keep compiling while we submit more work
+    if (error == GL_NO_ERROR && ret && mFSBatching)
+    {
+        mFSPendingObjects.push_back(ret);
+    }
+    else
+    // </FS:Trish>
     if (error == GL_NO_ERROR)
     {
         //check for errors
@@ -989,6 +997,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     //successfully loaded, save results
     if (ret)
     {
+        ++mFSObjectsCompiled; // <FS:Trish/>
         // Add shader file to map
         if (type == GL_VERTEX_SHADER) {
             mVertexShaderObjects[filename] = ret;
@@ -1304,6 +1313,224 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
     }
     return false;
 }
+
+// <FS:Trish> Parallel shader compile (FSPerfParallelShaderCompile)
+#ifndef GL_COMPLETION_STATUS_KHR
+#define GL_COMPLETION_STATUS_KHR 0x91B1
+#endif
+
+bool LLShaderMgr::fsRunBatched(const std::function<bool()>& load_phase)
+{
+    if (!mFSParallelRequested || !gGLManager.mHasParallelShaderCompile || mFSBatching)
+    {
+        return load_phase();
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    gGLManager.fsSetMaxShaderCompilerThreads();
+
+    mFSBatching = true;
+    mFSBatchFailed = false;
+    mFSPendingObjects.clear();
+    mFSPendingPrograms.clear();
+    mFSBatchPrograms.clear();
+
+    // Submit: every compile and link of the phase goes to the driver without a status query
+    bool success = load_phase();
+
+    // Resolve: nothing below adds new work to the batch
+    mFSBatching = false;
+
+    // Shared objects (loadBasicShaders) are checked in submission order. Querying one blocks
+    // only until that object is done; the driver keeps compiling the rest meanwhile.
+    for (GLuint object : mFSPendingObjects)
+    {
+        GLint compiled = GL_FALSE;
+        glGetShaderiv(object, GL_COMPILE_STATUS, &compiled);
+        if (compiled != GL_TRUE)
+        {
+            success = false;
+        }
+    }
+
+    // Programs are finished in the order the driver completes them, so the main thread maps
+    // uniforms of finished programs while the driver threads still link the others.
+    while (!mFSPendingPrograms.empty())
+    {
+        bool resolved_any = false;
+        for (size_t i = 0; i < mFSPendingPrograms.size();)
+        {
+            LLGLSLShader* shader = mFSPendingPrograms[i];
+            GLint done = GL_FALSE;
+            glGetProgramiv(shader->mProgramObject, GL_COMPLETION_STATUS_KHR, &done);
+            if (done == GL_TRUE)
+            {
+                mFSPendingPrograms.erase(mFSPendingPrograms.begin() + i);
+                if (!shader->fsResolveShader())
+                {
+                    mFSBatchFailed = true;
+                }
+                resolved_any = true;
+            }
+            else
+            {
+                ++i;
+            }
+        }
+
+        if (!resolved_any)
+        {
+            // Nothing finished yet: wait on the oldest (the link status query blocks)
+            LLGLSLShader* shader = mFSPendingPrograms.front();
+            mFSPendingPrograms.erase(mFSPendingPrograms.begin());
+            if (!shader->fsResolveShader())
+            {
+                mFSBatchFailed = true;
+            }
+        }
+    }
+
+    success = success && !mFSBatchFailed;
+
+    if (!success)
+    {
+        // Put the phase back to where it started and run it the classic way, so shader level
+        // fallback, optional-program handling and the error logs are exactly the original ones
+        LL_WARNS("ShaderLoading") << "Parallel shader compile: a shader in this phase failed; loading the phase again without batching" << LL_ENDL;
+        for (GLuint object : mFSPendingObjects)
+        {
+            glDeleteShader(object);
+        }
+        for (LLGLSLShader* shader : mFSBatchPrograms)
+        {
+            shader->unload();
+        }
+        ++mFSBatchRetries;
+        mFSPendingObjects.clear();
+        mFSBatchPrograms.clear();
+        mFSBatchFailed = false;
+        return load_phase();
+    }
+
+    mFSPendingObjects.clear();
+    mFSBatchPrograms.clear();
+    return true;
+}
+
+void LLShaderMgr::fsAddPendingProgram(LLGLSLShader* shader)
+{
+    mFSPendingPrograms.push_back(shader);
+}
+
+void LLShaderMgr::fsForgetPendingProgram(LLGLSLShader* shader)
+{
+    mFSPendingPrograms.erase(std::remove(mFSPendingPrograms.begin(), mFSPendingPrograms.end(), shader), mFSPendingPrograms.end());
+}
+
+bool LLShaderMgr::fsResolvePendingProgram(LLGLSLShader* shader)
+{
+    // A program used before the end of its batch (e.g. bound to set a sampler uniform)
+    fsForgetPendingProgram(shader);
+    const bool batching = mFSBatching;
+    mFSBatching = false;
+    const bool success = shader->fsResolveShader();
+    mFSBatching = batching;
+    if (!success)
+    {
+        mFSBatchFailed = true;
+    }
+    return success;
+}
+
+void LLShaderMgr::fsNoteProgramCreated(LLGLSLShader* shader, bool from_cache)
+{
+    if (from_cache)
+    {
+        ++mFSProgramsCached;
+    }
+    else
+    {
+        ++mFSProgramsCompiled;
+    }
+
+    if (mFSBatching && std::find(mFSBatchPrograms.begin(), mFSBatchPrograms.end(), shader) == mFSBatchPrograms.end())
+    {
+        mFSBatchPrograms.push_back(shader);
+    }
+}
+
+bool LLShaderMgr::fsCheckLinkStatus(GLuint program)
+{
+    // Same test as linkProgramObject(), minus the logs: a failure re-runs the phase the
+    // classic way, which logs it.
+    GLint success = GL_FALSE;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (success != GL_TRUE)
+    {
+        return false;
+    }
+
+    std::string log = get_program_log(program);
+    LLStringUtil::toLower(log);
+    if (log.find("software") != std::string::npos)
+    {
+        return false;
+    }
+    return true;
+}
+
+void LLShaderMgr::fsBeginLoadStats(bool parallel_requested)
+{
+    mFSParallelRequested = parallel_requested;
+    mFSProgramsCompiled = 0;
+    mFSProgramsCached = 0;
+    mFSObjectsCompiled = 0;
+    mFSBatchRetries = 0;
+    mFSLoadStart = LLTimer::getTotalSeconds();
+}
+
+void LLShaderMgr::fsEndLoadStats()
+{
+    const F64 seconds = LLTimer::getTotalSeconds() - mFSLoadStart;
+
+    // Global defines reach every program's hash, so a changed one makes every program miss the
+    // binary cache. Name them, so a full recompile can be traced to the setting behind it.
+    std::string changed;
+    if (!mFSLastGlobalDefines.empty())
+    {
+        const LLGLSLShader::defines_map_t& now = LLGLSLShader::sGlobalDefines;
+        for (const auto& define : now)
+        {
+            auto old = mFSLastGlobalDefines.find(define.first);
+            if (old == mFSLastGlobalDefines.end())
+            {
+                changed += " +" + define.first;
+            }
+            else if (old->second != define.second)
+            {
+                changed += " " + define.first + "(" + old->second + "->" + define.second + ")";
+            }
+        }
+        for (const auto& define : mFSLastGlobalDefines)
+        {
+            if (!now.count(define.first))
+            {
+                changed += " -" + define.first;
+            }
+        }
+    }
+    mFSLastGlobalDefines = LLGLSLShader::sGlobalDefines;
+
+    const bool parallel = mFSParallelRequested && gGLManager.mHasParallelShaderCompile;
+    LL_INFOS("ShaderLoading") << "Shader load took " << llformat("%.3f", seconds) << " s: "
+        << mFSProgramsCompiled << " programs compiled, " << mFSProgramsCached << " loaded from binary cache, "
+        << mFSObjectsCompiled << " shader objects compiled; parallel compile "
+        << (parallel ? "on" : (mFSParallelRequested ? "unavailable" : "off"))
+        << ", batch retries " << mFSBatchRetries
+        << "; global defines changed:" << (changed.empty() ? std::string(" none") : changed) << LL_ENDL;
+}
+// </FS:Trish>
 
 //virtual
 void LLShaderMgr::initAttribsAndUniforms()

@@ -138,6 +138,8 @@
 #include "llerror.h"
 #include "idvolumetricclouds.h" // <ID:VolumetricClouds/>
 #include "fsdynamicresolution.h" // <FS:Trish/> Dynamic resolution
+#include "fsrepresentativefragment.h" // <FS:Trish/> Representative fragment test for occlusion queries
+#include "fsvrs.h" // <FS:Trish/> Variable rate shading
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -1521,6 +1523,7 @@ void LLPipeline::releaseGLBuffers()
     }
 
     releaseLUTBuffers();
+    FSVRS::releaseGL(); // <FS:Trish/> Variable rate shading
 
     mWaterDis.release();
 
@@ -1627,6 +1630,7 @@ void LLPipeline::releaseSunShadowTargets()
         releaseSunShadowTarget(i);
     }
     fsReleaseShadowCache(); // <FS:Trish/> FSPerfShadowStaticCache
+    fsReleaseShadowSinglePass(); // <FS:Trish/> FSPerfShadowSinglePass
 }
 
 void LLPipeline::releaseSpotShadowTargets()
@@ -3030,6 +3034,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         gGL.setColorMask(false, false);
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);
         LLGLDisable cull(GL_CULL_FACE);
+        FSRepresentativeFragmentScope representative_fragment; // <FS:Trish/> query-only draws from here
 
         gOcclusionCubeProgram.bind();
 
@@ -3057,6 +3062,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);
 
         LLGLDisable cull(GL_CULL_FACE);
+        FSRepresentativeFragmentScope representative_fragment; // <FS:Trish/> query-only draws from here
 
         gOcclusionCubeProgram.bind();
 
@@ -10387,6 +10393,8 @@ void LLPipeline::renderFinalize()
         std::swap(sourceBuffer, targetBuffer);
     }
 
+    FSVRS::buildRateImage(sourceBuffer, &mRT->deferredScreen); // <FS:Trish/> Variable rate shading: next frame's rates
+
      if (RenderFSAAType == 1)
     {
         applyFXAA(sourceBuffer, targetBuffer);
@@ -12424,7 +12432,11 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
         //{
         //    renderObjects(type, false, false, rigged);
         //}
-        if (rigged || !fsRenderShadowOpaqueBatches(types, LL_ARRAY_SIZE(types)))
+        if (fsShadowSinglePassRecord(FS_SHADOW_SP_OPAQUE, rigged, types, LL_ARRAY_SIZE(types)))
+        {
+            // FSPerfShadowSinglePass: recorded, drawn once for all cascades by fsShadowSinglePassFinish
+        }
+        else if (rigged || !fsRenderShadowOpaqueBatches(types, LL_ARRAY_SIZE(types)))
         {
             for (U32 type : types)
             {
@@ -12459,6 +12471,7 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
         {
             bool rigged = i == 1;
 
+            if (!fsShadowSinglePassRecord(FS_SHADOW_SP_ALPHA_MASK, rigged)) // <FS:Trish/> FSPerfShadowSinglePass
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha masked");
                 LL_PROFILE_GPU_ZONE("shadow alpha masked");
@@ -12478,6 +12491,7 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                 renderAlphaObjects(rigged);
             }
 
+            if (!fsShadowSinglePassRecord(FS_SHADOW_SP_FULLBRIGHT_MASK, rigged)) // <FS:Trish/> FSPerfShadowSinglePass
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow fullbright alpha masked");
                 LL_PROFILE_GPU_ZONE("shadow alpha masked");
@@ -12498,6 +12512,7 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                     renderObjects(LLRenderPass::PASS_GRASS, true);
                 }
 
+                if (!fsShadowSinglePassRecord(FS_SHADOW_SP_MATERIAL_MASK, rigged)) // <FS:Trish/> FSPerfShadowSinglePass
                 {
                     LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha material");
                     LL_PROFILE_GPU_ZONE("shadow alpha material");
@@ -12535,7 +12550,13 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
         }
     }
 
-    renderColoredShadowCasters(); // <FS:Trish/> coloured shadows: translucent casters of this sun cascade
+    // <FS:Trish> coloured shadows: translucent casters of this sun cascade
+    //renderColoredShadowCasters();
+    if (!fsShadowSinglePassDeferColored()) // FSPerfShadowSinglePass: after the merge, see fsShadowSinglePassFinish
+    {
+        renderColoredShadowCasters();
+    }
+    // </FS:Trish>
 
     gDeferredShadowCubeProgram.bind();
     gGLLastMatrix = NULL;
@@ -14788,6 +14809,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             }
         }
 
+        fsShadowSinglePassBegin(); // <FS:Trish/> FSPerfShadowSinglePass
         //for (S32 j = 0; j < (gCubeSnapshot ? 2 : 4); j++)
         for (S32 j = 0; !probe_shadow_done && j < (gCubeSnapshot ? 2 : 4); j++) // <FS:Trish/>
         {
@@ -15266,7 +15288,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 }
                 sShadowMinCasterSize = have_union_cull ? 0.f : min_caster_size; // <FS:Trish/> used by LLOctreeCullShadow
                 fsShadowCacheBeginCascade(j, proj[j], view[j]); // <FS:Trish/> FSPerfShadowStaticCache
+                fsShadowSinglePassBeginCascade(j, proj[j], view[j], result[j]); // <FS:Trish/> FSPerfShadowSinglePass
                 renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull);
+                fsShadowSinglePassEndCascade(); // <FS:Trish/>
                 fsShadowCacheEndCascade(); // <FS:Trish/>
                 sShadowMinCasterSize = 0.f; // <FS:Trish/>
             }
@@ -15278,6 +15302,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 mShadowCamera[j+4] = shadow_cam;
             }
         }
+        fsShadowSinglePassFinish(); // <FS:Trish/> FSPerfShadowSinglePass: the recorded casters, once for all cascades
         mColoredShadowCascade = -1; // <FS:Trish/> not for the projector shadows below
     }
     // <FS:Trish> coloured projector shadows turned off: free the maps even while no shadow re-renders

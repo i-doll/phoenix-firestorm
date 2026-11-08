@@ -55,6 +55,7 @@
 #include "fspointlightbatch.h" // <FS:Trish/>
 #include "fsssrhiz.h" // <FS:Trish/>
 #include "fsskinonce.h" // <FS:Trish/>
+#include "fsshadowsinglepass.h" // <FS:Trish/>
 
 static LLStaticHashedString sTexture0("texture0");
 static LLStaticHashedString sTexture1("texture1");
@@ -803,6 +804,11 @@ void LLViewerShaderMgr::setShaders()
         return;
     }
 
+    // <FS:Trish> Parallel shader compile and load timing (one log line at the end)
+    static LLCachedControl<bool> fs_parallel_compile(gSavedSettings, "FSPerfParallelShaderCompile", false);
+    fsBeginLoadStats(fs_parallel_compile);
+    // </FS:Trish>
+
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
         LLUUID old_cache_version;
@@ -904,7 +910,11 @@ void LLViewerShaderMgr::setShaders()
     mShaderLevel[SHADER_WINDLIGHT] = wl_class;
     mShaderLevel[SHADER_DEFERRED] = deferred_class;
 
-    std::string shader_name = loadBasicShaders();
+    // <FS:Trish> Parallel shader compile: each load phase is one batch
+    //std::string shader_name = loadBasicShaders();
+    std::string shader_name;
+    fsRunBatched([&]() { shader_name = loadBasicShaders(); return shader_name.empty(); });
+    // </FS:Trish>
     if (shader_name.empty())
     {
         LL_INFOS("Shader") << "Loaded basic shaders." << LL_ENDL;
@@ -926,7 +936,10 @@ void LLViewerShaderMgr::setShaders()
 
     gPipeline.mShadersLoaded = false;
 
-    bool loaded = loadShadersWater();
+    // <FS:Trish> Parallel shader compile
+    //bool loaded = loadShadersWater();
+    bool loaded = fsRunBatched([this]() { return loadShadersWater(); });
+    // </FS:Trish>
 
     if (loaded)
     {
@@ -939,7 +952,10 @@ void LLViewerShaderMgr::setShaders()
 
     if (loaded)
     {
-        loaded = loadShadersEffects();
+        // <FS:Trish> Parallel shader compile
+        //loaded = loadShadersEffects();
+        loaded = fsRunBatched([this]() { return loadShadersEffects(); });
+        // </FS:Trish>
         if (loaded)
         {
             LL_INFOS() << "Loaded effects shaders." << LL_ENDL;
@@ -952,7 +968,10 @@ void LLViewerShaderMgr::setShaders()
 
     if (loaded)
     {
-        loaded = loadShadersInterface();
+        // <FS:Trish> Parallel shader compile
+        //loaded = loadShadersInterface();
+        loaded = fsRunBatched([this]() { return loadShadersInterface(); });
+        // </FS:Trish>
         if (loaded)
         {
             LL_INFOS() << "Loaded interface shaders." << LL_ENDL;
@@ -969,7 +988,10 @@ void LLViewerShaderMgr::setShaders()
         mShaderLevel[SHADER_AVATAR] = 3;
         mMaxAvatarShaderLevel = 3;
 
-        if (loadShadersObject())
+        // <FS:Trish> Parallel shader compile
+        //if (loadShadersObject())
+        if (fsRunBatched([this]() { return loadShadersObject(); }))
+        // </FS:Trish>
         { //hardware skinning is enabled and rigged attachment shaders loaded correctly
             // cloth is a class3 shader
             constexpr S32 avatar_class = 1;
@@ -977,7 +999,10 @@ void LLViewerShaderMgr::setShaders()
             // Set the actual level
             mShaderLevel[SHADER_AVATAR] = avatar_class;
 
-            loaded = loadShadersAvatar();
+            // <FS:Trish> Parallel shader compile
+            //loaded = loadShadersAvatar();
+            loaded = fsRunBatched([this]() { return loadShadersAvatar(); });
+            // </FS:Trish>
             if (!loaded)
             {
                 LL_ERRS("Shader") << "Failed to load required avatar shaders. See preceding shader compilation/link errors." << LL_ENDL;
@@ -993,7 +1018,12 @@ void LLViewerShaderMgr::setShaders()
     }
 
     llassert(loaded);
-    loaded = loaded && loadShadersDeferred();
+    // <FS:Trish> Parallel shader compile
+    //loaded = loaded && loadShadersDeferred();
+    // A failed batch runs the phase again: drop the material programs it listed the first time
+    const size_t fs_list_size = mShaderList.size();
+    loaded = loaded && fsRunBatched([this, fs_list_size]() { mShaderList.resize(fs_list_size); return loadShadersDeferred(); });
+    // </FS:Trish>
     if (!loaded)
     {
         LL_ERRS("Shader") << "Failed to load required deferred shaders. See preceding shader compilation/link errors." << LL_ENDL;
@@ -1014,6 +1044,8 @@ void LLViewerShaderMgr::setShaders()
     gPipeline.createGLBuffers();
 
     finalizeShaderList();
+
+    fsEndLoadStats(); // <FS:Trish/>
 
     reentrance = false;
 }
@@ -1573,6 +1605,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gIDCloudsFroxelAccumProgram.unload();
         // </ID:VolumetricClouds>
         unload_fs_colored_shadow_casters(); // <FS:Trish/>
+        fsUnloadShadowSinglePassShaders(); // <FS:Trish/>
 
         for (auto i = 0; i < 4; ++i)
         {
@@ -2858,6 +2891,15 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = success && gDeferredShadowGLTFAlphaBlendProgram.createShader();
         llassert(success);
     }
+
+    // <FS:Trish> FSPerfShadowSinglePass: single pass copies of the sun shadow caster programs. Optional,
+    // a failure leaves the cascades on their own passes.
+    fsUnloadShadowSinglePassShaders();
+    if (success)
+    {
+        fsLoadShadowSinglePassShaders(mShaderLevel[SHADER_DEFERRED], use_sun_shadow);
+    }
+    // </FS:Trish>
 
     if (success)
     {

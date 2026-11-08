@@ -97,6 +97,7 @@
 #include "llpresetsmanager.h"
 #include "fsdata.h"
 #include "fsdynamicresolution.h" // <FS:Trish/> Dynamic resolution
+#include "fsvrs.h" // <FS:Trish/> Variable rate shading
 
 // <FS:PP> Render chat range spheres in 3D world
 #include "lfsimfeaturehandler.h"
@@ -1168,7 +1169,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             }
 
             gGL.setColorMask(true, true);
+            FSVRS::beginGBuffer(for_snapshot); // <FS:Trish/> Variable rate shading: main camera G-buffer only
             gPipeline.renderGeomDeferred(*LLViewerCamera::getInstance(), true);
+            FSVRS::endGBuffer(); // <FS:Trish/> Variable rate shading
         }
 
         {

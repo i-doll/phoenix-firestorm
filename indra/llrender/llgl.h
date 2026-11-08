@@ -99,6 +99,10 @@ public:
     bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
     bool mHasDSA = false;
+    bool mHasNVRepresentativeFragmentTest = false; // <FS:Trish/> GL_NV_representative_fragment_test (FSPerfRepresentativeFragmentTest)
+    bool mHasNVShadingRateImage = false; // <FS:Trish/> GL_NV_shading_rate_image (FSRenderVRS)
+    bool mHasParallelShaderCompile = false; // <FS:Trish/> GL_KHR/ARB_parallel_shader_compile
+    S32 mFSVertexViewportIndex = 0; // <FS:Trish/> gl_ViewportIndex from the vertex shader (FSPerfShadowSinglePass): 0 none, 1 ARB, 2 NV, 3 AMD
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
@@ -141,6 +145,9 @@ public:
     void getGLInfo(LLSD& info);
 
     void asLLSD(LLSD& info);
+    // <FS:Trish> Parallel shader compile: let the driver use all its compiler threads
+    void fsSetMaxShaderCompilerThreads();
+    // </FS:Trish>
 
     // In ALL CAPS
     std::string mGLVendor;
@@ -488,5 +495,12 @@ extern bool gGLActive;
 #ifndef GL_DEPTH24_STENCIL8
 #define GL_DEPTH24_STENCIL8 GL_DEPTH24_STENCIL8_EXT
 #endif
+
+// <FS:Trish> GL_NV_shading_rate_image entry points (FSRenderVRS), loaded by initExtensions().
+// Only valid while gGLManager.mHasNVShadingRateImage is true.
+extern PFNGLBINDSHADINGRATEIMAGENVPROC fs_glBindShadingRateImageNV;
+extern PFNGLSHADINGRATEIMAGEPALETTENVPROC fs_glShadingRateImagePaletteNV;
+extern PFNGLSHADINGRATEIMAGEBARRIERNVPROC fs_glShadingRateImageBarrierNV;
+// </FS:Trish>
 
 #endif // LL_LLGL_H

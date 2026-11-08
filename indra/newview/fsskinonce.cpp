@@ -376,7 +376,7 @@ namespace
         {
             return true;
         }
-        if (sCaptureFailed)
+        if (sCaptureFailed || LLShaderMgr::instance()->fsIsBatching())
         {
             return false;
         }

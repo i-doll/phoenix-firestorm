@@ -26927,6 +26927,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.05</real>
     </map>
+    <key>FSPerfShadowSinglePass</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Draw the opaque and alpha masked shadow casters of the sun shadow cascades once instead of once per cascade: each object is sent with one instanced draw call that the graphics card routes to every cascade it reaches (into a shadow atlas that is then merged into the cascade maps). Shadows look the same. Saves CPU time in busy scenes. Needs OpenGL 4.1 and GL_ARB_shader_viewport_layer_array, GL_NV_viewport_array2 or GL_AMD_vertex_shader_viewport_index; without them the cascades are drawn as before. Uses one extra depth buffer the size of the four sun shadow maps. Rebuilds shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSRenderColoredShadows</key>
     <map>
       <key>Comment</key>
@@ -27619,6 +27630,72 @@ Change of this parameter will affect the layout of buttons in notification toast
       <string>S32</string>
       <key>Value</key>
       <integer>0</integer>
+    </map>
+    <key>FSPerfRepresentativeFragmentTest</key>
+    <map>
+      <key>Comment</key>
+      <string>Enable GL_NV_representative_fragment_test around the occlusion query box draws (object groups, object cache and reflection probes), so the GPU can stop rasterizing a box face once one of its pixels is known to be visible. Only applied while color, depth and stencil writes are off, and only to queries that ask whether anything is visible. NVIDIA Turing and newer; ignored elsewhere.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfParallelShaderCompile</key>
+    <map>
+      <key>Comment</key>
+      <string>Compile shaders in parallel when the driver supports GL_KHR_parallel_shader_compile or GL_ARB_parallel_shader_compile. Each load phase submits all its compiles and links first and reads the results at the end, so the driver can use all its compiler threads. If a shader fails, that phase is loaded again the old way, one shader at a time, with the usual fallback and error log. Has no effect if the driver lacks the extension. Takes effect at the next shader reload; it does not cause one.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderVRS</key>
+    <map>
+      <key>Comment</key>
+      <string>Variable rate shading of the main view's opaque G-buffer pass through GL_NV_shading_rate_image (NVIDIA RTX / GTX 16xx, Turing or newer, only). Tiles of 16x16 pixels that were low in contrast last frame, the sky, and areas blurred by depth of field run the pixel shaders once per 2x1, 1x2, 2x2 (up to 4x4 for the sky and strong blur) pixels; tiles with edges stay at full rate. Lighting and post effects still run at full resolution. Never used for snapshots, reflection probes, mirrors, shadows, transparency or the UI. Does nothing on other graphics cards. No shader rebuild.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSRenderVRSQuality</key>
+    <map>
+      <key>Comment</key>
+      <string>Variable rate shading: how much detail a tile may have and still be shaded coarsely, 0 to 1. Higher keeps more tiles at full rate (better quality, smaller saving); lower shades more tiles coarsely. Maps to a per pixel luminance step threshold of 0.05 (at 0) to 0.005 (at 1).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>FSRenderVRSPeriphery</key>
+    <map>
+      <key>Comment</key>
+      <string>Variable rate shading: extra coarsening towards the screen edges, 0 to 1. 0 treats the whole screen alike; 1 lets the corners be shaded coarsely with up to five times the contrast of the centre. Strong edges always stay at full rate.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>FSRenderVRSLogInterval</key>
+    <map>
+      <key>Comment</key>
+      <string>Variable rate shading: seconds between log lines giving the share of tiles at each shading rate and the average G-buffer pass GPU time with and without variable rate shading. 0 turns the log off.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>5.0</real>
     </map>
     <key>FSRenderShadowFarCascadeInterval</key>
     <map>

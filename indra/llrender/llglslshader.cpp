@@ -357,6 +357,15 @@ void LLGLSLShader::unloadInternal()
 {
     sInstances.erase(this);
 
+    // <FS:Trish> Parallel shader compile: drop a program still waiting in a batch
+    if (mFSPending)
+    {
+        mFSPending = false;
+        LLShaderMgr::instance()->fsForgetPendingProgram(this);
+    }
+    mFSLinked = false;
+    // </FS:Trish>
+
     stop_glerror();
     mAttribute.clear();
     mTexture.clear();
@@ -451,6 +460,14 @@ bool LLGLSLShader::createShader()
 
     mUsingBinaryProgram =  LLShaderMgr::instance()->loadCachedProgramBinary(this);
 
+    // <FS:Trish> Parallel shader compile: inside a batch, submit and finish later
+    LLShaderMgr::instance()->fsNoteProgramCreated(this, mUsingBinaryProgram);
+    if (!mUsingBinaryProgram && LLShaderMgr::instance()->fsIsBatching())
+    {
+        return fsSubmitShader();
+    }
+    // </FS:Trish>
+
     if (!mUsingBinaryProgram)
     {
 #if DEBUG_SHADER_INCLUDES
@@ -480,6 +497,13 @@ bool LLGLSLShader::createShader()
         unloadInternal();
         return false;
     }
+    // <FS:Trish> Parallel shader compile: the rest is shared with fsResolveShader()
+    return fsFinishCreateShader(success);
+}
+
+bool LLGLSLShader::fsFinishCreateShader(bool success)
+{
+    // </FS:Trish>
     // Map attributes and uniforms
     if (success)
     {
@@ -559,6 +583,89 @@ bool LLGLSLShader::createShader()
 
     return success;
 }
+
+// <FS:Trish> Parallel shader compile (FSPerfParallelShaderCompile, LLShaderMgr::fsRunBatched)
+bool LLGLSLShader::fsSubmitShader()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    LLShaderMgr* mgr = LLShaderMgr::instance();
+
+    // This program's own objects are covered by its link status; only shared objects
+    // (loadBasicShaders) stay on the manager's list to be checked one by one
+    const size_t first_object = mgr->mFSPendingObjects.size();
+    bool submitted = true;
+    for (const auto& file : mShaderFiles)
+    {
+        GLuint handle = mgr->loadShaderFile(file.first, mShaderLevel, file.second, &mDefines, mFeatures.mIndexedTextureChannels);
+        if (handle)
+        {
+            attachObject(handle);
+        }
+        else
+        {
+            submitted = false;
+        }
+    }
+    mgr->mFSPendingObjects.resize(first_object);
+
+    if (!submitted)
+    {
+        // Missing file or GL error before the compile even started: take the classic path,
+        // which has the shader level fallback
+        return fsCreateShaderSync();
+    }
+
+    if (!mgr->attachShaderFeatures(this))
+    {
+        unloadInternal();
+        return false;
+    }
+
+    // As mapAttributes(): reserved attributes get consistent locations before linking
+    for (U32 i = 0; i < mgr->mReservedAttribs.size(); i++)
+    {
+        glBindAttribLocation(mProgramObject, i, (const GLchar*)mgr->mReservedAttribs[i].c_str());
+    }
+    glLinkProgram(mProgramObject);
+
+    mFSPending = true;
+    mgr->fsAddPendingProgram(this);
+    return true;
+}
+
+bool LLGLSLShader::fsCreateShaderSync()
+{
+    LLShaderMgr* mgr = LLShaderMgr::instance();
+    const bool batching = mgr->mFSBatching;
+    mgr->mFSBatching = false;
+    const bool success = createShader();
+    mgr->mFSBatching = batching;
+    return success;
+}
+
+bool LLGLSLShader::fsResolveShader()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    mFSPending = false;
+
+    LLShaderMgr* mgr = LLShaderMgr::instance();
+    if (mProgramObject == 0 || !mgr->fsCheckLinkStatus(mProgramObject))
+    {
+        // Left as is: the batch is loaded again the classic way, which logs the error
+        return false;
+    }
+
+    // As link()
+    mgr->saveCachedProgramBinary(this);
+
+    mFSLinked = true;
+    const bool success = fsFinishCreateShader(true);
+    mFSLinked = false;
+    return success && mProgramObject != 0;
+}
+// </FS:Trish>
 
 #if DEBUG_SHADER_INCLUDES
 void dumpAttachObject(const char* func_name, GLuint program_object, const std::string& object_path)
@@ -659,7 +766,10 @@ bool LLGLSLShader::mapAttributes()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
     bool res = true;
-    if (!mUsingBinaryProgram)
+    // <FS:Trish> Parallel shader compile: a batched program was linked and checked already
+    //if (!mUsingBinaryProgram)
+    if (!mUsingBinaryProgram && !mFSLinked)
+    // </FS:Trish>
     {
         //before linking, make sure reserved attributes always have consistent locations
         for (U32 i = 0; i < LLShaderMgr::instance()->mReservedAttribs.size(); i++)
@@ -1055,6 +1165,14 @@ bool LLGLSLShader::link(bool suppress_errors)
 void LLGLSLShader::bind()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    // <FS:Trish> Parallel shader compile: finish a batched program before its first use. If it
+    // failed, its batch is loaded again the classic way, so skip this use rather than assert.
+    if (mFSPending && !LLShaderMgr::instance()->fsResolvePendingProgram(this) && mProgramObject == 0)
+    {
+        return;
+    }
+    // </FS:Trish>
 
     llassert_always(mProgramObject != 0);
 
