@@ -147,6 +147,30 @@ public:
     static void fsReplayMap(const FSMapRecord& record);
     // </FS:Trish>
 
+    // <FS:Trish> FSPerfVertexArrayObjects: a buffer drawn more than once keeps vertex array
+    // objects of its own, one per shader attribute mask (up to FS_VAOS_PER_BUFFER), holding its
+    // attribute layout, enabled arrays and index buffer. setBuffer() then binds one object
+    // instead of binding both buffers and setting every attribute pointer again; buffers drawn
+    // in only one frame (immediate mode batches, often drawn several times within it) keep the
+    // old path, or objects were made and thrown away every frame. Everything else, including code that
+    // sets attributes itself, works on the global object LLRender::init creates: it calls
+    // fsUseDefaultVAO() first, and so do unbind(), setupClientArrays() and every path that binds
+    // an index buffer for an upload. Main thread only.
+    static void fsSetVAOEnabled(bool enabled);
+    // LLRender::init: the global object, bound; a new context invalidates every buffer's objects
+    static void fsSetDefaultVAO(U32 vao);
+    // binds the global object if a buffer's own is bound
+    static void fsUseDefaultVAO()
+    {
+        if (sFSBoundVAO != sFSDefaultVAO)
+        {
+            fsBindDefaultVAO();
+        }
+    }
+    // a buffer name is about to be deleted: the binding trackers must not take it for bound
+    static void fsForgetDeletedBuffer(U32 name);
+    // </FS:Trish>
+
     //WARNING -- when updating these enums you MUST
     // 1 - update LLVertexBuffer::sTypeSize
     // 2 - update LLVertexBuffer::vb_type_name
@@ -350,6 +374,31 @@ protected:
     std::vector<MappedRegion> mMappedIndexRegions;   // list of mMappedIndexData byte ranges that must be sent to GL
 
     U32     mFSContentSerial;   // <FS:Trish/> see getFSContentSerial()
+
+    // <FS:Trish> FSPerfVertexArrayObjects
+    // six, replaced least recently used first: a buffer drawn with more attribute masks than it
+    // has objects would build one on every draw
+    static constexpr U32 FS_VAOS_PER_BUFFER = 6;
+    struct FSVAO
+    {
+        U32 mMask = 0;
+        U32 mVAO = 0;
+        U32 mLastUse = 0;   // sFSVAOClock when last bound
+    };
+    FSVAO   mFSVAO[FS_VAOS_PER_BUFFER];
+    U32     mFSVAOGeneration = 0;   // the context's generation the objects belong to
+    U8      mFSUses = 0;            // frames the buffer was drawn in, counted to 2
+    U32     mFSLastUseFrame = 0;    // sFSFrame of the last counted one
+    void    fsReleaseVAOs();
+    static void fsBindDefaultVAO();
+    static bool sFSVAOEnabled;
+    static U32  sFSDefaultVAO;
+    static U32  sFSBoundVAO;
+    static U32  sFSDefaultIndices;  // the global object's index buffer while another is bound
+    static U32  sFSVAOGenerationNow;
+    static U32  sFSFrame;           // advanced by fsSetVAOEnabled, once a frame
+    static U32  sFSVAOClock;        // advanced by every bind of a buffer's own object
+    // </FS:Trish>
 
 private:
     // DEPRECATED

@@ -427,6 +427,8 @@ FSGDDArenaEntry* FSGDDArena::find(LLVertexBuffer* vb, U32 frame, U32* reason)
 
 void FSGDDArena::bindForDraw(U32 attrib_mask)
 {
+    // the attributes and index buffer go into the global vertex array object, never a buffer's own
+    LLVertexBuffer::fsUseDefaultVAO();
     for (size_t i = 0; i < mTypes.size(); ++i)
     {
         const U32 type = mTypes[i];

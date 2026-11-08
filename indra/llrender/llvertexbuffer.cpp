@@ -29,6 +29,8 @@
 #include "llfasttimer.h"
 #include "llsys.h"
 #include "llvertexbuffer.h"
+#include <mutex> // <FS:Trish/>
+#include "llthread.h" // <FS:Trish/> on_main_thread
 // #include "llrender.h"
 #include "llglheaders.h"
 #include "llrender.h"
@@ -327,6 +329,15 @@ static void delete_buffers(S32 count, GLuint* buffers)
 
         if (!sFreeList[idx].empty())
         {
+            // <FS:Trish> the trackers must not take a deleted name for bound (see fsForgetDeletedBuffer)
+            if (on_main_thread())
+            {
+                for (GLuint name : sFreeList[idx])
+                {
+                    LLVertexBuffer::fsForgetDeletedBuffer(name);
+                }
+            }
+            // </FS:Trish>
             glDeleteBuffers((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
             sFreeList[idx].resize(0);
         }
@@ -473,6 +484,7 @@ public:
             }
             else
             {
+                LLVertexBuffer::fsUseDefaultVAO(); // <FS:Trish/>
                 glBindBuffer(type, name);
                 glBufferData(type, size, nullptr, GL_DYNAMIC_DRAW);
                 if (type == GL_ELEMENT_ARRAY_BUFFER)
@@ -703,6 +715,111 @@ U64 LLVertexBuffer::getBytesAllocated()
 U32 LLVertexBuffer::sGLRenderBuffer = 0;
 U32 LLVertexBuffer::sGLRenderIndices = 0;
 U32 LLVertexBuffer::sLastMask = 0;
+// <FS:Trish> FSPerfVertexArrayObjects
+bool LLVertexBuffer::sFSVAOEnabled = false;
+U32 LLVertexBuffer::sFSDefaultVAO = 0;
+U32 LLVertexBuffer::sFSBoundVAO = 0;
+U32 LLVertexBuffer::sFSDefaultIndices = 0;
+U32 LLVertexBuffer::sFSVAOGenerationNow = 1;
+U32 LLVertexBuffer::sFSFrame = 1;
+U32 LLVertexBuffer::sFSVAOClock = 0;
+
+namespace
+{
+    // Objects of buffers destroyed off the main thread, deleted on it at the next setBuffer()
+    std::mutex sFSDeadVAOMutex;
+    std::vector<U32> sFSDeadVAOs;
+    std::atomic<bool> sFSHaveDeadVAOs{ false };
+}
+
+//static
+void LLVertexBuffer::fsSetVAOEnabled(bool enabled)
+{
+    ++sFSFrame;
+    // not on Apple, where unmapping a buffer replaces its GL names
+    sFSVAOEnabled = enabled && sFSDefaultVAO != 0 && !gGLManager.mIsApple;
+    if (!sFSVAOEnabled)
+    {
+        fsUseDefaultVAO();
+    }
+}
+
+//static
+void LLVertexBuffer::fsSetDefaultVAO(U32 vao)
+{
+    sFSDefaultVAO = vao;
+    sFSBoundVAO = vao;
+    sFSDefaultIndices = 0;
+    ++sFSVAOGenerationNow; // objects made in an earlier context are gone with it
+    std::lock_guard<std::mutex> lock(sFSDeadVAOMutex);
+    sFSDeadVAOs.clear();
+    sFSHaveDeadVAOs = false;
+}
+
+//static
+void LLVertexBuffer::fsBindDefaultVAO()
+{
+    glBindVertexArray(sFSDefaultVAO);
+    sFSBoundVAO = sFSDefaultVAO;
+    sGLRenderIndices = sFSDefaultIndices; // the index binding is the object's own
+    // The global object's attribute pointers may belong to another buffer than the one bound
+    // last (building an object binds its buffer): force the next setBuffer to set them up
+    sGLRenderBuffer = 0;
+}
+
+//static
+void LLVertexBuffer::fsForgetDeletedBuffer(U32 name)
+{
+    if (!name)
+    {
+        return;
+    }
+    // GL unbinds a deleted buffer from GL_ARRAY_BUFFER and from the bound vertex array object
+    if (sGLRenderBuffer == name)
+    {
+        sGLRenderBuffer = 0;
+    }
+    if (sGLRenderIndices == name)
+    {
+        sGLRenderIndices = 0;
+    }
+    // Other vertex array objects keep the orphan attached, under a name glGenBuffers may hand out
+    // again: what the global one holds is unknown, so the next setBuffer() binds its indices
+    // whatever they are. (Not done by binding the global object first: code between a
+    // setBuffer() and its draw may free a buffer, and that draw needs the object it set up.)
+    if (sFSBoundVAO != sFSDefaultVAO && sFSDefaultIndices == name)
+    {
+        sFSDefaultIndices = U32_MAX;
+    }
+}
+
+void LLVertexBuffer::fsReleaseVAOs()
+{
+    const bool live = mFSVAOGeneration == sFSVAOGenerationNow;
+    for (FSVAO& v : mFSVAO)
+    {
+        if (v.mVAO && live)
+        {
+            if (on_main_thread())
+            {
+                if (sFSBoundVAO == v.mVAO)
+                {
+                    fsBindDefaultVAO();
+                }
+                glDeleteVertexArrays(1, &v.mVAO);
+            }
+            else
+            {
+                std::lock_guard<std::mutex> lock(sFSDeadVAOMutex);
+                sFSDeadVAOs.push_back(v.mVAO);
+                sFSHaveDeadVAOs = true;
+            }
+        }
+        v = FSVAO();
+    }
+    mFSUses = 0;
+}
+// </FS:Trish>
 // <FS:Trish> Skin once per frame, see getFSContentSerial()
 LLVertexBuffer::fs_rigged_draw_hook_t LLVertexBuffer::sFSRiggedDrawHook = nullptr;
 static U32 sFSNextContentSerial = 0;
@@ -764,6 +881,7 @@ const U32 LLVertexBuffer::sGLMode[LLRender::NUM_MODES] =
 //static
 void LLVertexBuffer::setupClientArrays(U32 data_mask)
 {
+    fsUseDefaultVAO(); // <FS:Trish/> the enabled arrays are the object's own
     if (sLastMask != data_mask)
     {
         for (U32 i = 0; i < TYPE_MAX; ++i)
@@ -1024,11 +1142,13 @@ void LLVertexBuffer::initClass(LLWindow* window)
 void LLVertexBuffer::unbind()
 {
     STOP_GLERROR;
+    fsUseDefaultVAO(); // <FS:Trish/>
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     STOP_GLERROR;
     sGLRenderBuffer = 0;
     sGLRenderIndices = 0;
+    sFSDefaultIndices = 0; // <FS:Trish/>
 }
 
 //static
@@ -1136,6 +1256,7 @@ LLVertexBuffer::~LLVertexBuffer()
 
     destroyGLBuffer();
     destroyGLIndices();
+    fsReleaseVAOs(); // <FS:Trish/>
 
     if (mMappedData)
     {
@@ -1152,6 +1273,7 @@ LLVertexBuffer::~LLVertexBuffer()
 void LLVertexBuffer::genBuffer(U32 size)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
+    fsReleaseVAOs(); // <FS:Trish/> new buffer, new layout
     llassert(sVBOPool);
 
     if (sVBOPool)
@@ -1168,6 +1290,7 @@ void LLVertexBuffer::genBuffer(U32 size)
 void LLVertexBuffer::genIndices(U32 size)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
+    fsReleaseVAOs(); // <FS:Trish/> new index buffer
     llassert(sVBOPool);
 
     if (sVBOPool)
@@ -1498,6 +1621,27 @@ U8* LLVertexBuffer::mapIndexBuffer(U32 index, S32 count)
 //  dst -- mMappedData or mMappedIndexData
 void LLVertexBuffer::flush_vbo(GLenum target, U32 start, U32 end, void* data, U8* dst)
 {
+    // <FS:Trish> Never upload into a buffer's own object. Without DSA the upload targets the
+    // bound buffer, which setBuffer() no longer binds for a buffer drawn through its own object:
+    // bind it here, and leave the array tracker unset so setBuffer sets the pointers up again.
+    // With DSA nothing is bound, so whichever object is bound stays.
+    if (!gGLManager.mHasDSA)
+    {
+        fsUseDefaultVAO();
+        if (target == GL_ARRAY_BUFFER && sGLRenderBuffer != mGLBuffer)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
+            sGLRenderBuffer = 0;
+        }
+        else if (target == GL_ELEMENT_ARRAY_BUFFER && sGLRenderIndices != mGLIndices)
+        {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
+            sGLRenderIndices = mGLIndices;
+            sFSDefaultIndices = mGLIndices;
+        }
+    }
+    // </FS:Trish>
+
     if (gGLManager.mIsApple)
     {
         // on OS X, flush_vbo doesn't actually write to the GL buffer, so be sure to call
@@ -1510,13 +1654,12 @@ void LLVertexBuffer::flush_vbo(GLenum target, U32 start, U32 end, void* data, U8
     }
     else
     {
-        llassert(target == GL_ARRAY_BUFFER ? sGLRenderBuffer == mGLBuffer : sGLRenderIndices == mGLIndices);
+        // <FS:Trish> bound above when it matters (without DSA)
+        //llassert(target == GL_ARRAY_BUFFER ? sGLRenderBuffer == mGLBuffer : sGLRenderIndices == mGLIndices);
 
-        // <FS:Trish> Skin once per frame: vertex data changed
-        if (target == GL_ARRAY_BUFFER)
-        {
-            mFSContentSerial = ++sFSNextContentSerial;
-        }
+        // <FS:Trish> Skin once per frame: vertex data changed. Indices too: the GPU-driven arenas
+        // keep copies of both and compare this serial.
+        mFSContentSerial = ++sFSNextContentSerial;
         // </FS:Trish>
 
         // skip mapped data and stream to GPU via glBufferSubData
@@ -1570,6 +1713,7 @@ void LLVertexBuffer::_unmapBuffer()
     {
         return;
     }
+    fsUseDefaultVAO(); // <FS:Trish/> the upload binds the index buffer
 
     mFSContentSerial = ++sFSNextContentSerial; // <FS:Trish/> Skin once per frame: vertex data may have changed
 
@@ -1857,6 +2001,112 @@ void LLVertexBuffer::setBuffer()
     llassert_msg((data_mask & mTypeMask) == data_mask,
         "Attribute mask mismatch! mTypeMask should be a superset of data_mask.  data_mask: 0x"
                 << std::hex << data_mask << " mTypeMask: 0x" << mTypeMask << " Missing: 0x" << (data_mask & ~mTypeMask) <<  std::dec);
+
+    // <FS:Trish> FSPerfVertexArrayObjects: the buffer's own object for this attribute mask
+    if (sFSHaveDeadVAOs)
+    {
+        std::vector<U32> dead;
+        {
+            std::lock_guard<std::mutex> lock(sFSDeadVAOMutex);
+            dead.swap(sFSDeadVAOs);
+            sFSHaveDeadVAOs = false;
+        }
+        for (U32 vao : dead)
+        {
+            if (sFSBoundVAO == vao)
+            {
+                fsBindDefaultVAO();
+            }
+            glDeleteVertexArrays(1, &vao);
+        }
+    }
+    if (sFSVAOEnabled && mGLBuffer)
+    {
+        if (mFSVAOGeneration != sFSVAOGenerationNow)
+        {   // made in an earlier context: the names are gone with it
+            for (FSVAO& v : mFSVAO)
+            {
+                v = FSVAO();
+            }
+            mFSVAOGeneration = sFSVAOGenerationNow;
+            mFSUses = 0;
+        }
+        if (mFSUses < 2 && mFSLastUseFrame != sFSFrame)
+        {   // drawn in another frame than before
+            ++mFSUses;
+            mFSLastUseFrame = sFSFrame;
+        }
+        if (mFSUses >= 2)
+        {
+            FSVAO* slot = nullptr;
+            FSVAO* oldest = &mFSVAO[0];   // an empty slot, or the least recently used one
+            for (FSVAO& v : mFSVAO)
+            {
+                if (v.mVAO && v.mMask == data_mask)
+                {
+                    slot = &v;
+                    break;
+                }
+                if (oldest->mVAO && (!v.mVAO || v.mLastUse < oldest->mLastUse))
+                {
+                    oldest = &v;
+                }
+            }
+            if (!slot)
+            {   // build it: the same calls as below, captured once
+                slot = oldest;
+                if (slot->mVAO)
+                {
+                    if (sFSBoundVAO == slot->mVAO)
+                    {
+                        fsBindDefaultVAO();
+                    }
+                    glDeleteVertexArrays(1, &slot->mVAO);
+                    slot->mVAO = 0;
+                }
+                if (sFSBoundVAO == sFSDefaultVAO)
+                {
+                    sFSDefaultIndices = sGLRenderIndices;
+                }
+                U32 vao = 0;
+                glGenVertexArrays(1, &vao);
+                glBindVertexArray(vao);
+                sFSBoundVAO = vao;
+                glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
+                sGLRenderBuffer = mGLBuffer;
+                setupVertexBuffer();
+                for (U32 i = 0; i < TYPE_MAX; ++i)
+                {
+                    if (data_mask & (1 << i))
+                    {
+                        glEnableVertexAttribArray(i);
+                    }
+                }
+                if (mGLIndices)
+                {
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
+                }
+                slot->mVAO = vao;
+                slot->mMask = data_mask;
+            }
+            else if (sFSBoundVAO != slot->mVAO)
+            {
+                if (sFSBoundVAO == sFSDefaultVAO)
+                {
+                    sFSDefaultIndices = sGLRenderIndices;
+                }
+                glBindVertexArray(slot->mVAO);
+                sFSBoundVAO = slot->mVAO;
+            }
+            slot->mLastUse = ++sFSVAOClock;
+            sGLRenderIndices = mGLIndices;  // this object's index buffer
+            sGLRenderBuffer = mGLBuffer;    // as the draw checks expect; the layout is captured
+            STOP_GLERROR;
+            return;
+        }
+    }
+    fsUseDefaultVAO();
+    // </FS:Trish>
 
     if (sGLRenderBuffer != mGLBuffer)
     {
