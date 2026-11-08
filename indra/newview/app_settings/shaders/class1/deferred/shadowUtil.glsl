@@ -218,6 +218,10 @@ float pcfShadow(sampler2DShadow shadowMap, vec3 norm, vec4 stc, float bias_mul, 
 float pcfSpotShadow(sampler2DShadow shadowMap, vec4 stc, float bias_scale, vec2 pos_screen)
 {
 #if defined(SPOT_SHADOW)
+    if (stc.w <= 0.0)
+    {
+        return 1.0; // behind the projector: the divide would mirror the map
+    }
     stc.xyz /= stc.w;
     stc.z += spot_shadow_bias * bias_scale;
     if (cube_snapshot != 0)

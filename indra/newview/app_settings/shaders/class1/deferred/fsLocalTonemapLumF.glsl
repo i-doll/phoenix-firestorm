@@ -21,5 +21,7 @@ void main()
     c += texture(diffuseRect, tc + vec2( 1.0,  1.0) * src_texel).rgb;
 
     float L = dot(max(c * 0.25, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722));
+    // Keep NaN and Inf out of the log and the mip chain built from it
+    L = isnan(L) ? 0.0 : min(L, 65504.0);
     frag_color = vec4(log2(max(L, 1.0e-4)), 0.0, 0.0, 1.0);
 }

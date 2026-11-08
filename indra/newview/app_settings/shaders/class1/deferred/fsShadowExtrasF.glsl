@@ -54,18 +54,20 @@ uniform vec4 fs_cloud_params;         // x: cloud_scale, y: cloud_variance, z: c
 uniform vec2 fs_cloud_light_offset;   // lightnorm.xz * 0.0125: the sky's self shadow offset
 uniform vec2 fs_cloud_shadow;         // x: strength 0-1 (0: off), y: softness 0-1
 
-vec4 fsCloudNoise(vec2 uv, float bias)
+// Explicit LOD: the uv comes from the world position, so implicit derivatives jump across
+// depth edges and pick a wrong mip in a line along every silhouette.
+vec4 fsCloudNoise(vec2 uv, float lod)
 {
     // blend_factor is uniform: endpoint skies need only one lookup
     if (fs_cloud_params.w <= 0.0)
     {
-        return texture(cloud_noise_texture, uv, bias);
+        return textureLod(cloud_noise_texture, uv, lod);
     }
     if (fs_cloud_params.w >= 1.0)
     {
-        return texture(cloud_noise_texture_next, uv, bias);
+        return textureLod(cloud_noise_texture_next, uv, lod);
     }
-    return mix(texture(cloud_noise_texture, uv, bias), texture(cloud_noise_texture_next, uv, bias), fs_cloud_params.w);
+    return mix(textureLod(cloud_noise_texture, uv, lod), textureLod(cloud_noise_texture_next, uv, lod), fs_cloud_params.w);
 }
 
 // fraction (0..1) of the light the cloud layer lets through to view space position pos
@@ -92,7 +94,11 @@ float fsCloudShadow(vec3 pos, vec3 light_dir)
     vec2 q = p.xy + l.xy * ((fs_cloud_map.w - p.z) / max(l.z, 0.05));
 
     float softness = clamp(fs_cloud_shadow.y, 0.0, 1.0);
-    float bias = softness * 3.0;                  // mip bias: softer cloud edges
+    // Mip of the base (uv1) frequency: a pixel's footprint, taken as about 1 mrad of the
+    // distance (smooth in depth, unlike derivatives), in noise texels, plus the softness bias.
+    // The taps below add log2 of their own frequency to it.
+    float texels_per_metre = fs_cloud_map.z * float(textureSize(cloud_noise_texture, 0).x);
+    float lod = log2(max(length(p) * 0.001 * texels_per_metre, 1.0)) + softness * 3.0;
 
     // the uv sets of cloudsV.glsl (before the scroll)
     vec2 uv1 = fs_cloud_map.xy + vec2(q.x, -q.y) * fs_cloud_map.z;
@@ -104,8 +110,8 @@ float fsCloudShadow(vec3 pos, vec3 light_dir)
     float cloud_variance = fs_cloud_params.y;
     float cloudDensity = 2.0 * (fs_cloud_params.z - 0.25);
 
-    vec2 disturbance  = vec2(fsCloudNoise(uv1 / 8.0, bias).x, fsCloudNoise((uv3 + uv1) / 16.0, bias).x) * cloud_variance * (1.0 - cloud_scale * 0.25);
-    vec2 disturbance2 = vec2(fsCloudNoise((uv1 + uv3) / 4.0, bias).x, fsCloudNoise((uv4 + uv2) / 8.0, bias).x) * cloud_variance * (1.0 - cloud_scale * 0.25);
+    vec2 disturbance  = vec2(fsCloudNoise(uv1 / 8.0, lod - 3.0).x, fsCloudNoise((uv3 + uv1) / 16.0, lod).x) * cloud_variance * (1.0 - cloud_scale * 0.25);
+    vec2 disturbance2 = vec2(fsCloudNoise((uv1 + uv3) / 4.0, lod + 2.0).x, fsCloudNoise((uv4 + uv2) / 8.0, lod + 1.0).x) * cloud_variance * (1.0 - cloud_scale * 0.25);
 
     uv1 += fs_cloud_pos_density1.xy + (disturbance * 0.2);
     uv3 += fs_cloud_pos_density2.xy;
@@ -113,7 +119,7 @@ float fsCloudShadow(vec3 pos, vec3 light_dir)
     float density_variance = min(1.0, (disturbance.x * 2.0 + disturbance.y * 2.0 + disturbance2.x + disturbance2.y) * 4.0);
     cloudDensity *= 1.0 - (density_variance * density_variance);
 
-    float alpha1 = (fsCloudNoise(uv1, bias).x - 0.5) + (fsCloudNoise(uv3, bias).x - 0.5) * fs_cloud_pos_density2.z;
+    float alpha1 = (fsCloudNoise(uv1, lod).x - 0.5) + (fsCloudNoise(uv3, lod + 4.0).x - 0.5) * fs_cloud_pos_density2.z;
     // the sky's gain of 10 gives hard edged clouds; softness lowers it
     alpha1 = min(max(alpha1 + cloudDensity, 0.0) * mix(10.0, 3.0, softness) * fs_cloud_pos_density1.z, 1.0);
     alpha1 = 1.0 - alpha1 * alpha1;

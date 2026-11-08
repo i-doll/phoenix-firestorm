@@ -32,6 +32,9 @@ vec3 brightPart(vec3 c)
 vec3 tap(vec2 tc, float scale, inout float weight_sum)
 {
     vec3 c = texture(diffuseRect, tc).rgb * scale;
+    // A NaN or Inf texel would poison the weights and spread over the whole bloom
+    c = mix(c, vec3(0.0), isnan(c));
+    c = min(c, vec3(65000.0));
     c = brightPart(c);
     // A single very bright pixel would otherwise turn into a flickering blob: weigh each tap
     // down by its own brightness, so the average leans toward the typical value

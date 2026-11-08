@@ -40,10 +40,11 @@ vec3 fsColoredShadowFetch(sampler2D map, mat4 m, vec3 pos)
     return texture(map, uv).rgb;
 }
 
-// Sun transmittance (linear rgb, 1 = unfiltered) at view space position pos. Cascade 0 up to
-// its split, cascade 1 past it; fades back to white across the blend from cascade 1 to 2
-// (0.75 to 1.25 times the second split, as in sampleDirectionalShadow), since the far
-// cascades have no colour map.
+// Sun transmittance (linear rgb, 1 = unfiltered) at view space position pos. Cascade 0 blends
+// into cascade 1 over 0.75 to 1.25 times the first split, the range sampleDirectionalShadow
+// blends the depth maps over, so the tint does not step where the shadow does not. Fades back
+// to white across the blend from cascade 1 to 2 (the same range around the second split),
+// since the far cascades have no colour map.
 vec3 fsColoredShadowTransmittance(vec3 pos)
 {
     float z = -pos.z;
@@ -53,15 +54,20 @@ vec3 fsColoredShadowTransmittance(vec3 pos)
         return vec3(1.0);
     }
 
-    vec3 t = vec3(1.0);
-    if (z < shadow_clip.x && colored_shadow_valid.x > 0.5)
+    // 0 in cascade 0 alone, 1 in cascade 1 alone
+    float blend = clamp((z - 0.75 * shadow_clip.x) / max(0.5 * shadow_clip.x, 1.0e-3), 0.0, 1.0);
+
+    vec3 t0 = vec3(1.0);
+    vec3 t1 = vec3(1.0);
+    if (blend < 1.0 && colored_shadow_valid.x > 0.5)
     {
-        t = fsColoredShadowFetch(coloredShadowMap0, shadow_matrix[0], pos);
+        t0 = fsColoredShadowFetch(coloredShadowMap0, shadow_matrix[0], pos);
     }
-    else if (z >= shadow_clip.x && colored_shadow_valid.y > 0.5)
+    if (blend > 0.0 && colored_shadow_valid.y > 0.5)
     {
-        t = fsColoredShadowFetch(coloredShadowMap1, shadow_matrix[1], pos);
+        t1 = fsColoredShadowFetch(coloredShadowMap1, shadow_matrix[1], pos);
     }
+    vec3 t = mix(t0, t1, blend);
 
     float fade = clamp((far_end - z) / max(shadow_clip.y * 0.5, 1.0e-3), 0.0, 1.0);
     return mix(vec3(1.0), clamp(t, vec3(0.0), vec3(1.0)), fade);

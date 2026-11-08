@@ -112,7 +112,8 @@ vec3 pbrBaseLight(vec3 diffuseColor,
                   vec3 colorEmissive,
                   float ao,
                   vec3 additive,
-                  vec3 atten);
+                  vec3 atten,
+                  float micro);
 
 GBufferInfo getGBuffer(vec2 screenpos);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
@@ -279,8 +280,10 @@ void main()
         calcDiffuseSpecular(baseColor.rgb, metallic, diffuseColor, specularColor);
 
         vec3 v = -normalize(pos.xyz);
-        scol *= fsMicroShadow(dot(gb.normal, light_dir), visibility); // normal-map micro-shadows, 1 when off
-        color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten);
+        // Normal-map micro-shadows, 1 when off. The cone comes from the normal map's own
+        // occlusion; SSAO measures larger scale geometry, not the bumps the normal map draws.
+        float micro = fsMicroShadow(dot(gb.normal, light_dir), ao);
+        color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten, micro);
     }
     else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
     {
@@ -334,11 +337,8 @@ void main()
         glossenv *= fsSpecularOcclusion(envVisibility, fs_nv, 1.0 - spec.a);
         legacyenv *= fsSpecularOcclusion(envVisibility, fs_nv, 0.0);
 
-        // Normal-map micro-shadows on the sun, 1 when off. Both halves of min(da, scol) and the
-        // specular's scol, so it scales the sun term rather than only capping it.
-        float fs_micro = fsMicroShadow(da, envVisibility);
-        da *= fs_micro;
-        scol *= fs_micro;
+        // No normal-map micro-shadows here: the cone needs the material's own occlusion, which
+        // legacy materials do not have, and SSAO is the wrong scale for it.
 
         // apply lambertian IBL only (see pbrIbl)
         color.rgb = irradiance;

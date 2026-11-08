@@ -46,7 +46,9 @@ float fsSpecularAARoughness(float perceptualRoughness, vec3 n, vec3 mapNormal)
     float variance = fs_specular_aa_variance * (dot(du, du) + dot(dv, dv));
 
     float len = clamp(length(mapNormal), 0.05, 1.0);
-    variance += max(1.0 - len - FS_SPECULAR_AA_TOKSVIG_DEADZONE, 0.0) / len;
+    // Relative to the 0.25 default, so the strength setting scales this term too and 0 turns
+    // it off, while the default looks as before
+    variance += max(1.0 - len - FS_SPECULAR_AA_TOKSVIG_DEADZONE, 0.0) / len * (fs_specular_aa_variance * 4.0);
 
     float kernel = min(2.0 * variance, fs_specular_aa_threshold);
 

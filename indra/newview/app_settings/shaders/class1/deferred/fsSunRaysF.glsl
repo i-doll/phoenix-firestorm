@@ -83,7 +83,8 @@ float phase(float cos_theta, float g)
 {
     float g2 = g * g;
     float denom = 1.0 + g2 - 2.0 * g * cos_theta;
-    return (1.0 - g2) / (denom * sqrt(denom));
+    // Capped: near g = 1 the peak grows without bound and blows out bloom
+    return min((1.0 - g2) / (denom * sqrt(denom)), 16.0);
 }
 
 // Per pixel start offset (interleaved gradient noise), so neighbouring pixels sample between

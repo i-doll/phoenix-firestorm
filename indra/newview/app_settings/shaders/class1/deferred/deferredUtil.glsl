@@ -650,7 +650,8 @@ void pbrIbl(vec3 diffuseColor,
     // Keep Firestorm's established single-scatter response. The added multiple-scattering
     // compensation raised rough reflective materials enough to look self-lit under probes.
     vec2 brdf = BRDF(clamp(nv, 0.0, 1.0), 1.0-perceptualRough);
-    diffuseOut = irradiance * diffuseColor * ao;
+    // Multi-bounce (see gtaoMultiBounce), as the classic branch of pbrBaseLight applies it
+    diffuseOut = irradiance * diffuseColor * gtaoMultiBounce(ao, diffuseColor);
     specularOut = radiance * (specularColor * brdf.x + brdf.y) * fsSpecularOcclusion(ao, nv, perceptualRough);
 }
 
@@ -993,7 +994,9 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor
     specularColor = mix(f0, baseColor, metallic);
 }
 
-vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten)
+// micro: normal-map micro-shadow factor for the sun (fsMicroShadow), kept apart from scol
+// because the classic branch spends scol twice and the micro-shadow must apply once.
+vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten, float micro)
 {
     perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     vec3 color = vec3(0);
@@ -1040,13 +1043,13 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
         // this explicit rather than accidental, and it picks up the material occlusion that this
         // branch has never applied.
         vec3 finalAmbient = irradiance.rgb * diffuseColor.rgb * gtaoMultiBounce(ao, diffuseColor); // BINGO
-        vec3 finalSun = clampRadiance(sun_contrib * ((diffPunc.rgb + specPunc.rgb) * scol)); // QUESTIONABLE BINGO?
+        vec3 finalSun = clampRadiance(sun_contrib * ((diffPunc.rgb + specPunc.rgb) * scol)) * micro; // QUESTIONABLE BINGO?
         color.rgb = srgb_to_linear(linear_to_srgb(finalAmbient) + (linear_to_srgb(finalSun) * 1.1));
         //color.rgb = sun_contrib * diffuseColor.rgb;
     }
     else
     {
-        color += clampRadiance(nl * (diffPunc + specPunc)) * sunlit * PUNCTUAL_LIGHT_SCALE * scol;
+        color += clampRadiance(nl * (diffPunc + specPunc)) * sunlit * PUNCTUAL_LIGHT_SCALE * (scol * micro);
     }
 
     color.rgb += iblSpec.rgb;
@@ -1054,6 +1057,12 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
     color += colorEmissive;
 
     return color;
+}
+
+// Without micro-shadows: the forward PBR passes
+vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten)
+{
+    return pbrBaseLight(diffuseColor, specularColor, metallic, v, norm, perceptualRoughness, light_dir, sunlit, scol, radiance, irradiance, colorEmissive, ao, additive, atten, 1.0);
 }
 
 uniform vec4 waterPlane;

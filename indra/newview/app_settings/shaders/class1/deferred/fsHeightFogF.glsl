@@ -105,7 +105,8 @@ float fsHeightFogPhase(float cos_theta, float g)
 {
     float g2 = g * g;
     float denom = 1.0 + g2 - 2.0 * g * cos_theta;
-    return (1.0 - g2) / (denom * sqrt(denom));
+    // Capped: near g = 1 the peak grows without bound and blows out bloom
+    return min((1.0 - g2) / (denom * sqrt(denom)), 16.0);
 }
 
 // Linear HDR colour of the light the fog scatters toward the camera along view_dir. amb_scale and
@@ -133,7 +134,11 @@ vec3 fsHeightFogColor(vec3 view_dir, float amb_scale, float sun_scale)
     // The sky's haze colour with the sun's share scattered by the lobe, converted the way
     // atmosFragLighting converts the haze
     vec3 col = blue_horizon * blue_weight * (cs + amb) + haze_horizon * haze_weight * (cs * phase + amb);
-    col = srgb_to_linear(min(col, vec3(10.0)) * 2.0) * sky_hdr_scale;
+    // Clamp after the conversion and by the peak channel, so a bright lobe keeps its hue.
+    // 1174 is srgb_to_linear(20), the old per channel cap of 10 doubled.
+    col = srgb_to_linear(col * 2.0);
+    col *= min(1.0, 1174.0 / max(max(col.r, max(col.g, col.b)), 1e-6));
+    col *= sky_hdr_scale;
 
     if (fs_height_fog_color.a > 0.5)
     {

@@ -14,9 +14,10 @@
 //
 // Output is visibility in [0,1], 1 unoccluded, the same range and meaning the SSAO estimator
 // writes into the green channel, so the light-map blur and the lighting pass are unchanged.
-// The slice rotation and step offset are jittered per pixel for that blur to resolve. Multi-bounce is not applied here: the PBR lighting already lifts this term
-// through gtaoMultiBounce (deferredUtil.glsl) with the surface albedo, and doing it twice
-// would double-count.
+// The slice rotation and step offset are jittered per pixel for that blur to resolve.
+// Multi-bounce is not applied here: the PBR ambient term (pbrIbl, and the classic branch of
+// pbrBaseLight in deferredUtil.glsl) lifts it through gtaoMultiBounce with the surface albedo,
+// and doing it twice would double-count. Legacy materials get the plain visibility.
 
 #ifndef FS_GTAO_SLICES
 #define FS_GTAO_SLICES 2
@@ -43,6 +44,7 @@ uniform vec2 screen_res;
 uniform float ssao_max_radius;   // RenderSSAOMaxScale: ceiling on the search radius in pixels
 uniform float fs_gtao_radius;    // FSRenderGTAORadius: search radius in metres
 uniform float fs_gtao_intensity; // FSRenderGTAOIntensity: exponent on the visibility
+uniform float ssao_factor;       // RenderSSAOFactor: AO strength, as the stock SSAO uses it
 
 float getDepth(vec2 pos_screen);
 bool isFarDepth(float d);
@@ -219,5 +221,9 @@ float fsCalcGTAO(vec3 pos, vec3 norm, vec2 pos_screen)
 
     visibility /= float(FS_GTAO_SLICES);
 
-    return pow(clamp(visibility, 0.0, 1.0), max(fs_gtao_intensity, 0.05)); // pow(0, 0) is undefined
+    visibility = pow(clamp(visibility, 0.0, 1.0), max(fs_gtao_intensity, 0.05)); // pow(0, 0) is undefined
+    // The AO strength setting, so it controls GTAO as it does the stock estimator: 0 turns it
+    // off and the stock default (0.3) and up give the full effect, which FSRenderGTAOIntensity
+    // shapes. The half resolution pass calls this too; the upsample does not apply it again.
+    return mix(1.0, visibility, clamp(ssao_factor / 0.3, 0.0, 1.0));
 }

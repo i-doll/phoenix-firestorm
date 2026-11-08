@@ -98,7 +98,8 @@ float phaseHG(float cos_theta, float g)
 {
     float g2 = g * g;
     float denom = 1.0 + g2 - 2.0 * g * cos_theta;
-    return (1.0 - g2) / (denom * sqrt(denom));
+    // Capped: near g = 1 the peak grows without bound and blows out bloom
+    return min((1.0 - g2) / (denom * sqrt(denom)), 16.0);
 }
 
 // Dust scatters strongly forward: backlit specks blaze, side lit ones are faint
@@ -321,8 +322,8 @@ void main()
                 k_slow.y = k_slow.x;
                 ph_slow.y = ph_slow.x + 0.25;
             }
-            float tc = dust_time * (1.0 / CYCLE);
-            vec3 wobble = 0.7 * sin(TWO_PI * fract(k_slow * tc + ph_slow)) + 0.3 * sin(TWO_PI * fract(k_fast * tc + ph_fast));
+            float cyc = dust_time * (1.0 / CYCLE);
+            vec3 wobble = 0.7 * sin(TWO_PI * fract(k_slow * cyc + ph_slow)) + 0.3 * sin(TWO_PI * fract(k_fast * cyc + ph_fast));
             vec3 mote = vec3(cell) + path + w * wobble;
 
             vec3 rel = (mote - dust_cam_cell) * cs;     // metres from the camera
@@ -362,7 +363,7 @@ void main()
                     // Twinkle: a flat flake turning slowly (2 to 8 seconds a turn, its own rate
                     // and phase) flashes twice a turn as it faces the light. Some motes are
                     // brighter than others.
-                    float spin = TWO_PI * fract(float(120u + 4u * (hl3.x >> 26u)) * tc + r.z);
+                    float spin = TWO_PI * fract(float(120u + 4u * (hl3.x >> 26u)) * cyc + r.z);
                     float twinkle = 0.3 + 2.0 * pow(abs(cos(spin)), 12.0);
                     float variety = 0.3 + 0.7 * r.y * r.y;
 

@@ -41,6 +41,9 @@ void main()
     float z = dot(vec4(ssr_inv_proj[0].z, ssr_inv_proj[1].z, ssr_inv_proj[2].z, ssr_inv_proj[3].z), ndc);
     float w = dot(vec4(ssr_inv_proj[0].w, ssr_inv_proj[1].w, ssr_inv_proj[2].w, ssr_inv_proj[3].w), ndc);
     float lin = -z / w;
+    // Half float storage rounds to nearest (up to 1/2048 relative): pull the depth toward the
+    // camera by more than that, so the stored nearest depth never lies behind the surface.
+    lin *= 1.0 - 1.0 / 1024.0;
     // Half float storage: keep the far plane (or an infinite one) finite.
     frag_color = vec4(col, clamp(lin, 0.0, 60000.0));
 }
