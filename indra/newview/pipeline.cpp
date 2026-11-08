@@ -11337,19 +11337,36 @@ static void fs_bind_wet_shore(LLGLSLShader& shader)
     static LLCachedControl<F32> swell(gSavedSettings, "FSRenderWetShoreSwell", 0.15f);
     static LLStaticHashedString s_params("fs_wet_shore_params");
     static LLStaticHashedString s_inv_view("fs_wet_shore_inv_view");
+    static LLStaticHashedString s_offset("fs_wet_shore_offset");
 
     if (!enabled || shader.getUniformLocation(s_params) < 0)
     {
         return;
     }
 
-    // The swells are sines of this phase at fractional rates: wrapped at an hour, they jump once
-    const F32 phase = gCubeSnapshot ? 0.f : (F32)fmod(LLFrameTimer::getElapsedSeconds(), 3600.0);
+    // The swells' phases and the noise offset are worked out in F64 and wrapped where the
+    // pattern repeats (a whole turn; a period of whole noise cells), so nothing pops when time
+    // grows or when the agent's region, which agent space is relative to, changes
+    constexpr F64 NOISE_PERIOD_M = 1000.0; // metres (FS_WET_SHORE_PERIOD); fsWetShoreF.glsl's noise repeats there
+    constexpr F64 TWO_PI = 6.283185307179586;
+    const F64 t = gCubeSnapshot ? 0.0 : LLFrameTimer::getElapsedSeconds().value();
+    LLVector3d origin;
+    if (LLViewerRegion* region = gAgent.getRegion())
+    {
+        origin = region->getOriginGlobal();
+    }
+    const F64 phase1 = fmod(t * 0.45 + origin.mdV[VX] * 0.11 + origin.mdV[VY] * 0.07, TWO_PI);
+    const F64 phase2 = fmod(t * 0.31 - origin.mdV[VX] * 0.05 - origin.mdV[VY] * 0.13, TWO_PI);
     shader.uniform4f(s_params,
                      llclamp((F32)strength, 0.f, 1.f),
                      llclamp((F32)height, 0.f, 5.f),
-                     phase,
+                     0.f,
                      llclamp((F32)swell, 0.f, 2.f));
+    shader.uniform4f(s_offset,
+                     (F32)fmod(origin.mdV[VX], NOISE_PERIOD_M),
+                     (F32)fmod(origin.mdV[VY], NOISE_PERIOD_M),
+                     (F32)phase1,
+                     (F32)phase2);
 
     const glm::mat4 inv_view = glm::inverse(get_current_modelview());
     shader.uniformMatrix4fv(s_inv_view, 1, GL_FALSE, glm::value_ptr(inv_view));

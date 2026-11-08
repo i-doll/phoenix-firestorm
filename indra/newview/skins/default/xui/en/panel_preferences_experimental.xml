@@ -1996,6 +1996,56 @@
                      width="100" />
                     <text
                      follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderwaterfogvariation_label"
+                     tool_tip="EXPERIMENTAL. How much the murkiness of the water varies, in slowly drifting patches. 0 is the uniform fog of the stock viewer, which hides underwater surfaces along one clean contour."
+                     top="2030"
+                     width="285">
+                        Water fog variation
+                    </text>
+                    <spinner
+                     control_name="FSRenderWaterFogVariation"
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1.0"
+                     min_val="0.0"
+                     name="fs_fsrenderwaterfogvariation"
+                     tool_tip="EXPERIMENTAL. How much the murkiness of the water varies, in slowly drifting patches. 0 is the uniform fog of the stock viewer, which hides underwater surfaces along one clean contour."
+                     top="2028"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderwaterfogpatchsize_label"
+                     tool_tip="EXPERIMENTAL. Size of the murkier and clearer patches in the water."
+                     top="2058"
+                     width="285">
+                        Fog patch size (m)
+                    </text>
+                    <spinner
+                     control_name="FSRenderWaterFogPatchSize"
+                     decimal_digits="1"
+                     follows="left|top"
+                     height="20"
+                     increment="0.5"
+                     layout="topleft"
+                     left="330"
+                     max_val="100.0"
+                     min_val="0.5"
+                     name="fs_fsrenderwaterfogpatchsize"
+                     tool_tip="EXPERIMENTAL. Size of the murkier and clearer patches in the water."
+                     top="2056"
+                     width="100" />
+                    <text
+                     follows="left|top"
                      font="SansSerifBold"
                      height="18"
                      layout="topleft"

@@ -39,6 +39,58 @@ vec3 atmosFragLighting(vec3 light, vec3 additive, vec3 atten);
 vec3 fsApplyHeightFog(vec3 pos, vec3 color); // fsHeightFogF.glsl
 #endif
 
+// FS: water fog variation (FSRenderWaterFogVariation). Uploaded with the other water uniforms;
+// left at zero, as in programs that don't get them, it changes nothing.
+uniform vec4 fs_water_fog_noise;            // x variation 0 to 1, y patches per metre (info only), w noise period in cells
+uniform vec4 fs_water_fog_vtw0;              // eye space to noise space, by rows: global position in patches
+uniform vec4 fs_water_fog_vtw1;              // plus the drift, wrapped at the period on the CPU
+uniform vec4 fs_water_fog_vtw2;
+
+float fsWaterFogHash(vec3 p)
+{
+    p = fract(p * 0.1031);
+    p += dot(p, p.zyx + 31.32);
+    return fract((p.x + p.y) * p.z);
+}
+
+// Value noise in [0, 1], its lattice repeating every period cells so the CPU can wrap the offset
+float fsWaterFogNoise(vec3 p, float period)
+{
+    vec3 i = floor(p);
+    vec3 f = p - i;
+    f = f * f * (3.0 - 2.0 * f);
+    float n000 = fsWaterFogHash(mod(i, period));
+    float n100 = fsWaterFogHash(mod(i + vec3(1.0, 0.0, 0.0), period));
+    float n010 = fsWaterFogHash(mod(i + vec3(0.0, 1.0, 0.0), period));
+    float n110 = fsWaterFogHash(mod(i + vec3(1.0, 1.0, 0.0), period));
+    float n001 = fsWaterFogHash(mod(i + vec3(0.0, 0.0, 1.0), period));
+    float n101 = fsWaterFogHash(mod(i + vec3(1.0, 0.0, 1.0), period));
+    float n011 = fsWaterFogHash(mod(i + vec3(0.0, 1.0, 1.0), period));
+    float n111 = fsWaterFogHash(mod(i + vec3(1.0, 1.0, 1.0), period));
+    return mix(mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y),
+               mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y), f.z);
+}
+
+// How much thicker or thinner the water between the eye-space points a and b looks: murkier and
+// clearer patches fixed in the world (sampled at the surface point b, so a patch stays put as
+// the camera moves), drifting slowly, plus a per-pixel dither of a percent so the fog's gradient
+// never steps. 1 when off.
+float fsWaterFogThickness(vec3 a, vec3 b)
+{
+    float variation = fs_water_fog_noise.x;
+    if (variation <= 0.0)
+    {
+        return 1.0;
+    }
+    vec4 p = vec4(b, 1.0);
+    vec3 w = vec3(dot(fs_water_fog_vtw0, p), dot(fs_water_fog_vtw1, p), dot(fs_water_fog_vtw2, p));
+    float period = max(fs_water_fog_noise.w, 1.0);
+    // the second octave's scale is a whole number, so its lattice repeats with the first
+    float n = 0.65 * fsWaterFogNoise(w, period) + 0.35 * fsWaterFogNoise(w * 3.0 + 17.0, period);
+    float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
+    return max(1.0 + variation * 1.2 * (n - 0.5) + 0.02 * dither, 0.05);
+}
+
 // get a water fog color that will apply the appropriate haze to a color given
 // a blend function of (ONE, SOURCE_ALPHA)
 vec4 getWaterFogViewNoClip(vec3 pos)
@@ -59,6 +111,7 @@ vec4 getWaterFogViewNoClip(vec3 pos)
 
     //get "thickness" of water
     float l = max(depth, 0.1);
+    l *= fsWaterFogThickness(int_v, pos); // <FS:Trish/> water fog variation
 
     float kd = waterFogDensity;
     float ks = waterFogKS;

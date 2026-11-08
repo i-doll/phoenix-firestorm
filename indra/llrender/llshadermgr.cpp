@@ -1960,6 +1960,12 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("fs_spot_colored_map");
     // </FS:Trish>
     mReservedUniforms.push_back("ssrHiZMap"); // <FS:Trish/>
+    // <FS:Trish> Water fog variation
+    mReservedUniforms.push_back("fs_water_fog_noise");
+    mReservedUniforms.push_back("fs_water_fog_vtw0");
+    mReservedUniforms.push_back("fs_water_fog_vtw1");
+    mReservedUniforms.push_back("fs_water_fog_vtw2");
+    // </FS:Trish>
 
     mReservedUniforms.push_back("tonyMcMapfaceLut");
 

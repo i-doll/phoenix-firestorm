@@ -4,8 +4,13 @@
 // on. Uses the region's water height, so a surface at that height away from any water (rare,
 // as land sits above it) gets wet too.
 
-uniform vec4 fs_wet_shore_params;   // x strength (0 = off), y band height in metres, z swell phase, w swell height in metres
+uniform vec4 fs_wet_shore_params;   // x strength (0 = off), y band height in metres, z unused, w swell height in metres
 uniform mat4 fs_wet_shore_inv_view; // eye space to agent space
+uniform vec4 fs_wet_shore_offset;   // xy agent region's global origin modulo 1000 m, zw swell phases (radians)
+
+// The edge noise repeats every 1000 m (FS_WET_SHORE_PERIOD in pipeline.cpp): both octaves'
+// scales times that are whole numbers of cells, so the CPU wraps the region offset there
+// without a seam
 
 // Value noise in [0, 1], arithmetic hash only so it is stable across GPUs
 float fsWetShoreHash(vec2 p)
@@ -15,15 +20,16 @@ float fsWetShoreHash(vec2 p)
     return fract((q.x + q.y) * q.z);
 }
 
-float fsWetShoreNoise(vec2 p)
+// period: cells after which the lattice repeats
+float fsWetShoreNoise(vec2 p, float period)
 {
     vec2 i = floor(p);
     vec2 f = p - i;
     f = f * f * (3.0 - 2.0 * f);
-    float a = fsWetShoreHash(i);
-    float b = fsWetShoreHash(i + vec2(1.0, 0.0));
-    float c = fsWetShoreHash(i + vec2(0.0, 1.0));
-    float d = fsWetShoreHash(i + vec2(1.0, 1.0));
+    float a = fsWetShoreHash(mod(i, period));
+    float b = fsWetShoreHash(mod(i + vec2(1.0, 0.0), period));
+    float c = fsWetShoreHash(mod(i + vec2(0.0, 1.0), period));
+    float d = fsWetShoreHash(mod(i + vec2(1.0, 1.0), period));
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
@@ -46,13 +52,16 @@ float fsWetShore(vec3 pos, vec3 norm, vec4 water_plane)
 
     vec2 xy = (fs_wet_shore_inv_view * vec4(pos, 1.0)).xy;
 
-    // Swells: two slow travelling waves across the region, so the band breathes unevenly
-    float t = fs_wet_shore_params.z;
-    float swell = 0.5 + 0.25 * sin(t * 0.45 + dot(xy, vec2(0.11, 0.07)))
-                      + 0.25 * sin(t * 0.31 - dot(xy, vec2(0.05, 0.13)));
+    // Swells: two slow travelling waves across the region, so the band breathes unevenly. Time
+    // and the region's position are in the phases.
+    float swell = 0.5 + 0.25 * sin(fs_wet_shore_offset.z + dot(xy, vec2(0.11, 0.07)))
+                      + 0.25 * sin(fs_wet_shore_offset.w - dot(xy, vec2(0.05, 0.13)));
 
-    // Ragged edge: the top moves by up to a third of the band with metre and decimetre noise
-    float ragged = fsWetShoreNoise(xy * 0.9) * 0.7 + fsWetShoreNoise(xy * 6.0) * 0.3;
+    // Ragged edge: the top moves by up to a third of the band with metre and decimetre noise,
+    // fixed in the world
+    vec2 g = xy + fs_wet_shore_offset.xy;
+    float ragged = fsWetShoreNoise(g * 0.9, 900.0) * 0.7     // FS_WET_SHORE_PERIOD * 0.9, exact
+                 + fsWetShoreNoise(g * 6.0, 6000.0) * 0.3;   // FS_WET_SHORE_PERIOD * 6.0
     float top = band * (0.67 + 0.33 * ragged) + fs_wet_shore_params.w * swell;
 
     // Fully wet near the water, drying over the upper part of the band

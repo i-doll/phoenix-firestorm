@@ -26806,6 +26806,28 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSRenderWaterFogVariation</key>
+    <map>
+      <key>Comment</key>
+      <string>Water fog: how much the murkiness of the water varies, in slowly drifting patches fixed in the world (0 to 1). Off by default (0 = uniform, the standard look, at no cost); above 0 it breaks up the clean contour along which uniform fog hides underwater surfaces and dithers the fog's gradient, at the cost of some noise lookups on every fogged pixel.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0</real>
+    </map>
+    <key>FSRenderWaterFogPatchSize</key>
+    <map>
+      <key>Comment</key>
+      <string>Water fog: size in metres of the murkier and clearer patches (0.5 to 100).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>6.0</real>
+    </map>
     <key>FSRenderWetShoreStrength</key>
     <map>
       <key>Comment</key>

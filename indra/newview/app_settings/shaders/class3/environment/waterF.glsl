@@ -291,10 +291,15 @@ void main()
 
     refPos = getPositionWithNDC(vec3(distort2 * 2.0 - vec2(1.0), depth * 2.0 - 1.0));
 
-    if (pos.z < refPos.z - 0.05)
-    {
-        distort2 = distort;
-    }
+    // <FS:Trish> Where the distorted lookup lands on something in front of the water (an object
+    // standing in it), fall back to the undistorted one gradually over 30 cm instead of at once:
+    // the hard switch drew a seam along such objects' outlines and water lines
+    //if (pos.z < refPos.z - 0.05)
+    //{
+    //    distort2 = distort;
+    //}
+    distort2 = mix(distort2, distort, smoothstep(0.05, 0.35, refPos.z - pos.z));
+    // </FS:Trish>
 
     vec4 fb = texture(screenTex, distort2);
 

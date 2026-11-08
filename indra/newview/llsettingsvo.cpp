@@ -1133,6 +1133,42 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         LLColor4 fog_color(env.getCurrentWater()->getWaterFogColor());
         shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, fog_color.mV);
 
+        // <FS:Trish> Water fog variation (waterFogF.glsl): slow, world fixed changes in how murky
+        // the water is, so fog doesn't cut every surface off along the same clean contour. The eye
+        // to noise space transform goes as three rows, the uniform set has no matrices. Noise
+        // space is global position in patches plus a slow drift, worked out here in F64 and
+        // wrapped at the noise's period (a whole number of cells, the shader wraps its lattice the
+        // same way), so it neither pops when a float clock wraps nor jumps on region crossings.
+        {
+            static LLCachedControl<F32> variation(gSavedSettings, "FSRenderWaterFogVariation", 0.f);
+            static LLCachedControl<F32> patch_size(gSavedSettings, "FSRenderWaterFogPatchSize", 6.f);
+            constexpr F64 NOISE_PERIOD = 1024.0;    // cells; must match the w component below
+            const F32 v = llclamp((F32)variation, 0.f, 1.f);
+            const F64 freq = 1.0 / (F64)llclamp((F32)patch_size, 0.5f, 100.f);
+            shader->uniform4fv(LLShaderMgr::FS_WATER_FOG_NOISE, LLVector4(v, (F32)freq, 0.f, (F32)NOISE_PERIOD));
+            if (v > 0.f)
+            {
+                const glm::mat4 view_to_world = glm::inverse(mat);
+                // camera position in noise space, drift included, in F64 before the wrap
+                const LLVector3 eye_agent(view_to_world[3][0], view_to_world[3][1], view_to_world[3][2]);
+                const LLVector3d eye_global = gAgent.getPosGlobalFromAgent(eye_agent);
+                const F64 t = LLFrameTimer::getElapsedSeconds();
+                const F64 drift[3] = { 0.013, 0.007, 0.004 };   // cells per second: a patch moves a few metres a minute
+                for (S32 row = 0; row < 3; ++row)
+                {
+                    F64 offset = fmod(eye_global.mdV[row] * freq + drift[row] * t, NOISE_PERIOD);
+                    if (offset < 0.0)
+                    {
+                        offset += NOISE_PERIOD;
+                    }
+                    shader->uniform4fv(LLShaderMgr::FS_WATER_FOG_VIEW_TO_WORLD0 + row,
+                                       LLVector4(view_to_world[0][row] * (F32)freq, view_to_world[1][row] * (F32)freq,
+                                                 view_to_world[2][row] * (F32)freq, (F32)offset));
+                }
+            }
+        }
+        // </FS:Trish>
+
         shader->uniform3fv(LLShaderMgr::WATER_FOGCOLOR_LINEAR, linearColor3(fog_color).mV);
 
         F32 blend_factor = (F32)env.getCurrentWater()->getBlendFactor();

@@ -370,6 +370,12 @@ public:
         FS_SPOT_COLORED_MAP,                // "fs_spot_colored_map"
         // </FS:Trish>
         FS_SSR_HIZ_MAP,                     // "ssrHiZMap" <FS:Trish/>
+        // <FS:Trish> Water fog variation (waterFogF.glsl)
+        FS_WATER_FOG_NOISE,                 // "fs_water_fog_noise"
+        FS_WATER_FOG_VIEW_TO_WORLD0,        // "fs_water_fog_vtw0": rows of eye space to agent space
+        FS_WATER_FOG_VIEW_TO_WORLD1,        // "fs_water_fog_vtw1"
+        FS_WATER_FOG_VIEW_TO_WORLD2,        // "fs_water_fog_vtw2"
+        // </FS:Trish>
 
         TONY_MC_MAPFACE_LUT,                //  "tonyMcMapfaceLut"
 
