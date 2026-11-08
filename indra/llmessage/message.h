@@ -978,6 +978,11 @@ private:
     // Returns packet_size (0 if no packet was available).
     S32  bufferInboundPacket();
 
+    // <FS:Trish> If the raw packet is a standalone PacketAck message, apply
+    // its acks to cdp right away (used while buffering).
+    void harvestPacketAckMessage(LLCircuitData* cdp, const U8* data, S32 packet_size);
+    // </FS:Trish>
+
     // Returns true if the next inbound packet should be intentionally dropped.
     bool computeDrop();
 

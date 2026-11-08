@@ -1113,6 +1113,16 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
         }
 
+        // <FS:Trish> Also apply standalone PacketAck messages now. Left in the
+        // ring, they would only be seen after the end-of-frame resend pass,
+        // which then resends packets the sim has already acked. The message is
+        // still dispatched normally later; acking an id twice is a no-op.
+        if (cdp)
+        {
+            harvestPacketAckMessage(cdp, (const U8*)data, packet_size);
+        }
+        // </FS:Trish>
+
         if (cdp)
         {
             // ACK inbound reliable packet ASAP
@@ -1145,6 +1155,56 @@ S32 LLMessageSystem::bufferInboundPacket()
 
     return packet_size;
 }
+
+// <FS:Trish>
+void LLMessageSystem::harvestPacketAckMessage(LLCircuitData* cdp, const U8* data, S32 packet_size)
+{
+    // PacketAck is "Fixed 0xFFFFFFFB Unencoded": ff ff ff fb, then a variable
+    // block count (U8) and that many little-endian U32 packet ids. Skip
+    // anything zero-coded or malformed and leave it to the normal dispatch.
+    if (!cdp || (data[PHL_FLAGS] & LL_ZERO_CODE_FLAG))
+    {
+        return;
+    }
+
+    S32 end = packet_size;
+    if (data[PHL_FLAGS] & LL_ACK_FLAG)
+    {
+        // Exclude the piggybacked ack tail
+        end -= 1 + (S32)data[packet_size - 1] * (S32)sizeof(TPACKETID);
+    }
+
+    const S32 name_pos = PHL_NAME;
+    if (end < name_pos + 5
+        || data[name_pos] != 0xFF || data[name_pos + 1] != 0xFF
+        || data[name_pos + 2] != 0xFF || data[name_pos + 3] != 0xFB)
+    {
+        return;
+    }
+
+    S32 pos = name_pos + 4 + (S32)data[PHL_OFFSET];
+    if (pos >= end)
+    {
+        return;
+    }
+    S32 count = (S32)data[pos++];
+    if (count <= 0 || pos + count * (S32)sizeof(U32) > end)
+    {
+        return;
+    }
+
+    for (S32 i = 0; i < count; ++i, pos += sizeof(U32))
+    {
+        U32 ack_id = 0;
+        htolememcpy(&ack_id, &data[pos], MVT_U32, sizeof(U32));
+        cdp->ackReliablePacket(ack_id);
+    }
+    if (!cdp->getUnackedPacketCount())
+    {
+        mCircuitInfo.mUnackedCircuitMap.erase(cdp->mHost);
+    }
+}
+// </FS:Trish>
 
 bool LLMessageSystem::sendPacketToSocket(const char* datap, S32 data_size, LLHost host)
 {
