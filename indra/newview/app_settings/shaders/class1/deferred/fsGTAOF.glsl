@@ -79,13 +79,64 @@ float fsGTAOHorizon(vec2 tc, vec3 pos, vec3 v, float low_cos, float falloff_mul,
                                     : max(mix(horizon_cos, sample_cos, FS_GTAO_THICKNESS), low_cos);
 }
 
-// pos: view-space position of the pixel; norm: view-space geometric normal (the depth buffer
-// knows nothing of normal-mapped detail, so a shading normal would occlude a flat wall with its
-// own texture); pos_screen: the pixel's [0,1] screen coordinate.
+// View-space position of a neighbour, false for sky (which unprojects to infinity)
+bool fsGTAONeighbour(vec2 tc, out vec3 p)
+{
+    float d = getDepth(tc);
+    if (isFarDepth(d))
+    {
+        p = vec3(0.0);
+        return false;
+    }
+    p = getPositionWithDepth(tc, d).xyz;
+    return true;
+}
+
+// The surface normal the depth buffer itself describes: on each axis the neighbour whose depth
+// is closer to this pixel's, so a silhouette edge doesn't bend it. The horizons are measured on
+// that same depth surface, and only legacy surfaces' G-buffer normal is a shading normal: with
+// it a flat bump-mapped wall occluded itself in the pattern of its own normal map.
+vec3 fsGTAODepthNormal(vec2 tc, vec3 pos, vec3 fallback)
+{
+    vec2 px = 1.0 / screen_res;
+    vec3 pr, pl, pu, pd;
+    bool r = fsGTAONeighbour(tc + vec2(px.x, 0.0), pr);
+    bool l = fsGTAONeighbour(tc - vec2(px.x, 0.0), pl);
+    bool u = fsGTAONeighbour(tc + vec2(0.0, px.y), pu);
+    bool d = fsGTAONeighbour(tc - vec2(0.0, px.y), pd);
+    if (!(r || l) || !(u || d))
+    {
+        return fallback;
+    }
+    vec3 dr = pr - pos;
+    vec3 dl = pos - pl;
+    vec3 du = pu - pos;
+    vec3 dd = pos - pd;
+    vec3 dx = (r && (!l || abs(dr.z) <= abs(dl.z))) ? dr : dl;
+    vec3 dy = (u && (!d || abs(du.z) <= abs(dd.z))) ? du : dd;
+    vec3 n = cross(dx, dy);
+    float len = length(n);
+    if (len < 1e-10)
+    {
+        return fallback;
+    }
+    n /= len;
+    return dot(n, -pos) < 0.0 ? -n : n; // facing the camera
+}
+
+// pos: view-space position of the pixel; norm: view-space G-buffer normal, used only where the
+// depth buffer can't give one (see fsGTAODepthNormal); pos_screen: the pixel's [0,1] screen
+// coordinate.
 float fsCalcGTAO(vec3 pos, vec3 norm, vec2 pos_screen)
 {
+    // RenderSSAOFactor 0 leaves no occlusion (see the mix at the end): skip the horizon search
+    if (ssao_factor <= 0.0)
+    {
+        return 1.0;
+    }
+
     vec3 v = normalize(-pos);
-    vec3 n = normalize(norm);
+    vec3 n = fsGTAODepthNormal(pos_screen, pos, normalize(norm));
     float view_depth = max(-pos.z, 1e-4);
 
     // World radius to screen. ndc.xy = P00 x / -z, P11 y / -z and inv_proj holds 1/P00, 1/P11.

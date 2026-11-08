@@ -129,13 +129,15 @@ float fsCloudShadow(vec3 pos, vec3 light_dir)
 // light. Catches the small shadows the cascades are too coarse for (feet on the ground, folds,
 // small props); multiplied into the cascaded shadow, so it can only darken.
 uniform mat4 projection_matrix;
+uniform vec2 screen_res;
 uniform vec2 fs_contact_shadow;      // x: ray length (m), y: strength 0-1 (0: off)
 
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 float getDepth(vec2 pos_screen);
 bool isFarDepth(float d);
 
-#define FS_CONTACT_STEPS      14
+#define FS_CONTACT_MIN_STEPS  6      // steps along the ray: one per two pixels it covers on
+#define FS_CONTACT_MAX_STEPS  24     // screen, within these bounds
 #define FS_CONTACT_FADE_NEAR  24.0   // metres from the camera: full strength up to here
 #define FS_CONTACT_FADE_FAR   48.0   // and none from here on
 #define FS_CONTACT_EDGE       0.04   // screen fraction at the edges over which hits fade out
@@ -151,15 +153,33 @@ float fsContactShadow(vec3 pos, vec3 norm, vec3 light_dir)
         return 1.0; // far away, off, or facing away from the light (already dark)
     }
 
-    // depth precision falls with distance: leave the surface further and widen the hit test with it
-    float bias = 0.01 + 0.002 * dist;
+    // depth precision falls with distance: leave the surface further and widen the hit test with
+    // it. At grazing light the ray runs along the surface, so it also leaves it further there, or
+    // the surface's own depth steps shadow it in streaks near the terminator.
+    float nl = dot(norm, light_dir);
+    float bias = (0.01 + 0.002 * dist) / max(nl, 0.25);
     float thickness = FS_CONTACT_THICKNESS + 0.01 * dist;
-    float step_len = len / float(FS_CONTACT_STEPS);
     vec3 origin = pos + norm * bias;
+
+    // As many steps as the ray covers pixels (halved), so a ray close to the camera doesn't step
+    // over thin occluders and a distant one doesn't sample the same pixel over and over
+    vec4 clip0 = projection_matrix * vec4(origin, 1.0);
+    vec4 clip1 = projection_matrix * vec4(origin + light_dir * len, 1.0);
+    float px = 0.0;
+    if (clip0.w > 0.0 && clip1.w > 0.0)
+    {
+        px = length((clip1.xy / clip1.w - clip0.xy / clip0.w) * 0.5 * screen_res);
+    }
+    int steps = int(clamp(px * 0.5, float(FS_CONTACT_MIN_STEPS), float(FS_CONTACT_MAX_STEPS)));
+    float step_len = len / float(steps);
     float t = step_len * fsExtrasNoise(gl_FragCoord.xy); // jittered start: banding becomes noise the blur removes
 
-    for (int i = 0; i < FS_CONTACT_STEPS; ++i)
+    for (int i = 0; i < FS_CONTACT_MAX_STEPS; ++i)
     {
+        if (i >= steps)
+        {
+            break;
+        }
         t += step_len;
         vec3 p = origin + light_dir * t;
         vec4 clip = projection_matrix * vec4(p, 1.0);

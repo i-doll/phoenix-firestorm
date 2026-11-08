@@ -4,9 +4,11 @@
 // is on, so sunLightSSAOF.glsl's FS_GTAO hook calls this fsCalcGTAO unchanged and the result
 // lands in the light map's green channel, blurred and read exactly as before.
 //
-// The four half-resolution texels around the pixel are weighted bilinearly, times how well each
-// one's depth and geometric normal (stored by fsGTAOHalfF.glsl) match the pixel's own. A texel
-// from the other side of a silhouette or a crease then carries almost no weight, so occlusion
+// The 4x4 half-resolution texels around the pixel are weighted by a tent two texels wide (four
+// full pixels), times how well each one's depth and geometric normal (stored by fsGTAOHalfF.glsl)
+// match the pixel's own. The tent upsamples and also averages out the per-pixel slice and step
+// jitter, which otherwise only the light-map blur removes (and that blur can be turned off). A
+// texel from the other side of a silhouette or a crease carries almost no weight, so occlusion
 // does not bleed across edges. If none of them matches (a thin feature that fell between the
 // half-resolution samples), the closest match is taken alone.
 
@@ -55,9 +57,9 @@ float fsCalcGTAO(vec3 pos, vec3 norm, vec2 pos_screen)
     float best_score = 1e30;
     float best_ao = 1.0;
 
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 16; ++i)
     {
-        ivec2 o = ivec2(i & 1, i >> 1);
+        ivec2 o = ivec2(i & 3, i >> 2) - ivec2(1);
         vec4 s = texelFetch(occlusionMap, clamp(base + o, ivec2(0), lo_max), 0);
         if (s.g < 0.0)
         {
@@ -67,11 +69,10 @@ float fsCalcGTAO(vec3 pos, vec3 norm, vec2 pos_screen)
         float rel = abs(s.g - z) * inv_tol;
         float nd = max(dot(fsGTAOOctDecode(s.ba), n), 0.0);
         float w_n = nd * nd;
-        w_n *= w_n;
-        w_n *= w_n; // nd^8
+        w_n *= w_n; // nd^4: legacy surfaces' normal carries their normal map, so not stricter
 
-        vec2 bil = mix(vec2(1.0) - f, f, vec2(o));
-        float w = bil.x * bil.y * w_n / (1.0 + rel * rel);
+        vec2 tent = max(vec2(1.0) - abs(vec2(o) - f) * 0.5, vec2(0.0));
+        float w = tent.x * tent.y * w_n / (1.0 + rel * rel);
         sum_w += w;
         sum_ao += w * s.r;
 
