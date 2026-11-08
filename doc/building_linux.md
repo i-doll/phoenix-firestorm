@@ -261,7 +261,7 @@ Using rsync has the advantage of updating the destination, replacing only those 
 Create the desktop launcher after copying to the destination machine
 
 ```
-cd /path/to/firestorm
+cd /path/to/idyll
 etc/refresh_desktop_app_entry.sh
 ```
 
