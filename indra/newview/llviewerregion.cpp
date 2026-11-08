@@ -126,6 +126,21 @@ void newRegionEntry(LLViewerRegion& region)
     LLAppViewer::instance()->writeDebugInfo();
 }
 
+// <FS:Trish> Short pause before retrying a failed seed or SimulatorFeatures
+// request, so a struggling sim isn't hit with back-to-back POSTs.
+// Returns false if the viewer is shutting down and the caller should stop.
+bool seed_retry_backoff(S32 attempt)
+{
+    if (LLApp::isExiting() || gDisconnected)
+    {
+        return false;
+    }
+    F32 delay = attempt <= 1 ? 0.1f : (attempt == 2 ? 0.2f : 0.5f);
+    llcoro::suspendUntilTimeout(delay);
+    return !(LLApp::isExiting() || gDisconnected);
+}
+// </FS:Trish>
+
 } // anonymous namespace
 
 // support for secondlife:///app/region/{REGION} SLapps
@@ -265,6 +280,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
 
     LLSD result;
     LLViewerRegion *regionp = NULL;
+    S32 last_id = -1; // <FS:Trish/> responder id of our previous attempt
 
     // This loop is used for retrying a capabilities request.
     do
@@ -288,6 +304,13 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             return; // this error condition is not recoverable.
         }
         LLViewerRegionImpl* impl = regionp->getRegionImplNC();
+        // <FS:Trish> On a retry, stop if a newer request took over meanwhile
+        if (last_id >= 0 && last_id != impl->mHttpResponderID)
+        {
+            LL_INFOS("AppInit", "Capabilities") << "Newer seed capabilities request in flight, dropping retry" << LL_ENDL;
+            return;
+        }
+        // </FS:Trish>
         LL_DEBUGS("AppInit", "Capabilities") << "requesting seed caps for handle " << regionHandle
                                              << " name " << regionp->getName() << LL_ENDL;
 
@@ -310,6 +333,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
         }
 
         S32 id = ++(impl->mHttpResponderID);
+        last_id = id; // <FS:Trish/>
 
         LLSD capabilityNames = LLSD::emptyArray();
         impl->buildCapabilityNames(capabilityNames);
@@ -352,11 +376,21 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
 
         impl = regionp->getRegionImplNC();
 
+        // <FS:Trish> A failed stale request must not retry or count against
+        // the newer request's attempts either.
+        if (id != impl->mHttpResponderID)
+        {
+            LL_INFOS("AppInit", "Capabilities") << "Reply for a stale capabilities request, a newer one is in flight" << LL_ENDL;
+            return;
+        }
+        // </FS:Trish>
+
         if (!result.isMap() || result.has("error"))
         {
             LL_WARNS("AppInit", "Capabilities") << "Malformed response" << LL_ENDL;
             ++(impl->mSeedCapAttempts);
             // setup for retry.
+            if (!seed_retry_backoff(impl->mSeedCapAttempts)) return; // <FS:Trish/>
             continue;
         }
 
@@ -367,6 +401,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             LL_WARNS("AppInit", "Capabilities") << "HttpStatus error " << LL_ENDL;
             ++(impl->mSeedCapAttempts);
             // setup for retry.
+            if (!seed_retry_backoff(impl->mSeedCapAttempts)) return; // <FS:Trish/>
             continue;
         }
 
@@ -376,9 +411,14 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
         if (id != impl->mHttpResponderID) // region is no longer referring to this request
         {
             LL_WARNS("AppInit", "Capabilities") << "Received results for a stale capabilities request!" << LL_ENDL;
-            ++(impl->mSeedCapAttempts);
-            // setup for retry.
-            continue;
+            // <FS:Trish> A newer request owns the region now. Retrying here
+            // would make that one stale in turn, and two coroutines could
+            // keep invalidating each other until the attempt limit.
+            //++(impl->mSeedCapAttempts);
+            //// setup for retry.
+            //continue;
+            return;
+            // </FS:Trish>
         }
 
         LLSD::map_const_iterator iter;
@@ -588,6 +628,12 @@ void LLViewerRegionImpl::requestSimulatorFeatureCoro(std::string url, U64 region
         if (!status)
         {
             LL_WARNS("AppInit", "SimulatorFeatures") << "HttpStatus error retrying" << LL_ENDL;
+            // <FS:Trish> Don't retry immediately; stop if shutting down
+            if (!seed_retry_backoff(attemptNumber))
+            {
+                break;
+            }
+            // </FS:Trish>
             continue;
         }
 
@@ -3627,6 +3673,16 @@ void LLViewerRegion::setSeedCapability(const std::string& url)
 {
     if (getCapability("Seed") == url)
     {
+        // <FS:Trish> The second seed POST is only a debugging comparison and
+        // costs a full seed request on every teleport/crossing into a known
+        // region, so only do it when asked for.
+        static LLCachedControl<bool> debug_duplicate_seed(gSavedSettings, "FSDebugDuplicateSeedCaps", false);
+        if (!debug_duplicate_seed())
+        {
+            LL_DEBUGS("CrossingCaps") << "Received duplicate seed capability for " << getRegionID() << ", ignoring" << LL_ENDL;
+            return;
+        }
+        // </FS:Trish>
         setCapabilityDebug("Seed", url);
         LL_WARNS("CrossingCaps") <<  "Received duplicate seed capability for " << getRegionID() << ", posting to seed " <<
                 url << LL_ENDL;

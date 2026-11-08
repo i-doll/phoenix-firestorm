@@ -1923,6 +1923,17 @@
       <key>Value</key>
       <real>0.025</real>
     </map>
+    <key>FSDebugDuplicateSeedCaps</key>
+    <map>
+      <key>Comment</key>
+      <string>When a region sends the seed capability we already have (teleport or crossing into a known region), post to the seed a second time and log differences between the two capability grants. Debugging only, costs an extra seed request.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AdminMenu</key>
     <map>
       <key>Comment</key>
