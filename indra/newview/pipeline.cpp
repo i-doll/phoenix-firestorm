@@ -823,6 +823,7 @@ void LLPipeline::cleanup()
     mMovedList.clear();
     mMovedBridge.clear();
     mShiftList.clear();
+    fsSpotCacheForgetAll(); // <FS:Trish/> FSPerfSpotShadowCache holds textures
 
     mInitialized = false;
 
@@ -1682,6 +1683,7 @@ void LLPipeline::releaseSpotShadowTargets()
         {
             state.mValid = false;
         }
+        fsSpotCacheForgetAll();
         // </FS:Trish>
     }
 }
@@ -2269,6 +2271,7 @@ void LLPipeline::unlinkDrawable(LLDrawable *drawable)
         if (mShadowSpotLight[i] == drawablep)
         {
             mShadowSpotLight[i] = NULL;
+            fsSpotCacheForget(i); // <FS:Trish/>
         }
 
         if (mTargetShadowSpotLight[i] == drawablep)
@@ -2499,7 +2502,18 @@ void LLPipeline::updateMovedList(LLDrawable::drawable_vector_t& moved_list, F32 
         bool done = true;
         if (!drawablep->isDead() && (!drawablep->isState(LLDrawable::EARLY_MOVE)))
         {
+            // <FS:Trish> FSPerfSpotShadowCache: where it was and where it is now
+            //done = drawablep->updateMove();
+            if (mFSSpotCacheInUse)
+            {
+                fsSpotCacheNoteMoved(drawablep);
+            }
             done = drawablep->updateMove();
+            if (mFSSpotCacheInUse)
+            {
+                fsSpotCacheNoteMoved(drawablep);
+            }
+            // </FS:Trish>
         }
         drawablep->clearState(LLDrawable::EARLY_MOVE | LLDrawable::MOVE_UNDAMPED);
         if (done)
@@ -12966,9 +12980,10 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
         // </FS:Trish>
 
         // <FS:Trish> FSPerfShadowSinglePass: the opaque GLTF batches are recorded too, only the
-        // GLTF scene manager's objects are drawn per cascade
+        // GLTF scene manager's objects are drawn per cascade. Where they aren't recorded (projectors),
+        // the non-rigged ones go through the merged and GPU-driven opaque path.
         //renderGLTFObjects(LLRenderPass::PASS_GLTF_PBR, false, rigged);
-        if (fsShadowSinglePassRecord(FS_SHADOW_SP_GLTF, rigged))
+        if (fsShadowSinglePassRecord(FS_SHADOW_SP_GLTF, rigged) || (!rigged && fsRenderShadowGLTFOpaque()))
         {
             gGL.loadMatrix(gGLModelView);
             gGLLastMatrix = NULL;
@@ -13172,10 +13187,61 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
         }
     }
 
-    // <FS:Trish> FSPerfGPUDrivenDraws: the casters in the position arena go out as one multi-draw, the rest below
     const size_t collected = batches.size();
+    const U32 draws = fsDrawShadowOpaqueList(batches, merged_batches, gpu_driven);
+
+    if (batch_stats)
+    {
+        fsCountShadowDraws((U32)collected, draws);
+    }
+    return true;
+}
+
+// The opaque GLTF casters of a shadow pass that doesn't record them (projectors, or the sun without
+// FSPerfShadowSinglePass), through the same merged and GPU-driven path as the legacy opaque casters:
+// they take the same depth only program. Double sided materials go in a second list drawn without
+// face culling. Every batch is drawn: the static caster cache doesn't hold GLTF.
+bool LLPipeline::fsRenderShadowGLTFOpaque()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    static LLCachedControl<bool> merged_batches(gSavedSettings, "FSPerfShadowMergedBatches", false);
+    const bool gpu_driven = fsGDDShadowEnabled(false);
+    if (!merged_batches && !gpu_driven)
+    {
+        return false;
+    }
+
+    static std::vector<LLDrawInfo*> single_sided;
+    static std::vector<LLDrawInfo*> double_sided;
+    single_sided.clear();
+    double_sided.clear();
+    const U32 type = LLRenderPass::PASS_GLTF_PBR;
+    LLCullResult::drawinfo_iterator end = endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = beginRenderMap(type); i != end; )
+    {
+        LLDrawInfo* params = *i;
+        LLCullResult::increment_iterator(i, end);
+        if (params && params->mCount && params->mVertexBuffer.notNull())
+        {
+            const bool two_sided = params->mGLTFMaterial.notNull() && params->mGLTFMaterial->mDoubleSided;
+            (two_sided ? double_sided : single_sided).push_back(params);
+        }
+    }
+    fsDrawShadowOpaqueList(single_sided, merged_batches, gpu_driven);
+    if (!double_sided.empty())
+    {
+        LLGLDisable no_cull(GL_CULL_FACE);
+        fsDrawShadowOpaqueList(double_sided, merged_batches, gpu_driven);
+    }
+    return true;
+}
+
+// Draws a list of depth only opaque casters: those in the position arena as one multi-draw
+// (FSPerfGPUDrivenDraws), the rest sorted and, when merged, with contiguous index ranges joined.
+// Returns the draw calls made.
+U32 LLPipeline::fsDrawShadowOpaqueList(std::vector<LLDrawInfo*>& batches, bool merged_batches, bool gpu_driven)
+{
     U32 draws = gpu_driven ? fsGDDDrawShadowOpaque(batches) : 0;
-    // </FS:Trish>
 
     std::sort(batches.begin(), batches.end(), [](const LLDrawInfo* lhs, const LLDrawInfo* rhs)
     {
@@ -13197,7 +13263,6 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
     gGL.loadMatrix(gGLModelView);
     gGLLastMatrix = NULL;
 
-    //U32 draws = 0; // <FS:Trish/> FSPerfGPUDrivenDraws, above
     const size_t count = batches.size();
     size_t i = 0;
     while (i < count)
@@ -13239,13 +13304,7 @@ bool LLPipeline::fsRenderShadowOpaqueBatches(const U32* types, U32 type_count)
 
     gGL.loadMatrix(gGLModelView);
     gGLLastMatrix = NULL;
-
-    if (batch_stats)
-    {
-        //fsCountShadowDraws((U32)count, draws);
-        fsCountShadowDraws((U32)collected, draws); // <FS:Trish/> FSPerfGPUDrivenDraws
-    }
-    return true;
+    return draws;
 }
 
 // Debug log of the shadow opaque batches and the draw calls they took, every 10 seconds (FSPerfShadowBatchStats)
@@ -13315,6 +13374,8 @@ void LLPipeline::fsShadowCacheBeginFrame(bool texel_snap)
         return;
     }
 
+    fsSpotCacheBeginFrame(); // FSPerfSpotShadowCache reads the same change notes first
+
     static LLCachedControl<bool> static_cache(gSavedSettings, "FSPerfShadowStaticCache", false);
     const bool enable = static_cache && texel_snap && RenderShadowDetail > 0 && RenderShadowDetail <= 2 &&
                         RenderShadowSplits >= 2;
@@ -13324,6 +13385,8 @@ void LLPipeline::fsShadowCacheBeginFrame(bool texel_snap)
         {
             fsReleaseShadowCache();
         }
+        mFSShadowDirty.clear();
+        mFSShadowDirtyAll = false;
         return;
     }
     mFSShadowCacheInUse = true;
@@ -13450,7 +13513,14 @@ void LLPipeline::fsShadowCacheBeginCascade(S32 cascade, const glm::mat4& proj, c
     }
     cache.mMatch = match;
 
-    // the region render matrices static batches are drawn with
+    fsUpdateShadowStaticMatrices();
+
+    mFSShadowCacheCascade = cascade;
+}
+
+// The region render matrices static batches are drawn with
+void LLPipeline::fsUpdateShadowStaticMatrices()
+{
     mFSShadowStaticMatrices.clear();
     for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
     {
@@ -13459,8 +13529,6 @@ void LLPipeline::fsShadowCacheBeginCascade(S32 cascade, const glm::mat4& proj, c
             mFSShadowStaticMatrices.push_back(&region->mRenderMatrix);
         }
     }
-
-    mFSShadowCacheCascade = cascade;
 }
 
 void LLPipeline::fsShadowCacheEndCascade()
@@ -13497,7 +13565,7 @@ bool LLPipeline::fsShadowPoolAllowed(U32 pool_type) const
 
 void LLPipeline::fsNoteShadowStaticChange(const LLVector4a* extents)
 {
-    if (!mFSShadowCacheInUse || !extents)
+    if ((!mFSShadowCacheInUse && !mFSSpotCacheInUse) || !extents)
     {
         return;
     }
@@ -13913,6 +13981,394 @@ U32 LLPipeline::getProjectorShadowCount() const
 {
     // limited by allocated targets so a raised setting waits for the shadow buffer resize
     return RenderShadowDetail > 1 ? llmin(RenderProjectorShadowCount, mSpotShadowAllocated) : 0;
+}
+
+// FSPerfSpotShadowCache. A projector re-renders its shadow map every frame (culling, sorting and
+// drawing its casters) although most look at nothing that moves. A slot is kept as it is while:
+//  - its light and the light's settings are unchanged (the same test as the update interval),
+//  - its last render saw only static casters: no spatial bridge (avatars, animesh, attachments,
+//    moving objects), no tree or grass, every batch drawn with its region's matrix, no coloured
+//    translucent casters (an alpha fade changes them without a rebuild), no animated texture
+//    on an alpha tested batch (its texture matrix changes every frame without a rebuild),
+//  - no static geometry in its frustum was added, removed or rebuilt since (the change notes of
+//    FSPerfShadowStaticCache, LOD switches included),
+//  - nothing moved through its frustum since: a scripted or edited object turns into a spatial
+//    bridge without velocity, so neither the change notes nor the active list see it; every
+//    drawable on the move lists is noted before and after its move (fsSpotCacheNoteMoved),
+//  - the alpha tested textures it drew have the same discard level (one still loading changes the mask),
+//  - no shadow casting avatar or active object's bounds reach into its frustum now,
+//  - it was rendered less than a second ago (a safety net for anything the above misses).
+// Coloured projector shadow targets are per slot and kept with it, as with the update interval.
+
+namespace
+{
+    // Whether an agent space box can reach into the clip volume of proj * view (perspective).
+    // Conservative: a box straddling the eye plane counts.
+    bool fs_box_in_clip(const glm::mat4& clip, const LLVector4a& lo, const LLVector4a& hi)
+    {
+        glm::vec3 mn(FLT_MAX);
+        glm::vec3 mx(-FLT_MAX);
+        U32 behind = 0;
+        for (U32 c = 0; c < 8; ++c)
+        {
+            const glm::vec4 p = clip * glm::vec4((c & 1) ? hi[0] : lo[0], (c & 2) ? hi[1] : lo[1], (c & 4) ? hi[2] : lo[2], 1.f);
+            if (p.w <= 1e-4f)
+            {
+                ++behind;
+                continue;
+            }
+            const glm::vec3 ndc = glm::vec3(p) / p.w;
+            mn = glm::min(mn, ndc);
+            mx = glm::max(mx, ndc);
+        }
+        if (behind == 8)
+        {
+            return false;
+        }
+        if (behind)
+        {
+            return true;
+        }
+        return mx.x >= -1.f && mn.x <= 1.f && mx.y >= -1.f && mn.y <= 1.f && mn.z <= 1.f;
+    }
+
+    // Render types whose shadow depends on a texture's alpha
+    bool fs_alpha_tested_type(U32 type)
+    {
+        switch (type)
+        {
+            case LLRenderPass::PASS_ALPHA:
+            case LLRenderPass::PASS_ALPHA_MASK:
+            case LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK:
+            case LLRenderPass::PASS_MATERIAL_ALPHA_MASK:
+            case LLRenderPass::PASS_SPECMAP_MASK:
+            case LLRenderPass::PASS_NORMMAP_MASK:
+            case LLRenderPass::PASS_NORMSPEC_MASK:
+            case LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK:
+                return true;
+            default:
+                return false;
+        }
+    }
+}
+
+namespace
+{
+    // Whether two agent space boxes overlap
+    bool fs_box_overlap(const glm::vec3& min_a, const glm::vec3& max_a, const LLVector4a& lo, const LLVector4a& hi)
+    {
+        return lo[0] <= max_a.x && hi[0] >= min_a.x &&
+               lo[1] <= max_a.y && hi[1] >= min_a.y &&
+               lo[2] <= max_a.z && hi[2] >= min_a.z;
+    }
+
+    // Whether the (min, max) boxes in list reach into the frustum of clip, min_a and max_a its box
+    bool fs_boxes_in_clip(const glm::mat4& clip, const glm::vec3& min_a, const glm::vec3& max_a,
+                          const std::vector<LLVector4a>& list)
+    {
+        for (size_t i = 0; i + 1 < list.size(); i += 2)
+        {
+            if (fs_box_overlap(min_a, max_a, list[i], list[i + 1]) &&
+                fs_box_in_clip(clip, list[i], list[i + 1]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+// generateSunShadow, once a frame before the projectors: marks the slots whose frustum saw static
+// geometry change, or something move, since their last render.
+void LLPipeline::fsSpotCacheBeginFrame()
+{
+    static LLCachedControl<bool> spot_cache(gSavedSettings, "FSPerfSpotShadowCache", false);
+    const bool enable = spot_cache && RenderShadowDetail > 1;
+    if (!enable)
+    {
+        if (mFSSpotCacheInUse)
+        {
+            fsSpotCacheForgetAll();
+        }
+        mFSSpotCacheInUse = false;
+        return;
+    }
+    mFSSpotCacheInUse = true;
+
+    for (SpotShadowState& state : mSpotShadowState)
+    {
+        if (!state.mStaticOnly || state.mDirty)
+        {
+            continue;
+        }
+        if (mFSShadowDirtyAll || mFSMovedAll ||
+            fs_boxes_in_clip(state.mClip, state.mClipMin, state.mClipMax, mFSShadowDirty) ||
+            fs_boxes_in_clip(state.mClip, state.mClipMin, state.mClipMax, mFSMovedBounds))
+        {
+            state.mDirty = true;
+        }
+    }
+    // the moves noted since the last call (this frame's updateMove and updateGeom included) are
+    // now in every slot's dirty flag
+    mFSMovedBounds.clear();
+    mFSMovedAll = false;
+}
+
+// updateMovedList, before and after a drawable's move: its agent space extents. A spatial bridge
+// has them in agent space; drawables inside a bridge keep theirs in its local space and are
+// covered by the bridge, which is on the move list as well. Avatars, their attachments and animesh
+// are left to the avatar bounds of fsSpotShadowStill.
+void LLPipeline::fsSpotCacheNoteMoved(LLDrawable* drawable)
+{
+    if (!drawable || drawable->isDead() || mFSMovedAll)
+    {
+        return;
+    }
+    const LLViewerObject* vobj = nullptr;
+    if (drawable->isSpatialBridge())
+    {
+        const LLDrawable* root = ((LLSpatialBridge*)drawable)->mDrawable;
+        vobj = root ? root->getVObj() : nullptr;
+    }
+    else
+    {
+        LLSpatialGroup* group = drawable->getSpatialGroup();
+        LLSpatialPartition* part = group ? group->getSpatialPartition() : nullptr;
+        if (!part || part->isBridge())
+        {
+            return;
+        }
+        vobj = drawable->getVObj().get();
+    }
+    if (!vobj || vobj->isAvatar() || vobj->isAttachment() || vobj->isAnimatedObject())
+    {
+        return;
+    }
+    const LLVector4a* ext = drawable->getSpatialExtents();
+    if (!ext)
+    {
+        return;
+    }
+    if (mFSMovedBounds.size() >= 8192)
+    {
+        mFSMovedAll = true;
+        mFSMovedBounds.clear();
+        return;
+    }
+    mFSMovedBounds.push_back(ext[0]);
+    mFSMovedBounds.push_back(ext[1]);
+}
+
+void LLPipeline::fsSpotCacheForget(U32 slot)
+{
+    if (slot < MAX_PROJECTOR_SHADOWS)
+    {
+        SpotShadowState& state = mSpotShadowState[slot];
+        state.mStaticOnly = false;
+        state.mMaskTextures.clear();
+    }
+}
+
+void LLPipeline::fsSpotCacheForgetAll()
+{
+    for (U32 i = 0; i < MAX_PROJECTOR_SHADOWS; ++i)
+    {
+        fsSpotCacheForget(i);
+    }
+    mFSMovedBounds.clear();
+    mFSMovedAll = false;
+    mFSSpotRecordTextures.clear();
+}
+
+// Whether the slot's map can be kept this frame (see above). shadow_cam has its frustum planes set.
+bool LLPipeline::fsSpotShadowStill(U32 slot, LLCamera& shadow_cam)
+{
+    constexpr F32 MAX_AGE = 1.f;
+    if (!mFSSpotCacheInUse || gCubeSnapshot || slot >= MAX_PROJECTOR_SHADOWS)
+    {
+        return false;
+    }
+    const SpotShadowState& state = mSpotShadowState[slot];
+    if (!state.mStaticOnly || state.mDirty || gFrameTimeSeconds < state.mRenderTime ||
+        gFrameTimeSeconds - state.mRenderTime > MAX_AGE)
+    {
+        return false;
+    }
+    for (const auto& tex : state.mMaskTextures)
+    {
+        if (tex.first.isNull() || tex.first->getDiscardLevel() != tex.second)
+        {
+            return false;
+        }
+    }
+
+    // avatars that cast a shadow (attachments are in their bounds) and active objects, gathered
+    // once a frame
+    const U32 frame = LLFrameTimer::getFrameCount();
+    if (mFSDynamicBoundsFrame != frame)
+    {
+        mFSDynamicBoundsFrame = frame;
+        mFSDynamicBounds.clear();
+        auto add = [this](const LLDrawable* drawable)
+        {
+            const LLVector4a* ext = drawable ? drawable->getSpatialExtents() : nullptr;
+            if (ext)
+            {
+                LLVector4a center;
+                LLVector4a half;
+                center.setAdd(ext[0], ext[1]);
+                center.mul(0.5f);
+                half.setSub(ext[1], ext[0]);
+                half.mul(0.5f);
+                mFSDynamicBounds.push_back(center);
+                mFSDynamicBounds.push_back(half);
+            }
+        };
+        for (LLCharacter* character : LLCharacter::sInstances)
+        {
+            LLVOAvatar* avatar = (LLVOAvatar*)character;
+            if (!avatar || avatar->isDead() || avatar->mDrawable.isNull())
+            {
+                continue;
+            }
+            // the avatar pool draws no shadow for these, nor are their attachments drawn
+            // (LLDrawPoolAvatar::renderShadow, LLSpatialBridge::setVisible); once one casts a
+            // shadow again it is tested here the same frame
+            if (isBeyondAvatarShadowDistance(avatar) || avatar->isTooSlow() || avatar->isImpostor() ||
+                avatar->getOverallAppearance() == LLVOAvatar::AOA_INVISIBLE)
+            {
+                continue;
+            }
+            add(avatar->mDrawable);
+        }
+        for (const LLPointer<LLViewerObject>& object : gObjectList.getActiveObjects())
+        {
+            if (object.notNull() && !object->isDead() && !object->isAttachment() && object->mDrawable.notNull())
+            {
+                add(object->mDrawable);
+            }
+        }
+    }
+    LLVector4a sphere_center;
+    sphere_center.set(state.mClipCenter.x, state.mClipCenter.y, state.mClipCenter.z);
+    for (size_t i = 0; i + 1 < mFSDynamicBounds.size(); i += 2)
+    {
+        // the frustum's bounding sphere first, the six planes only for what it can't rule out
+        LLVector4a delta;
+        delta.setSub(mFSDynamicBounds[i], sphere_center);
+        const F32 reach = state.mClipRadius + mFSDynamicBounds[i + 1].getLength3().getF32();
+        if (delta.dot3(delta).getF32() > reach * reach)
+        {
+            continue;
+        }
+        if (shadow_cam.AABBInFrustum(mFSDynamicBounds[i], mFSDynamicBounds[i + 1]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Right after a slot's renderShadow: notes whether what it drew was static only.
+void LLPipeline::fsSpotShadowRecord(U32 slot, LLCullResult& result, const glm::mat4& clip)
+{
+    if (slot >= MAX_PROJECTOR_SHADOWS)
+    {
+        return;
+    }
+    SpotShadowState& state = mSpotShadowState[slot];
+    state.mStaticOnly = false;
+    state.mDirty = false;
+    state.mRenderTime = gFrameTimeSeconds;
+    state.mClip = clip;
+    state.mMaskTextures.clear();
+    if (!mFSSpotCacheInUse || gCubeSnapshot || mFSSpotColoredDrawn[slot])
+    {
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    if (result.beginVisibleBridge() != result.endVisibleBridge())
+    {
+        return;
+    }
+    for (LLCullResult::sg_iterator i = result.beginVisibleGroups(), end = result.endVisibleGroups(); i != end; ++i)
+    {
+        LLSpatialPartition* part = *i ? (*i)->getSpatialPartition() : nullptr;
+        if (!part || part->isBridge() ||
+            (part->mPartitionType != LLViewerRegion::PARTITION_VOLUME && part->mPartitionType != LLViewerRegion::PARTITION_TERRAIN))
+        {
+            return;
+        }
+    }
+
+    fsUpdateShadowStaticMatrices();
+    std::vector<LLViewerTexture*>& textures = mFSSpotRecordTextures; // reused, no allocation per call
+    textures.clear();
+    for (U32 type = 0; type < LLRenderPass::NUM_RENDER_TYPES; ++type)
+    {
+        const bool alpha_tested = fs_alpha_tested_type(type);
+        for (LLCullResult::drawinfo_iterator i = result.beginRenderMap(type), end = result.endRenderMap(type); i != end; ++i)
+        {
+            const LLDrawInfo* params = *i;
+            if (!params || !params->mCount)
+            {
+                continue;
+            }
+            if (!fsIsStaticShadowBatch(params))
+            {
+                return;
+            }
+            if (alpha_tested)
+            {
+                // an animated texture: LLViewerTextureAnim rewrites the face's texture matrix every
+                // frame without a rebuild, and the shadow mask draw applies it
+                if (params->mTextureMatrix)
+                {
+                    return;
+                }
+                if (params->mTexture.notNull())
+                {
+                    textures.push_back(params->mTexture.get());
+                }
+                if (params->mGLTFMaterial.notNull() && params->mGLTFMaterial->mBaseColorTexture.notNull())
+                {
+                    textures.push_back(params->mGLTFMaterial->mBaseColorTexture.get());
+                }
+            }
+        }
+    }
+
+    // the frustum's agent space box and the sphere around it, for the cheap rejects of
+    // fsSpotCacheBeginFrame and fsSpotShadowStill
+    const glm::mat4 inv_clip = glm::inverse(clip);
+    glm::vec3 mn(FLT_MAX);
+    glm::vec3 mx(-FLT_MAX);
+    for (U32 c = 0; c < 8; ++c)
+    {
+        const glm::vec4 p = inv_clip * glm::vec4((c & 1) ? 1.f : -1.f, (c & 2) ? 1.f : -1.f, (c & 4) ? 1.f : -1.f, 1.f);
+        if (std::fabs(p.w) < 1e-8f)
+        {
+            return; // degenerate projection: keep nothing
+        }
+        const glm::vec3 v = glm::vec3(p) / p.w;
+        mn = glm::min(mn, v);
+        mx = glm::max(mx, v);
+    }
+    state.mClipMin = mn;
+    state.mClipMax = mx;
+    state.mClipCenter = (mn + mx) * 0.5f;
+    state.mClipRadius = glm::length(mx - mn) * 0.5f;
+
+    std::sort(textures.begin(), textures.end());
+    textures.erase(std::unique(textures.begin(), textures.end()), textures.end());
+    state.mMaskTextures.reserve(textures.size());
+    for (LLViewerTexture* tex : textures)
+    {
+        state.mMaskTextures.emplace_back(tex, tex->getDiscardLevel());
+    }
+    textures.clear();
+    state.mStaticOnly = true;
 }
 
 // Coloured projector shadows (FSRenderColoredShadows and FSRenderColoredShadowsProjectors): light
@@ -14457,7 +14913,7 @@ void LLPipeline::renderSpotVolumetrics()
                 const bool shadowed = light.mSlot >= 0 && shadow_channel > -1;
                 FSDustSpot& dust = mFSDustSpots[mFSDustSpotCount++];
                 dust.mProj = screen_to_light;
-                dust.mShadowMatrix = shadowed ? (light.mSlot < 2 ? mSunShadowMatrix[4 + light.mSlot] : mFSSpotShadowMatrix[light.mSlot]) : glm::mat4(1.f);
+                dust.mShadowMatrix = shadowed ? mSpotShadowMatrix[light.mSlot] : glm::mat4(1.f);
                 dust.mCenter.set(center.x, center.y, center.z, s);
                 dust.mOrigin.set(screen_origin.x, screen_origin.y, screen_origin.z, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
                 dust.mColor.set(col.mV[0], col.mV[1], col.mV[2], shadowed ? 1.f - mSpotLightFade[light.mSlot] : -1.f);
@@ -16407,6 +16863,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     {
         mShadowSpotLight[i] = NULL;
         mTargetShadowSpotLight[i] = NULL;
+        fsSpotCacheForget(i); // <FS:Trish/> FSPerfSpotShadowCache
     }
 
     if (shadow_count > 0)
@@ -16477,6 +16934,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
             if (mShadowSpotLight[i].isNull())
             {
+                fsSpotCacheForget(i); // <FS:Trish/>
                 continue;
             }
 
@@ -16485,6 +16943,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             if (!volume)
             {
                 mShadowSpotLight[i] = NULL;
+                fsSpotCacheForget(i); // <FS:Trish/>
                 continue;
             }
 
@@ -16567,8 +17026,21 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                                         spot_state.mParams == params &&
                                         spot_state.mRadius == light_radius;
             const bool spot_skip = spot_interval > 1 && spot_unchanged && (mShadowFrame - spot_state.mFrame) < spot_interval;
+            // FSPerfSpotShadowCache: also kept while nothing it shows can have changed. The frustum
+            // built for the test is the one the render below uses.
+            LLCamera shadow_cam = camera;
+            bool shadow_cam_set = false;
+            bool spot_still = false;
+            if (!gCubeSnapshot && !spot_skip && spot_unchanged && mFSSpotCacheInUse)
+            {
+                shadow_cam.setFar(far_clip);
+                shadow_cam.setOrigin(origin);
+                LLViewerCamera::updateFrustumPlanes(shadow_cam, false, false, true);
+                shadow_cam_set = true;
+                spot_still = fsSpotShadowStill(i, shadow_cam);
+            }
             //if (!gCubeSnapshot) //skip updating spot shadow maps during cubemap updates
-            if (!gCubeSnapshot && !spot_skip) //skip updating spot shadow maps during cubemap updates
+            if (!gCubeSnapshot && !spot_skip && !spot_still) //skip updating spot shadow maps during cubemap updates
             // </FS:Trish>
             {
                 // <FS:Trish>
@@ -16582,11 +17054,20 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 spot_state.mRadius = light_radius;
                 spot_state.mFrame = mShadowFrame;
                 // </FS:Trish>
-                LLCamera shadow_cam = camera;
-                shadow_cam.setFar(far_clip);
-                shadow_cam.setOrigin(origin);
+                // <FS:Trish> already built for the cache test
+                //LLCamera shadow_cam = camera;
+                //shadow_cam.setFar(far_clip);
+                //shadow_cam.setOrigin(origin);
+                //
+                //LLViewerCamera::updateFrustumPlanes(shadow_cam, false, false, true);
+                if (!shadow_cam_set)
+                {
+                    shadow_cam.setFar(far_clip);
+                    shadow_cam.setOrigin(origin);
 
-                LLViewerCamera::updateFrustumPlanes(shadow_cam, false, false, true);
+                    LLViewerCamera::updateFrustumPlanes(shadow_cam, false, false, true);
+                }
+                // </FS:Trish>
 
                 //
 
@@ -16603,6 +17084,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
                 renderShadow(view[i + 4], proj[i + 4], shadow_cam, result[i], false);
                 fsEndSpotColoredShadow(); // <FS:Trish/>
+                fsSpotShadowRecord(i, result[i], proj[i + 4] * view[i + 4]); // <FS:Trish/> FSPerfSpotShadowCache
 
                 RenderSpotLight = nullptr;
 

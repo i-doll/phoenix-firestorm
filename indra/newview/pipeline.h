@@ -282,6 +282,8 @@ public:
     // <FS:Trish> FSPerfShadowMergedBatches: the untextured opaque shadow batches of every pass type in one
     // list, sorted by model matrix and vertex buffer, contiguous index ranges drawn with one call
     bool fsRenderShadowOpaqueBatches(const U32* types, U32 type_count);
+    bool fsRenderShadowGLTFOpaque();    // opaque GLTF casters the same way, false when that path is off
+    U32  fsDrawShadowOpaqueList(std::vector<LLDrawInfo*>& batches, bool merged, bool gpu_driven);
     void fsCountShadowDraws(U32 batches, U32 draws);
     // </FS:Trish>
     // <FS:Trish> FSPerfShadowStaticCache: static casters of the far sun cascades kept in a depth target of
@@ -990,7 +992,33 @@ public:
         U32                 mTex = 0;
         U32                 mFrame = 0;
         bool                mValid = false;
+        // FSPerfSpotShadowCache: what the last render of this slot saw
+        bool                mStaticOnly = false;            // only static casters (fsSpotShadowRecord)
+        bool                mDirty = false;                 // static geometry in its frustum changed since
+        F32                 mRenderTime = 0.f;
+        glm::mat4           mClip;                          // proj * view it was rendered with
+        glm::vec3           mClipMin = glm::vec3(0.f);      // agent space box around that frustum
+        glm::vec3           mClipMax = glm::vec3(0.f);
+        glm::vec3           mClipCenter = glm::vec3(0.f);   // ...and the sphere around that box
+        F32                 mClipRadius = 0.f;
+        std::vector<std::pair<LLPointer<LLViewerTexture>, S32>> mMaskTextures; // alpha tested textures, discard
     } mSpotShadowState[MAX_PROJECTOR_SHADOWS];
+    // FSPerfSpotShadowCache (pipeline.cpp): a projector's shadow is kept, not re-rendered, while nothing it
+    // could show changed: the light, static geometry in its frustum, its alpha masks, and no avatar or
+    // moving object inside it
+    bool                    mFSSpotCacheInUse = false;
+    std::vector<LLVector4a> mFSDynamicBounds;               // centre, half size of avatars and moving objects
+    U32                     mFSDynamicBoundsFrame = 0;
+    std::vector<LLVector4a> mFSMovedBounds;                 // agent space extents (min, max) moved since the last fsSpotCacheBeginFrame
+    bool                    mFSMovedAll = false;            // ...too many to keep
+    std::vector<LLViewerTexture*> mFSSpotRecordTextures;    // scratch of fsSpotShadowRecord
+    void                    fsSpotCacheBeginFrame();
+    void                    fsSpotCacheNoteMoved(LLDrawable* drawable); // updateMovedList, before and after its move
+    void                    fsSpotCacheForget(U32 slot);    // the slot's light is gone: drop what its last render kept
+    void                    fsSpotCacheForgetAll();
+    bool                    fsSpotShadowStill(U32 slot, LLCamera& shadow_cam);
+    void                    fsSpotShadowRecord(U32 slot, LLCullResult& result, const glm::mat4& clip);
+    void                    fsUpdateShadowStaticMatrices();
     // </FS:Trish>
 
     // <FS:Trish> Coloured projector shadows (FSRenderColoredShadows and

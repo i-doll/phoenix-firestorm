@@ -312,10 +312,11 @@ void LLSpatialGroup::expandExtents(const LLVector4a* addingExtents, const LLXfor
 }
 
 // <FS:Trish> FSPerfShadowStaticCache: report static geometry changes (agent space extents) to the
-// far sun cascade cache. Bridged partitions are skipped: their batches are always drawn as dynamic.
+// far sun cascade cache and the projector shadow cache (FSPerfSpotShadowCache). Bridged partitions
+// are skipped: their batches are always drawn as dynamic.
 static void fs_note_static_shadow_change(LLSpatialGroup* group, const LLVector4a* extents)
 {
-    if (!gPipeline.mFSShadowCacheInUse || !group || !extents)
+    if ((!gPipeline.mFSShadowCacheInUse && !gPipeline.mFSSpotCacheInUse) || !group || !extents)
     {
         return;
     }
