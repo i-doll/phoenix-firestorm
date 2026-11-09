@@ -37,9 +37,10 @@
 // whenever its content serial (LLVertexBuffer::getFSContentSerial, bumped on every upload) changes. Entries
 // that no shadow pass used for a while are dropped. Each caster then is one 20 byte indirect command
 // (index range offset into the arena, base vertex of its copy, and as base instance its own index) plus a
-// record naming its matrix, the model view projection the stock path would have computed for it. The vertex
-// shader reads the record as an instanced attribute (divisor 4, so every instance of a command reads the
-// command's record), which is what gl_DrawIDARB would give without needing GL_ARB_shader_draw_parameters.
+// record per instance naming its matrix, the model view projection the stock path would have computed for it,
+// and (single pass) its cascade. The vertex shader reads the records as an instanced attribute with divisor 1
+// stepped from the command's base instance, which is what gl_DrawIDARB would give without needing
+// GL_ARB_shader_draw_parameters; it never reads gl_InstanceID, which some drivers offset by the base instance.
 // A whole shadow pass is one glMultiDrawElementsIndirect; with FSPerfShadowSinglePass, one per set of
 // cascades, each command instanced once per cascade like the stock single pass draws.
 //
@@ -82,7 +83,6 @@ LLGLSLShader gFSGDDShadowSPProgram;
 namespace
 {
     constexpr GLuint FS_GDD_MATRIX_BINDING = 7;     // shader storage binding of FSGDDMatrices
-    constexpr GLuint FS_GDD_RECORD_DIVISOR = 4;     // instances per record step: at least the most cascades a command has
     constexpr U32 FS_GDD_VERIFY_SAMPLES = 64;       // samples a verify pass may let through before it warns
 
     const LLStaticHashedString sClip("fs_shadow_clip");
@@ -108,7 +108,12 @@ namespace
     GLint sRecordAttrib[2] = { -1, -1 };   // location of fs_gdd_draw: plain, single pass
     S32 sInputsReady[2] = { 0, 0 };         // bind_inputs done: 0 not yet, 1 yes, -1 failed
     std::vector<DrawCommand> sCommands;
-    std::vector<U32> sDraws;                // per command: matrix index
+    struct Record                           // fs_gdd_draw, one per instance of a command
+    {
+        U32 mMatrix;                        // index into fs_gdd_matrix
+        U32 mCascade;                       // single pass: the cascade the instance draws into
+    };
+    std::vector<Record> sDraws;
     std::vector<glm::mat4> sMatrices;
     std::unordered_map<const LLMatrix4*, U32> sMatrixIndex;
 
@@ -377,6 +382,18 @@ namespace
             }
             const U32 matrix = matrix_index(model, proj, view);
             const U32 instances = single_pass ? popcount4(first.mMask) : 1;
+            U32 cascades[4] = { 0, 0, 0, 0 };   // the cascade of each instance
+            if (single_pass)
+            {
+                U32 n = 0;
+                for (U32 c = 0; c < 4; ++c)
+                {
+                    if (first.mMask & (1u << c))
+                    {
+                        cascades[n++] = c;
+                    }
+                }
+            }
 
             // a run of contiguous index ranges is one command; a range inside the one just added is dropped
             U32 offset = first.mParams->mOffset;
@@ -393,9 +410,12 @@ namespace
                     index_end += params->mCount;
                     continue;
                 }
-                // base instance: this command's record
-                sCommands.push_back({ index_end - offset, instances, entry->mIndex + offset, (GLint)entry->mVertex, (GLuint)sCommands.size() });
-                sDraws.push_back(matrix);
+                // base instance: this command's first record, one record per instance
+                sCommands.push_back({ index_end - offset, instances, entry->mIndex + offset, (GLint)entry->mVertex, (GLuint)sDraws.size() });
+                for (U32 n = 0; n < instances; ++n)
+                {
+                    sDraws.push_back({ matrix, cascades[n] });
+                }
                 ++sSegments.back().mCount;
                 if (params)
                 {
@@ -431,32 +451,18 @@ namespace
         upload(sMatrixBuffer, GL_SHADER_STORAGE_BUFFER, sMatrices.data(), sMatrices.size() * sizeof(glm::mat4));
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, FS_GDD_MATRIX_BINDING, sMatrixBuffer);
 
-        // the per command records, an instanced attribute stepped by the commands' base instances; it goes
-        // into the global vertex array object, never a buffer's own
+        // the per instance records, an instanced attribute (divisor 1) stepped from the commands' base
+        // instances; it goes into the global vertex array object, never a buffer's own
         LLVertexBuffer::fsUseDefaultVAO();
         const GLuint record = (GLuint)sRecordAttrib[single_pass ? 1 : 0];
-        upload(sDrawBuffer, GL_ARRAY_BUFFER, sDraws.data(), sDraws.size() * sizeof(U32));
+        upload(sDrawBuffer, GL_ARRAY_BUFFER, sDraws.data(), sDraws.size() * sizeof(Record));
         glEnableVertexAttribArray(record);
-        glVertexAttribIPointer(record, 1, GL_UNSIGNED_INT, sizeof(U32), nullptr);
-        glVertexAttribDivisor(record, FS_GDD_RECORD_DIVISOR);
+        glVertexAttribIPointer(record, 2, GL_UNSIGNED_INT, sizeof(Record), nullptr);
+        glVertexAttribDivisor(record, 1);
         sArena.bindForDraw(LLVertexBuffer::MAP_VERTEX);
 
-        LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
         for (const Segment& segment : sSegments)
         {
-            if (single_pass)
-            {
-                F32 cascades[4] = { 0.f, 0.f, 0.f, 0.f };
-                U32 n = 0;
-                for (U32 c = 0; c < 4; ++c)
-                {
-                    if (segment.mMask & (1u << c))
-                    {
-                        cascades[n++] = (F32)c;
-                    }
-                }
-                shader->uniform4f(sCascade, cascades[0], cascades[1], cascades[2], cascades[3]);
-            }
             glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT,
                                         (const void*)((size_t)segment.mFirst * sizeof(DrawCommand)), (GLsizei)segment.mCount, 0);
         }

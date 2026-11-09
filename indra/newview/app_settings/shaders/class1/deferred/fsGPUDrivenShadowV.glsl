@@ -26,18 +26,23 @@
  */
 
 // The stand-in for shadowV.glsl when the opaque casters come out of the position arena in one
-// multi-draw. Every draw command has a record, fetched as an instanced vertex attribute: the command's
-// base instance points at it and the attribute divisor (4) is at least the instance count, so all
-// instances of the command read the same record. The record names the command's matrix in
-// fs_gdd_matrix: the model view projection the stock path would have put in modelview_projection_matrix
-// for that batch, computed the same way. (gl_DrawIDARB would do the same, but needs
-// GL_ARB_shader_draw_parameters; the base instance works on every OpenGL 4.3 driver.)
+// multi-draw. Every instance of every draw command has a record, fetched as an instanced vertex
+// attribute with divisor 1: the command's base instance points at its first record and instance i
+// reads the record after it, which is the plain base instance plus divisor 1 form every OpenGL 4.3
+// driver handles (gl_DrawIDARB would need GL_ARB_shader_draw_parameters). The record names the
+// matrix in fs_gdd_matrix: the model view projection the stock path would have put in
+// modelview_projection_matrix for that batch, computed the same way; and, single pass, the cascade.
+//
+// Nothing here reads gl_InstanceID: with a non-zero base instance some drivers have offset it by the
+// base instance, and divisors other than 1 combined with a base instance are rarely exercised, so
+// the record carries everything the instance needs.
 
 #extension GL_ARB_shader_storage_buffer_object : require
 
 #ifdef FS_SHADOW_SINGLE_PASS
-// Single pass sun shadow cascades (FSPerfShadowSinglePass), as in shadowV.glsl: instance i draws the
-// vertex into the atlas viewport of cascade fs_shadow_cascade[i]. The matrices hold only the model matrix.
+// Single pass sun shadow cascades (FSPerfShadowSinglePass), as in shadowV.glsl: each instance draws
+// the vertex into the atlas viewport of the cascade its record names. The matrices hold only the
+// model matrix.
 #if FS_SHADOW_SINGLE_PASS == 2
 #extension GL_NV_viewport_array2 : require
 #elif FS_SHADOW_SINGLE_PASS == 3
@@ -46,7 +51,6 @@
 #extension GL_ARB_shader_viewport_layer_array : require
 #endif
 uniform mat4 fs_shadow_clip[4];     // light projection * view of each cascade, from agent space
-uniform vec4 fs_shadow_cascade;     // cascade drawn by each instance
 #endif
 
 layout(std430) readonly buffer FSGDDMatrices
@@ -55,13 +59,13 @@ layout(std430) readonly buffer FSGDDMatrices
 };
 
 in vec3 position;
-in uint fs_gdd_draw;                // per draw command: index into fs_gdd_matrix
+in uvec2 fs_gdd_draw;               // per instance of a draw command: x index into fs_gdd_matrix, y cascade
 
 void main()
 {
-    mat4 mat = fs_gdd_matrix[fs_gdd_draw];
+    mat4 mat = fs_gdd_matrix[fs_gdd_draw.x];
 #ifdef FS_SHADOW_SINGLE_PASS
-    int cascade = int(fs_shadow_cascade[gl_InstanceID]);
+    int cascade = int(min(fs_gdd_draw.y, 3u));
     gl_Position = fs_shadow_clip[cascade] * (mat * vec4(position.xyz, 1.0));
     gl_ViewportIndex = cascade;
 #else
