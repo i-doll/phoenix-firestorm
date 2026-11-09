@@ -121,6 +121,25 @@ float fsLum(vec3 c)
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
 
+// A NaN or Inf anywhere in the lit screen (an overflowed half float highlight, a bad light) must
+// never enter the blur: Inf / albedo times a clamp factor of 0 is NaN, and min/max/clamp with a
+// NaN operand are undefined (NVIDIA tends to return the other operand, AMD the NaN), so a single
+// bad pixel would spread over the whole kernel and blend black into the skin around it.
+bool fsSkinBad(vec3 v)
+{
+    return any(isnan(v)) || any(isinf(v));
+}
+
+bool fsSkinBad(vec4 v)
+{
+    return any(isnan(v)) || any(isinf(v));
+}
+
+bool fsSkinBad(float v)
+{
+    return isnan(v) || isinf(v);
+}
+
 // 0: not avatar, 1: legacy avatar surface, 2: PBR avatar surface
 int fsSkinSurface(float flag)
 {
@@ -225,14 +244,18 @@ float fsSkinDiffuseCeiling()
     float sun_k = classic_mode < 1 ? 1.0 : 3.14159265; // classic PBR scales the sun by pi
 
     float env = fsLum(fsSkinSunlight()) * sun_k + 2.0 * fsLum(amb) * sky_ambient_scale;
-    float expo = max(exposure * texture(exposureMap, vec2(0.5)).r, 1e-4);
-    return 1.25 * max(env, 1.0 / expo);
+    float map_expo = texture(exposureMap, vec2(0.5)).r;
+    map_expo = (fsSkinBad(map_expo) || map_expo <= 0.0) ? 1.0 : map_expo;
+    float expo = max(exposure * map_expo, 1e-4);
+    float ceiling = 1.25 * max(env, 1.0 / expo);
+    return (fsSkinBad(ceiling) || ceiling <= 0.0) ? 1.0 : min(ceiling, 60000.0);
 }
 
 // Irradiance clamped to the ceiling: luminance first (keeps the hue of the light), then a per
-// channel cap so a floored albedo channel cannot blow up
+// channel cap so a floored albedo channel cannot blow up. e must be finite (see fsSkinBad).
 vec3 fsSkinClamp(vec3 e, float ceiling, out float f)
 {
+    e = max(e, vec3(0.0));
     f = min(1.0, ceiling / max(fsLum(e), 1e-6));
     return min(e * f, vec3(3.0 * ceiling));
 }
@@ -307,7 +330,13 @@ vec3 fsSkinCascadeTransmittance(sampler2DShadow depth_map, mat4 m, vec3 p, vec3 
 // Sunlight transmitted through thin skin at this pixel, before albedo
 vec3 fsSkinTranslucency(vec3 pos, vec3 n)
 {
-    vec3 l = normalize((sun_up_factor == 1) ? sun_dir : moon_dir);
+    vec3 l = (sun_up_factor == 1) ? sun_dir : moon_dir;
+    float l_len2 = dot(l, l);
+    if (!(l_len2 > 1e-12))
+    {
+        return vec3(0.0); // no light direction (or not a number): normalize would be undefined
+    }
+    l *= inversesqrt(l_len2);
     float wrap = max(0.3 + dot(-n, l), 0.0);
     if (wrap <= 0.0)
     {
@@ -349,6 +378,16 @@ void main()
     }
 
     vec3 pos = getPosition(tc).xyz;
+    if (fsSkinBad(pos))
+    {
+        // No usable depth: leave the pixel as lit. Alpha 0 in the scratch marks it for pass 1.
+        if (sss_pass == 1)
+        {
+            discard;
+        }
+        frag_color = vec4(0.0);
+        return;
+    }
     float dist = max(-pos.z, 1e-3);
 
     vec3 trans = vec3(0.0);
@@ -357,6 +396,7 @@ void main()
         if (sss_translucency > 0.0)
         {
             trans = fsSkinTranslucency(pos, getNorm(tc).xyz) * albedo * (sss_translucency * center_w);
+            trans = fsSkinBad(trans) ? vec3(0.0) : max(trans, vec3(0.0));
         }
         if (sss_strength <= 0.0)
         {
@@ -372,12 +412,25 @@ void main()
     if (sss_pass == 0)
     {
         ceiling = fsSkinDiffuseCeiling();
-        center = fsSkinClamp(texture(altDiffuseMap, tc).rgb / albedo, ceiling, f_c);
+        vec3 lit = texture(altDiffuseMap, tc).rgb;
+        if (fsSkinBad(lit))
+        {
+            // Already broken upstream: keep it out of every neighbour's blur (they stand in their
+            // own centre for it, see below) and leave the pixel itself as it is, alpha 0 telling
+            // pass 1 so. Blending over it could only turn an Inf into a NaN (Inf * 0).
+            frag_color = vec4(0.0);
+            return;
+        }
+        center = fsSkinClamp(lit / albedo, ceiling, f_c);
     }
     else
     {
         vec4 c = texture(altDiffuseMap, tc);
-        center = c.rgb;
+        if (fsSkinBad(c) || c.a <= 0.0)
+        {
+            discard; // pass 0 left this pixel alone
+        }
+        center = max(c.rgb, vec3(0.0));
         f_c = clamp(c.a, 1e-3, 1.0);
     }
 
@@ -409,20 +462,31 @@ void main()
                 {
                     float dz = abs(max(-getPosition(stc).z, 1e-3) - dist);
                     keep *= 1.0 - clamp(dz * depth_reject, 0.0, 1.0);
-                    vec3 c = texture(altDiffuseMap, stc).rgb;
-                    if (sss_pass == 0)
+                    vec4 c = texture(altDiffuseMap, stc);
+                    // A tap pass 0 skipped (alpha 0), or one that is not a finite number, counts
+                    // as off the skin: a single bad pixel must not spread through the kernel
+                    bool bad = fsSkinBad(c) || (sss_pass == 1 && c.a <= 0.0);
+                    if (!bad && sss_pass == 0)
                     {
                         float f;
-                        c = fsSkinClamp(c / s_albedo, ceiling, f);
+                        c.rgb = fsSkinClamp(c.rgb / s_albedo, ceiling, f);
+                        bad = fsSkinBad(c.rgb);
+                    }
+                    if (bad || fsSkinBad(keep))
+                    {
+                        keep = 0.0;
                     }
                     // Off the skin or across a depth step: stand in the centre, so nothing
                     // bleeds in from clothing or the background (Jimenez's follow-surface rule)
-                    s = mix(center, c, keep);
+                    s = keep > 0.0 ? mix(center, max(c.rgb, vec3(0.0)), keep) : center;
                 }
                 result += s * k;
             }
         }
     }
+
+    // Last line of defence: whatever slipped through, the output is finite
+    result = fsSkinBad(result) ? center : result;
 
     if (sss_pass == 0)
     {
