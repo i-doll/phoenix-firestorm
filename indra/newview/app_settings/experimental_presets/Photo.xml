@@ -12,6 +12,8 @@
     <boolean>1</boolean>
     <key>FSPerfAudioThrottleChecks</key>
     <boolean>1</boolean>
+    <key>FSPerfAvatarRankHysteresis</key>
+    <boolean>1</boolean>
     <key>FSPerfHeroProbeSkipHiddenFaces</key>
     <boolean>1</boolean>
     <key>FSPerfInventoryIdleThrottle</key>

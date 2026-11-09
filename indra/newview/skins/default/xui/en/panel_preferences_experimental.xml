@@ -5067,7 +5067,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="111"
+                 height="164"
                  layout="topleft"
                  left="0"
                  name="experimental_avatar_settings"
@@ -5079,8 +5079,30 @@
                      height="18"
                      layout="topleft"
                      left="15"
-                     name="avatar_loading_heading"
+                     name="avatar_animation_heading"
                      top="10"
+                     width="475">
+                        Avatar animation
+                    </text>
+                    <check_box
+                     control_name="FSExperimentalSyncAnimationClock"
+                     follows="left|top"
+                     height="20"
+                     label="Keep animations in sync after late loading"
+                     layout="topleft"
+                     left="15"
+                     name="sync_animation_clock"
+                     tool_tip="EXPERIMENTAL."
+                     top="33"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="avatar_loading_heading"
+                     top="63"
                      width="475">
                         Avatar loading
                     </text>
@@ -5093,7 +5115,7 @@
                      left="15"
                      name="avatar_cloud_fast_retry"
                      tool_tip="EXPERIMENTAL. When another avatar is missing its shape or body textures, ask the region for its appearance again after 15, 30 and 60 seconds, instead of only every 2 minutes."
-                     top="32"
+                     top="85"
                      width="475" />
                     <check_box
                      control_name="FSAvatarRetryEmptyAppearance"
@@ -5104,7 +5126,7 @@
                      left="15"
                      name="avatar_retry_empty_appearance"
                      tool_tip="EXPERIMENTAL. When the region sends another avatar's appearance without a shape, ask for it again right away (at most every 10 seconds) instead of waiting for the cloud timeout."
-                     top="54"
+                     top="107"
                      width="475" />
                     <check_box
                      control_name="FSAvatarDropStaleAppearance"
@@ -5115,7 +5137,7 @@
                      left="15"
                      name="avatar_drop_stale_appearance"
                      tool_tip="EXPERIMENTAL. During an outfit change, appearance updates for another avatar can arrive out of order. Ignore one that is older than the last applied, if it arrives within 10 seconds of it. Logged under Avatar."
-                     top="76"
+                     top="129"
                      width="475" />
                 </panel>
             </scroll_container>
@@ -5140,7 +5162,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="1938"
+                 height="1960"
                  layout="topleft"
                  left="0"
                  name="experimental_performance_settings"
@@ -5169,8 +5191,19 @@
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
-                         parameter="FSPerfRiggedPaletteCache,FSPerfAttachmentExtentsCache,FSPerfSkinOncePerFrame" />
+                         parameter="FSPerfAvatarRankHysteresis,FSPerfRiggedPaletteCache,FSPerfAttachmentExtentsCache,FSPerfSkinOncePerFrame" />
                     </button>
+                    <check_box
+                     control_name="FSPerfAvatarRankHysteresis"
+                     follows="left|top"
+                     height="20"
+                     label="Keep avatar ranking steady while object updates arrive"
+                     layout="topleft"
+                     left="15"
+                     name="perf_avatarrankhysteresis"
+                     tool_tip="EXPERIMENTAL. Only re-rank avatars for impostors and loading when one is added, removed or reseated, or when its on-screen size changes enough. Without this, every object update in the region re-sorts all avatars every frame."
+                     top="33"
+                     width="475" />
                     <check_box
                      control_name="FSPerfRiggedPaletteCache"
                      follows="left|top"
@@ -5180,7 +5213,7 @@
                      left="15"
                      name="perf_riggedpalettecache"
                      tool_tip="EXPERIMENTAL. Build each rigged mesh's joint matrix palette once per skeleton update and reuse it in every render pass (camera, shadows, probes), instead of rebuilding it for each pass."
-                     top="33"
+                     top="55"
                      width="475" />
                     <check_box
                      control_name="FSPerfAttachmentExtentsCache"
@@ -5191,7 +5224,7 @@
                      left="15"
                      name="perf_attachmentextentscache"
                      tool_tip="EXPERIMENTAL. Only push a rigged attachment's bounding box into the scene tree when the avatar's bounds actually changed."
-                     top="55"
+                     top="77"
                      width="475" />
                     <check_box
                      control_name="FSPerfSkinOncePerFrame"
@@ -5202,7 +5235,7 @@
                      left="15"
                      name="fs_fsperfskinonceperframe"
                      tool_tip="EXPERIMENTAL. Skins rigged mesh avatars, clothing and animesh once per frame and reuses the result in every pass (shadows, reflections, glow, alpha), instead of skinning again in each pass. Helps most in crowds with shadows on. Uses some extra video memory (48 bytes per rigged vertex on screen). Works best with the rigged palette cache. Reloads shaders."
-                     top="85"
+                     top="107"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5211,7 +5244,7 @@
                      layout="topleft"
                      left="15"
                      name="perf_heading_scene"
-                     top="111"
+                     top="133"
                      width="340">
                         Scene
                     </text>
@@ -5223,7 +5256,7 @@
                      left="370"
                      name="reset_perf_heading_scene"
                      tool_tip="Set every option in &quot;Scene&quot; back to its default value."
-                     top="110"
+                     top="132"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5238,7 +5271,7 @@
                      left="15"
                      name="perf_alpharesortonly"
                      tool_tip="EXPERIMENTAL. When the camera turns, re-order only the transparent faces of each group for correct blending, instead of rebuilding the group's geometry."
-                     top="134"
+                     top="156"
                      width="475" />
                     <check_box
                      control_name="FSPerfRebuildTimeBudget"
@@ -5249,7 +5282,7 @@
                      left="15"
                      name="perf_rebuildtimebudget"
                      tool_tip="EXPERIMENTAL. Limit how long geometry rebuilds may take each frame and rebuild groups and particles that are off screen only once they come into view."
-                     top="156"
+                     top="178"
                      width="475" />
                     <check_box
                      control_name="FSPerfShadowPointCloudFromCull"
@@ -5260,7 +5293,7 @@
                      left="15"
                      name="perf_shadowpointcloudfromcull"
                      tool_tip="EXPERIMENTAL. Work out the shadow map bounds from the objects the camera already found visible, instead of searching the scene again for every shadow cascade."
-                     top="178"
+                     top="200"
                      width="475" />
                     <check_box
                      control_name="FSPerfRepresentativeFragmentTest"
@@ -5271,7 +5304,7 @@
                      left="15"
                      name="fs_fsperfrepresentativefragmenttest"
                      tool_tip="EXPERIMENTAL. Lets NVIDIA Turing and newer graphics cards stop drawing an occlusion test box as soon as one pixel of it is found visible, which makes the hidden-object checks cheaper. Visibility results stay the same. Has no effect on other graphics cards."
-                     top="208"
+                     top="230"
                      width="475" />
                     <check_box
                      control_name="FSPerfAlphaGlowSkip"
@@ -5282,7 +5315,7 @@
                      left="15"
                      name="fs_fsperfalphaglowskip"
                      tool_tip="EXPERIMENTAL. Transparent faces get drawn a second time for glow whenever any face near them has glow, even when they have none themselves. Skip that second draw for faces without glow; it adds nothing to the picture."
-                     top="238"
+                     top="260"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5291,7 +5324,7 @@
                      layout="topleft"
                      left="15"
                      name="perf_heading_lightingandreflections"
-                     top="260"
+                     top="282"
                      width="340">
                         Lighting and reflections
                     </text>
@@ -5303,7 +5336,7 @@
                      left="370"
                      name="reset_perf_heading_lightingandreflections"
                      tool_tip="Set every option in &quot;Lighting and reflections&quot; back to its default value."
-                     top="259"
+                     top="281"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5318,7 +5351,7 @@
                      left="15"
                      name="perf_lightrescanthrottle"
                      tool_tip="EXPERIMENTAL. Rescan the scene for the nearest local lights 10 times a second, or when the camera moves, instead of every frame."
-                     top="283"
+                     top="305"
                      width="475" />
                     <check_box
                      control_name="FSPerfHeroProbeSkipHiddenFaces"
@@ -5329,7 +5362,7 @@
                      left="15"
                      name="perf_heroprobeskiphiddenfaces"
                      tool_tip="EXPERIMENTAL. Do not render the sides of a mirror's reflection cube that face away from the mirror surface."
-                     top="305"
+                     top="327"
                      width="475" />
                     <check_box
                      control_name="FSPerfProbeUniformCache"
@@ -5340,7 +5373,7 @@
                      left="15"
                      name="perf_probeuniformcache"
                      tool_tip="EXPERIMENTAL. Do not update the mirror (hero) probe data a second time in each render pass; the reflection probe update already includes it."
-                     top="327"
+                     top="349"
                      width="475" />
                     <check_box
                      control_name="FSPerfBatchedLocalLights"
@@ -5351,7 +5384,7 @@
                      left="15"
                      name="fs_fsperfbatchedlocallights"
                      tool_tip="EXPERIMENTAL. Draws point lights in a few instanced calls instead of one call per light, cutting CPU time where hundreds of lights are visible (clubs, cities). Lighting should look the same. Spotlights and projectors are unchanged. Rebuilds shaders when changed."
-                     top="357"
+                     top="379"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5360,7 +5393,7 @@
                      layout="topleft"
                      left="15"
                      name="perf_heading_other"
-                     top="383"
+                     top="405"
                      width="340">
                         Other
                     </text>
@@ -5372,7 +5405,7 @@
                      left="370"
                      name="reset_perf_heading_other"
                      tool_tip="Set every option in &quot;Other&quot; back to its default value."
-                     top="382"
+                     top="404"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5387,7 +5420,7 @@
                      left="15"
                      name="perf_audiothrottlechecks"
                      tool_tip="EXPERIMENTAL. Re-check whether each sound source is muted or allowed by parcel rules 4 times a second, or right away when the mute list, parcel or your position changes, instead of every frame."
-                     top="406"
+                     top="428"
                      width="475" />
                     <check_box
                      control_name="FSPerfInventoryIdleThrottle"
@@ -5398,7 +5431,7 @@
                      left="15"
                      name="perf_inventoryidlethrottle"
                      tool_tip="EXPERIMENTAL. Inventory panels that are not on screen update their folder views twice a second instead of every frame."
-                     top="428"
+                     top="450"
                      width="475" />
                     <check_box
                      control_name="FSPerfHoverPickThrottle"
@@ -5409,7 +5442,7 @@
                      left="15"
                      name="fs_fsperfhoverpickthrottle"
                      tool_tip="EXPERIMENTAL. While the mouse, its buttons and the camera stay still, the viewer reuses what it found under the mouse for up to a tenth of a second instead of casting a ray through the scene every frame. Something moving under a still mouse is noticed within that time."
-                     top="458"
+                     top="480"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5418,7 +5451,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_shadows"
-                     top="488"
+                     top="510"
                      width="340">
                         Shadows
                     </text>
@@ -5430,7 +5463,7 @@
                      left="370"
                      name="reset_fs_heading_shadows"
                      tool_tip="Set every option in &quot;Shadows&quot; back to its default value."
-                     top="487"
+                     top="509"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5446,7 +5479,7 @@
                      left="15"
                      name="fs_fsperfshadowmergedbatches"
                      tool_tip="EXPERIMENTAL. Sends the opaque shadow casters of each shadow pass as fewer, larger draw calls. Shadows look the same; saves CPU time in scenes with many objects."
-                     top="514"
+                     top="536"
                      width="475" />
                     <check_box
                      control_name="FSPerfShadowStaticCache"
@@ -5458,7 +5491,7 @@
                      left="15"
                      name="fs_fsperfshadowstaticcache"
                      tool_tip="EXPERIMENTAL. Keeps the shadows of buildings and terrain in the two far sun shadow maps between frames and only redraws moving things into them. Needs 'Snap sun shadows to texels' (FSRenderShadowTexelSnap). Uses one extra depth buffer per far shadow map."
-                     top="540"
+                     top="562"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5467,7 +5500,7 @@
                      left="35"
                      name="fs_fsperfshadowstaticcachesunangle_label"
                      tool_tip="EXPERIMENTAL. With the static far shadow cache, the far shadows follow the sun in steps of this many degrees, 0 to 2. Larger steps redraw the cache less often under a moving sun."
-                     top="568"
+                     top="590"
                      width="285">
                         Far shadow sun step (degrees)
                     </text>
@@ -5484,7 +5517,7 @@
                      min_val="0"
                      name="fs_fsperfshadowstaticcachesunangle"
                      tool_tip="EXPERIMENTAL. With the static far shadow cache, the far shadows follow the sun in steps of this many degrees, 0 to 2. Larger steps redraw the cache less often under a moving sun."
-                     top="566"
+                     top="588"
                      width="100" />
                     <check_box
                      control_name="FSPerfShadowSinglePass"
@@ -5496,7 +5529,7 @@
                      left="15"
                      name="fs_fsperfshadowsinglepass"
                      tool_tip="EXPERIMENTAL. Sends buildings, objects, rigged mesh and alpha masked surfaces to the sun shadow maps once instead of once per shadow cascade; the graphics card copies each to every cascade it reaches. Shadows look the same; saves CPU time in busy scenes. Needs a graphics card and driver that can pick the viewport in the vertex shader (most NVIDIA and AMD cards with current drivers); otherwise nothing changes. Uses one extra depth buffer the size of the four sun shadow maps."
-                     top="598"
+                     top="620"
                      width="475" />
                     <check_box
                      control_name="FSPerfSpotShadowCache"
@@ -5507,7 +5540,7 @@
                      left="15"
                      name="fs_fsperfspotshadowcache"
                      tool_tip="EXPERIMENTAL. A projector's shadow is only redrawn when something it shows can have changed: the light moved or changed, objects in its cone were added, removed or changed detail, or an avatar or moving object is inside its cone. Otherwise the last shadow is kept, and it is redrawn at least once a second anyway. Saves the culling and drawing of every shadowed projector that only lights static scenery."
-                     top="628"
+                     top="650"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5516,7 +5549,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_shaders"
-                     top="660"
+                     top="682"
                      width="340">
                         Shaders
                     </text>
@@ -5528,7 +5561,7 @@
                      left="370"
                      name="reset_fs_heading_shaders"
                      tool_tip="Set every option in &quot;Shaders&quot; back to its default value."
-                     top="659"
+                     top="681"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5543,7 +5576,7 @@
                      left="15"
                      name="fs_fsperfparallelshadercompile"
                      tool_tip="EXPERIMENTAL. Shorter pauses when graphics settings change and shaders are rebuilt, because the graphics driver compiles them on several threads at once. Needs a driver that supports parallel shader compile (current NVIDIA and AMD drivers, Mesa). Without that support nothing changes. Applies from the next shader rebuild."
-                     top="686"
+                     top="708"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5552,7 +5585,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_textures"
-                     top="726"
+                     top="748"
                      width="340">
                         Textures
                     </text>
@@ -5564,7 +5597,7 @@
                      left="370"
                      name="reset_fs_heading_textures"
                      tool_tip="Set every option in &quot;Textures&quot; back to its default value."
-                     top="725"
+                     top="747"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5579,7 +5612,7 @@
                      left="15"
                      name="fs_fsperftextureuploadpbo"
                      tool_tip="EXPERIMENTAL. Copies newly loaded textures to the graphics card asynchronously, which can reduce stutter when many textures arrive at once. Only has an effect when textures are not already created on a background thread (usually AMD and Intel graphics). Needs OpenGL 4.4."
-                     top="752"
+                     top="774"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5588,7 +5621,7 @@
                      left="35"
                      name="fs_fsperftextureuploadbudgetmb_label"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="780"
+                     top="802"
                      width="285">
                         Texture upload budget per frame (MB)
                     </text>
@@ -5604,7 +5637,7 @@
                      min_val="0"
                      name="fs_fsperftextureuploadbudgetmb"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="778"
+                     top="800"
                      width="100" />
                     <text
                      follows="left|top"
@@ -5613,7 +5646,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_variable_rate_shading"
-                     top="820"
+                     top="842"
                      width="340">
                         Variable rate shading
                     </text>
@@ -5625,7 +5658,7 @@
                      left="370"
                      name="reset_fs_heading_variable_rate_shading"
                      tool_tip="Set every option in &quot;Variable rate shading&quot; back to its default value."
-                     top="819"
+                     top="841"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5640,7 +5673,7 @@
                      left="15"
                      name="fs_fsrendervrs"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / GTX 16xx (Turing) or newer only; does nothing on other graphics cards. Shades low-detail parts of the scene (flat or low-contrast surfaces, the sky, areas blurred by depth of field) at a coarser rate to save GPU time in the opaque geometry pass. Edges and fine detail stay at full rate. Snapshots are always rendered at full rate."
-                     top="846"
+                     top="868"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5649,7 +5682,7 @@
                      left="35"
                      name="fs_fsrendervrsquality_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="874"
+                     top="896"
                      width="285">
                         Quality
                     </text>
@@ -5666,7 +5699,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsquality"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="872"
+                     top="894"
                      width="100" />
                     <text
                      follows="left|top"
@@ -5675,7 +5708,7 @@
                      left="35"
                      name="fs_fsrendervrsperiphery_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="902"
+                     top="924"
                      width="285">
                         Coarser at screen edges
                     </text>
@@ -5692,7 +5725,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsperiphery"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="900"
+                     top="922"
                      width="100" />
                     <text
                      follows="left|top"
@@ -5701,7 +5734,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_threading"
-                     top="942"
+                     top="964"
                      width="340">
                         Threading
                     </text>
@@ -5713,7 +5746,7 @@
                      left="370"
                      name="reset_fs_heading_threading"
                      tool_tip="Set every option in &quot;Threading&quot; back to its default value."
-                     top="941"
+                     top="963"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5729,7 +5762,7 @@
                      left="15"
                      name="fs_fsperfparallelshadowcull"
                      tool_tip="EXPERIMENTAL. Works out which objects fall into each sun shadow map on several CPU cores at once instead of one map after another on the main thread. Shadows look the same; saves main thread time in busy scenes."
-                     top="968"
+                     top="990"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelShadowCullVerify"
@@ -5741,7 +5774,7 @@
                      left="35"
                      name="fs_fsperfparallelshadowcullverify"
                      tool_tip="Debug. Also runs the old shadow cull and writes any difference to the log. Slower; only for testing."
-                     top="994"
+                     top="1016"
                      width="455" />
                     <check_box
                      control_name="FSPerfParallelGeometry"
@@ -5752,7 +5785,7 @@
                      left="15"
                      name="fs_fsperfparallelgeometry"
                      tool_tip="EXPERIMENTAL. Fills the vertex data of rezzing and changing objects on several CPU cores instead of only the main thread. Reduces hitches on region arrival, teleports and heavy rezzing. Looks exactly the same as when off."
-                     top="1024"
+                     top="1046"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelGeometryVerify"
@@ -5764,7 +5797,7 @@
                      left="35"
                      name="fs_fsperfparallelgeometryverify"
                      tool_tip="EXPERIMENTAL. Debug aid: builds the geometry a second time on the main thread and logs any difference to the threaded result. Costs more than it saves; for testing only."
-                     top="1050"
+                     top="1072"
                      width="455" />
                     <text
                      follows="left|top"
@@ -5773,7 +5806,7 @@
                      left="35"
                      name="fs_fsperfparallelgeometryminverts_label"
                      tool_tip="EXPERIMENTAL. A geometry rebuild uses the worker threads only when it has at least this many vertices; smaller ones are built on the main thread, where waking the workers would cost more than it saves."
-                     top="1078"
+                     top="1100"
                      width="285">
                         Min. vertices for threaded geometry
                     </text>
@@ -5790,7 +5823,7 @@
                      min_val="0"
                      name="fs_fsperfparallelgeometryminverts"
                      tool_tip="EXPERIMENTAL. A geometry rebuild uses the worker threads only when it has at least this many vertices; smaller ones are built on the main thread, where waking the workers would cost more than it saves."
-                     top="1076"
+                     top="1098"
                      width="100" />
                     <check_box
                      control_name="FSPerfParallelAvatarUpdate"
@@ -5801,7 +5834,7 @@
                      left="15"
                      name="fs_fsperfparallelavatarupdate"
                      tool_tip="EXPERIMENTAL. Evaluates the animations of all visible avatars of a frame in parallel on worker threads instead of one after another on the main thread. Helps most in crowded places. Your own avatar stays on the main thread."
-                     top="1108"
+                     top="1130"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelAvatarUpdateVerify"
@@ -5813,7 +5846,7 @@
                      left="35"
                      name="fs_fsperfparallelavatarupdateverify"
                      tool_tip="EXPERIMENTAL. Debug check: recomputes the avatar joints serially after the worker threads and logs any difference. Costs extra CPU time, only for testing."
-                     top="1134"
+                     top="1156"
                      width="455" />
                     <check_box
                      control_name="FSPerfParallelMainCull"
@@ -5824,7 +5857,7 @@
                      left="15"
                      name="fs_fsperfparallelmaincull"
                      tool_tip="EXPERIMENTAL. Works out which objects are in view (main camera and reflection probe updates) on several CPU cores at once instead of only on the main thread. The scene looks the same; saves main thread time in busy scenes."
-                     top="1164"
+                     top="1186"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelMainCullVerify"
@@ -5836,7 +5869,7 @@
                      left="35"
                      name="fs_fsperfparallelmaincullverify"
                      tool_tip="Debug. Also runs the old view cull and writes any difference to the log. Slower; only for testing."
-                     top="1190"
+                     top="1212"
                      width="455" />
                     <check_box
                      control_name="FSPerfParallelPostSort"
@@ -5847,7 +5880,7 @@
                      left="15"
                      name="fs_fsperfparallelpostsort"
                      tool_tip="EXPERIMENTAL. Collects the draw lists of each camera (main view, shadow cascades, probes) on worker threads in postSort. Same result as before, less main thread time in busy places."
-                     top="1220"
+                     top="1242"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelPostSortVerify"
@@ -5859,7 +5892,7 @@
                      left="35"
                      name="fs_fsperfparallelpostsortverify"
                      tool_tip="EXPERIMENTAL. Debug: also builds the render lists serially and logs any difference. Slower; for testing only."
-                     top="1246"
+                     top="1268"
                      width="455" />
                     <text
                      follows="left|top"
@@ -5868,7 +5901,7 @@
                      left="35"
                      name="fs_fsperfparallelpostsortmingroups_label"
                      tool_tip="EXPERIMENTAL. Views with fewer visible groups than this build their render lists on the main thread, where the worker hand-off would cost more than it saves."
-                     top="1274"
+                     top="1296"
                      width="285">
                         Parallel render lists min groups
                     </text>
@@ -5885,7 +5918,7 @@
                      min_val="2"
                      name="fs_fsperfparallelpostsortmingroups"
                      tool_tip="EXPERIMENTAL. Views with fewer visible groups than this build their render lists on the main thread, where the worker hand-off would cost more than it saves."
-                     top="1272"
+                     top="1294"
                      width="100" />
                     <check_box
                      control_name="FSPerfParallelTexturePriority"
@@ -5896,7 +5929,7 @@
                      left="15"
                      name="fs_fsperfparalleltexturepriority"
                      tool_tip="EXPERIMENTAL. Computes how sharp each texture needs to be (face screen areas and texture virtual sizes) on worker threads instead of the main thread. Helps in busy places with many textures loaded."
-                     top="1304"
+                     top="1326"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelTexturePriorityVerify"
@@ -5908,7 +5941,7 @@
                      left="35"
                      name="fs_fsperfparalleltexturepriorityverify"
                      tool_tip="EXPERIMENTAL. Debug: also computes texture priorities the old way and logs any difference. Costs more than either alone."
-                     top="1330"
+                     top="1352"
                      width="455" />
                     <text
                      follows="left|top"
@@ -5917,7 +5950,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_gpu_driven_draws"
-                     top="1358"
+                     top="1380"
                      width="340">
                         GPU-driven draws
                     </text>
@@ -5929,7 +5962,7 @@
                      left="370"
                      name="reset_fs_heading_gpu_driven_draws"
                      tool_tip="Set every option in &quot;GPU-driven draws&quot; back to its default value."
-                     top="1357"
+                     top="1379"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5945,7 +5978,7 @@
                      left="15"
                      name="fs_fsperfgpudrivendraws"
                      tool_tip="EXPERIMENTAL. Sends the opaque buildings and objects of each shadow map to the graphics card as one multi-draw call instead of one call per object batch, from a copy of their positions kept in video memory. Shadows look the same; saves CPU time in busy scenes. Works together with 'Draw sun shadow cascades in one pass'. Needs OpenGL 4.3 (most NVIDIA, AMD and Intel cards with current drivers; not macOS); otherwise nothing changes."
-                     top="1384"
+                     top="1406"
                      width="475" />
                     <check_box
                      control_name="FSPerfGPUDrivenDrawsVerify"
@@ -5957,7 +5990,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsverify"
                      tool_tip="Debug. Draws the shadow casters a second time the old way and logs any place where the result would differ, plus draw statistics every 10 seconds. Slows rendering down; for testing only."
-                     top="1410"
+                     top="1432"
                      width="455" />
                     <text
                      follows="left|top"
@@ -5966,7 +5999,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsarenamb_label"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1438"
+                     top="1460"
                      width="285">
                         Shadow caster memory (MB)
                     </text>
@@ -5983,7 +6016,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivendrawsarenamb"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1436"
+                     top="1458"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenPBR"
@@ -5994,7 +6027,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenpbr"
                      tool_tip="EXPERIMENTAL. Draws static opaque PBR (GLTF material) surfaces with a few large multi-draw calls out of a shared vertex arena instead of one draw call each. Looks the same; saves CPU time in busy scenes. Needs OpenGL 4.3. Uses up to the arena size below of video memory. Rebuilds shaders."
-                     top="1468"
+                     top="1490"
                      width="475" />
                     <check_box
                      control_name="FSPerfGPUDrivenPBRBindless"
@@ -6006,7 +6039,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenpbrbindless"
                      tool_tip="EXPERIMENTAL. With GPU-driven PBR surfaces: uses bindless textures (GL_ARB_bindless_texture) so surfaces with different materials share one draw call. Looks the same; saves more CPU time. Not used where the driver doesn't support it properly. Rebuilds shaders."
-                     top="1494"
+                     top="1516"
                      width="455" />
                     <text
                      follows="left|top"
@@ -6015,7 +6048,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenpbrarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven PBR surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1522"
+                     top="1544"
                      width="285">
                         PBR vertex arena (MB)
                     </text>
@@ -6032,7 +6065,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenpbrarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven PBR surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1520"
+                     top="1542"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenLegacy"
@@ -6043,7 +6076,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenlegacy"
                      tool_tip="EXPERIMENTAL. Draws static opaque non-PBR surfaces (simple, alpha masked and fullbright) with a few large multi-draw calls out of a shared vertex arena, with bindless textures, instead of one draw call and several texture binds each. Looks the same; saves CPU time in busy scenes. Needs OpenGL 4.3 and bindless textures (NVIDIA GPUs only). Uses up to the arena size below of video memory. Rebuilds shaders."
-                     top="1552"
+                     top="1574"
                      width="475" />
                     <text
                      follows="left|top"
@@ -6052,7 +6085,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenlegacyarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1580"
+                     top="1602"
                      width="285">
                         Legacy vertex arena (MB)
                     </text>
@@ -6069,7 +6102,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenlegacyarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1578"
+                     top="1600"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenPBRGroupRuns"
@@ -6080,7 +6113,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenpbrgroupruns"
                      tool_tip="EXPERIMENTAL. Applies to GPU-driven PBR surfaces and GPU-driven legacy material surfaces: draws them grouped instead of in the stock order. PBR: every surface with bindless textures in one multi-draw, the others one run per material. Legacy materials: every GPU-driven surface in one multi-draw. The surfaces drawn the old way follow. Far fewer draw calls and texture binds in busy scenes. Only where two surfaces lie at exactly the same depth can the other one show."
-                     top="1610"
+                     top="1632"
                      width="455" />
                     <check_box
                      control_name="FSPerfGPUDrivenMaterials"
@@ -6091,7 +6124,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenmaterials"
                      tool_tip="EXPERIMENTAL. Draws static opaque surfaces with legacy normal or specular maps (or shine on a material) with a few large multi-draw calls out of a shared vertex arena, with bindless textures, instead of one draw call, several texture binds and material settings each. Looks the same; saves CPU time in busy scenes. Needs OpenGL 4.3 and bindless textures (NVIDIA GPUs only). Uses up to the arena size below of video memory. Rebuilds shaders."
-                     top="1640"
+                     top="1662"
                      width="475" />
                     <text
                      follows="left|top"
@@ -6100,7 +6133,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenmaterialsarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy material surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1668"
+                     top="1690"
                      width="285">
                         Material vertex arena (MB)
                     </text>
@@ -6117,7 +6150,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenmaterialsarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy material surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1666"
+                     top="1688"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenShadowAlpha"
@@ -6129,7 +6162,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenshadowalpha"
                      tool_tip="EXPERIMENTAL. Sends the alpha tested shadow casters (leaves, fences, grass, cut-out textures, alpha masked PBR materials) of each shadow map to the graphics card as one multi-draw call with bindless textures, instead of one call and several texture binds per object batch. Shadows look the same; saves CPU time in busy scenes. Works together with 'Draw sun shadow cascades in one pass'; checked by 'Verify multi-draw shadows'. Needs OpenGL 4.3 and bindless textures (NVIDIA GPUs only); otherwise nothing changes. Rebuilds shaders."
-                     top="1698"
+                     top="1720"
                      width="475" />
                     <text
                      follows="left|top"
@@ -6138,7 +6171,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenshadowalphaarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the copy of the alpha tested shadow casters' vertex data may use, 16 to 2048 MB. Casters that don't fit are drawn the old way."
-                     top="1726"
+                     top="1748"
                      width="285">
                         Alpha shadow caster memory (MB)
                     </text>
@@ -6155,7 +6188,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenshadowalphaarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the copy of the alpha tested shadow casters' vertex data may use, 16 to 2048 MB. Casters that don't fit are drawn the old way."
-                     top="1724"
+                     top="1746"
                      width="100" />
                     <text
                      follows="left|top"
@@ -6164,7 +6197,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_render_thread"
-                     top="1750"
+                     top="1772"
                      width="340">
                         Render thread
                     </text>
@@ -6176,7 +6209,7 @@
                      left="370"
                      name="reset_fs_heading_render_thread"
                      tool_tip="Set every option in &quot;Render thread&quot; back to its default value."
-                     top="1749"
+                     top="1771"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -6191,7 +6224,7 @@
                      left="15"
                      name="fs_fsrenderthread"
                      tool_tip="EXPERIMENTAL. Windows only, takes effect after a restart. The main thread hands its OpenGL work to a render thread, which talks to the graphics driver while the main thread already prepares the next frame. Can raise the frame rate when the main thread is the bottleneck. The picture is the same; if something renders wrongly or the viewer stalls, turn it off."
-                     top="1776"
+                     top="1798"
                      width="475" />
                     <check_box
                      control_name="FSRenderThreadCheck"
@@ -6203,7 +6236,7 @@
                      left="35"
                      name="fs_fsrenderthreadcheck"
                      tool_tip="Debug. Writes OpenGL calls made from the wrong thread, and calls that make the main thread wait for the render thread, to the log. Only for testing."
-                     top="1802"
+                     top="1824"
                      width="455" />
                     <text
                      follows="left|top"
@@ -6212,7 +6245,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_user_interface"
-                     top="1842"
+                     top="1864"
                      width="340">
                         User interface
                     </text>
@@ -6224,7 +6257,7 @@
                      left="370"
                      name="reset_fs_heading_user_interface"
                      tool_tip="Set every option in &quot;User interface&quot; back to its default value."
-                     top="1841"
+                     top="1863"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -6237,7 +6270,7 @@
                      left="35"
                      name="fs_fsrenderuicap_label"
                      tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
-                     top="1870"
+                     top="1892"
                      width="285">
                         UI redraw cap (per second, 0 = every frame)
                     </text>
@@ -6253,7 +6286,7 @@
                      min_val="0"
                      name="fs_fsrenderuicap"
                      tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
-                     top="1868"
+                     top="1890"
                      width="100" />
                     <text
                      follows="left|top"
@@ -6262,7 +6295,7 @@
                      left="35"
                      name="fs_fsrenderuiidlerate_label"
                      tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
-                     top="1898"
+                     top="1920"
                      width="285">
                         UI idle refresh (per second)
                     </text>
@@ -6279,7 +6312,7 @@
                      min_val="0.5"
                      name="fs_fsrenderuiidlerate"
                      tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
-                     top="1896"
+                     top="1918"
                      width="100" />
                 </panel>
             </scroll_container>
