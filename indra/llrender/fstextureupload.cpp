@@ -119,9 +119,16 @@ namespace
         while (!sInFlight.empty())
         {
             const UploadRegion& r = sInFlight.front();
-            if (glClientWaitSync(r.mFence, 0, 0) == GL_TIMEOUT_EXPIRED)
+            const GLenum status = glClientWaitSync(r.mFence, 0, 0);
+            if (status == GL_TIMEOUT_EXPIRED)
             {
                 break;
+            }
+            if (status == GL_WAIT_FAILED)
+            {
+                // The fence can't tell us: make sure the GPU is done with the region before it
+                // is written again
+                glFinish();
             }
             glDeleteSync(r.mFence);
             sInFlight.pop_front();

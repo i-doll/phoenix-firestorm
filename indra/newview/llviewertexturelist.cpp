@@ -1236,10 +1236,16 @@ namespace
 
     // Puts the textures the user is most likely looking at first: boosted ones (own avatar,
     // HUD, UI, selection), then by on-screen size. Stable, so equal ones keep arrival order.
+    // A texture that has waited AGE_PROMOTE_FRAMES counts as boosted, so small or off-screen
+    // ones can't stay at the back for good while new ones keep arriving (holding their decoded
+    // images in memory all that time).
     void fs_sort_create_queue(LLViewerTextureList::image_queue_t& queue)
     {
+        constexpr U32 AGE_PROMOTE_FRAMES = 60;
+        static std::unordered_map<const LLViewerFetchedTexture*, U32> s_queued_since;
         if (queue.size() < 2)
         {
+            s_queued_since.clear();
             return;
         }
         struct Entry
@@ -1250,14 +1256,25 @@ namespace
         };
         std::vector<Entry> items;
         items.reserve(queue.size());
+        std::unordered_map<const LLViewerFetchedTexture*, U32> still_queued;
+        still_queued.reserve(queue.size());
         while (!queue.empty())
         {
             LLPointer<LLViewerFetchedTexture> imagep = queue.front();
             queue.pop();
-            const bool boost = imagep.notNull() && imagep->getBoostLevel() > LLGLTexture::BOOST_NONE;
+            U32 since = gFrameCount;
+            if (imagep.notNull())
+            {
+                auto it = s_queued_since.find(imagep.get());
+                since = it != s_queued_since.end() ? it->second : gFrameCount;
+                still_queued.emplace(imagep.get(), since);
+            }
+            const bool boost = imagep.notNull() &&
+                (imagep->getBoostLevel() > LLGLTexture::BOOST_NONE || gFrameCount - since >= AGE_PROMOTE_FRAMES);
             const F32 size = imagep.notNull() ? imagep->getMaxVirtualSize() : -1.f;
             items.push_back({ boost, size, imagep });
         }
+        s_queued_since.swap(still_queued);
         std::stable_sort(items.begin(), items.end(),
             [](const Entry& a, const Entry& b)
             {
