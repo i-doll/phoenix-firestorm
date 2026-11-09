@@ -1019,12 +1019,12 @@ const char* FSPanelPreferenceExperimental::unsupportedReason(const std::string& 
     {
         return "Not available on this graphics card or driver: it doesn't report its free video memory.";
     }
-!LL_WINDOWS
+#if !LL_WINDOWS
     if (setting == "FSRenderThread" || setting == "FSRenderThreadCheck")
     {
         return "Not available on this operating system: the render thread is Windows only.";
     }
-if
+#endif
     return nullptr;
 }
 

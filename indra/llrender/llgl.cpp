@@ -1603,8 +1603,8 @@ void LLGLManager::initExtensions()
     // glCopyBufferSubData (OpenGL 4.3, loaded below), and a shader storage block the vertex shader can read.
     mFSHasGPUDrivenDraws = false;
     if (mGLVersion >= 4.29f && !mIsApple &&
-        mGLExtensions.contains("GL_ARB_shader_storage_buffer_object") &&
-        mGLExtensions.contains("GL_ARB_multi_draw_indirect"))
+        id_gl_extension_supported("GL_ARB_shader_storage_buffer_object") &&
+        id_gl_extension_supported("GL_ARB_multi_draw_indirect"))
     {
         GLint vs_blocks = 0;
         glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &vs_blocks);
@@ -1624,16 +1624,18 @@ void LLGLManager::initExtensions()
     {
         proc = nullptr;
     }
-    if (mFSHasGPUDrivenDraws && mGLExtensions.contains("GL_ARB_bindless_texture"))
+#if LL_WINDOWS || LL_SDL
+    if (mFSHasGPUDrivenDraws && id_gl_extension_supported("GL_ARB_bindless_texture"))
     {
-        mFSBindlessProcs[0] = (void*)LL_GET_PROC_ADDRESS("glGetTextureSamplerHandleARB");
-        mFSBindlessProcs[1] = (void*)LL_GET_PROC_ADDRESS("glMakeTextureHandleResidentARB");
-        mFSBindlessProcs[2] = (void*)LL_GET_PROC_ADDRESS("glMakeTextureHandleNonResidentARB");
+        mFSBindlessProcs[0] = (void*)GLH_EXT_GET_PROC_ADDRESS("glGetTextureSamplerHandleARB");
+        mFSBindlessProcs[1] = (void*)GLH_EXT_GET_PROC_ADDRESS("glMakeTextureHandleResidentARB");
+        mFSBindlessProcs[2] = (void*)GLH_EXT_GET_PROC_ADDRESS("glMakeTextureHandleNonResidentARB");
         if (!mFSBindlessProcs[0] || !mFSBindlessProcs[1] || !mFSBindlessProcs[2])
         {
             mFSBindlessProcs[0] = mFSBindlessProcs[1] = mFSBindlessProcs[2] = nullptr;
         }
     }
+#endif
     LL_INFOS("RenderInit") << "Bindless textures available: " << (mFSBindlessProcs[0] != nullptr) << LL_ENDL;
     // </FS:Trish>
 

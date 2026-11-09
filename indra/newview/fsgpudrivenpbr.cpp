@@ -345,8 +345,9 @@ namespace
         state.mWrap = mode < 3 ? wrap[mode] : GL_REPEAT;
         if (gGLManager.mHasAnisotropic)
         {
-            state.mAniso = (option == LLTexUnit::TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
-                               ? llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mMaxAnisotropy)
+            // as LLTexUnit::setTextureFilteringOption applies it in this tree: on or off, no level
+            state.mAniso = (option == LLTexUnit::TFO_ANISOTROPIC && LLImageGL::sGlobalUseAnisotropic)
+                               ? gGLManager.mMaxAnisotropy
                                : 1.f;
         }
         return state;

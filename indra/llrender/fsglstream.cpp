@@ -3830,6 +3830,9 @@ namespace FSGLStream
 
 #else // !LL_WINDOWS
 
+#include "llgl.h"
+#include "llglheaders.h"
+
 namespace FSGLStream
 {
     bool install() { return false; }
@@ -3842,6 +3845,15 @@ namespace FSGLStream
     void present(std::function<void()> fn) { fn(); }
     void setCheck(bool) {}
     Stats takeStats() { return Stats(); }
+    void recordCall(void (*fn)(U64), U64 value) { fn(value); }
+    void setRenderPoll(bool (*)(bool)) {}
+    void setFilter(bool) {}
+    void clearErrors()
+    {
+        for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; ++i)
+        {
+        }
+    }
 }
 
 #endif // LL_WINDOWS

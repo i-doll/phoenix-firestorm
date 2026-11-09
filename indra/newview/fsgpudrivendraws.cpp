@@ -720,7 +720,7 @@ U32 fsGDDDrawShadowSinglePass(std::vector<LLPipeline::FSShadowSPEntry>& list, co
     list.clear();
     for (const Item& item : left)
     {
-        list.push_back({ item.mParams, item.mMask });
+        list.push_back({ item.mParams, item.mParams->mVertexBuffer, item.mMask }); // still the recorded buffer: stale entries were dropped before this
     }
     gGL.loadMatrix(gGLModelView);
     gGLLastMatrix = NULL;
