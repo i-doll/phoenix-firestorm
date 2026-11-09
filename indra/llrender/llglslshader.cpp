@@ -53,6 +53,7 @@ using std::string;
 
 GLuint LLGLSLShader::sCurBoundShader = 0;
 LLGLSLShader* LLGLSLShader::sCurBoundShaderPtr = NULL;
+bool LLGLSLShader::sFSLazyTextureEnable = false; // <FS:Trish/>
 S32 LLGLSLShader::sIndexedTextureChannels = 0;
 U32 LLGLSLShader::sMaxGLTFMaterials = 0;
 U32 LLGLSLShader::sMaxGLTFNodes = 0;
@@ -1357,7 +1358,12 @@ S32 LLGLSLShader::enableTexture(S32 uniform, LLTexUnit::eTextureType mode)
 
 
     S32 index = mTexture[uniform];
-    if (index != -1)
+    // <FS:Trish> Lazy enable: nothing to change on a unit that already has this texture type,
+    // and a glActiveTexture for each of a deferred shader's dozen samplers on every rebind adds
+    // up. The bind that follows activates the unit when it actually binds.
+    //if (index != -1)
+    if (index != -1 && !(sFSLazyTextureEnable && gGL.getTexUnit(index)->isEnabledAs(mode)))
+    // </FS:Trish>
     {
         gGL.getTexUnit(index)->activate();
         gGL.getTexUnit(index)->enable(mode);

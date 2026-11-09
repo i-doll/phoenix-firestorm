@@ -232,6 +232,12 @@ public:
     // Must be called by anything that binds a texture on this unit without going through
     // LLTexUnit, or that deletes a texture which may be bound.
     void invalidateFastBind() { mFastBoundTex = 0; }
+
+    // True when enable(type) would change nothing: the unit already has this texture type and
+    // the GL state is known. LLGLSLShader::enableTexture then leaves the active unit alone while
+    // LLGLSLShader::sFSLazyTextureEnable is set, and the bind that follows activates the unit
+    // only if it really binds something.
+    bool isEnabledAs(eTextureType type) const;
     // </FS:Trish>
 
     static U32 getInternalType(eTextureType type);
@@ -492,6 +498,7 @@ public:
                eBlendFactor alpha_sfactor, eBlendFactor alpha_dfactor);
 
     LLLightState* getLight(U32 index);
+    U32 getLightHash() const { return mLightHash; } // <FS:Trish/> changes whenever a light's state does
     void setAmbientLightColor(const LLColor4& color);
 
     void setLineWidth(F32 line_width); // <FS> Line width OGL core profile fix by Rye Mutt

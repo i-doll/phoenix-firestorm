@@ -511,6 +511,7 @@ void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilt
     LLTexUnit* unit = gGL.getTexUnit(channel);
     if (!unit->isFilteringOptionCached(filter_options))
     {
+        unit->activate(); // the unit may not be active when bindManual had nothing to bind
         unit->setTextureFilteringOption(filter_options);
     }
     // </FS:Trish>

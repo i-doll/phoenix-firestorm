@@ -185,6 +185,13 @@ void LLTexUnit::enable(eTextureType type)
     }
 }
 
+// <FS:Trish> See LLGLSLShader::sFSLazyTextureEnable
+bool LLTexUnit::isEnabledAs(eTextureType type) const
+{
+    return mIndex >= 0 && type != TT_NONE && mCurrTexType == type && !gGL.mDirty;
+}
+// </FS:Trish>
+
 void LLTexUnit::disable(void)
 {
     if (mIndex < 0) return;
@@ -709,10 +716,10 @@ void LLTexUnit::unregisterFilterCacheTexture(U32 tex)
 
 bool LLTexUnit::isFilteringOptionCached(eTextureFilterOptions option) const
 {
-    // Only valid when this unit is the active one, since that's where setTextureFilteringOption's
-    // glTexParameter calls would land
-    if (mIndex < 0 || mCurrTexture == 0 || option == TFO_ANISOTROPIC || gGL.mDirty
-        || (S32)gGL.getCurrentTexUnitIndex() != mIndex)
+    // The state is the texture's, whichever unit is active. A caller that finds it not cached
+    // must make this unit active before setTextureFilteringOption, that's where the
+    // glTexParameter calls land.
+    if (mIndex < 0 || mCurrTexture == 0 || option == TFO_ANISOTROPIC || gGL.mDirty)
     {
         return false;
     }

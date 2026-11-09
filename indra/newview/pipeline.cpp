@@ -5766,6 +5766,7 @@ void LLPipeline::bindColoredShadowMaps(LLGLSLShader& shader)
         if (drawn)
         {
             gGL.getTexUnit(channel)->bind(&target);
+            gGL.getTexUnit(channel)->activate(); // enableTexture may have left it inactive (sFSLazyTextureEnable)
             gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
             gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
             valid[k] = 1.f;
@@ -8038,6 +8039,18 @@ void LLPipeline::enableLights(U32 mask)
 void LLPipeline::enableLightsDynamic()
 {
     assertInitialized();
+    // <FS:Trish> The alpha pool calls this for every group it draws. In the normal mode it
+    // ends with all lights on and light 1 black; when no light has changed since the last such
+    // call (same light hash, mask still all on), it would only switch light 1 off and on again.
+    static U32 last_light_hash = 0;
+    static bool last_valid = false;
+    const bool normal_mode = isAgentAvatarValid() && gAgentAvatarp->mSpecialRenderMode == 0 && !gAvatarBacklight;
+    if (normal_mode && last_valid && mLightMask == 0xff && gGL.getLightHash() == last_light_hash &&
+        mHWLightColors[1] == LLColor4::black)
+    {
+        return;
+    }
+    // </FS:Trish>
     U32 mask = 0xff & (~2); // Local lights
     enableLights(mask);
 
@@ -8052,6 +8065,10 @@ void LLPipeline::enableLightsDynamic()
             gPipeline.enableLightsAvatarEdit(LLColor4(0.7f, 0.6f, 0.3f, 1.f));
         }
     }
+    // <FS:Trish>
+    last_valid = normal_mode && mLightMask == 0xff;
+    last_light_hash = gGL.getLightHash();
+    // </FS:Trish>
 }
 
 void LLPipeline::enableLightsAvatar()
@@ -11035,9 +11052,14 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
     { // was previously fully bound, use fast path
         shader.bind();
         shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
+        // <FS:Trish> Rebinding: the samplers mostly still hold their textures, switch to a unit
+        // only to bind something on it (see LLGLSLShader::sFSLazyTextureEnable)
+        LLGLSLShader::sFSLazyTextureEnable = true;
+        // </FS:Trish>
         bindBrdfLut(shader);
         bindShadowMaps(shader);
         bindReflectionProbes(shader);
+        LLGLSLShader::sFSLazyTextureEnable = false; // <FS:Trish/>
     }
     else
     { //wasn't previously bound, use slow path

@@ -167,6 +167,12 @@ public:
 
     static GLuint sCurBoundShader;
     static LLGLSLShader* sCurBoundShaderPtr;
+    // <FS:Trish> While set, enableTexture leaves the active texture unit alone when the unit
+    // already has the requested texture type: the LLTexUnit bind that follows makes the unit
+    // active itself if it binds anything. Only for code whose follow-up GL work all goes through
+    // LLTexUnit (bindDeferredShaderFast), never for raw GL calls on "the active unit".
+    static bool sFSLazyTextureEnable;
+    // </FS:Trish>
     static S32 sIndexedTextureChannels;
 
     static U32 sMaxGLTFMaterials;
