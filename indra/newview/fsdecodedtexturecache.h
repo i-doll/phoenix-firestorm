@@ -83,6 +83,13 @@ public:
     // Decode pool. Returns null on failure, dropping the entry.
     LLPointer<LLImageRaw> load(const LLUUID& id, S32 discard);
 
+    // Any thread. Loads read whole files of raw pixels, so only a few may run at once: a login or
+    // teleport otherwise starts thousands together on every decode thread and saturates the disk.
+    // tryReserveLoad() is false when the limit is reached (decode normally instead); every true
+    // must be followed by one releaseLoad() after load().
+    bool tryReserveLoad();
+    void releaseLoad();
+
     // Fetch thread. Queues a write when this is better than what is stored. 'raw' must not be
     // modified while the write is pending (texture fetch results are not).
     void store(const LLUUID& id, const LLPointer<LLImageRaw>& raw, S32 discard);
@@ -129,7 +136,7 @@ private:
     void dropOtherRegions(U32 region);
     // Posts the clean up the current mode calls for, after a region, mode or list change
     void applyModeToEntries();
-    void dropEntry(const LLUUID& id);
+    void dropEntry(const LLUUID& id, const std::string* only_path = nullptr); // only_path: drop only while the entry still has that file
     void evictIfNeeded();
     static S64 now();
 
@@ -145,6 +152,7 @@ private:
     U64 mTotalBytes = 0;
 
     std::atomic<U32> mCurrentRegion{ 0 };
+    std::atomic<S32> mLoadsInFlight{ 0 };
 
     // Session counters for the stats
     std::atomic<U32> mLoads{ 0 };

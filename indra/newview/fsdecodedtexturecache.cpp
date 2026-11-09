@@ -59,6 +59,10 @@ namespace
     constexpr char TEMP_EXTENSION[] = ".tmp";
     constexpr U32 FILE_MAGIC = 0x54444346; // "FCDT"
     constexpr U32 FILE_VERSION = 1;
+    // Most halvings a load may do to serve a lower resolution than the one stored
+    constexpr S32 MAX_LOAD_HALVINGS = 1;
+    // Most loads running at once (see tryReserveLoad)
+    constexpr S32 MAX_LOADS_IN_FLIGHT = 3;
 
     struct FileHeader
     {
@@ -435,6 +439,12 @@ bool FSDecodedTextureCache::canLoad(const LLUUID& id, S32 discard) const
     }
     const Entry& entry = it->second;
     const S32 shift = discard - entry.mDiscard;
+    // A load reads the whole stored file, 4x the requested pixels per halving: further down, the
+    // normal decode of the J2C stream (which only reads what it needs) is cheaper than the disk read
+    if (shift > MAX_LOAD_HALVINGS)
+    {
+        return false;
+    }
     // halving needs sizes that divide evenly
     if (((entry.mWidth >> shift) << shift) != entry.mWidth || ((entry.mHeight >> shift) << shift) != entry.mHeight)
     {
@@ -443,6 +453,24 @@ bool FSDecodedTextureCache::canLoad(const LLUUID& id, S32 discard) const
     const U32 width = entry.mWidth >> shift;
     const U32 height = entry.mHeight >> shift;
     return width > 0 && height > 0 && llmax(width, height) >= sMinSize;
+}
+
+bool FSDecodedTextureCache::tryReserveLoad()
+{
+    S32 in_flight = mLoadsInFlight.load(std::memory_order_relaxed);
+    while (in_flight < MAX_LOADS_IN_FLIGHT)
+    {
+        if (mLoadsInFlight.compare_exchange_weak(in_flight, in_flight + 1, std::memory_order_acq_rel))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void FSDecodedTextureCache::releaseLoad()
+{
+    mLoadsInFlight.fetch_sub(1, std::memory_order_acq_rel);
 }
 
 // Decode pool
@@ -475,7 +503,11 @@ LLPointer<LLImageRaw> FSDecodedTextureCache::load(const LLUUID& id, S32 discard)
         {
             raw = new LLImageRaw(entry.mWidth, entry.mHeight, entry.mComponents);
             U8* dest = raw->getData();
-            if (dest && raw->getDataSize() >= (S32)header.mRawSize)
+            // The packed size comes from the file: a damaged one must not ask for gigabytes
+            const bool size_ok = header.mCompressed
+                ? header.mDataSize > 0 && header.mDataSize <= compressBound(header.mRawSize)
+                : header.mDataSize == header.mRawSize;
+            if (dest && size_ok && raw->getDataSize() >= (S32)header.mRawSize)
             {
                 if (header.mCompressed)
                 {
@@ -487,7 +519,7 @@ LLPointer<LLImageRaw> FSDecodedTextureCache::load(const LLUUID& id, S32 discard)
                 }
                 else
                 {
-                    ok = header.mDataSize == header.mRawSize && fread(dest, 1, header.mRawSize, fp) == header.mRawSize;
+                    ok = fread(dest, 1, header.mRawSize, fp) == header.mRawSize;
                 }
             }
         }
@@ -498,7 +530,9 @@ LLPointer<LLImageRaw> FSDecodedTextureCache::load(const LLUUID& id, S32 discard)
     {
         LL_DEBUGS("DecodedTextureCache") << "Dropping unreadable entry " << path << LL_ENDL;
         ++mLoadFailures;
-        dropEntry(id);
+        // Only the entry that was read: the writer may have replaced or retagged it since, which
+        // moves the file, and the new one is fine
+        dropEntry(id, &path);
         return nullptr;
     }
     ++mLoads;
@@ -761,7 +795,7 @@ void FSDecodedTextureCache::dropOtherRegions(U32 region)
     }
 }
 
-void FSDecodedTextureCache::dropEntry(const LLUUID& id)
+void FSDecodedTextureCache::dropEntry(const LLUUID& id, const std::string* only_path)
 {
     std::string path;
     {
@@ -772,6 +806,10 @@ void FSDecodedTextureCache::dropEntry(const LLUUID& id)
             return;
         }
         path = entryPath(id, it->second);
+        if (only_path && path != *only_path)
+        {
+            return;
+        }
         mTotalBytes -= it->second.mFileBytes;
         mEntries.erase(it);
     }

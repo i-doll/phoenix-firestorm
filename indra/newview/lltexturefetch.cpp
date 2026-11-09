@@ -3055,6 +3055,11 @@ bool LLTextureFetchWorker::tryDecodedCache()
         return false;
     }
 
+    if (!cache.tryReserveLoad())
+    {
+        return false; // enough loads in flight: decode this one normally rather than queue more disk reads
+    }
+
     static std::atomic<U32> sHandleCounter{ 0 };
     U32 handle = ++sHandleCounter;
     if (handle == 0)
@@ -3076,6 +3081,7 @@ bool LLTextureFetchWorker::tryDecodedCache()
     const bool posted = LLAppViewer::getImageDecodeThread()->postTask([fetcher, id, handle, discard]()
         {
             LLPointer<LLImageRaw> raw = FSDecodedTextureCache::instance().load(id, discard);
+            FSDecodedTextureCache::instance().releaseLoad();
             if (LLTextureFetchWorker* worker = fetcher->getWorker(id))
             {
                 worker->callbackDecodedCache(handle, raw, discard);
@@ -3083,6 +3089,7 @@ bool LLTextureFetchWorker::tryDecodedCache()
         }, mImagePriority);
     if (!posted)
     {
+        cache.releaseLoad();
         mDecodedFromCache = false;
         mDecodedCacheHandle = 0;
         setState(LOAD_FROM_TEXTURE_CACHE);
