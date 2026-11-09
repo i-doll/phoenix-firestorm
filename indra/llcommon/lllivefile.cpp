@@ -29,6 +29,12 @@
 #include "llframetimer.h"
 #include "lleventtimer.h"
 
+// <FS:Trish> stat the file off the main thread
+#include <atomic>
+#include <memory>
+#include <thread>
+// </FS:Trish>
+
 const F32 DEFAULT_CONFIG_FILE_REFRESH = 5.0f;
 
 
@@ -40,6 +46,21 @@ public:
 
     bool check();
     void changed();
+
+    // <FS:Trish> The periodic checks stat the file on a short lived thread: a stat can block for
+    // seconds when the disk is busy (a build, antivirus scanning a large file operation), and these
+    // checks run on the main thread every few seconds, freezing the viewer for that long. The first
+    // (forced) check stays synchronous, as callers expect the file loaded once it returns.
+    struct AsyncStat
+    {
+        std::atomic<int> mState{ 0 };   // 0 idle, 1 running, 2 result ready
+        bool mExists = false;
+        time_t mModTime = 0;
+    };
+    std::shared_ptr<AsyncStat> mAsync;  // shared with a thread that may outlive this
+    bool checkAsync();
+    bool applyStat(bool exists, time_t mod_time);
+    // </FS:Trish>
 
     bool mForceCheck;
     F32 mRefreshPeriod;
@@ -83,8 +104,91 @@ LLLiveFile::~LLLiveFile()
 }
 
 
+// <FS:Trish> see AsyncStat
+bool LLLiveFile::Impl::applyStat(bool exists, time_t mod_time)
+{
+    bool detected_change = false;
+    if (!exists)
+    {
+        if (mLastExists)
+        {
+            mLastExists = false;
+            detected_change = true; // no longer existing is a change!
+            LL_DEBUGS() << "detected deleted file '" << mFilename << "'" << LL_ENDL;
+        }
+    }
+    else
+    {
+        if (!mLastExists)
+        {
+            LL_DEBUGS() << "detected created file '" << mFilename << "'" << LL_ENDL;
+            detected_change = true;
+        }
+        else if (mod_time > mLastModTime)
+        {
+            LL_DEBUGS() << "detected updated file '" << mFilename << "'" << LL_ENDL;
+            detected_change = true;
+        }
+        mLastExists = true;
+        mLastStatTime = mod_time;
+    }
+    if (detected_change)
+    {
+        LL_INFOS() << "detected file change '" << mFilename << "'" << LL_ENDL;
+    }
+    return detected_change;
+}
+
+bool LLLiveFile::Impl::checkAsync()
+{
+    bool detected_change = false;
+    if (mAsync && mAsync->mState.load(std::memory_order_acquire) == 2)
+    {
+        detected_change = applyStat(mAsync->mExists, mAsync->mModTime);
+        mAsync->mState.store(0, std::memory_order_relaxed);
+    }
+    if (mRefreshTimer.getElapsedTimeF32() >= mRefreshPeriod &&
+        (!mAsync || mAsync->mState.load(std::memory_order_acquire) == 0))
+    {
+        mRefreshTimer.reset();
+        if (!mAsync)
+        {
+            mAsync = std::make_shared<AsyncStat>();
+        }
+        mAsync->mState.store(1, std::memory_order_relaxed);
+        std::shared_ptr<AsyncStat> state = mAsync;
+        std::string filename = mFilename;
+        try
+        {
+            std::thread([state, filename]()
+            {
+                llstat stat_data;
+                const bool exists = LLFile::stat(filename, &stat_data) == 0;
+                state->mExists = exists;
+                state->mModTime = exists ? stat_data.st_mtime : 0;
+                state->mState.store(2, std::memory_order_release);
+            }).detach();
+        }
+        catch (const std::system_error&)
+        {   // no thread: check the old way
+            mAsync->mState.store(0, std::memory_order_relaxed);
+            llstat stat_data;
+            const bool exists = LLFile::stat(mFilename, &stat_data) == 0;
+            detected_change |= applyStat(exists, exists ? stat_data.st_mtime : 0);
+        }
+    }
+    return detected_change;
+}
+// </FS:Trish>
+
 bool LLLiveFile::Impl::check()
 {
+    // <FS:Trish> periodic checks don't block on the disk
+    if (!mForceCheck)
+    {
+        return checkAsync();
+    }
+    // </FS:Trish>
     bool detected_change = false;
     // Skip the check if not enough time has elapsed and we're not
     // forcing a check of the file
