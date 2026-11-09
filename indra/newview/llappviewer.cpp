@@ -32,7 +32,6 @@
 #include "idmaterialtheme.h" // <ID:MaterialTheme>
 #include "fsrenderthread.h" // <FS:Trish/> FSRenderThread
 #include "fsgputimers.h" // <FS:Trish/> FSRenderGPUTimings
-#include "fsnativepopout.h"
 
 // Viewer includes
 #include "llversioninfo.h"
