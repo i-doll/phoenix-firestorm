@@ -191,6 +191,7 @@ namespace
     bool sActive = false;                   // between a successful fsGDDShadowAlphaBegin and the flush
     U32 sFrame = 0;
     std::vector<Item> sItems;
+    std::vector<Item> sSortedItems;         // build's bucket sort target, kept for its capacity
     std::vector<TexEntry> sTextures;
     std::vector<DrawCommand> sCommands;
     std::vector<Record> sRecords;
@@ -198,6 +199,10 @@ namespace
     std::vector<glm::mat4> sMatrices;
     std::unordered_map<const LLMatrix4*, U32> sMatrixIndex;
     std::unordered_map<const LLMatrix4*, U32> sTexMatrixIndex;
+    const LLMatrix4* sLastModel = nullptr;  // consecutive batches mostly share their matrices
+    U32 sLastModelIndex = U32_MAX;          // U32_MAX: none yet this build
+    const LLMatrix4* sLastTexMatrix = nullptr;
+    U32 sLastTexMatrixIndex = U32_MAX;
     std::unordered_map<const LLFetchedGLTFMaterial*, U32> sTransformIndex;
 
     // stats, every 10 seconds with FSPerfShadowBatchStats or FSPerfGPUDrivenDrawsVerify
@@ -606,9 +611,15 @@ namespace
 {
     U32 matrix_index(const LLMatrix4* model, const glm::mat4& proj, const glm::mat4& view)
     {
+        if (sLastModelIndex != U32_MAX && model == sLastModel)
+        {
+            return sLastModelIndex;
+        }
+        sLastModel = model;
         auto it = sMatrixIndex.find(model);
         if (it != sMatrixIndex.end())
         {
+            sLastModelIndex = it->second;
             return it->second;
         }
         // as LLRenderPass::applyModelMatrix and LLRender::syncMatrices compose it
@@ -620,6 +631,7 @@ namespace
         const U32 index = (U32)sMatrices.size();
         sMatrices.push_back(proj * modelview);
         sMatrixIndex.emplace(model, index);
+        sLastModelIndex = index;
         return index;
     }
 
@@ -629,14 +641,21 @@ namespace
         {
             return 0;   // identity, what MM_TEXTURE0 holds outside pushBatch and pushGLTFBatch
         }
+        if (sLastTexMatrixIndex != U32_MAX && texture_matrix == sLastTexMatrix)
+        {
+            return sLastTexMatrixIndex;
+        }
+        sLastTexMatrix = texture_matrix;
         auto it = sTexMatrixIndex.find(texture_matrix);
         if (it != sTexMatrixIndex.end())
         {
+            sLastTexMatrixIndex = it->second;
             return it->second;
         }
         const U32 index = (U32)sMatrices.size();
         sMatrices.push_back(glm::make_mat4((const F32*)texture_matrix->mMatrix));
         sTexMatrixIndex.emplace(texture_matrix, index);
+        sLastTexMatrixIndex = index;
         return index;
     }
 
@@ -682,14 +701,29 @@ namespace
     // Turns the pending items (sorted by face culling, then cascade set) into commands, records and segments.
     void build(bool single_pass)
     {
-        std::sort(sItems.begin(), sItems.end(), [](const Item& a, const Item& b)
+        // A bucket sort: single sided first, then by cascade set (four bits; 1 outside the single pass). Stable,
+        // so batches that share matrices stay next to each other.
+        constexpr U32 BUCKETS = 32;
+        U32 starts[BUCKETS] = {};
+        auto bucket = [](const Item& item) { return (item.mDoubleSided ? 16u : 0u) | (item.mMask & 15u); };
+        for (const Item& item : sItems)
         {
-            if (a.mDoubleSided != b.mDoubleSided)
-            {
-                return b.mDoubleSided;
-            }
-            return a.mMask < b.mMask;
-        });
+            llassert(item.mMask < 16);
+            ++starts[bucket(item)];
+        }
+        U32 total = 0;
+        for (U32& start : starts)
+        {
+            const U32 count = start;
+            start = total;
+            total += count;
+        }
+        sSortedItems.resize(sItems.size());
+        for (const Item& item : sItems)
+        {
+            sSortedItems[starts[bucket(item)]++] = item;
+        }
+        sItems.swap(sSortedItems);
 
         sCommands.clear();
         sRecords.clear();
@@ -698,6 +732,8 @@ namespace
         sMatrixIndex.clear();
         sTexMatrixIndex.clear();
         sTransformIndex.clear();
+        sLastModelIndex = U32_MAX;
+        sLastTexMatrixIndex = U32_MAX;
         sMatrices.push_back(glm::mat4(1.f));   // texture matrix 0: identity
 
         const glm::mat4 proj = gGL.getProjectionMatrix();

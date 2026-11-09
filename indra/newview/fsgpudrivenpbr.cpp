@@ -1066,6 +1066,7 @@ namespace
         Record mRecord;
         EOpKind mKind;
         bool mDoubleSided;
+        U32 mSeq;                   // stock order, the last sort key (std::sort without stable_sort's buffer)
     };
     std::vector<Pending> sPending;
     std::vector<LLDrawInfo*> sStockParams;
@@ -1090,7 +1091,7 @@ namespace
                              nullptr });
         };
 
-        std::stable_sort(sPending.begin(), sPending.end(), [](const Pending& a, const Pending& b)
+        std::sort(sPending.begin(), sPending.end(), [](const Pending& a, const Pending& b)
         {
             if (a.mKind != b.mKind)
             {
@@ -1107,7 +1108,11 @@ namespace
                     return a.mTex < b.mTex;
                 }
             }
-            return a.mDoubleSided < b.mDoubleSided;
+            if (a.mDoubleSided != b.mDoubleSided)
+            {
+                return a.mDoubleSided < b.mDoubleSided;
+            }
+            return a.mSeq < b.mSeq;
         });
 
         auto first = sPending.cbegin();
@@ -1228,7 +1233,7 @@ namespace
             if (group_runs)
             {
                 sPending.push_back({ &params, mat, media, params.mCount, entry->mIndex + params.mOffset, (GLint)entry->mVertex,
-                                     record, kind, double_sided });
+                                     record, kind, double_sided, (U32)sPending.size() });
                 continue;
             }
 
