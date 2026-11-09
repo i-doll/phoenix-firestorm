@@ -490,9 +490,13 @@ namespace
             state.mUsable = state.mOnceLoc >= 0 && state.mBaseLoc >= 0 && sampler >= 0
                 && shader->mActiveTextureChannels <= sTextureUnit
                 && (shader->mAttributeMask & LLVertexBuffer::MAP_WEIGHT4);
-            if (state.mUsable)
+            if (sampler >= 0)
             {
-                glUniform1i(sampler, sTextureUnit); // the program is the bound one
+                // the program is the bound one. Also when it can't use the capture: the sampler
+                // uniform defaults to unit 0, where the program's sampler2D diffuseMap sits, and two
+                // sampler types on one unit fail the draw with GL_INVALID_OPERATION on strict drivers
+                // (AMD), even though fs_skin_once is 0 and the buffer is never read
+                glUniform1i(sampler, sTextureUnit);
             }
             state.mOnce = -1;
             state.mBase = S32_MIN;
