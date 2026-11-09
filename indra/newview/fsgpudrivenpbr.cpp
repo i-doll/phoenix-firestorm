@@ -61,7 +61,9 @@
 // texture or change its parameters they call LLImageGL::sFSTextureUnlock, which makes its handles non
 // resident and deletes its samplers, which deletes the handles and makes the texture mutable again (checked
 // once per GL context: if a driver keeps the texture immutable, bindless is not used). Handles are looked up
-// by the texture's current GL name every pass, so a reallocated texture (a new name) gets a new handle. Only
+// by the texture's current GL name every pass, so a reallocated texture (a new name) gets a new handle. Making
+// a handle waits for FSRenderThread, so while it records, a missing handle is queued (the batch takes bound
+// textures this time) and the queued ones are made together, in one wait, at the next frame's first lookup. Only
 // fetched textures with three or four components that are complete, not waiting for their options to be
 // applied, and not media get handles; a batch with any other texture is drawn with bound textures.
 //
@@ -117,6 +119,7 @@ namespace
                                        LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_COLOR;
     constexpr U32 FS_GDD_HANDLE_IDLE_FRAMES = 300;      // frames a handle may go unused before it is made non resident
     constexpr U32 FS_GDD_HANDLE_DROP_FRAMES = 1800;     // and before it is deleted
+    constexpr U32 FS_GDD_HANDLE_RETRY_FRAMES = 60;      // frames before a texture/sampler pair that got no handle is tried again
 
     // everything pbropaqueV.glsl reads, an eighth of FSPerfGPUDrivenPBRArenaMB for indices
     FSGDDArena sArena("FSPerfGPUDrivenPBR arena",
@@ -292,14 +295,25 @@ namespace
     {
         SamplerState mState;
         GLuint mSampler = 0;
-        GLuint64 mHandle = 0;
+        GLuint64 mHandle = 0;           // 0: the driver gave none at mLastFrame (no sampler then), tried again later
         bool mResident = false;
         U32 mLastFrame = 0;
     };
 
+    // A handle wanted while the render thread records: made with the others at the next frame's first lookup
+    struct HandleRequest
+    {
+        LLPointer<LLViewerTexture> mTex;
+        U32 mName;
+        SamplerState mState;
+        GLuint mSampler;                // while being made
+    };
+
     std::mutex sHandleMutex;                                    // the hook may come from the texture thread
     std::unordered_map<U32, std::vector<HandleSlot>> sHandles;  // by texture GL name
-    std::atomic<U32> sHandleTextures{ 0 };                      // sHandles.size(), for the hook's fast path
+    std::atomic<U32> sHandleTextures{ 0 };                      // sHandles.size() + sHandleQueue.size(), for the hook's fast path
+    std::unordered_map<U32, std::vector<HandleRequest>> sHandleQueue;   // by texture GL name; changed on the main thread only
+    U32 sHandleQueueFrame = 0;                                  // the frame the queue was last worked off
     U32 sResident = 0;
     U32 sStatHandlesMade = 0;
     U32 sStatHandleFailures = 0;
@@ -350,10 +364,19 @@ namespace
                 fsMakeNonResident(slot.mHandle);
                 --sResident;
             }
-            glDeleteSamplers(1, &slot.mSampler);
+            if (slot.mSampler)
+            {
+                glDeleteSamplers(1, &slot.mSampler);
+            }
         }
 #endif
         slots.clear();
+    }
+
+    // sHandleMutex held
+    void update_handle_count()
+    {
+        sHandleTextures.store((U32)(sHandles.size() + sHandleQueue.size()), std::memory_order_relaxed);
     }
 
     // LLImageGL::sFSTextureUnlock: tex_name is about to be respecified or get new parameters.
@@ -363,27 +386,42 @@ namespace
         {
             return;
         }
+        // Released after the lock: dropping the last reference to a texture deletes it, which comes back here
+        std::vector<HandleRequest> dropped;
         std::lock_guard<std::mutex> lock(sHandleMutex);
         auto it = sHandles.find(tex_name);
+        if (!on_main_thread())
+        {   // handles are only made for textures the main thread owns; the texture thread works on new names
+            // (and a queued request, which holds a texture reference, is checked again before its handle is made)
+            if (it != sHandles.end())
+            {
+                LL_WARNS_ONCE("Rendering") << "FSPerfGPUDrivenPBRBindless: texture " << tex_name
+                                           << " with bindless handles changed off the main thread" << LL_ENDL;
+            }
+            return;
+        }
+        auto queued = sHandleQueue.find(tex_name);
+        if (queued != sHandleQueue.end())
+        {   // respecified or deleted before its handle was made
+            dropped.swap(queued->second);
+            sHandleQueue.erase(queued);
+            update_handle_count();
+        }
         if (it == sHandles.end())
         {
             return;
         }
-        if (!on_main_thread())
-        {   // handles are only made for textures the main thread owns; the texture thread works on new names
-            LL_WARNS_ONCE("Rendering") << "FSPerfGPUDrivenPBRBindless: texture " << tex_name
-                                       << " with bindless handles changed off the main thread" << LL_ENDL;
-            return;
-        }
         drop_slots(it->second);
         sHandles.erase(it);
-        sHandleTextures.store((U32)sHandles.size(), std::memory_order_relaxed);
+        update_handle_count();
         ++sStatUnlocks;
     }
 
     void release_handles()
     {
+        std::unordered_map<U32, std::vector<HandleRequest>> queue;  // released after the lock (unlock_texture)
         std::lock_guard<std::mutex> lock(sHandleMutex);
+        queue.swap(sHandleQueue);
         for (auto& texture : sHandles)
         {
             drop_slots(texture.second);
@@ -449,7 +487,121 @@ namespace
 #endif
     }
 
-    // The resident handle of tex as the stock path would sample it, or 0 if it can't have one.
+#if FS_GDD_BINDLESS_API
+    // A sampler set up as state; recorded, no wait
+    GLuint make_sampler(const SamplerState& state)
+    {
+        GLuint sampler = 0;
+        glGenSamplers(1, &sampler);
+        glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, state.mMag);
+        glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, state.mMin);
+        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, state.mWrap);
+        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, state.mWrap);
+        if (state.mAniso > 0.f)
+        {
+            glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY, state.mAniso);
+        }
+        return sampler;
+    }
+
+    // Files a handle just made under name, or (handle 0) that the driver gave none, so the pair isn't asked
+    // for again every frame. sHandleMutex held, main thread.
+    void add_slot(U32 name, const SamplerState& state, GLuint sampler, GLuint64 handle, U32 frame)
+    {
+        HandleSlot slot;
+        slot.mState = state;
+        slot.mLastFrame = frame;
+        if (!handle)
+        {
+            glDeleteSamplers(1, &sampler);
+            ++sStatHandleFailures;
+        }
+        else
+        {
+            slot.mSampler = sampler;
+            slot.mHandle = handle;
+            fsMakeResident(handle);
+            slot.mResident = true;
+            ++sResident;
+            ++sStatHandlesMade;
+        }
+        sHandles[name].push_back(slot);
+    }
+
+    // The handles asked for while the render thread recorded, of the textures still as they were then, all
+    // made in one wait for the render thread. Once per frame, at its first lookup or sweep. Main thread.
+    void make_queued_handles(U32 frame)
+    {
+        if (frame == sHandleQueueFrame)
+        {
+            return;
+        }
+        sHandleQueueFrame = frame;
+        // released after the lock: dropping the last reference to a texture deletes it, which calls unlock_texture
+        std::unordered_map<U32, std::vector<HandleRequest>> queue;
+        std::vector<HandleRequest> requests;
+        std::lock_guard<std::mutex> lock(sHandleMutex);
+        if (sHandleQueue.empty())
+        {
+            return;
+        }
+        queue.swap(sHandleQueue);
+        for (auto& texture : queue)
+        {
+            for (HandleRequest& request : texture.second)
+            {
+                LLImageGL* gl = request.mTex->getGLTexture();
+                if (!gl || gl->getTexName() != request.mName || gl->getFSTexOptionsDirty() || gl->getComponents() < 3 ||
+                    gl->getTarget() != LLTexUnit::TT_TEXTURE || !(sampler_state(gl) == request.mState))
+                {   // changed since: asked for again if still wanted
+                    continue;
+                }
+                bool made = false;
+                auto it = sHandles.find(request.mName);
+                if (it != sHandles.end())
+                {
+                    for (const HandleSlot& slot : it->second)
+                    {
+                        made = made || slot.mState == request.mState;
+                    }
+                }
+                if (!made)
+                {
+                    request.mSampler = make_sampler(request.mState);
+                    requests.push_back(request);
+                }
+            }
+        }
+
+        if (!requests.empty())
+        {
+            std::vector<GLuint64> handles(requests.size(), 0);
+            FSGLStream::runSync([&]()
+                {
+                    for (size_t i = 0; i < requests.size(); ++i)
+                    {
+                        // 0 (and GL_INVALID_OPERATION) for a texture that isn't complete with this sampler
+                        handles[i] = sGetTextureSamplerHandle(requests[i].mName, requests[i].mSampler);
+                        if (!handles[i])
+                        {
+                            for (U32 j = 0; j < 4 && glGetError() != GL_NO_ERROR; ++j)
+                            {
+                            }
+                        }
+                    }
+                });
+            for (size_t i = 0; i < requests.size(); ++i)
+            {
+                add_slot(requests[i].mName, requests[i].mState, requests[i].mSampler, handles[i], frame);
+            }
+        }
+        update_handle_count();
+    }
+#endif
+
+    // The resident handle of tex as the stock path would sample it, or 0 if it can't have one. While the
+    // render thread records, a missing handle is queued (0 this time) and made at the next frame's first
+    // lookup together with the others: one wait for the render thread per frame, not one per texture.
     GLuint64 texture_handle(LLViewerTexture* tex, U32 frame)
     {
 #if FS_GDD_BINDLESS_API
@@ -469,13 +621,34 @@ namespace
             return 0;
         }
         const SamplerState state = sampler_state(gl);
+        make_queued_handles(frame);
 
         std::lock_guard<std::mutex> lock(sHandleMutex);
-        std::vector<HandleSlot>& slots = sHandles[name];
-        for (HandleSlot& slot : slots)
+        auto it = sHandles.find(name);
+        if (it != sHandles.end())
         {
-            if (slot.mState == state)
+            std::vector<HandleSlot>& slots = it->second;
+            for (size_t i = 0; i < slots.size(); ++i)
             {
+                HandleSlot& slot = slots[i];
+                if (!(slot.mState == state))
+                {
+                    continue;
+                }
+                if (!slot.mHandle)
+                {   // the driver gave none
+                    if (frame - slot.mLastFrame < FS_GDD_HANDLE_RETRY_FRAMES)
+                    {
+                        return 0;
+                    }
+                    slots.erase(slots.begin() + i);
+                    if (slots.empty())
+                    {
+                        sHandles.erase(it);
+                        update_handle_count();
+                    }
+                    break;
+                }
                 if (!slot.mResident)
                 {
                     fsMakeResident(slot.mHandle);
@@ -487,40 +660,33 @@ namespace
             }
         }
 
-        HandleSlot slot;
-        slot.mState = state;
-        glGenSamplers(1, &slot.mSampler);
-        glSamplerParameteri(slot.mSampler, GL_TEXTURE_MAG_FILTER, state.mMag);
-        glSamplerParameteri(slot.mSampler, GL_TEXTURE_MIN_FILTER, state.mMin);
-        glSamplerParameteri(slot.mSampler, GL_TEXTURE_WRAP_S, state.mWrap);
-        glSamplerParameteri(slot.mSampler, GL_TEXTURE_WRAP_T, state.mWrap);
-        if (state.mAniso > 0.f)
-        {
-            glSamplerParameterf(slot.mSampler, GL_TEXTURE_MAX_ANISOTROPY, state.mAniso);
-        }
-        // 0 (and GL_INVALID_OPERATION) for a texture that isn't complete with this sampler
-        slot.mHandle = fsGetHandle(name, slot.mSampler);
-        if (!slot.mHandle)
-        {
-            glDeleteSamplers(1, &slot.mSampler);
-            for (U32 i = 0; i < 4 && glGetError() != GL_NO_ERROR; ++i)
+        if (!FSGLStream::isRecording())
+        {   // GL is on this thread: made right away, nothing to wait for
+            const GLuint sampler = make_sampler(state);
+            // 0 (and GL_INVALID_OPERATION) for a texture that isn't complete with this sampler
+            const GLuint64 handle = sGetTextureSamplerHandle(name, sampler);
+            if (!handle)
             {
+                for (U32 i = 0; i < 4 && glGetError() != GL_NO_ERROR; ++i)
+                {
+                }
             }
-            ++sStatHandleFailures;
-            if (slots.empty())
-            {
-                sHandles.erase(name);
-            }
-            return 0;
+            add_slot(name, state, sampler, handle, frame);
+            update_handle_count();
+            return handle;
         }
-        fsMakeResident(slot.mHandle);
-        slot.mResident = true;
-        slot.mLastFrame = frame;
-        ++sResident;
-        ++sStatHandlesMade;
-        slots.push_back(slot);
-        sHandleTextures.store((U32)sHandles.size(), std::memory_order_relaxed);
-        return slot.mHandle;
+
+        std::vector<HandleRequest>& queued = sHandleQueue[name];
+        for (const HandleRequest& request : queued)
+        {
+            if (request.mState == state)
+            {
+                return 0;
+            }
+        }
+        queued.push_back({ tex, name, state, 0 });
+        update_handle_count();
+        return 0;
 #else
         return 0;
 #endif
@@ -529,6 +695,9 @@ namespace
     // Every so often: handles not used for a while go non resident, and later away.
     void sweep_handles(U32 frame)
     {
+#if FS_GDD_BINDLESS_API
+        make_queued_handles(frame);
+#endif
         if (frame - sLastHandleSweep < 120)
         {
             return;
@@ -560,7 +729,7 @@ namespace
             }
             it = slots.empty() ? sHandles.erase(it) : std::next(it);
         }
-        sHandleTextures.store((U32)sHandles.size(), std::memory_order_relaxed);
+        update_handle_count();
 #endif
     }
 }
