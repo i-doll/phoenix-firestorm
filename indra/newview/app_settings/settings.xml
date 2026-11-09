@@ -28367,7 +28367,7 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>FSPerfGPUDrivenPBRGroupRuns</key>
     <map>
       <key>Comment</key>
-      <string>EXPERIMENTAL. With FSPerfGPUDrivenPBR, draw the PBR batches grouped instead of in the stock order: all batches with bindless textures in one multi-draw per face culling state, the others one run per material. Far fewer draw calls, program switches and texture binds in busy scenes. Only where two surfaces lie at exactly the same depth can the other one show than with the stock order.</string>
+      <string>EXPERIMENTAL. Applies to the PBR pass (FSPerfGPUDrivenPBR) and the legacy material passes (FSPerfGPUDrivenMaterials): draw their batches grouped instead of in the stock order. PBR: all batches with bindless textures in one multi-draw per face culling state, the others one run per material, then the stock fallbacks. Legacy materials: all GPU-driven batches in one multi-draw, then the stock fallbacks. Far fewer draw calls, program switches and texture binds in busy scenes. Only where two surfaces lie at exactly the same depth can the other one show than with the stock order.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

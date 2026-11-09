@@ -49,6 +49,13 @@
 // full or the copy budget used up) is drawn by the stock code in its place. Rigged and blended passes stay
 // entirely stock.
 //
+// FSPerfGPUDrivenPBRGroupRuns gives that order up here too: the stock fallbacks spread through a pass cut it
+// into many runs, and every switch between a run and a stock batch costs a program bind and the inputs set up
+// again. A run has no state of its own (the material of every batch is in its record), so grouped, all batches
+// from the arena go out as one multi-draw and the stock fallbacks after them, in their stock order. The depth
+// test decides what a G-buffer pass leaves, so only where two surfaces have exactly the same depth can a
+// different one win than in the stock order.
+//
 // The texture handles are those of FSPerfGPUDrivenPBRBindless (fsgpudrivenpbr.cpp), looked up once per
 // texture per pass through the cache FSPerfGPUDrivenLegacy keeps (fsGDDPassTextureHandle); this needs bindless
 // textures, which are only used on NVIDIA.
@@ -441,8 +448,9 @@ namespace
         return handle ? -1 : R_HANDLE;
     }
 
-    // Turns the pass's batches into ops (in the stock order) and commands.
-    void build(U32 index, LLCullResult::drawinfo_iterator begin, LLCullResult::drawinfo_iterator end)
+    // Turns the pass's batches into ops (in the stock order, or grouped: one op for all the commands, then the
+    // stock fallbacks) and commands.
+    void build(U32 index, LLCullResult::drawinfo_iterator begin, LLCullResult::drawinfo_iterator end, bool grouped)
     {
         sOps.clear();
         sCommands.clear();
@@ -561,6 +569,10 @@ namespace
                                  material, 0 });
             sCommandParams.push_back(&params);
 
+            if (grouped)
+            {
+                continue;
+            }
             Op* last = sOps.empty() ? nullptr : &sOps.back();
             if (last && !last->mStock)
             {
@@ -570,6 +582,10 @@ namespace
             {
                 sOps.push_back({ false, command, 1, nullptr });
             }
+        }
+        if (grouped && !sCommands.empty())
+        {   // the commands first, as one run
+            sOps.insert(sOps.begin(), { false, 0, (U32)sCommands.size(), nullptr });
         }
         sStatMaterials += sMaterials.size();
     }
@@ -973,6 +989,7 @@ bool fsGDDDrawMaterials(U32 type, LLGLSLShader& stock)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     static LLCachedControl<bool> verify(gSavedSettings, "FSPerfGPUDrivenMaterialsVerify", false);
     static LLCachedControl<bool> stats(gSavedSettings, "FSPerfGPUDrivenMaterialsStats", false);
+    static LLCachedControl<bool> group_runs(gSavedSettings, "FSPerfGPUDrivenPBRGroupRuns", false);
 
     // The first bind finds the program's inputs; do that now, so a failure leaves the whole pass to the
     // stock loop rather than part of it
@@ -993,7 +1010,7 @@ bool fsGDDDrawMaterials(U32 type, LLGLSLShader& stock)
 
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWPOOL("gdd materials build");
-        build(index, begin, end);
+        build(index, begin, end, group_runs);
     }
     if (sCommands.empty())
     {   // nothing from the arena: the stock loop draws exactly the same
