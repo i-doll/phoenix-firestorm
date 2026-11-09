@@ -2909,8 +2909,14 @@ namespace
             if (r != sQueryResults.end() && r->second.mGen == it->second)
             {
                 if (r->second.mDropped)
-                {
-                    return false;   // the render thread gave up on it: let the driver answer
+                {   // the render thread gave up on it (2 s): the GPU has long finished, so call it available
+                    // without asking the driver, and let the driver answer the result itself
+                    if (pname == GL_QUERY_RESULT_AVAILABLE)
+                    {
+                        *params = (T)GL_TRUE;
+                        return true;
+                    }
+                    return false;
                 }
                 have = true;
                 value = r->second.mValue;

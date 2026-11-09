@@ -33,6 +33,7 @@
 #include "llglslshader.h"
 #include "llviewershadermgr.h"
 #include "lldrawpoolwater.h"
+#include "fsglstream.h" // <FS:Trish/> FSRenderThread
 
 //-----------------------------------------------------------------------------------
 //static variables definitions
@@ -1146,6 +1147,17 @@ void LLOcclusionCullingGroup::checkOcclusion()
 
             static LLCachedControl<U32> occlusion_timeout(gSavedSettings, "RenderOcclusionTimeout", 4);
 
+            // <FS:Trish> FSRenderThread: a blocking GL_QUERY_RESULT read waits for everything the render thread
+            // has queued and for the GPU, often a frame or more. A query still not in after the timeout leaves
+            // the group visible instead, as a discarded query does; it is asked again next time.
+            if (!available && mOcclusionCheckCount[LLViewerCamera::sCurCameraID] > occlusion_timeout && FSGLStream::isRecording())
+            {
+                mOcclusionCheckCount[LLViewerCamera::sCurCameraID] = 0;
+                clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
+                clearOcclusionState(QUERY_PENDING);
+            }
+            else
+            // </FS:Trish>
             if (available || mOcclusionCheckCount[LLViewerCamera::sCurCameraID] > occlusion_timeout)
             {
                 mOcclusionCheckCount[LLViewerCamera::sCurCameraID] = 0;
