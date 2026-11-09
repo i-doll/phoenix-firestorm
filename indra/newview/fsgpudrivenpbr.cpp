@@ -48,6 +48,13 @@
 // an attribute, arena full or the copy budget used up) is drawn by the stock code in its place, so the order,
 // and with it the result where two surfaces have the same depth, is the stock one.
 //
+// FSPerfGPUDrivenPBRGroupRuns gives that order up: in a busy scene the batches without handles (media, textures
+// waiting for their options), the stock fallbacks and the double sided ones are spread through the pass and
+// cut it into thousands of runs, each a multi-draw, a program switch or four texture binds. Grouped, all
+// bindless batches go out as one multi-draw per face culling state, the bound ones as one run per material,
+// and the stock fallbacks after them. The depth test decides what a G-buffer pass leaves, so only where two
+// surfaces have exactly the same depth can a different one win than in the stock order.
+//
 // Bindless textures: a texture with a handle is immutable (no glTexImage, no glTexParameter). The handles are
 // made with glGetTextureSamplerHandleARB and a sampler object of our own per texture, set up as LLTexUnit
 // would set up the texture (filter, mipmaps, wrap, anisotropy). Before LLImageGL or LLTexUnit respecify a
@@ -878,9 +885,87 @@ namespace
         ++sStatReasons[reason];
     }
 
-    // Turns the pass's batches into ops (in the stock order) and commands.
-    void build(LLCullResult::drawinfo_iterator begin, LLCullResult::drawinfo_iterator end, bool bindless)
+    // FSPerfGPUDrivenPBRGroupRuns: the batches of the pass, collected before they become commands
+    struct Pending
     {
+        LLDrawInfo* mParams;
+        LLFetchedGLTFMaterial* mMat;
+        LLViewerTexture* mTex;      // media override
+        GLuint mCount;
+        GLuint mFirstIndex;
+        GLint mBaseVertex;
+        Record mRecord;
+        EOpKind mKind;
+        bool mDoubleSided;
+    };
+    std::vector<Pending> sPending;
+    std::vector<LLDrawInfo*> sStockParams;
+
+    // Grouped order: all bindless batches as one multi-draw per face culling state, then the bound ones as
+    // one run per material (and media override and culling state), then the stock fallbacks. Within a group
+    // batches keep their stock order (the render map's material sort).
+    void emit_grouped()
+    {
+        auto emit_run = [](std::vector<Pending>::const_iterator first, std::vector<Pending>::const_iterator last)
+        {
+            const U32 start = (U32)sCommands.size();
+            for (auto it = first; it != last; ++it)
+            {
+                const U32 command = (U32)sCommands.size();
+                sCommands.push_back({ it->mCount, 1, it->mFirstIndex, it->mBaseVertex, command });
+                sRecords.push_back(it->mRecord);
+                sCommandParams.push_back(it->mParams);
+            }
+            sOps.push_back({ first->mKind, first->mDoubleSided, start, (U32)(last - first),
+                             first->mKind == OP_BOUND ? first->mMat : nullptr, first->mKind == OP_BOUND ? first->mTex : nullptr,
+                             nullptr });
+        };
+
+        std::stable_sort(sPending.begin(), sPending.end(), [](const Pending& a, const Pending& b)
+        {
+            if (a.mKind != b.mKind)
+            {
+                return a.mKind < b.mKind;   // OP_BINDLESS first
+            }
+            if (a.mKind == OP_BOUND)
+            {
+                if (a.mMat != b.mMat)
+                {
+                    return a.mMat < b.mMat;
+                }
+                if (a.mTex != b.mTex)
+                {
+                    return a.mTex < b.mTex;
+                }
+            }
+            return a.mDoubleSided < b.mDoubleSided;
+        });
+
+        auto first = sPending.cbegin();
+        for (auto it = sPending.cbegin(); it != sPending.cend(); ++it)
+        {
+            if (it->mKind != first->mKind || it->mDoubleSided != first->mDoubleSided ||
+                (it->mKind == OP_BOUND && (it->mMat != first->mMat || it->mTex != first->mTex)))
+            {
+                emit_run(first, it);
+                first = it;
+            }
+        }
+        if (first != sPending.cend())
+        {
+            emit_run(first, sPending.cend());
+        }
+        for (LLDrawInfo* params : sStockParams)
+        {
+            sOps.push_back({ OP_STOCK, false, 0, 0, nullptr, nullptr, params });
+        }
+    }
+
+    // Turns the pass's batches into ops (in the stock order, or grouped) and commands.
+    void build(LLCullResult::drawinfo_iterator begin, LLCullResult::drawinfo_iterator end, bool bindless, bool group_runs)
+    {
+        sPending.clear();
+        sStockParams.clear();
         sOps.clear();
         sCommands.clear();
         sRecords.clear();
@@ -938,7 +1023,14 @@ namespace
             if (reason >= 0)
             {
                 count(reason);
-                sOps.push_back({ OP_STOCK, false, 0, 0, nullptr, nullptr, &params });
+                if (group_runs)
+                {
+                    sStockParams.push_back(&params);
+                }
+                else
+                {
+                    sOps.push_back({ OP_STOCK, false, 0, 0, nullptr, nullptr, &params });
+                }
                 continue;
             }
 
@@ -961,11 +1053,19 @@ namespace
                 }
             }
             const bool double_sided = mat->mDoubleSided;
+            const Record record = { matrix_index(params.mModelMatrix, proj, view), texture_matrix_index(params.mTextureMatrix.get()),
+                                    info.mIndex, 0 };
+
+            if (group_runs)
+            {
+                sPending.push_back({ &params, mat, media, params.mCount, entry->mIndex + params.mOffset, (GLint)entry->mVertex,
+                                     record, kind, double_sided });
+                continue;
+            }
 
             const U32 command = (U32)sCommands.size();
             sCommands.push_back({ params.mCount, 1, entry->mIndex + params.mOffset, (GLint)entry->mVertex, command });
-            sRecords.push_back({ matrix_index(params.mModelMatrix, proj, view), texture_matrix_index(params.mTextureMatrix.get()),
-                                 info.mIndex, 0 });
+            sRecords.push_back(record);
             sCommandParams.push_back(&params);
 
             Op* last = sOps.empty() ? nullptr : &sOps.back();
@@ -978,6 +1078,11 @@ namespace
             {
                 sOps.push_back({ kind, double_sided, command, 1, mat, media, nullptr });
             }
+        }
+
+        if (group_runs)
+        {
+            emit_grouped();
         }
     }
 
@@ -1273,6 +1378,7 @@ bool fsGDDDrawPBR(U32 type)
     static LLCachedControl<bool> want_bindless(gSavedSettings, "FSPerfGPUDrivenPBRBindless", false);
     static LLCachedControl<bool> verify(gSavedSettings, "FSPerfGPUDrivenPBRVerify", false);
     static LLCachedControl<bool> stats(gSavedSettings, "FSPerfGPUDrivenPBRStats", false);
+    static LLCachedControl<bool> group_runs(gSavedSettings, "FSPerfGPUDrivenPBRGroupRuns", false);
 
     // The first bind of each program finds its inputs; do that now, so a failure leaves the whole pass
     // to the stock loop rather than part of it
@@ -1300,7 +1406,7 @@ bool fsGDDDrawPBR(U32 type)
 
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWPOOL("gdd pbr build");
-        build(begin, end, bindless);
+        build(begin, end, bindless, group_runs);
     }
     if (sCommands.empty())
     {   // nothing from the arena: the stock loop draws exactly the same

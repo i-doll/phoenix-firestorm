@@ -4802,7 +4802,7 @@
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
-                         parameter="FSPerfGPUDrivenDraws,FSPerfGPUDrivenDrawsVerify,FSPerfGPUDrivenDrawsArenaMB,FSPerfGPUDrivenPBR,FSPerfGPUDrivenPBRBindless,FSPerfGPUDrivenPBRArenaMB,FSPerfGPUDrivenLegacy,FSPerfGPUDrivenLegacyArenaMB" />
+                         parameter="FSPerfGPUDrivenDraws,FSPerfGPUDrivenDrawsVerify,FSPerfGPUDrivenDrawsArenaMB,FSPerfGPUDrivenPBR,FSPerfGPUDrivenPBRBindless,FSPerfGPUDrivenPBRArenaMB,FSPerfGPUDrivenLegacy,FSPerfGPUDrivenLegacyArenaMB,FSPerfGPUDrivenPBRGroupRuns" />
                     </button>
                     <check_box
                      control_name="FSPerfGPUDrivenDraws"
@@ -4940,6 +4940,18 @@
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
                      top="1548"
                      width="100" />
+                    <check_box
+                     control_name="FSPerfGPUDrivenPBRGroupRuns"
+                     enabled_control="FSPerfGPUDrivenPBR"
+                     follows="left|top"
+                     height="20"
+                     label="Group PBR draws"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsperfgpudrivenpbrgroupruns"
+                     tool_tip="EXPERIMENTAL. With GPU-driven PBR surfaces on, draws them grouped instead of in the stock order: every surface with bindless textures in one multi-draw, the others one run per material. Far fewer draw calls and texture binds in busy scenes. Only where two surfaces lie at exactly the same depth can the other one show."
+                     top="1580"
+                     width="455" />
                     <text
                      follows="left|top"
                      font="SansSerifBold"
@@ -4947,7 +4959,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_render_thread"
-                     top="1586"
+                     top="1612"
                      width="340">
                         Render thread
                     </text>
@@ -4959,7 +4971,7 @@
                      left="370"
                      name="reset_fs_heading_render_thread"
                      tool_tip="Set every option in &quot;Render thread&quot; back to its default value."
-                     top="1585"
+                     top="1611"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -4974,7 +4986,7 @@
                      left="15"
                      name="fs_fsrenderthread"
                      tool_tip="EXPERIMENTAL. Windows only, takes effect after a restart. The main thread hands its OpenGL work to a render thread, which talks to the graphics driver while the main thread already prepares the next frame. Can raise the frame rate when the main thread is the bottleneck. The picture is the same; if something renders wrongly or the viewer stalls, turn it off."
-                     top="1612"
+                     top="1638"
                      width="475" />
                     <check_box
                      control_name="FSRenderThreadCheck"
@@ -4986,7 +4998,7 @@
                      left="35"
                      name="fs_fsrenderthreadcheck"
                      tool_tip="Debug. Writes OpenGL calls made from the wrong thread, and calls that make the main thread wait for the render thread, to the log. Only for testing."
-                     top="1638"
+                     top="1664"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4995,7 +5007,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_user_interface"
-                     top="1678"
+                     top="1704"
                      width="340">
                         User interface
                     </text>
@@ -5007,7 +5019,7 @@
                      left="370"
                      name="reset_fs_heading_user_interface"
                      tool_tip="Set every option in &quot;User interface&quot; back to its default value."
-                     top="1677"
+                     top="1703"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5020,7 +5032,7 @@
                      left="35"
                      name="fs_fsrenderuicap_label"
                      tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
-                     top="1706"
+                     top="1732"
                      width="285">
                         UI redraw cap (per second, 0 = every frame)
                     </text>
@@ -5036,7 +5048,7 @@
                      min_val="0"
                      name="fs_fsrenderuicap"
                      tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
-                     top="1704"
+                     top="1730"
                      width="100" />
                     <text
                      follows="left|top"
@@ -5045,7 +5057,7 @@
                      left="35"
                      name="fs_fsrenderuiidlerate_label"
                      tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
-                     top="1734"
+                     top="1760"
                      width="285">
                         UI idle refresh (per second)
                     </text>
@@ -5062,7 +5074,7 @@
                      min_val="0.5"
                      name="fs_fsrenderuiidlerate"
                      tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
-                     top="1732"
+                     top="1758"
                      width="100" />
                 </panel>
             </scroll_container>

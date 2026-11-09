@@ -28320,6 +28320,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>FSPerfGPUDrivenPBRGroupRuns</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. With FSPerfGPUDrivenPBR, draw the PBR batches grouped instead of in the stock order: all batches with bindless textures in one multi-draw per face culling state, the others one run per material. Far fewer draw calls, program switches and texture binds in busy scenes. Only where two surfaces lie at exactly the same depth can the other one show than with the stock order.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>FSPerfGPUDrivenPBRStats</key>
     <map>
       <key>Comment</key>
