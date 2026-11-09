@@ -1610,6 +1610,13 @@ void LLGLManager::initExtensions()
         glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &vs_blocks);
         mFSHasGPUDrivenDraws = vs_blocks >= 1;
     }
+    // AMD's OpenGL driver renders the multi-draws wrongly (black artefacts on avatars from the shadow
+    // and PBR passes): not used there until that is understood
+    if (mFSHasGPUDrivenDraws && mIsAMD)
+    {
+        mFSHasGPUDrivenDraws = false;
+        LL_INFOS("RenderInit") << "GPU-driven draws: off on AMD graphics (they render incorrectly with its driver)" << LL_ENDL;
+    }
     LL_INFOS("RenderInit") << "GPU-driven draws available: " << mFSHasGPUDrivenDraws << LL_ENDL;
     // </FS:Trish>
     // <FS:Trish> Bindless textures for the GPU-driven PBR pass (FSPerfGPUDrivenPBRBindless)
