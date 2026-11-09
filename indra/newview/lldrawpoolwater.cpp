@@ -131,21 +131,88 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
 
 // <FS:Trish> Shoreline foam: uniforms for fsWaterFoamF.glsl, linked into the water shaders only
 // when it is enabled
-static void fs_bind_water_foam(LLGLSLShader* shader)
+//
+// The foam finds the shoreline from the depth behind the water surface. The water's own depth
+// (and the G-buffer's) already holds the alpha drawn below the water line, which writes depth for
+// every fragment it draws, even nearly invisible ones, so an invisible or see-through prim at the
+// edge made a foam outline. fsCaptureFoamDepth copies the opaque scene's depth (alpha masked
+// surfaces included where they are solid) before any alpha, and the foam reads that instead.
+static LLRenderTarget* sFSFoamDepth = nullptr; // never destroyed at exit: released with the GL buffers
+static bool sFSFoamDepthValid = false;         // captured for the view being rendered
+
+static bool fs_water_foam_enabled()
 {
     static LLCachedControl<bool> enabled(gSavedSettings, "FSRenderWaterFoam", false);
+    return enabled && LLPipeline::sRenderTransparentWater;
+}
+
+// static
+void LLDrawPoolWater::fsCaptureFoamDepth(LLRenderTarget& src)
+{
+    sFSFoamDepthValid = false;
+    if (!fs_water_foam_enabled() || gCubeSnapshot || LLPipeline::sRenderingHUDs || !src.isComplete())
+    {
+        return;
+    }
+    LL_PROFILE_GPU_ZONE("fs foam depth copy");
+    const U32 width = src.getWidth();
+    const U32 height = src.getHeight();
+    if (!sFSFoamDepth)
+    {
+        sFSFoamDepth = new LLRenderTarget();
+    }
+    if (!sFSFoamDepth->isComplete() || sFSFoamDepth->getWidth() != width || sFSFoamDepth->getHeight() != height)
+    {
+        sFSFoamDepth->release();
+        if (!sFSFoamDepth->allocate(width, height, GL_R8, true))
+        {
+            sFSFoamDepth->release();
+            return;
+        }
+    }
+    sFSFoamDepth->copyContents(src, 0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    sFSFoamDepthValid = true;
+}
+
+// static
+void LLDrawPoolWater::fsReleaseFoamDepth()
+{
+    sFSFoamDepthValid = false;
+    if (sFSFoamDepth)
+    {
+        sFSFoamDepth->release();
+    }
+}
+
+// Returns the texture unit fs_foam_depth was bound on, or -1
+static S32 fs_bind_water_foam(LLGLSLShader* shader, LLRenderTarget& water_dis)
+{
     static LLCachedControl<F32> width(gSavedSettings, "FSRenderWaterFoamWidth", 0.6f);
     static LLCachedControl<F32> strength(gSavedSettings, "FSRenderWaterFoamStrength", 0.8f);
     static LLStaticHashedString s_params("fs_foam_params");
+    static LLStaticHashedString s_foam_depth("fs_foam_depth");
 
-    if (!enabled || shader->getUniformLocation(s_params) < 0)
+    if (!fs_water_foam_enabled() || shader->getUniformLocation(s_params) < 0)
     {
-        return;
+        return -1;
     }
 
     // Wrapped so the phase keeps its precision; the pattern jumps once an hour
     const F32 phase = (F32)fmod(LLFrameTimer::getElapsedSeconds(), 3600.0);
     shader->uniform4f(s_params, llclamp((F32)strength, 0.f, 1.f), llclamp((F32)width, 0.05f, 5.f), phase, 0.f);
+
+    // The opaque depth of this view when it was captured (main view), otherwise the water's own
+    // copy (probes, mirrors: as before). Same size as the screen either way.
+    LLRenderTarget* depth = (sFSFoamDepthValid && sFSFoamDepth) ? sFSFoamDepth : &water_dis;
+    sFSFoamDepthValid = false; // one view per capture
+    const S32 unit = shader->mActiveTextureChannels;
+    if (shader->getUniformLocation(s_foam_depth) < 0 || unit >= llmin(gGLManager.mNumTextureImageUnits, (S32)LL_NUM_TEXTURE_LAYERS))
+    {
+        return -1;
+    }
+    shader->uniform1i(s_foam_depth, unit);
+    gGL.getTexUnit(unit)->bind(depth, true);
+    return unit;
 }
 
 // Sun glints: uniforms for fsWaterGlintF.glsl, linked into the water shader only when enabled
@@ -366,7 +433,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         shader->uniform1f(LLShaderMgr::WATER_REFSCALE, pwater->getScaleAbove());
     }
 
-    fs_bind_water_foam(shader); // <FS:Trish/>
+    const S32 fs_foam_unit = fs_bind_water_foam(shader, water_dis); // <FS:Trish/>
     fs_bind_water_glints(shader); // <FS:Trish/>
 
     LLGLDisable cullface(GL_CULL_FACE);
@@ -380,6 +447,12 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     pushWaterPlanes(0);
 
     // clean up
+    // <FS:Trish> Shoreline foam's depth, on a unit unbindDeferredShader doesn't know about
+    if (fs_foam_unit >= 0)
+    {
+        gGL.getTexUnit(fs_foam_unit)->unbind(LLTexUnit::TT_TEXTURE);
+    }
+    // </FS:Trish>
     gPipeline.unbindDeferredShader(*shader);
 
     gGL.setColorMask(true, false);

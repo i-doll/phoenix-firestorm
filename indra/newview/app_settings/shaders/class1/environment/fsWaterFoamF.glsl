@@ -3,7 +3,7 @@
 // FSRenderWaterFoam is on and water is transparent, since it needs the scene depth behind the
 // surface. The pattern is procedural, so there is no texture to load.
 
-uniform sampler2D depthMap;     // scene depth before the water was drawn
+uniform sampler2D fs_foam_depth; // opaque scene depth, copied before any alpha was drawn (lldrawpoolwater.cpp)
 uniform mat4 inv_proj;
 uniform vec3 eyeVec;            // camera position, agent space
 uniform vec4 fs_foam_params;    // x strength (0 = off), y band width in metres, z animation phase
@@ -42,7 +42,9 @@ float fsWaterFoam(vec2 screen_tc, vec3 pos, vec3 up, vec2 view_offset)
         return 0.0;
     }
 
-    float depth = texture(depthMap, screen_tc).r;
+    // Alpha-blended surfaces (invisible or see-through prims, glass) are not in this depth, so
+    // they make no shoreline
+    float depth = texture(fs_foam_depth, screen_tc).r;
     if (depth >= 1.0)
     {
         return 0.0; // sky behind the surface

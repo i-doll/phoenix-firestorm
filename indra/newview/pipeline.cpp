@@ -1498,6 +1498,8 @@ void LLPipeline::releaseGLBuffers()
 {
     assertInitialized();
 
+    LLDrawPoolWater::fsReleaseFoamDepth(); // <FS:Trish/> shoreline foam depth
+
     if (mNoiseMap)
     {
         LLImageGL::deleteTextures(1, &mNoiseMap);
@@ -4814,6 +4816,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     bool done_atmospherics = LLPipeline::sRenderingHUDs; //skip atmospherics on huds
     bool done_water_haze = done_atmospherics;
     bool done_water_exclusion = false;
+    bool fs_foam_depth_done = false; // <FS:Trish/> shoreline foam depth
 
     // do water exclusion just before water pass.
     U32 water_exclusion_pass = LLDrawPool::POOL_WATEREXCLUSION;
@@ -4983,6 +4986,14 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
             doWaterHaze();
             done_water_haze = true;
         }
+
+        // <FS:Trish> Shoreline foam: the opaque scene's depth, before the alpha below the water line
+        if (cur_type >= LLDrawPool::POOL_ALPHA_PRE_WATER && !fs_foam_depth_done)
+        {
+            LLDrawPoolWater::fsCaptureFoamDepth(mRT->screen);
+            fs_foam_depth_done = true;
+        }
+        // </FS:Trish>
 
         pool_set_t::iterator iter2 = iter1;
         if (hasRenderType(poolp->getType()) && poolp->getNumPostDeferredPasses() > 0)

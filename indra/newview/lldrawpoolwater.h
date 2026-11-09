@@ -49,6 +49,13 @@ public:
     static bool sNeedsDistortionUpdate;
     static F32 sWaterFogEnd;
 
+    // <FS:Trish> Shoreline foam (FSRenderWaterFoam): the depth of the opaque scene, copied before
+    // any alpha is drawn, so alpha-blended surfaces (invisible or see-through prims, glass) at the
+    // water's edge don't count as shoreline. Pipeline calls these.
+    static void fsCaptureFoamDepth(LLRenderTarget& src);
+    static void fsReleaseFoamDepth();
+    // </FS:Trish>
+
     enum
     {
         VERTEX_DATA_MASK =  LLVertexBuffer::MAP_VERTEX |
