@@ -107,6 +107,10 @@ private:
     EHairPass mHairPass = HAIR_OFF;
     // </FS:Trish>
 
+    // <FS:Trish> Whether the current forwardRender pass writes depth (FSPerfAlphaGlowSkip)
+    bool mFSWriteDepth = false;
+    // </FS:Trish>
+
     // our 'normal' alpha blend function for this pass
     LLRender::eBlendFactor mColorSFactor;
     LLRender::eBlendFactor mColorDFactor;

@@ -327,6 +327,7 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     // </FS:Trish>
 
     LLGLDepthTest depth(GL_TRUE, write_depth ? GL_TRUE : GL_FALSE);
+    mFSWriteDepth = write_depth; // <FS:Trish/>
 
     const bool pref_premult_blend = LLPipeline::RenderUsePremultAlpha && !LLPipeline::sRenderingHUDs && !LLPipeline::sImpostorRender;
     const bool force_premult_for_wboit = LLPipeline::RenderOITWeighted && LLPipeline::sOITPass == 1;
@@ -927,6 +928,18 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
     bool initialized_lighting = false;
     bool light_enabled = true;
 
+    // <FS:Trish> FSPerfAlphaGlowSkip: a draw whose faces all have no glow adds nothing in the glow
+    // pass (it adds glow times coverage to alpha), so it is left out of it. Not when that pass
+    // writes depth (non-rigged, depth writing alpha passes): there the legacy glow shader writes
+    // depth for fragments the alpha draw discarded, and that stays as it is.
+    static LLCachedControl<bool> glow_skip_setting(gSavedSettings, "FSPerfAlphaGlowSkip", false);
+    const bool glow_skip = glow_skip_setting;
+    auto needs_glow = [&](const LLDrawInfo& draw)
+    {
+        return !(glow_skip && draw.mFSGlowFree && (draw.mAvatar.notNull() || !mFSWriteDepth));
+    };
+    // </FS:Trish>
+
     const LLVOAvatar* lastAvatar = nullptr;
     U64 lastMeshId = 0;
     const LLGLSLShader* lastAvatarShader = nullptr;
@@ -1238,7 +1251,10 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     // <FS:Trish> Two-pass rigged alpha: a split draw's glow goes with its fringe pass
                     (mHairPass == HAIR_OFF || hair_split == (mHairPass == HAIR_FRINGE)) &&
                     // </FS:Trish>
-                    params.mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_EMISSIVE))
+                    // <FS:Trish> FSPerfAlphaGlowSkip
+                    //params.mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_EMISSIVE))
+                    params.mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_EMISSIVE) && needs_glow(params))
+                    // </FS:Trish>
                 {
                     if (params.mAvatar != nullptr)
                     {

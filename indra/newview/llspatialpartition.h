@@ -147,6 +147,11 @@ public:
     U8   mShiny = 0;
     bool mFullbright = false;
     bool mHasGlow = false;
+    // <FS:Trish> Set by LLVolumeGeometryManager::registerFace when every face in this batch has a
+    // glow of 0 in its vertex data, so the alpha glow pass has nothing to add (FSPerfAlphaGlowSkip).
+    // False means unknown.
+    bool mFSGlowFree = false;
+    // </FS:Trish>
 
     struct CompareTexture
     {

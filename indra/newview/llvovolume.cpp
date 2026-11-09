@@ -6141,6 +6141,9 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
     const LLTextureEntry* te = facep->getTextureEntry();
     U8 bump = (type == LLRenderPass::PASS_BUMP || type == LLRenderPass::PASS_POST_BUMP) ? te->getBumpmap() : 0;
     U8 shiny = te->getShiny();
+    // <FS:Trish> The glow this face's vertices carry, as LLFace::getGeometryVolume writes it
+    const bool glow_free = (U8)llclamp((S32)(te->getGlow() * 255), 0, 255) == 0;
+    // </FS:Trish>
 
     LLViewerTexture* tex = facep->getTexture();
 
@@ -6238,6 +6241,7 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
     {
         info->mCount += facep->getIndicesCount();
         info->mEnd += facep->getGeomCount();
+        info->mFSGlowFree = info->mFSGlowFree && glow_free; // <FS:Trish/>
 
         if (index < FACE_DO_NOT_BATCH_TEXTURES && index >= info->mTextureList.size())
         {
@@ -6263,6 +6267,7 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 
         draw_info->mBump  = bump;
         draw_info->mShiny = shiny;
+        draw_info->mFSGlowFree = glow_free; // <FS:Trish/>
 
         static const float alpha[4] =
         {
