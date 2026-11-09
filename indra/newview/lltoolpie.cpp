@@ -869,7 +869,47 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
         }
     }
     // <FS:minerjr> [FIRE-35019]
-    mHoverPick = gViewerWindow->pickImmediate(x, y, false, pick_rigged);
+    // <FS:Trish> FSPerfHoverPickThrottle: the hover pick (a ray cast through the scene, about 2% of the
+    // main thread in a busy scene) runs every frame. While the mouse, its buttons, the camera (position,
+    // direction, roll and zoom) and the world view size stay put, the last pick is reused for up to a
+    // tenth of a second, so something moving under a still mouse is picked up within that.
+    //mHoverPick = gViewerWindow->pickImmediate(x, y, false, pick_rigged);
+    {
+        static LLCachedControl<bool> throttle(gSavedSettings, "FSPerfHoverPickThrottle", false);
+        static S32 last_x = -1;
+        static S32 last_y = -1;
+        static MASK last_mask = 0;
+        static bool last_down = false;
+        static LLVector3 last_origin;
+        static LLVector3 last_at;
+        static LLVector3 last_up;
+        static F32 last_view = 0.f;
+        static LLRect last_rect;
+        static F64 last_time = -1.0;
+        const LLViewerCamera* camera = LLViewerCamera::getInstance();
+        const LLRect world_rect = gViewerWindow->getWorldViewRectRaw();
+        const F64 now = LLFrameTimer::getElapsedSeconds();
+        const bool reuse = throttle && mHoverPick.isValid() && x == last_x && y == last_y && mask == last_mask &&
+                           mMouseButtonDown == last_down && camera->getOrigin() == last_origin &&
+                           camera->getAtAxis() == last_at && camera->getUpAxis() == last_up &&
+                           camera->getView() == last_view && world_rect == last_rect &&
+                           now >= last_time && now - last_time < 0.1;
+        if (!reuse)
+        {
+            mHoverPick = gViewerWindow->pickImmediate(x, y, false, pick_rigged);
+            last_x = x;
+            last_y = y;
+            last_mask = mask;
+            last_down = mMouseButtonDown;
+            last_origin = camera->getOrigin();
+            last_at = camera->getAtAxis();
+            last_up = camera->getUpAxis();
+            last_view = camera->getView();
+            last_rect = world_rect;
+            last_time = now;
+        }
+    }
+    // </FS:Trish>
     LLViewerObject *parent = NULL;
     LLViewerObject *object = mHoverPick.getObject();
 // [RLVa:KB] - Checked: RLVa-1.1.0
