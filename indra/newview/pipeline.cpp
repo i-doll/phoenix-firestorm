@@ -144,6 +144,7 @@
 #include "fsfoginterior.h" // <FS:Trish/> height fog kept out of interiors
 #include "fsparallelcull.h" // <FS:Trish/> FSPerfParallelShadowCull
 #include "fsgpudrivendraws.h" // <FS:Trish/> FSPerfGPUDrivenDraws
+#include "fsgpudrivenshadowalpha.h" // <FS:Trish/> FSPerfGPUDrivenShadowAlpha
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -13021,6 +13022,10 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
         LL_PROFILE_GPU_ZONE("shadow alpha");
         const S32 sun_up = LLEnvironment::instance().getIsSunUp() ? 1 : 0;
         U32 target_width = LLRenderTarget::sCurResX;
+        // <FS:Trish> FSPerfGPUDrivenShadowAlpha: the non-rigged alpha tested casters below that can come out of
+        // a vertex arena with bindless textures are collected, and drawn as multi-draws after the GLTF ones
+        const bool gdd_alpha = fsGDDShadowAlphaBegin(false);
+        // </FS:Trish>
 
         for (int i = 0; i < 2; ++i)
         {
@@ -13033,7 +13038,17 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                 gDeferredShadowAlphaMaskProgram.bind(rigged);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                renderMaskedObjects(LLRenderPass::PASS_ALPHA_MASK, true, true, rigged);
+                // <FS:Trish> FSPerfGPUDrivenShadowAlpha
+                //renderMaskedObjects(LLRenderPass::PASS_ALPHA_MASK, true, true, rigged);
+                if (gdd_alpha && !rigged)
+                {
+                    fsRenderShadowAlphaBatches(FS_GDD_SA_ALPHA_MASK, LLRenderPass::PASS_ALPHA_MASK, -1.f);
+                }
+                else
+                {
+                    renderMaskedObjects(LLRenderPass::PASS_ALPHA_MASK, true, true, rigged);
+                }
+                // </FS:Trish>
             }
 
             // <FS:Trish> With coloured shadows they tint this cascade instead of blocking light
@@ -13053,7 +13068,17 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                 gDeferredShadowFullbrightAlphaMaskProgram.bind(rigged);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                renderFullbrightMaskedObjects(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true, rigged);
+                // <FS:Trish> FSPerfGPUDrivenShadowAlpha
+                //renderFullbrightMaskedObjects(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true, rigged);
+                if (gdd_alpha && !rigged)
+                {
+                    fsRenderShadowAlphaBatches(FS_GDD_SA_FULLBRIGHT_MASK, LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, -1.f);
+                }
+                else
+                {
+                    renderFullbrightMaskedObjects(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true, rigged);
+                }
+                // </FS:Trish>
             }
 
             {
@@ -13064,17 +13089,42 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
 
                 if (i == 0)
                 {
-                    renderObjects(LLRenderPass::PASS_GRASS, true);
+                    // <FS:Trish> FSPerfGPUDrivenShadowAlpha: the program's minimum alpha for every batch
+                    //renderObjects(LLRenderPass::PASS_GRASS, true);
+                    if (gdd_alpha)
+                    {
+                        fsRenderShadowAlphaBatches(FS_GDD_SA_TREE, LLRenderPass::PASS_GRASS, ALPHA_BLEND_CUTOFF);
+                    }
+                    else
+                    {
+                        renderObjects(LLRenderPass::PASS_GRASS, true);
+                    }
+                    // </FS:Trish>
                 }
 
                 if (!fsShadowSinglePassRecord(FS_SHADOW_SP_MATERIAL_MASK, rigged)) // <FS:Trish/> FSPerfShadowSinglePass
                 {
                     LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha material");
                     LL_PROFILE_GPU_ZONE("shadow alpha material");
-                    renderMaskedObjects(LLRenderPass::PASS_NORMSPEC_MASK, true, false, rigged);
-                    renderMaskedObjects(LLRenderPass::PASS_MATERIAL_ALPHA_MASK, true, false, rigged);
-                    renderMaskedObjects(LLRenderPass::PASS_SPECMAP_MASK, true, false, rigged);
-                    renderMaskedObjects(LLRenderPass::PASS_NORMMAP_MASK, true, false, rigged);
+                    // <FS:Trish> FSPerfGPUDrivenShadowAlpha
+                    //renderMaskedObjects(LLRenderPass::PASS_NORMSPEC_MASK, true, false, rigged);
+                    //renderMaskedObjects(LLRenderPass::PASS_MATERIAL_ALPHA_MASK, true, false, rigged);
+                    //renderMaskedObjects(LLRenderPass::PASS_SPECMAP_MASK, true, false, rigged);
+                    //renderMaskedObjects(LLRenderPass::PASS_NORMMAP_MASK, true, false, rigged);
+                    static const U32 material_masks[] = { LLRenderPass::PASS_NORMSPEC_MASK, LLRenderPass::PASS_MATERIAL_ALPHA_MASK,
+                                                          LLRenderPass::PASS_SPECMAP_MASK, LLRenderPass::PASS_NORMMAP_MASK };
+                    for (U32 type : material_masks)
+                    {
+                        if (gdd_alpha && !rigged)
+                        {
+                            fsRenderShadowAlphaBatches(FS_GDD_SA_TREE, type, -1.f);
+                        }
+                        else
+                        {
+                            renderMaskedObjects(type, true, false, rigged);
+                        }
+                    }
+                    // </FS:Trish>
                 }
             }
         }
@@ -13095,6 +13145,12 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
             {
                 mAlphaMaskPool->pushRiggedGLTFBatches(type + 1);
             }
+            // <FS:Trish> FSPerfGPUDrivenShadowAlpha
+            else if (gdd_alpha)
+            {
+                fsRenderShadowGLTFAlphaMask();
+            }
+            // </FS:Trish>
             else
             {
                 mAlphaMaskPool->pushGLTFBatches(type);
@@ -13103,6 +13159,13 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
             gGL.loadMatrix(gGLModelView);
             gGLLastMatrix = NULL;
         }
+
+        // <FS:Trish> FSPerfGPUDrivenShadowAlpha: the collected casters, before the coloured ones test against the depth
+        if (gdd_alpha)
+        {
+            fsGDDShadowAlphaFlush(target_width);
+        }
+        // </FS:Trish>
     }
 
     // <FS:Trish> coloured shadows: translucent casters of this sun cascade
@@ -13305,6 +13368,71 @@ U32 LLPipeline::fsDrawShadowOpaqueList(std::vector<LLDrawInfo*>& batches, bool m
     gGL.loadMatrix(gGLModelView);
     gGLLastMatrix = NULL;
     return draws;
+}
+
+// FSPerfGPUDrivenShadowAlpha: the non-rigged batches of one alpha tested pass type of a shadow pass, with the
+// stock program for it bound. Those the multi-draw path can take wait in its list (fsGDDShadowAlphaFlush), the
+// rest are drawn as renderMaskedObjects (fixed_cutoff < 0: each batch's cutoff) or renderObjects (the minimum
+// alpha the caller set) would draw them. A depth only pass doesn't depend on the order.
+void LLPipeline::fsRenderShadowAlphaBatches(U32 kind, U32 type, F32 fixed_cutoff)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    static std::vector<LLDrawInfo*> batches;
+    batches.clear();
+    LLCullResult::drawinfo_iterator end = endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = beginRenderMap(type); i != end; )
+    {
+        LLDrawInfo* params = *i;
+        LLCullResult::increment_iterator(i, end);
+        if (params)
+        {
+            batches.push_back(params);
+        }
+    }
+    fsGDDShadowAlphaCollect(kind, batches, fixed_cutoff);
+
+    // the alpha masked pools bind their texture batches, the tree program samples one texture
+    const bool batch_textures = kind == FS_GDD_SA_ALPHA_MASK || kind == FS_GDD_SA_FULLBRIGHT_MASK;
+    gGL.loadMatrix(gGLModelView);
+    gGLLastMatrix = NULL;
+    for (LLDrawInfo* params : batches)
+    {
+        if (fixed_cutoff < 0.f)
+        {
+            LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(params->mAlphaMaskCutoff);
+        }
+        mSimplePool->pushBatch(*params, true, batch_textures);
+    }
+    gGL.loadMatrix(gGLModelView);
+    gGLLastMatrix = NULL;
+}
+
+// The same for the non-rigged GLTF alpha masked casters, with gDeferredShadowGLTFAlphaMaskProgram bound: the rest
+// as pushGLTFBatches draws them.
+void LLPipeline::fsRenderShadowGLTFAlphaMask()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    static std::vector<LLDrawInfo*> batches;
+    batches.clear();
+    const U32 type = LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK;
+    LLCullResult::drawinfo_iterator end = endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = beginRenderMap(type); i != end; )
+    {
+        LLDrawInfo* params = *i;
+        LLCullResult::increment_iterator(i, end);
+        if (params)
+        {
+            batches.push_back(params);
+        }
+    }
+    fsGDDShadowAlphaCollect(FS_GDD_SA_GLTF_MASK, batches, -1.f);
+
+    LLFetchedGLTFMaterial* last_mat = nullptr;
+    LLViewerTexture* last_tex = nullptr;
+    for (LLDrawInfo* params : batches)
+    {
+        LLRenderPass::pushGLTFBatch(*params, last_mat, last_tex);
+    }
 }
 
 // Debug log of the shadow opaque batches and the draw calls they took, every 10 seconds (FSPerfShadowBatchStats)

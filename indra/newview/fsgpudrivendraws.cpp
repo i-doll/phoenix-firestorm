@@ -60,6 +60,7 @@
 #include "fsgpudrivenlegacy.h"
 #include "fsgpudrivenmaterials.h"
 #include "fsgpudrivenpbr.h"
+#include "fsgpudrivenshadowalpha.h"
 
 #include "fsshadowsinglepass.h"
 #include "lldrawpool.h"
@@ -157,6 +158,7 @@ void fsGDDReleaseGL()
     fsGDDLegacyReleaseGL();
     fsGDDMaterialsReleaseGL();
     fsGDDPBRReleaseGL();
+    fsGDDShadowAlphaReleaseGL();
     release_shadow_gl();
 }
 
@@ -166,6 +168,7 @@ void fsGDDUnloadShaders()
     fsGDDLegacyUnloadShaders(); // releases the legacy GL objects too
     fsGDDMaterialsUnloadShaders();  // and the material pass's
     fsGDDPBRUnloadShaders();    // releases the PBR GL objects too
+    fsGDDShadowAlphaUnloadShaders();
 }
 
 namespace
@@ -210,6 +213,8 @@ bool fsGDDLoadShaders(S32 shader_level, bool use_shadow)
     fsGDDLegacyLoadShaders();
     // and the legacy material passes (FSPerfGPUDrivenMaterials)
     fsGDDMaterialsLoadShaders();
+    // and the alpha tested shadow casters (FSPerfGPUDrivenShadowAlpha), also with bindless textures
+    fsGDDShadowAlphaLoadShaders(shader_level, use_shadow);
 
     static LLCachedControl<bool> enabled(gSavedSettings, "FSPerfGPUDrivenDraws", false);
     if (!enabled || !use_shadow)

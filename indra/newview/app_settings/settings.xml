@@ -28125,7 +28125,7 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>FSPerfGPUDrivenDrawsVerify</key>
     <map>
       <key>Comment</key>
-      <string>Debug for FSPerfGPUDrivenDraws: after each multi-draw, draws the same shadow casters again the old way with depth writes off and counts (occlusion query) the samples the old way would have put nearer than the multi-draw did, and reads back a couple of arena copies per pass to compare them with their vertex buffers. Mismatches are logged (Rendering, at most every 5 seconds); also logs draw statistics every 10 seconds. Stalls the GPU: slow, for testing only.</string>
+      <string>Debug for FSPerfGPUDrivenDraws: after each multi-draw, draws the same shadow casters again the old way with depth writes off and counts (occlusion query) the samples the old way would have put nearer than the multi-draw did, and reads back a couple of arena copies per pass to compare them with their vertex buffers. Also checks the alpha tested casters of FSPerfGPUDrivenShadowAlpha the same way. Mismatches are logged (Rendering, at most every 5 seconds); also logs draw statistics every 10 seconds. Stalls the GPU: slow, for testing only.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -28137,6 +28137,28 @@ Change of this parameter will affect the layout of buttons in notification toast
     <map>
       <key>Comment</key>
       <string>FSPerfGPUDrivenDraws: most video memory (MB, 16 to 2048) the shadow position arena may grow to; three quarters for positions, a quarter for indices. Casters that don't fit are drawn the old way.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>256</integer>
+    </map>
+    <key>FSPerfGPUDrivenShadowAlpha</key>
+    <map>
+      <key>Comment</key>
+      <string>EXPERIMENTAL. Draw the static (not rigged) alpha tested shadow casters of each shadow map (alpha masked, fullbright alpha masked and material alpha masked surfaces, grass and alpha masked GLTF materials; sun cascades, projector and probe shadows) with glMultiDrawElementsIndirect instead of one draw call and several texture binds per batch: their positions, texture coordinates, colours and indices are copied (on the GPU) into a shared arena once and reused while they don't change, and their textures are bindless handles. Works with FSPerfShadowSinglePass (one multi-draw per set of cascades). Casters that can't be drawn this way (rigged, alpha blended, media, textures not fully loaded or with one or two channels, 32 bit indices, arena full) are drawn as before. Shadows look the same; saves CPU time in busy scenes. Needs OpenGL 4.3 with GL_ARB_multi_draw_indirect and GL_ARB_shader_storage_buffer_object, and bindless textures (GL_ARB_bindless_texture, NVIDIA GPUs only, checked once at startup); otherwise, and on macOS, nothing changes. Uses up to FSPerfGPUDrivenShadowAlphaArenaMB of video memory. FSPerfGPUDrivenDrawsVerify checks it too. Rebuilds shaders.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FSPerfGPUDrivenShadowAlphaArenaMB</key>
+    <map>
+      <key>Comment</key>
+      <string>FSPerfGPUDrivenShadowAlpha: most video memory (MB, 16 to 2048) the alpha tested shadow caster arena may grow to; seven eighths for vertex data (28 bytes a vertex), an eighth for indices. Casters that don't fit are drawn the old way.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

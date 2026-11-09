@@ -286,6 +286,11 @@ public:
     U32  fsDrawShadowOpaqueList(std::vector<LLDrawInfo*>& batches, bool merged, bool gpu_driven);
     void fsCountShadowDraws(U32 batches, U32 draws);
     // </FS:Trish>
+    // <FS:Trish> FSPerfGPUDrivenShadowAlpha (fsgpudrivenshadowalpha.cpp): the non-rigged alpha tested casters of
+    // a shadow pass type that the multi-draw path can take wait for fsGDDShadowAlphaFlush, the rest are drawn here
+    void fsRenderShadowAlphaBatches(U32 kind, U32 type, F32 fixed_cutoff);
+    void fsRenderShadowGLTFAlphaMask();
+    // </FS:Trish>
     // <FS:Trish> FSPerfShadowStaticCache: static casters of the far sun cascades kept in a depth target of
     // their own, copied into the cascade each update, with only the dynamic casters drawn on top
     enum EFSShadowCasterFilter { FS_SHADOW_ALL = 0, FS_SHADOW_STATIC, FS_SHADOW_DYNAMIC };

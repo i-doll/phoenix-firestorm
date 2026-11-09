@@ -47,6 +47,8 @@
 // cascades that pass runs after the merge. Opaque GLTF casters are recorded too (those with double sided
 // materials in a list drawn without face culling), as they use the same depth only program. GLTF alpha
 // masked, alpha blended, grass, avatar, terrain and tree casters keep their per cascade passes. Probe captures and projector shadows are untouched.
+// With FSPerfGPUDrivenDraws the recorded opaque non-rigged casters go out as multi-draws, and with
+// FSPerfGPUDrivenShadowAlpha the recorded alpha masked non-rigged ones (fsgpudrivenshadowalpha.cpp).
 //
 // The consumers of the shadow maps (shadowUtil.glsl, PCSS, blur, coloured shadows, cloud and contact
 // shadows) read the same textures as before and are unchanged. The cost is the atlas (one more depth
@@ -57,6 +59,7 @@
 #include "fsshadowsinglepass.h"
 
 #include "fsgpudrivendraws.h"
+#include "fsgpudrivenshadowalpha.h"
 #include "pipeline.h"
 
 #include "lldrawpool.h"
@@ -611,6 +614,9 @@ void LLPipeline::fsShadowSinglePassFinish()
 
         const S32 sun_up = LLEnvironment::instance().getIsSunUp() ? 1 : 0;
         LLVertexBuffer::unbind();
+        // FSPerfGPUDrivenShadowAlpha: the non-rigged alpha masked kinds that can come out of its arena with bindless
+        // textures are collected and go out as multi-draws after the loop
+        const bool gdd_alpha = fsGDDShadowAlphaBegin(true);
 
         for (U32 kind = 0; kind < FS_SHADOW_SP_KINDS; ++kind)
         {
@@ -628,6 +634,16 @@ void LLPipeline::fsShadowSinglePassFinish()
                 {   // FSPerfGPUDrivenDraws: what is in the position arena goes out as one multi-draw per cascade set,
                     // the rest stays in the list for the loop below
                     draws += fsGDDDrawShadowSinglePass(list, clip);
+                    if (list.empty())
+                    {
+                        continue;
+                    }
+                }
+                else if (gdd_alpha && !rigged)
+                {
+                    fsGDDShadowAlphaCollectSP(kind == FS_SHADOW_SP_ALPHA_MASK ? FS_GDD_SA_ALPHA_MASK :
+                                              kind == FS_SHADOW_SP_FULLBRIGHT_MASK ? FS_GDD_SA_FULLBRIGHT_MASK : FS_GDD_SA_TREE,
+                                              list);
                     if (list.empty())
                     {
                         continue;
@@ -746,6 +762,10 @@ void LLPipeline::fsShadowSinglePassFinish()
             }
         }
         LLVertexBuffer::sFSInstanceCount = 0;
+        if (gdd_alpha)
+        {
+            draws += fsGDDShadowAlphaFlushSP(clip, widths);
+        }
         LLVertexBuffer::unbind();
     }
     mFSShadowAtlas.flush(); // glViewport puts every viewport back

@@ -158,6 +158,7 @@ set(viewer_SOURCE_FILES
     fsgpudrivenlegacy.cpp
     fsgpudrivenmaterials.cpp
     fsgpudrivenpbr.cpp
+    fsgpudrivenshadowalpha.cpp
     fsinventorycustomtabs.cpp
     # <ID:i.doll> [Received inventory destination controls]
     idfloaterinventorydestinationconfig.cpp
@@ -1076,6 +1077,7 @@ set(viewer_HEADER_FILES
     fsgpudrivenlegacy.h
     fsgpudrivenmaterials.h
     fsgpudrivenpbr.h
+    fsgpudrivenshadowalpha.h
     fsinventorycustomtabs.h
     # <ID:i.doll> [Received inventory destination controls]
     idfloaterinventorydestinationconfig.h

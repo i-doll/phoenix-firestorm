@@ -57,7 +57,8 @@ void fsGDDLegacyReleaseGL();
 bool fsGDDDrawLegacy(LLRenderPass& pool, U32 type);
 
 // The per pass handle cache of the bindless textures (LLViewerTexture::mFSGDDPass), shared by the passes that
-// look textures up per batch (also FSPerfGPUDrivenMaterials, fsgpudrivenmaterials.cpp). fsGDDBeginTexturePass
+// look textures up per batch (also FSPerfGPUDrivenMaterials, fsgpudrivenmaterials.cpp, and
+// FSPerfGPUDrivenShadowAlpha, fsgpudrivenshadowalpha.cpp, per shadow map). fsGDDBeginTexturePass
 // starts a pass; fsGDDPassTextureHandle is fsGDDTextureHandle looked up once per texture per pass, and sets a
 // texture with a handle active, as bindFast would.
 void fsGDDBeginTexturePass();
