@@ -33,7 +33,7 @@
      layout="topleft"
      left="10"
      name="experimental_preset_label"
-     tool_tip="Presets hold every setting on the Photo, Effects, Rendering, Shadows and Performance tabs. The General, Textures, Avatar and Five tabs are not included."
+     tool_tip="Presets hold every setting on the Photo, Effects, Rendering, Shadows and Performance tabs. The General, Textures and Avatar tabs are not included."
      top="32"
      width="50">
         Preset:
@@ -44,7 +44,7 @@
      layout="topleft"
      left="62"
      name="experimental_preset_combo"
-     tool_tip="Presets hold every setting on the Photo, Effects, Rendering, Shadows and Performance tabs; settings a preset doesn't list are set to their defaults when it is loaded. The General, Textures, Avatar and Five tabs are not included. Built-in presets can't be changed or deleted; Cancel undoes a loaded preset."
+     tool_tip="Presets hold every setting on the Photo, Effects, Rendering, Shadows and Performance tabs; settings a preset doesn't list are set to their defaults when it is loaded. The General, Textures and Avatar tabs are not included. Built-in presets can't be changed or deleted; Cancel undoes a loaded preset."
      top="30"
      width="200">
         <combo_box.commit_callback
@@ -119,7 +119,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="293"
+                 height="348"
                  layout="topleft"
                  left="0"
                  name="experimental_general_settings"
@@ -131,8 +131,30 @@
                      height="18"
                      layout="topleft"
                      left="15"
-                     name="network_heading"
+                     name="camera_heading"
                      top="10"
+                     width="475">
+                        Camera and movement
+                    </text>
+                    <check_box
+                     control_name="FSTrishMouseLookFix"
+                     follows="left|top"
+                     height="20"
+                     label="Enable passed-on mouselook controls"
+                     layout="topleft"
+                     left="15"
+                     name="mouselook_passon_fix"
+                     tool_tip="Allow passed-on mouselook controls to reach viewer picking and HUD touch"
+                     top="33"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="network_heading"
+                     top="65"
                      width="475">
                         Region and network diagnostics
                     </text>
@@ -145,7 +167,7 @@
                      left="15"
                      name="render_neighbor_adjacent_only"
                      tool_tip="Only connect to the current and adjacent regions, plus the teleport target, to limit neighbor loading"
-                     top="33"
+                     top="88"
                      width="475" />
                     <check_box
                      control_name="FSExperimentalReleaseNonAdjacentRegions"
@@ -157,7 +179,7 @@
                      left="30"
                      name="release_non_adjacent_regions"
                      tool_tip="EXPERIMENTAL. Releases a neighbor region once it has been non-adjacent for 5 seconds, by closing that region's connection only. Requires 'Only connect to adjacent regions'. Logged under FSRegionRelease."
-                     top="56"
+                     top="111"
                      width="460" />
                     <check_box
                      control_name="FSFetchOfflineIMsWhileOnline"
@@ -168,7 +190,7 @@
                      left="15"
                      name="fetch_offline_ims"
                      tool_tip="Periodically request offline instant messages while online"
-                     top="79"
+                     top="134"
                      width="475" />
                     <text
                      follows="left|top"
@@ -176,7 +198,7 @@
                      layout="topleft"
                      left="35"
                      name="offline_im_interval_label"
-                     top="105"
+                     top="160"
                      width="285">
                         Offline message fetch interval (seconds)
                     </text>
@@ -192,7 +214,7 @@
                      max_val="3600"
                      min_val="0"
                      name="offline_im_interval"
-                     top="102"
+                     top="157"
                      width="100" />
                     <text
                      follows="left|top"
@@ -200,7 +222,7 @@
                      layout="topleft"
                      left="35"
                      name="avatar_refresh_interval_label"
-                     top="131"
+                     top="186"
                      width="285">
                         Nearby avatar refresh interval (seconds)
                     </text>
@@ -215,7 +237,7 @@
                      max_val="3600"
                      min_val="0"
                      name="avatar_refresh_interval"
-                     top="128"
+                     top="183"
                      width="100" />
                     <text
                      follows="left|top"
@@ -223,7 +245,7 @@
                      layout="topleft"
                      left="35"
                      name="dc_threshold_label"
-                     top="157"
+                     top="212"
                      width="285">
                         Disconnect recovery threshold (seconds)
                     </text>
@@ -238,7 +260,7 @@
                      max_val="3600"
                      min_val="0"
                      name="dc_threshold"
-                     top="154"
+                     top="209"
                      width="100" />
                     <text
                      follows="left|top"
@@ -247,7 +269,7 @@
                      layout="topleft"
                      left="15"
                      name="rlva_heading"
-                     top="187"
+                     top="242"
                      width="475">
                         RLVa
                     </text>
@@ -260,7 +282,7 @@
                      left="15"
                      name="rlva_experimental_login_privacy"
                      tool_tip="Temporarily hide the world, names, location, maps, and nearby avatars during login; restrictions not resent by attachments are released after loading or a safety timeout"
-                     top="211"
+                     top="266"
                      width="475" />
                     <text
                      follows="left|top"
@@ -269,7 +291,7 @@
                      layout="topleft"
                      left="15"
                      name="developer_heading"
-                     top="234"
+                     top="289"
                      width="475">
                         Developer tools and performance
                     </text>
@@ -279,7 +301,7 @@
                      layout="topleft"
                      left="35"
                      name="mass_object_edit_workers_label"
-                     top="260"
+                     top="315"
                      width="285">
                         Mass Object Edit inventory workers
                     </text>
@@ -294,7 +316,7 @@
                      max_val="32"
                      min_val="1"
                      name="mass_object_edit_workers"
-                     top="257"
+                     top="312"
                      width="100" />
                 </panel>
             </scroll_container>
@@ -333,9 +355,23 @@
                      left="15"
                      name="photography_heading"
                      top="10"
-                     width="475">
+                     width="340">
                         Photography
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_photography_heading"
+                     tool_tip="Set every option in &quot;Photography&quot; back to its default value."
+                     top="9"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="RenderResolutionMultiplier,FSSnapshotWaitForTextures,FSSnapshotTextureWaitTimeout,RenderScreenSpaceReflections,RenderScreenSpaceReflectionIterations,RenderScreenSpaceReflectionRayStep,RenderScreenSpaceReflectionGlossySamples,RenderScreenSpaceReflectionDistanceBias,RenderScreenSpaceReflectionDepthRejectBias,FSRenderSSRHiZ,FSRenderSSRConeTrace,FSRenderSSRHiZSteps,FSRenderSSRThickness,FSRenderSSREdgeFade" />
+                    </button>
                     <text
                      follows="left|top"
                      height="18"
@@ -664,7 +700,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="1888"
+                 height="2904"
                  layout="topleft"
                  left="0"
                  name="experimental_effects_settings"
@@ -678,9 +714,23 @@
                      left="15"
                      name="sun_rays_heading"
                      top="10"
-                     width="475">
+                     width="340">
                         Sun rays
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_sun_rays_heading"
+                     tool_tip="Set every option in &quot;Sun rays&quot; back to its default value."
+                     top="9"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderSunRays,FSRenderSunRaysStrength,FSRenderSunRaysDensity,FSRenderSunRaysAnisotropy,FSRenderSunRaysDistance,FSRenderSunRaysSteps,FSRenderSunRaysResolution,FSRenderSunRaysHeightFalloff,FSRenderSunRaysSkyColor,FSRenderSunRaysTint,FSRenderSunRaysSkyHaze,FSRenderSunRaysMoon,FSRenderDustMotes,FSRenderDustMotesDensity,FSRenderDustMotesSize,FSRenderDustMotesBrightness,FSRenderDustMotesRange,FSRenderDustMotesTurbulence" />
+                    </button>
                     <check_box
                      control_name="FSRenderSunRays"
                      follows="left|top"
@@ -801,9 +851,47 @@
                      height="18"
                      layout="topleft"
                      left="35"
-                     name="sun_rays_steps_label"
-                     tool_tip="EXPERIMENTAL. Samples taken along each ray. Each pixel starts its samples at a slightly different point and the result is smoothed, so low counts give soft grain rather than bands. More gives cleaner shafts at more GPU time."
+                     name="sun_rays_quality_label"
+                     tool_tip="EXPERIMENTAL. Sets samples per ray and resolution together. Low: 12 samples at half resolution. Medium: 24 samples at half resolution. High: 32 samples at three quarter resolution. Changing either value below by hand shows Custom."
                      top="178"
+                     width="285">
+                        Quality preset
+                    </text>
+                    <combo_box
+                     enabled_control="FSRenderSunRays"
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left="330"
+                     name="sun_rays_quality"
+                     tool_tip="EXPERIMENTAL. Sets samples per ray and resolution together. Low: 12 samples at half resolution. Medium: 24 samples at half resolution. High: 32 samples at three quarter resolution. Changing either value below by hand shows Custom."
+                     top="176"
+                     width="160">
+                        <combo_box.item
+                         name="sun_rays_quality_low"
+                         label="Low"
+                         value="0" />
+                        <combo_box.item
+                         name="sun_rays_quality_medium"
+                         label="Medium"
+                         value="1" />
+                        <combo_box.item
+                         name="sun_rays_quality_high"
+                         label="High"
+                         value="2" />
+                        <combo_box.item
+                         name="sun_rays_quality_custom"
+                         label="Custom"
+                         value="3" />
+                    </combo_box>
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="sun_rays_steps_label"
+                     tool_tip="EXPERIMENTAL. Samples taken along each ray. Each pixel starts its samples at a slightly different point and the result is smoothed, so low counts give soft grain rather than bands. More gives cleaner shafts at more GPU time. Set by the quality preset."
+                     top="206"
                      width="285">
                         Samples per ray
                     </text>
@@ -819,8 +907,8 @@
                      max_val="128"
                      min_val="4"
                      name="sun_rays_steps"
-                     tool_tip="EXPERIMENTAL. Samples taken along each ray. Each pixel starts its samples at a slightly different point and the result is smoothed, so low counts give soft grain rather than bands. More gives cleaner shafts at more GPU time."
-                     top="176"
+                     tool_tip="EXPERIMENTAL. Samples taken along each ray. Each pixel starts its samples at a slightly different point and the result is smoothed, so low counts give soft grain rather than bands. More gives cleaner shafts at more GPU time. Set by the quality preset."
+                     top="204"
                      width="100" />
                     <text
                      follows="left|top"
@@ -828,8 +916,8 @@
                      layout="topleft"
                      left="35"
                      name="sun_rays_resolution_label"
-                     tool_tip="EXPERIMENTAL. Resolution the rays are computed at. 0.5 is a quarter of the pixels and looks nearly the same, since the rays are soft and are filled back in along object edges."
-                     top="206"
+                     tool_tip="EXPERIMENTAL. Resolution the rays are computed at. 0.5 is a quarter of the pixels and looks nearly the same, since the rays are soft and are filled back in along object edges. Set by the quality preset."
+                     top="234"
                      width="285">
                         Resolution (fraction of screen)
                     </text>
@@ -845,8 +933,8 @@
                      max_val="1"
                      min_val="0.25"
                      name="sun_rays_resolution"
-                     tool_tip="EXPERIMENTAL. Resolution the rays are computed at. 0.5 is a quarter of the pixels and looks nearly the same, since the rays are soft and are filled back in along object edges."
-                     top="204"
+                     tool_tip="EXPERIMENTAL. Resolution the rays are computed at. 0.5 is a quarter of the pixels and looks nearly the same, since the rays are soft and are filled back in along object edges. Set by the quality preset."
+                     top="232"
                      width="100" />
                     <text
                      follows="left|top"
@@ -855,7 +943,7 @@
                      left="35"
                      name="sun_rays_height_falloff_label"
                      tool_tip="EXPERIMENTAL. How quickly the air thins out above the camera, per meter, and thickens below it (up to 4 times). 0 keeps it even. At 0.005 the rays are half as dense about 140 m above you, so they gather low down instead of washing over the sky."
-                     top="234"
+                     top="262"
                      width="285">
                         Thin out with height
                     </text>
@@ -872,7 +960,7 @@
                      min_val="0"
                      name="sun_rays_height_falloff"
                      tool_tip="EXPERIMENTAL. How quickly the air thins out above the camera, per meter, and thickens below it (up to 4 times). 0 keeps it even. At 0.005 the rays are half as dense about 140 m above you, so they gather low down instead of washing over the sky."
-                     top="232"
+                     top="260"
                      width="100" />
                     <check_box
                      control_name="FSRenderSunRaysSkyColor"
@@ -884,7 +972,7 @@
                      left="35"
                      name="sun_rays_sky_color"
                      tool_tip="EXPERIMENTAL. Colour the rays with the current sky's sun or moon light, turning warmer and dimmer as the light nears the horizon, like the rest of the scene. Off uses only the tint colour."
-                     top="260"
+                     top="288"
                      width="455" />
                     <text
                      follows="left|top"
@@ -893,7 +981,7 @@
                      left="35"
                      name="sun_rays_tint_label"
                      tool_tip="EXPERIMENTAL. Colour multiplied into the rays. White leaves them the sky's colour; with sky colour off, this is their colour."
-                     top="290"
+                     top="318"
                      width="285">
                         Tint
                     </text>
@@ -909,7 +997,7 @@
                      left="330"
                      name="sun_rays_tint"
                      tool_tip="EXPERIMENTAL. Colour multiplied into the rays. White leaves them the sky's colour; with sky colour off, this is their colour."
-                     top="288"
+                     top="316"
                      width="44" />
                     <check_box
                      control_name="FSRenderSunRaysSkyHaze"
@@ -921,7 +1009,7 @@
                      left="35"
                      name="sun_rays_sky_haze"
                      tool_tip="EXPERIMENTAL. Hazier skies give thicker rays: the haze density above is scaled by the current sky's haze density, between half and twice."
-                     top="316"
+                     top="344"
                      width="455" />
                     <check_box
                      control_name="FSRenderSunRaysMoon"
@@ -933,7 +1021,7 @@
                      left="35"
                      name="sun_rays_moon"
                      tool_tip="EXPERIMENTAL. While the sun is down, draw much fainter rays from the moon, scaled by its brightness in the sky settings."
-                     top="344"
+                     top="372"
                      width="455" />
                     <check_box
                      control_name="FSRenderDustMotes"
@@ -1083,10 +1171,24 @@
                      layout="topleft"
                      left="15"
                      name="bloom_heading"
-                     top="380"
-                     width="475">
+                     top="574"
+                     width="340">
                         Bloom
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_bloom_heading"
+                     tool_tip="Set every option in &quot;Bloom&quot; back to its default value."
+                     top="573"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderBloom,FSRenderBloomStrength,FSRenderBloomThreshold,FSRenderBloomKnee,FSRenderBloomLevels" />
+                    </button>
                     <check_box
                      control_name="FSRenderBloom"
                      follows="left|top"
@@ -1096,7 +1198,7 @@
                      left="15"
                      name="bloom"
                      tool_tip="EXPERIMENTAL. Bright parts of the image glow onto their surroundings: sun on water, lamps, emissive surfaces. Works from the full brightness range of the scene, separately from the classic glow."
-                     top="406"
+                     top="600"
                      width="475" />
                     <text
                      follows="left|top"
@@ -1105,7 +1207,7 @@
                      left="35"
                      name="bloom_strength_label"
                      tool_tip="EXPERIMENTAL. How much bloom is added."
-                     top="436"
+                     top="630"
                      width="285">
                         Strength
                     </text>
@@ -1122,7 +1224,7 @@
                      min_val="0"
                      name="bloom_strength"
                      tool_tip="EXPERIMENTAL. How much bloom is added."
-                     top="434"
+                     top="628"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1131,7 +1233,7 @@
                      left="35"
                      name="bloom_threshold_label"
                      tool_tip="EXPERIMENTAL. Brightness above which light blooms. 1 is full white on screen, lower values let more of the image bloom."
-                     top="464"
+                     top="658"
                      width="285">
                         Threshold
                     </text>
@@ -1148,7 +1250,7 @@
                      min_val="0"
                      name="bloom_threshold"
                      tool_tip="EXPERIMENTAL. Brightness above which light blooms. 1 is full white on screen, lower values let more of the image bloom."
-                     top="462"
+                     top="656"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1157,7 +1259,7 @@
                      left="35"
                      name="bloom_knee_label"
                      tool_tip="EXPERIMENTAL. How gradually bloom fades in below the threshold."
-                     top="492"
+                     top="686"
                      width="285">
                         Softness
                     </text>
@@ -1174,7 +1276,7 @@
                      min_val="0"
                      name="bloom_knee"
                      tool_tip="EXPERIMENTAL. How gradually bloom fades in below the threshold."
-                     top="490"
+                     top="684"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1183,7 +1285,7 @@
                      left="35"
                      name="bloom_levels_label"
                      tool_tip="EXPERIMENTAL. Blur levels, each twice as wide as the last. More gives a wider, softer bloom."
-                     top="520"
+                     top="714"
                      width="285">
                         Size (levels)
                     </text>
@@ -1200,7 +1302,7 @@
                      min_val="1"
                      name="bloom_levels"
                      tool_tip="EXPERIMENTAL. Blur levels, each twice as wide as the last. More gives a wider, softer bloom."
-                     top="518"
+                     top="712"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1209,10 +1311,24 @@
                      layout="topleft"
                      left="15"
                      name="color_grade_heading"
-                     top="554"
-                     width="475">
+                     top="748"
+                     width="340">
                         Colour grading
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_color_grade_heading"
+                     tool_tip="Set every option in &quot;Colour grading&quot; back to its default value."
+                     top="747"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSColorGrade,FSColorGradeTemperature,FSColorGradeTint,FSColorGradeLift,FSColorGradeGamma,FSColorGradeGain,FSColorGradeContrast,FSColorGradeSaturation,FSColorGradeVibrance,FSColorGradeShadowTint,FSColorGradeHighlightTint,FSColorGradeSplitBalance,FSColorGradeLUT,FSColorGradeLUTStrength" />
+                    </button>
                     <check_box
                      control_name="FSColorGrade"
                      follows="left|top"
@@ -1222,7 +1338,7 @@
                      left="15"
                      name="color_grade"
                      tool_tip="EXPERIMENTAL. Adjust the colour of the finished image, after tone mapping, like a photo editor."
-                     top="580"
+                     top="774"
                      width="475" />
                     <text
                      follows="left|top"
@@ -1231,7 +1347,7 @@
                      left="35"
                      name="color_grade_temperature_label"
                      tool_tip="EXPERIMENTAL. 6500 is neutral. Lower values warm the image toward orange, higher values cool it toward blue."
-                     top="610"
+                     top="804"
                      width="285">
                         White balance (Kelvin)
                     </text>
@@ -1248,7 +1364,7 @@
                      min_val="2000"
                      name="color_grade_temperature"
                      tool_tip="EXPERIMENTAL. 6500 is neutral. Lower values warm the image toward orange, higher values cool it toward blue."
-                     top="608"
+                     top="802"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1257,7 +1373,7 @@
                      left="35"
                      name="color_grade_tint_label"
                      tool_tip="EXPERIMENTAL. Positive values shift the image toward green, negative toward magenta."
-                     top="638"
+                     top="832"
                      width="285">
                         Tint
                     </text>
@@ -1274,7 +1390,7 @@
                      min_val="-1"
                      name="color_grade_tint"
                      tool_tip="EXPERIMENTAL. Positive values shift the image toward green, negative toward magenta."
-                     top="636"
+                     top="830"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1283,7 +1399,7 @@
                      left="35"
                      name="color_grade_lift_label"
                      tool_tip="EXPERIMENTAL. Raises the blacks (positive, faded look) or crushes them (negative), without moving white."
-                     top="666"
+                     top="860"
                      width="285">
                         Lift (blacks)
                     </text>
@@ -1300,7 +1416,7 @@
                      min_val="-0.5"
                      name="color_grade_lift"
                      tool_tip="EXPERIMENTAL. Raises the blacks (positive, faded look) or crushes them (negative), without moving white."
-                     top="664"
+                     top="858"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1309,7 +1425,7 @@
                      left="35"
                      name="color_grade_gamma_label"
                      tool_tip="EXPERIMENTAL. Brightens (above 1) or darkens (below 1) the midtones, leaving black and white in place."
-                     top="694"
+                     top="888"
                      width="285">
                         Gamma (midtones)
                     </text>
@@ -1326,7 +1442,7 @@
                      min_val="0.25"
                      name="color_grade_gamma"
                      tool_tip="EXPERIMENTAL. Brightens (above 1) or darkens (below 1) the midtones, leaving black and white in place."
-                     top="692"
+                     top="886"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1335,7 +1451,7 @@
                      left="35"
                      name="color_grade_gain_label"
                      tool_tip="EXPERIMENTAL. Scales the image toward white."
-                     top="722"
+                     top="916"
                      width="285">
                         Gain (highlights)
                     </text>
@@ -1352,7 +1468,7 @@
                      min_val="0"
                      name="color_grade_gain"
                      tool_tip="EXPERIMENTAL. Scales the image toward white."
-                     top="720"
+                     top="914"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1361,7 +1477,7 @@
                      left="35"
                      name="color_grade_contrast_label"
                      tool_tip="EXPERIMENTAL. Contrast around mid grey."
-                     top="750"
+                     top="944"
                      width="285">
                         Contrast
                     </text>
@@ -1378,7 +1494,7 @@
                      min_val="0"
                      name="color_grade_contrast"
                      tool_tip="EXPERIMENTAL. Contrast around mid grey."
-                     top="748"
+                     top="942"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1387,7 +1503,7 @@
                      left="35"
                      name="color_grade_saturation_label"
                      tool_tip="EXPERIMENTAL. 0 is black and white."
-                     top="778"
+                     top="972"
                      width="285">
                         Saturation
                     </text>
@@ -1404,7 +1520,7 @@
                      min_val="0"
                      name="color_grade_saturation"
                      tool_tip="EXPERIMENTAL. 0 is black and white."
-                     top="776"
+                     top="970"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1413,7 +1529,7 @@
                      left="35"
                      name="color_grade_vibrance_label"
                      tool_tip="EXPERIMENTAL. Saturates muted colours more than ones that are already strong, which keeps skin from going orange. Negative values mute them."
-                     top="806"
+                     top="1000"
                      width="285">
                         Vibrance
                     </text>
@@ -1430,7 +1546,7 @@
                      min_val="-1"
                      name="color_grade_vibrance"
                      tool_tip="EXPERIMENTAL. Saturates muted colours more than ones that are already strong, which keeps skin from going orange. Negative values mute them."
-                     top="804"
+                     top="998"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1439,7 +1555,7 @@
                      left="35"
                      name="color_grade_shadow_tint_label"
                      tool_tip="EXPERIMENTAL. Colour the shadows are tinted toward. White leaves them alone."
-                     top="834"
+                     top="1028"
                      width="285">
                         Shadow tint
                     </text>
@@ -1455,7 +1571,7 @@
                      left="330"
                      name="color_grade_shadow_tint"
                      tool_tip="EXPERIMENTAL. Colour the shadows are tinted toward. White leaves them alone."
-                     top="832"
+                     top="1026"
                      width="44" />
                     <text
                      follows="left|top"
@@ -1464,7 +1580,7 @@
                      left="35"
                      name="color_grade_highlight_tint_label"
                      tool_tip="EXPERIMENTAL. Colour the highlights are tinted toward. White leaves them alone."
-                     top="862"
+                     top="1056"
                      width="285">
                         Highlight tint
                     </text>
@@ -1480,7 +1596,7 @@
                      left="330"
                      name="color_grade_highlight_tint"
                      tool_tip="EXPERIMENTAL. Colour the highlights are tinted toward. White leaves them alone."
-                     top="860"
+                     top="1054"
                      width="44" />
                     <text
                      follows="left|top"
@@ -1489,7 +1605,7 @@
                      left="35"
                      name="color_grade_split_balance_label"
                      tool_tip="EXPERIMENTAL. Moves the line between the shadow and highlight tints. Positive gives the highlight tint more of the image."
-                     top="890"
+                     top="1084"
                      width="285">
                         Shadow/highlight balance
                     </text>
@@ -1506,7 +1622,7 @@
                      min_val="-1"
                      name="color_grade_split_balance"
                      tool_tip="EXPERIMENTAL. Moves the line between the shadow and highlight tints. Positive gives the highlight tint more of the image."
-                     top="888"
+                     top="1082"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1515,7 +1631,7 @@
                      left="35"
                      name="color_grade_lut_label"
                      tool_tip="EXPERIMENTAL. A .cube file, as exported by most grading tools, or a PNG strip (size*size by size pixels, green increasing downward). A full path, or just the file name of one in the luts folder inside your user settings folder. Leave empty for none."
-                     top="918"
+                     top="1112"
                      width="285">
                         Lookup table file
                     </text>
@@ -1529,7 +1645,7 @@
                      max_length_bytes="1024"
                      name="color_grade_lut"
                      tool_tip="EXPERIMENTAL. A .cube file, as exported by most grading tools, or a PNG strip (size*size by size pixels, green increasing downward). A full path, or just the file name of one in the luts folder inside your user settings folder. Leave empty for none."
-                     top="916"
+                     top="1110"
                      width="160" />
                     <text
                      follows="left|top"
@@ -1538,7 +1654,7 @@
                      left="35"
                      name="color_grade_lut_strength_label"
                      tool_tip="EXPERIMENTAL. How much of the lookup table is applied."
-                     top="946"
+                     top="1140"
                      width="285">
                         Lookup table strength
                     </text>
@@ -1555,7 +1671,7 @@
                      min_val="0"
                      name="color_grade_lut_strength"
                      tool_tip="EXPERIMENTAL. How much of the lookup table is applied."
-                     top="944"
+                     top="1138"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1564,10 +1680,24 @@
                      layout="topleft"
                      left="15"
                      name="lens_heading"
-                     top="980"
-                     width="475">
+                     top="1174"
+                     width="340">
                         Lens effects
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_lens_heading"
+                     tool_tip="Set every option in &quot;Lens effects&quot; back to its default value."
+                     top="1173"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderChromaticAberration,FSRenderChromaticAberrationDoFOnly,FSRenderLensFlare,FSRenderFilmGrain,FSRenderFilmGrainSize" />
+                    </button>
                     <text
                      follows="left|top"
                      height="18"
@@ -1575,7 +1705,7 @@
                      left="35"
                      name="chromatic_aberration_label"
                      tool_tip="EXPERIMENTAL. Red and blue fringes that grow toward the edges of the frame, as with a real lens. The value is the fringe width at the corners. 0 is off."
-                     top="1008"
+                     top="1202"
                      width="285">
                         Chromatic aberration (pixels)
                     </text>
@@ -1591,7 +1721,7 @@
                      min_val="0"
                      name="chromatic_aberration"
                      tool_tip="EXPERIMENTAL. Red and blue fringes that grow toward the edges of the frame, as with a real lens. The value is the fringe width at the corners. 0 is off."
-                     top="1006"
+                     top="1200"
                      width="100" />
                     <check_box
                      control_name="FSRenderChromaticAberrationDoFOnly"
@@ -1602,7 +1732,7 @@
                      left="15"
                      name="chromatic_aberration_dof"
                      tool_tip="EXPERIMENTAL. Limit chromatic aberration to out of focus areas, scaled by how blurred they are. Needs depth of field on."
-                     top="1034"
+                     top="1228"
                      width="475" />
                     <text
                      follows="left|top"
@@ -1611,7 +1741,7 @@
                      left="35"
                      name="lens_flare_label"
                      tool_tip="EXPERIMENTAL. Flare, glare and ghosts when the sun or moon is in view and not hidden behind anything. 0 is off."
-                     top="1064"
+                     top="1258"
                      width="285">
                         Lens flare
                     </text>
@@ -1627,7 +1757,7 @@
                      min_val="0"
                      name="lens_flare"
                      tool_tip="EXPERIMENTAL. Flare, glare and ghosts when the sun or moon is in view and not hidden behind anything. 0 is off."
-                     top="1062"
+                     top="1256"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1636,7 +1766,7 @@
                      left="35"
                      name="film_grain_label"
                      tool_tip="EXPERIMENTAL. Film grain, strongest in the midtones. 0 is off."
-                     top="1092"
+                     top="1286"
                      width="285">
                         Film grain
                     </text>
@@ -1652,7 +1782,7 @@
                      min_val="0"
                      name="film_grain"
                      tool_tip="EXPERIMENTAL. Film grain, strongest in the midtones. 0 is off."
-                     top="1090"
+                     top="1284"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1661,7 +1791,7 @@
                      left="35"
                      name="film_grain_size_label"
                      tool_tip="EXPERIMENTAL. Size of the grain."
-                     top="1120"
+                     top="1314"
                      width="285">
                         Film grain size (pixels)
                     </text>
@@ -1677,7 +1807,211 @@
                      min_val="1"
                      name="film_grain_size"
                      tool_tip="EXPERIMENTAL. Size of the grain."
-                     top="1118"
+                     top="1312"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_volumetric_projector_light"
+                     top="1348"
+                     width="340">
+                        Volumetric projector light
+                    </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_volumetric_projector_light"
+                     tool_tip="Set every option in &quot;Volumetric projector light&quot; back to its default value."
+                     top="1347"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderSpotVolumetric,FSRenderSpotVolumetricStrength,FSRenderSpotVolumetricDensity,FSRenderSpotVolumetricMaxLights,FSRenderSpotVolumetricResolution,FSRenderSpotVolumetricSteps,FSRenderSpotVolumetricUnshadowed,FSRenderSpotVolumetricAnisotropy" />
+                    </button>
+                    <check_box
+                     control_name="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     label="Volumetric projector light"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsrenderspotvolumetric"
+                     tool_tip="EXPERIMENTAL. Light cones in the air from projectors and spotlights, for clubs and lamps. Shadowed projectors cast shafts through their shadows; textured projectors (gobos) colour their cones."
+                     top="1374"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderspotvolumetricstrength_label"
+                     tool_tip="EXPERIMENTAL. Brightness of the light cones."
+                     top="1402"
+                     width="285">
+                        Strength
+                    </text>
+                    <spinner
+                     control_name="FSRenderSpotVolumetricStrength"
+                     decimal_digits="2"
+                     enabled_control="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="4.0"
+                     min_val="0.0"
+                     name="fs_fsrenderspotvolumetricstrength"
+                     tool_tip="EXPERIMENTAL. Brightness of the light cones."
+                     top="1400"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderspotvolumetricdensity_label"
+                     tool_tip="EXPERIMENTAL. How thick the air is. Low values are a light haze, high values a smoky room."
+                     top="1430"
+                     width="285">
+                        Haze density
+                    </text>
+                    <spinner
+                     control_name="FSRenderSpotVolumetricDensity"
+                     decimal_digits="3"
+                     enabled_control="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     increment="0.005"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.5"
+                     min_val="0.0"
+                     name="fs_fsrenderspotvolumetricdensity"
+                     tool_tip="EXPERIMENTAL. How thick the air is. Low values are a light haze, high values a smoky room."
+                     top="1428"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderspotvolumetricmaxlights_label"
+                     tool_tip="EXPERIMENTAL. How many of the nearest projectors get a light cone. Each one costs a ray march at reduced resolution."
+                     top="1458"
+                     width="285">
+                        Most lights
+                    </text>
+                    <spinner
+                     control_name="FSRenderSpotVolumetricMaxLights"
+                     decimal_digits="0"
+                     enabled_control="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="1"
+                     name="fs_fsrenderspotvolumetricmaxlights"
+                     tool_tip="EXPERIMENTAL. How many of the nearest projectors get a light cone. Each one costs a ray march at reduced resolution."
+                     top="1456"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderspotvolumetricresolution_label"
+                     tool_tip="EXPERIMENTAL. Fraction of the screen resolution the cones are marched at. Lower is faster and softer."
+                     top="1486"
+                     width="285">
+                        Resolution
+                    </text>
+                    <spinner
+                     control_name="FSRenderSpotVolumetricResolution"
+                     decimal_digits="2"
+                     enabled_control="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1.0"
+                     min_val="0.25"
+                     name="fs_fsrenderspotvolumetricresolution"
+                     tool_tip="EXPERIMENTAL. Fraction of the screen resolution the cones are marched at. Lower is faster and softer."
+                     top="1484"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderspotvolumetricsteps_label"
+                     tool_tip="EXPERIMENTAL. Samples along each view ray through a light. More is smoother and slower."
+                     top="1514"
+                     width="285">
+                        Steps
+                    </text>
+                    <spinner
+                     control_name="FSRenderSpotVolumetricSteps"
+                     decimal_digits="0"
+                     enabled_control="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     increment="4"
+                     layout="topleft"
+                     left="330"
+                     max_val="64"
+                     min_val="4"
+                     name="fs_fsrenderspotvolumetricsteps"
+                     tool_tip="EXPERIMENTAL. Samples along each view ray through a light. More is smoother and slower."
+                     top="1512"
+                     width="100" />
+                    <check_box
+                     control_name="FSRenderSpotVolumetricUnshadowed"
+                     enabled_control="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     label="Include unshadowed projectors"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderspotvolumetricunshadowed"
+                     tool_tip="EXPERIMENTAL. Also give cones to projectors without a shadow map. Their light passes through walls and objects."
+                     top="1540"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderspotvolumetricanisotropy_label"
+                     tool_tip="EXPERIMENTAL. 0 makes cones equally bright from every side; higher values make them glow most when looking toward the light."
+                     top="1568"
+                     width="285">
+                        Forward scattering
+                    </text>
+                    <spinner
+                     control_name="FSRenderSpotVolumetricAnisotropy"
+                     decimal_digits="2"
+                     enabled_control="FSRenderSpotVolumetric"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.9"
+                     min_val="0.0"
+                     name="fs_fsrenderspotvolumetricanisotropy"
+                     tool_tip="EXPERIMENTAL. 0 makes cones equally bright from every side; higher values make them glow most when looking toward the light."
+                     top="1566"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1686,10 +2020,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_water"
-                     top="1154"
-                     width="475">
+                     top="1606"
+                     width="340">
                         Water
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_water"
+                     tool_tip="Set every option in &quot;Water&quot; back to its default value."
+                     top="1605"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderWaterCaustics,FSRenderWaterCausticsStrength,FSRenderWaterCausticsScale,FSRenderWaterCausticsSpeed,FSRenderWaterFoam,FSRenderWaterFoamWidth,FSRenderWaterFoamStrength,FSRenderSunGlints,FSRenderSunGlintsIntensity,FSRenderSunGlintsDensity,FSRenderWetShore,FSRenderWetShoreStrength,FSRenderWetShoreHeight,FSRenderWetShoreSwell,FSRenderWaterFogVariation,FSRenderWaterFogPatchSize" />
+                    </button>
                     <check_box
                      control_name="FSRenderWaterCaustics"
                      follows="left|top"
@@ -1699,7 +2047,7 @@
                      left="15"
                      name="fs_fsrenderwatercaustics"
                      tool_tip="EXPERIMENTAL. Moving patterns of sunlight focused by the waves on the sea floor, submerged objects and avatars standing in the water. They fade with depth and with a low sun. Costs a little in the sun lighting pass, only on pixels under the water."
-                     top="1180"
+                     top="1632"
                      width="475" />
                     <text
                      follows="left|top"
@@ -1708,7 +2056,7 @@
                      left="35"
                      name="fs_fsrenderwatercausticsstrength_label"
                      tool_tip="EXPERIMENTAL. Brightness of the caustics, as a fraction of the direct sunlight."
-                     top="1208"
+                     top="1660"
                      width="285">
                         Caustics strength
                     </text>
@@ -1725,7 +2073,7 @@
                      min_val="0.0"
                      name="fs_fsrenderwatercausticsstrength"
                      tool_tip="EXPERIMENTAL. Brightness of the caustics, as a fraction of the direct sunlight."
-                     top="1206"
+                     top="1658"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1734,7 +2082,7 @@
                      left="35"
                      name="fs_fsrenderwatercausticsscale_label"
                      tool_tip="EXPERIMENTAL. Size of the caustic cells in metres."
-                     top="1236"
+                     top="1688"
                      width="285">
                         Caustics size
                     </text>
@@ -1751,7 +2099,7 @@
                      min_val="0.25"
                      name="fs_fsrenderwatercausticsscale"
                      tool_tip="EXPERIMENTAL. Size of the caustic cells in metres."
-                     top="1234"
+                     top="1686"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1760,7 +2108,7 @@
                      left="35"
                      name="fs_fsrenderwatercausticsspeed_label"
                      tool_tip="EXPERIMENTAL. How fast the caustics move. 0 freezes them."
-                     top="1264"
+                     top="1716"
                      width="285">
                         Caustics speed
                     </text>
@@ -1777,7 +2125,7 @@
                      min_val="0.0"
                      name="fs_fsrenderwatercausticsspeed"
                      tool_tip="EXPERIMENTAL. How fast the caustics move. 0 freezes them."
-                     top="1262"
+                     top="1714"
                      width="100" />
                     <check_box
                      control_name="FSRenderWaterFoam"
@@ -1788,7 +2136,7 @@
                      left="15"
                      name="fs_fsrenderwaterfoam"
                      tool_tip="EXPERIMENTAL. A soft, moving band of foam where the water meets land, rocks, boats and anything else standing in it, seen from above and below the surface. Needs transparent water."
-                     top="1290"
+                     top="1742"
                      width="475" />
                     <text
                      follows="left|top"
@@ -1797,7 +2145,7 @@
                      left="35"
                      name="fs_fsrenderwaterfoamwidth_label"
                      tool_tip="EXPERIMENTAL. Water depth in metres at which the foam band ends."
-                     top="1318"
+                     top="1770"
                      width="285">
                         Foam width
                     </text>
@@ -1814,7 +2162,7 @@
                      min_val="0.05"
                      name="fs_fsrenderwaterfoamwidth"
                      tool_tip="EXPERIMENTAL. Water depth in metres at which the foam band ends."
-                     top="1316"
+                     top="1768"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1823,7 +2171,7 @@
                      left="35"
                      name="fs_fsrenderwaterfoamstrength_label"
                      tool_tip="EXPERIMENTAL. Opacity of the foam."
-                     top="1346"
+                     top="1798"
                      width="285">
                         Foam strength
                     </text>
@@ -1840,7 +2188,7 @@
                      min_val="0.0"
                      name="fs_fsrenderwaterfoamstrength"
                      tool_tip="EXPERIMENTAL. Opacity of the foam."
-                     top="1344"
+                     top="1796"
                      width="100" />
                     <check_box
                      control_name="FSRenderSunGlints"
@@ -1851,7 +2199,7 @@
                      left="15"
                      name="fs_fsrendersunglints"
                      tool_tip="EXPERIMENTAL. Sparkling highlights where the waves catch the sun, the glitter around the sun's reflection. They follow the sun colour and sun shadows and flicker as the waves move. Costs a little on water pixels only. Changing it rebuilds the shaders."
-                     top="1376"
+                     top="1828"
                      width="475" />
                     <text
                      follows="left|top"
@@ -1860,7 +2208,7 @@
                      left="35"
                      name="fs_fsrendersunglintsintensity_label"
                      tool_tip="EXPERIMENTAL. How bright the sun glints are."
-                     top="1404"
+                     top="1856"
                      width="285">
                         Glint brightness
                     </text>
@@ -1877,7 +2225,7 @@
                      min_val="0.0"
                      name="fs_fsrendersunglintsintensity"
                      tool_tip="EXPERIMENTAL. How bright the sun glints are."
-                     top="1402"
+                     top="1854"
                      width="100" />
                     <text
                      follows="left|top"
@@ -1886,7 +2234,7 @@
                      left="35"
                      name="fs_fsrendersunglintsdensity_label"
                      tool_tip="EXPERIMENTAL. How many sun glints there are."
-                     top="1432"
+                     top="1884"
                      width="285">
                         Glint density
                     </text>
@@ -1903,7 +2251,7 @@
                      min_val="0.1"
                      name="fs_fsrendersunglintsdensity"
                      tool_tip="EXPERIMENTAL. How many sun glints there are."
-                     top="1430"
+                     top="1882"
                      width="100" />
                     <check_box
                      control_name="FSRenderWetShore"
@@ -2051,10 +2399,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_lens_dirt"
-                     top="1466"
-                     width="475">
+                     top="2084"
+                     width="340">
                         Lens dirt
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_lens_dirt"
+                     tool_tip="Set every option in &quot;Lens dirt&quot; back to its default value."
+                     top="2083"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderBloomLensDirt,FSRenderBloomLensDirtStrength" />
+                    </button>
                     <check_box
                      control_name="FSRenderBloomLensDirt"
                      enabled_control="FSRenderBloom"
@@ -2065,7 +2427,7 @@
                      left="15"
                      name="fs_fsrenderbloomlensdirt"
                      tool_tip="EXPERIMENTAL. Smudges and specks on the lens that light up where bloom falls on them, as with bright lights or the sun in a camera. Needs bloom."
-                     top="1492"
+                     top="2110"
                      width="475" />
                     <text
                      follows="left|top"
@@ -2074,7 +2436,7 @@
                      left="35"
                      name="fs_fsrenderbloomlensdirtstrength_label"
                      tool_tip="EXPERIMENTAL. How much the dirt adds to the bloom where it lies."
-                     top="1520"
+                     top="2138"
                      width="285">
                         Lens dirt strength
                     </text>
@@ -2091,7 +2453,7 @@
                      min_val="0.0"
                      name="fs_fsrenderbloomlensdirtstrength"
                      tool_tip="EXPERIMENTAL. How much the dirt adds to the bloom where it lies."
-                     top="1518"
+                     top="2136"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2100,10 +2462,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_exposure_and_tone_mapping"
-                     top="1560"
-                     width="475">
+                     top="2178"
+                     width="340">
                         Exposure and tone mapping
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_exposure_and_tone_mapping"
+                     tool_tip="Set every option in &quot;Exposure and tone mapping&quot; back to its default value."
+                     top="2177"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderLocalTonemap,FSRenderExposureSpeedToBright,FSRenderExposureSpeedToDark,FSRenderExposureCenterWeight,FSRenderExposureRangeLimit,FSRenderLocalTonemapStrength,FSRenderLocalTonemapDetail" />
+                    </button>
                     <check_box
                      control_name="FSRenderLocalTonemap"
                      follows="left|top"
@@ -2113,7 +2489,7 @@
                      left="15"
                      name="fs_fsrenderlocaltonemap"
                      tool_tip="EXPERIMENTAL. Evens out large differences in brightness, such as a room beside a bright window, while keeping fine detail and contrast. Applied before the tonemapper. Costs a small quarter resolution pass."
-                     top="1586"
+                     top="2204"
                      width="475" />
                     <text
                      follows="left|top"
@@ -2122,7 +2498,7 @@
                      left="35"
                      name="fs_fsrenderexposurespeedtobright_label"
                      tool_tip="EXPERIMENTAL. How fast auto exposure adjusts when the scene gets brighter, as a multiple of the normal speed. 1 is the default."
-                     top="1614"
+                     top="2232"
                      width="285">
                         Adapt to bright speed
                     </text>
@@ -2138,7 +2514,7 @@
                      min_val="0.1"
                      name="fs_fsrenderexposurespeedtobright"
                      tool_tip="EXPERIMENTAL. How fast auto exposure adjusts when the scene gets brighter, as a multiple of the normal speed. 1 is the default."
-                     top="1612"
+                     top="2230"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2147,7 +2523,7 @@
                      left="35"
                      name="fs_fsrenderexposurespeedtodark_label"
                      tool_tip="EXPERIMENTAL. How fast auto exposure adjusts when the scene gets darker, as a multiple of the normal speed. Real eyes adapt to darkness more slowly than to light. 1 is the default."
-                     top="1642"
+                     top="2260"
                      width="285">
                         Adapt to dark speed
                     </text>
@@ -2163,7 +2539,7 @@
                      min_val="0.1"
                      name="fs_fsrenderexposurespeedtodark"
                      tool_tip="EXPERIMENTAL. How fast auto exposure adjusts when the scene gets darker, as a multiple of the normal speed. Real eyes adapt to darkness more slowly than to light. 1 is the default."
-                     top="1640"
+                     top="2258"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2172,7 +2548,7 @@
                      left="35"
                      name="fs_fsrenderexposurecenterweight_label"
                      tool_tip="EXPERIMENTAL. How much auto exposure favours the middle of the screen. 0 meters the whole view; 1 only the centre, so a bright sky at the edges doesn't darken a portrait."
-                     top="1670"
+                     top="2288"
                      width="285">
                         Centre weighted metering
                     </text>
@@ -2188,7 +2564,7 @@
                      min_val="0"
                      name="fs_fsrenderexposurecenterweight"
                      tool_tip="EXPERIMENTAL. How much auto exposure favours the middle of the screen. 0 meters the whole view; 1 only the centre, so a bright sky at the edges doesn't darken a portrait."
-                     top="1668"
+                     top="2286"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2197,7 +2573,7 @@
                      left="35"
                      name="fs_fsrenderexposurerangelimit_label"
                      tool_tip="EXPERIMENTAL. Limits how far auto exposure can brighten or darken, in stops either side of the middle of its range. 0 means no limit."
-                     top="1698"
+                     top="2316"
                      width="285">
                         Adaptation range limit (stops)
                     </text>
@@ -2213,7 +2589,7 @@
                      min_val="0"
                      name="fs_fsrenderexposurerangelimit"
                      tool_tip="EXPERIMENTAL. Limits how far auto exposure can brighten or darken, in stops either side of the middle of its range. 0 means no limit."
-                     top="1696"
+                     top="2314"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2222,7 +2598,7 @@
                      left="35"
                      name="fs_fsrenderlocaltonemapstrength_label"
                      tool_tip="EXPERIMENTAL. How much large scale brightness differences are reduced. 0 leaves them; 1 evens them out completely."
-                     top="1726"
+                     top="2344"
                      width="285">
                         Local tone mapping strength
                     </text>
@@ -2239,7 +2615,7 @@
                      min_val="0"
                      name="fs_fsrenderlocaltonemapstrength"
                      tool_tip="EXPERIMENTAL. How much large scale brightness differences are reduced. 0 leaves them; 1 evens them out completely."
-                     top="1724"
+                     top="2342"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2248,7 +2624,7 @@
                      left="35"
                      name="fs_fsrenderlocaltonemapdetail_label"
                      tool_tip="EXPERIMENTAL. Multiplies the fine detail kept on top of the evened out lighting. 1 keeps it as is; higher values add local contrast but can show halos at bright edges."
-                     top="1754"
+                     top="2372"
                      width="285">
                         Local detail boost
                     </text>
@@ -2265,7 +2641,7 @@
                      min_val="0"
                      name="fs_fsrenderlocaltonemapdetail"
                      tool_tip="EXPERIMENTAL. Multiplies the fine detail kept on top of the evened out lighting. 1 keeps it as is; higher values add local contrast but can show halos at bright edges."
-                     top="1752"
+                     top="2370"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2274,10 +2650,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_output"
-                     top="1794"
-                     width="475">
+                     top="2412"
+                     width="340">
                         Output
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_output"
+                     tool_tip="Set every option in &quot;Output&quot; back to its default value."
+                     top="2411"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderDeband,FSRenderDebandStrength" />
+                    </button>
                     <check_box
                      control_name="FSRenderDeband"
                      follows="left|top"
@@ -2287,7 +2677,7 @@
                      left="15"
                      name="fs_fsrenderdeband"
                      tool_tip="EXPERIMENTAL. Removes the visible steps (banding) in skies, fog and soft gradients by adding an invisible fine grain of one colour step before the image is reduced to 8 bits. Replaces the viewer's own present noise. Practically free."
-                     top="1820"
+                     top="2438"
                      width="475" />
                     <text
                      follows="left|top"
@@ -2296,7 +2686,7 @@
                      left="35"
                      name="fs_fsrenderdebandstrength_label"
                      tool_tip="EXPERIMENTAL. Amplitude of the debanding dither in colour steps. 1 is correct for 8 bit output; raise it only if some banding remains, it makes the grain visible."
-                     top="1848"
+                     top="2466"
                      width="285">
                         Dither strength
                     </text>
@@ -2313,7 +2703,298 @@
                      min_val="0.25"
                      name="fs_fsrenderdebandstrength"
                      tool_tip="EXPERIMENTAL. Amplitude of the debanding dither in colour steps. 1 is correct for 8 bit output; raise it only if some banding remains, it makes the grain visible."
-                     top="1846"
+                     top="2464"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_height_fog"
+                     top="2506"
+                     width="340">
+                        Height fog
+                    </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_height_fog"
+                     tool_tip="Set every option in &quot;Height fog&quot; back to its default value."
+                     top="2505"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderHeightFog,FSRenderHeightFogSkyColor,FSRenderHeightFogBaseAbsolute,FSRenderHeightFogSkyHaze,FSRenderHeightFogDensity,FSRenderHeightFogFalloff,FSRenderHeightFogBaseHeight,FSRenderHeightFogMaxOpacity,FSRenderHeightFogAnisotropy,FSRenderHeightFogTint,FSRenderHeightFogInteriors,FSRenderHeightFogInteriorRange,FSRenderHeightFogInteriorStrength" />
+                    </button>
+                    <check_box
+                     control_name="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     label="Height fog"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsrenderheightfog"
+                     tool_tip="EXPERIMENTAL. Fog that is thickest low down and thins with altitude, so valleys, the sea and the distance get haze. Coloured by the current sky, brighter toward the sun. Covers solid objects, the sky and transparent objects above the water. Changing it rebuilds the shaders; the values below change live at no extra cost."
+                     top="2532"
+                     width="475" />
+                    <check_box
+                     control_name="FSRenderHeightFogSkyColor"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     label="Colour from sky"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogskycolor"
+                     tool_tip="EXPERIMENTAL. Take the fog's colour from the current sky (times the tint). Off uses the tint colour at the sky's brightness."
+                     top="2558"
+                     width="455" />
+                    <check_box
+                     control_name="FSRenderHeightFogBaseAbsolute"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     label="Absolute base height"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogbaseabsolute"
+                     tool_tip="EXPERIMENTAL. The base height is a region height in meters instead of a height above the water."
+                     top="2584"
+                     width="455" />
+                    <check_box
+                     control_name="FSRenderHeightFogSkyHaze"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     label="Density follows sky haze"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogskyhaze"
+                     tool_tip="EXPERIMENTAL. Hazier skies make the fog a little thicker, clearer skies a little thinner (half to twice the set density)."
+                     top="2610"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogdensity_label"
+                     tool_tip="EXPERIMENTAL. Fog per meter at and below the base height. 0.003 hides most of what is 1 km away at that height."
+                     top="2638"
+                     width="285">
+                        Density
+                    </text>
+                    <spinner
+                     control_name="FSRenderHeightFogDensity"
+                     decimal_digits="4"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     increment="0.0005"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.1"
+                     min_val="0.0"
+                     name="fs_fsrenderheightfogdensity"
+                     tool_tip="EXPERIMENTAL. Fog per meter at and below the base height. 0.003 hides most of what is 1 km away at that height."
+                     top="2636"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogfalloff_label"
+                     tool_tip="EXPERIMENTAL. How fast the fog thins with height, per meter. 0.02 is a third as dense 50 m up; 0 is even fog at every height."
+                     top="2666"
+                     width="285">
+                        Height falloff
+                    </text>
+                    <spinner
+                     control_name="FSRenderHeightFogFalloff"
+                     decimal_digits="3"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     increment="0.005"
+                     layout="topleft"
+                     left="330"
+                     max_val="1.0"
+                     min_val="0.0"
+                     name="fs_fsrenderheightfogfalloff"
+                     tool_tip="EXPERIMENTAL. How fast the fog thins with height, per meter. 0.02 is a third as dense 50 m up; 0 is even fog at every height."
+                     top="2664"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogbaseheight_label"
+                     tool_tip="EXPERIMENTAL. Meters above the water (or the region height, with Absolute base height) where the fog reaches full density."
+                     top="2694"
+                     width="285">
+                        Base height
+                    </text>
+                    <spinner
+                     control_name="FSRenderHeightFogBaseHeight"
+                     decimal_digits="1"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     increment="1.0"
+                     layout="topleft"
+                     left="330"
+                     max_val="8192.0"
+                     min_val="-4096.0"
+                     name="fs_fsrenderheightfogbaseheight"
+                     tool_tip="EXPERIMENTAL. Meters above the water (or the region height, with Absolute base height) where the fog reaches full density."
+                     top="2692"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogmaxopacity_label"
+                     tool_tip="EXPERIMENTAL. The most the fog may hide, so the horizon never disappears completely."
+                     top="2722"
+                     width="285">
+                        Maximum opacity
+                    </text>
+                    <spinner
+                     control_name="FSRenderHeightFogMaxOpacity"
+                     decimal_digits="2"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1.0"
+                     min_val="0.0"
+                     name="fs_fsrenderheightfogmaxopacity"
+                     tool_tip="EXPERIMENTAL. The most the fog may hide, so the horizon never disappears completely."
+                     top="2720"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfoganisotropy_label"
+                     tool_tip="EXPERIMENTAL. 0 lights the fog evenly; higher values make it glow toward the sun or moon. Same scale as the sun rays' scattering."
+                     top="2750"
+                     width="285">
+                        Sun scattering
+                    </text>
+                    <spinner
+                     control_name="FSRenderHeightFogAnisotropy"
+                     decimal_digits="2"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.95"
+                     min_val="0.0"
+                     name="fs_fsrenderheightfoganisotropy"
+                     tool_tip="EXPERIMENTAL. 0 lights the fog evenly; higher values make it glow toward the sun or moon. Same scale as the sun rays' scattering."
+                     top="2748"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfogtint_label"
+                     tool_tip="EXPERIMENTAL. Colour multiplied into the fog. White leaves it the sky's colour; with sky colour off, this is the fog's colour."
+                     top="2778"
+                     width="285">
+                        Tint
+                    </text>
+                    <color_swatch
+                     border.border_thickness="0"
+                     can_apply_immediately="true"
+                     control_name="FSRenderHeightFogTint"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     label_height="0"
+                     layout="topleft"
+                     left="330"
+                     name="fs_fsrenderheightfogtint"
+                     tool_tip="EXPERIMENTAL. Colour multiplied into the fog. White leaves it the sky's colour; with sky colour off, this is the fog's colour."
+                     top="2776"
+                     width="44" />
+                    <check_box
+                     control_name="FSRenderHeightFogInteriors"
+                     enabled_control="FSRenderHeightFog"
+                     follows="left|top"
+                     height="20"
+                     label="Keep fog out of interiors"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfoginteriors"
+                     tool_tip="EXPERIMENTAL. Detects rooms and roofs around the camera with a few short rays per second, and keeps the height fog out of the room and out of the sun and sky light under a roof. Windows still show the fog outside."
+                     top="2808"
+                     width="455" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfoginteriorrange_label"
+                     tool_tip="EXPERIMENTAL. Length of the rays cast around the camera to find walls and ceilings. Rooms wider than this count as open air. Longer rays cost more CPU."
+                     top="2836"
+                     width="285">
+                        Interior detection range (m)
+                    </text>
+                    <spinner
+                     control_name="FSRenderHeightFogInteriorRange"
+                     decimal_digits="0"
+                     enabled_control="FSRenderHeightFogInteriors"
+                     follows="left|top"
+                     height="20"
+                     increment="1"
+                     layout="topleft"
+                     left="330"
+                     max_val="64"
+                     min_val="5"
+                     name="fs_fsrenderheightfoginteriorrange"
+                     tool_tip="EXPERIMENTAL. Length of the rays cast around the camera to find walls and ceilings. Rooms wider than this count as open air. Longer rays cost more CPU."
+                     top="2834"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrenderheightfoginteriorstrength_label"
+                     tool_tip="EXPERIMENTAL. How strongly rooms and roofs hold back the fog and its sky and sun light. 0 is the plain fog."
+                     top="2864"
+                     width="285">
+                        Interior strength
+                    </text>
+                    <spinner
+                     control_name="FSRenderHeightFogInteriorStrength"
+                     decimal_digits="2"
+                     enabled_control="FSRenderHeightFogInteriors"
+                     follows="left|top"
+                     height="20"
+                     increment="0.05"
+                     layout="topleft"
+                     left="330"
+                     max_val="1"
+                     min_val="0"
+                     name="fs_fsrenderheightfoginteriorstrength"
+                     tool_tip="EXPERIMENTAL. How strongly rooms and roofs hold back the fog and its sky and sun light. 0 is the plain fog."
+                     top="2862"
                      width="100" />
                 </panel>
             </scroll_container>
@@ -2338,7 +3019,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="1779"
+                 height="1872"
                  layout="topleft"
                  left="0"
                  name="experimental_rendering_settings"
@@ -2352,9 +3033,23 @@
                      left="15"
                      name="rendering_heading"
                      top="10"
-                     width="475">
+                     width="340">
                         Rendering and diagnostics
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_rendering_heading"
+                     tool_tip="Set every option in &quot;Rendering and diagnostics&quot; back to its default value."
+                     top="9"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="RenderAlphaBlendShadows,RLVaDebugSphereUseOpaqueDepth,RenderAMDDisableShaderCache,RenderAMDDisableTextureThreading,RenderRiggedDirectNormals,RenderRiggedLocalOrigin,RenderRiggedPreciseMath" />
+                    </button>
                     <check_box
                      control_name="RenderAlphaBlendShadows"
                      follows="left|top"
@@ -2440,9 +3135,23 @@
                      left="15"
                      name="shadows_heading"
                      top="231"
-                     width="475">
+                     width="340">
                         Shadows
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_shadows_heading"
+                     tool_tip="Set every option in &quot;Shadows&quot; back to its default value."
+                     top="230"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="RenderShadowCullMode,RenderShadowCullBridgesPerCascade,RenderShadowMinCasterTexels,FSRenderShadowMaxDistance,RenderShadowSplits,RenderShadowSplitExponent" />
+                    </button>
                     <text
                      follows="left|top"
                      height="18"
@@ -2575,15 +3284,101 @@
                     </combo_box>
                     <text
                      follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_split_ortho_label"
+                     tool_tip="EXPERIMENTAL. How the sun shadow maps divide the shadow distance when the sun is overhead or to the side. Higher values pull the maps toward the camera: sharper shadows close by, softer ones further out. Default 3."
+                     top="389"
+                     width="285">
+                        Shadow detail near camera, sun overhead
+                    </text>
+                    <spinner
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="1"
+                     name="shadow_split_ortho"
+                     tool_tip="EXPERIMENTAL. How the sun shadow maps divide the shadow distance when the sun is overhead or to the side. Higher values pull the maps toward the camera: sharper shadows close by, softer ones further out. Default 3."
+                     top="387"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_split_persp_label"
+                     tool_tip="EXPERIMENTAL. How the sun shadow maps divide the shadow distance when the sun is ahead of or behind the camera. Higher values pull the maps toward the camera: sharper shadows close by, softer ones further out. Default 3."
+                     top="417"
+                     width="285">
+                        Shadow detail near camera, sun ahead/behind
+                    </text>
+                    <spinner
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="1"
+                     name="shadow_split_persp"
+                     tool_tip="EXPERIMENTAL. How the sun shadow maps divide the shadow distance when the sun is ahead of or behind the camera. Higher values pull the maps toward the camera: sharper shadows close by, softer ones further out. Default 3."
+                     top="415"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="shadow_split_transition_label"
+                     tool_tip="EXPERIMENTAL. How quickly the shadow detail setting moves from the sun overhead value to the sun ahead/behind value as the sun lines up with the view. Default 2."
+                     top="445"
+                     width="285">
+                        Blend between the two
+                    </text>
+                    <spinner
+                     decimal_digits="2"
+                     follows="left|top"
+                     height="20"
+                     increment="0.25"
+                     layout="topleft"
+                     left="330"
+                     max_val="8"
+                     min_val="0.25"
+                     name="shadow_split_transition"
+                     tool_tip="EXPERIMENTAL. How quickly the shadow detail setting moves from the sun overhead value to the sun ahead/behind value as the sun lines up with the view. Default 2."
+                     top="443"
+                     width="100" />
+                    <text
+                     follows="left|top"
                      font="SansSerifBold"
                      height="18"
                      layout="topleft"
                      left="15"
                      name="shadow_performance_heading"
-                     top="388"
-                     width="475">
+                     top="481"
+                     width="340">
                         Shadow performance
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_shadow_performance_heading"
+                     tool_tip="Set every option in &quot;Shadow performance&quot; back to its default value."
+                     top="480"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderShadowFarCascadeInterval,FSRenderShadowFarCascadeResolution,FSRenderShadowFarCascadeMinCasterScale,FSRenderAvatarShadowDistance,FSRenderSpotShadowUpdateInterval,FSRenderShadowFastFilter,FSRenderShadowTexelSnap" />
+                    </button>
                     <text
                      follows="left|top"
                      height="18"
@@ -2591,7 +3386,7 @@
                      left="35"
                      name="shadow_far_cascade_interval_label"
                      tool_tip="EXPERIMENTAL. Render the two far sun shadow maps every this many frames instead of every frame (the furthest every twice this). Moving the camera, turning it or the sun moving re-renders them at once. 1 renders every frame."
-                     top="414"
+                     top="507"
                      width="285">
                         Update far sun shadows every N frames
                     </text>
@@ -2607,7 +3402,7 @@
                      min_val="1"
                      name="shadow_far_cascade_interval"
                      tool_tip="EXPERIMENTAL. Render the two far sun shadow maps every this many frames instead of every frame (the furthest every twice this). Moving the camera, turning it or the sun moving re-renders them at once. 1 renders every frame."
-                     top="412"
+                     top="505"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2616,7 +3411,7 @@
                      left="35"
                      name="shadow_far_cascade_resolution_label"
                      tool_tip="EXPERIMENTAL. Resolution of the two far sun shadow maps relative to the near ones (0.25 - 1). Far shadows cover a lot of ground per texel and blur anyway."
-                     top="442"
+                     top="535"
                      width="285">
                         Far sun shadow resolution
                     </text>
@@ -2632,7 +3427,7 @@
                      min_val="0.25"
                      name="shadow_far_cascade_resolution"
                      tool_tip="EXPERIMENTAL. Resolution of the two far sun shadow maps relative to the near ones (0.25 - 1). Far shadows cover a lot of ground per texel and blur anyway."
-                     top="440"
+                     top="533"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2641,7 +3436,7 @@
                      left="35"
                      name="shadow_far_cascade_min_caster_label"
                      tool_tip="EXPERIMENTAL. Multiplies RenderShadowMinCasterTexels for the two far sun shadow maps, so small objects far away stop casting sooner (1 - 16). Needs RenderShadowMinCasterTexels above 0."
-                     top="470"
+                     top="563"
                      width="285">
                         Far sun shadows skip small objects (x)
                     </text>
@@ -2657,7 +3452,7 @@
                      min_val="1"
                      name="shadow_far_cascade_min_caster"
                      tool_tip="EXPERIMENTAL. Multiplies RenderShadowMinCasterTexels for the two far sun shadow maps, so small objects far away stop casting sooner (1 - 16). Needs RenderShadowMinCasterTexels above 0."
-                     top="468"
+                     top="561"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2666,7 +3461,7 @@
                      left="35"
                      name="avatar_shadow_distance_label"
                      tool_tip="EXPERIMENTAL. Avatars and animesh further than this from the camera, with their attachments, cast no shadow. 0 for no limit. Your own avatar always casts."
-                     top="498"
+                     top="591"
                      width="285">
                         Avatar shadow distance (m, 0 = all)
                     </text>
@@ -2682,7 +3477,7 @@
                      min_val="0"
                      name="avatar_shadow_distance"
                      tool_tip="EXPERIMENTAL. Avatars and animesh further than this from the camera, with their attachments, cast no shadow. 0 for no limit. Your own avatar always casts."
-                     top="496"
+                     top="589"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2691,7 +3486,7 @@
                      left="35"
                      name="spot_shadow_update_interval_label"
                      tool_tip="EXPERIMENTAL. While a projector light and its settings stay unchanged, re-render its shadow only every this many frames. Things moving in its light update with that delay. 1 renders every frame."
-                     top="526"
+                     top="619"
                      width="285">
                         Update still projector shadows every N frames
                     </text>
@@ -2707,7 +3502,7 @@
                      min_val="1"
                      name="spot_shadow_update_interval"
                      tool_tip="EXPERIMENTAL. While a projector light and its settings stay unchanged, re-render its shadow only every this many frames. Things moving in its light update with that delay. 1 renders every frame."
-                     top="524"
+                     top="617"
                      width="100" />
                     <check_box
                      control_name="FSRenderShadowFastFilter"
@@ -2718,7 +3513,7 @@
                      left="15"
                      name="shadow_fast_filter"
                      tool_tip="EXPERIMENTAL. Sample sun shadows with 3 lookups instead of 5 where the area is clearly fully lit or fully shadowed, and only do all 5 near shadow edges. Rebuilds shaders when changed."
-                     top="552"
+                     top="645"
                      width="475" />
                     <check_box
                      control_name="FSRenderShadowTexelSnap"
@@ -2729,7 +3524,7 @@
                      left="15"
                      name="shadow_texel_snap"
                      tool_tip="EXPERIMENTAL. Snap each sun shadow cascade to whole shadow map texels, so shadow edges stay put instead of crawling and shimmering while the camera moves or turns. Costs almost nothing."
-                     top="574"
+                     top="667"
                      width="475" />
                     <text
                      follows="left|top"
@@ -2738,10 +3533,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_specular_anti_aliasing"
-                     top="597"
-                     width="475">
+                     top="690"
+                     width="340">
                         Specular anti-aliasing
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_specular_anti_aliasing"
+                     tool_tip="Set every option in &quot;Specular anti-aliasing&quot; back to its default value."
+                     top="689"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderSpecularAA,FSRenderSpecularAAStrength,FSRenderSpecularAAThreshold" />
+                    </button>
                     <check_box
                      control_name="FSRenderSpecularAA"
                      follows="left|top"
@@ -2751,7 +3560,7 @@
                      left="15"
                      name="fs_fsrenderspecularaa"
                      tool_tip="EXPERIMENTAL. Reduces sparkle and shimmer on shiny PBR and legacy material surfaces at a distance and on detailed normal maps by widening highlights where normal detail is too fine for the pixel."
-                     top="623"
+                     top="716"
                      width="475" />
                     <text
                      follows="left|top"
@@ -2760,7 +3569,7 @@
                      left="35"
                      name="fs_fsrenderspecularaastrength_label"
                      tool_tip="EXPERIMENTAL. How strongly normal variation between pixels softens highlights. Higher removes more sparkle but makes distant shiny surfaces duller."
-                     top="651"
+                     top="744"
                      width="285">
                         Strength
                     </text>
@@ -2777,7 +3586,7 @@
                      min_val="0.0"
                      name="fs_fsrenderspecularaastrength"
                      tool_tip="EXPERIMENTAL. How strongly normal variation between pixels softens highlights. Higher removes more sparkle but makes distant shiny surfaces duller."
-                     top="649"
+                     top="742"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2786,7 +3595,7 @@
                      left="35"
                      name="fs_fsrenderspecularaathreshold_label"
                      tool_tip="EXPERIMENTAL. Upper limit on how much roughness the filter may add."
-                     top="679"
+                     top="772"
                      width="285">
                         Max widening
                     </text>
@@ -2803,7 +3612,7 @@
                      min_val="0.02"
                      name="fs_fsrenderspecularaathreshold"
                      tool_tip="EXPERIMENTAL. Upper limit on how much roughness the filter may add."
-                     top="677"
+                     top="770"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2812,10 +3621,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_ambient_occlusion"
-                     top="717"
-                     width="475">
+                     top="810"
+                     width="340">
                         Ambient occlusion
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_ambient_occlusion"
+                     tool_tip="Set every option in &quot;Ambient occlusion&quot; back to its default value."
+                     top="809"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderGTAO,FSRenderGTAORadius,FSRenderGTAOIntensity,FSRenderGTAOSlices,FSRenderGTAOHalfRes" />
+                    </button>
                     <check_box
                      control_name="FSRenderGTAO"
                      enabled_control="RenderDeferredSSAO"
@@ -2826,7 +3649,7 @@
                      left="15"
                      name="fs_fsrendergtao"
                      tool_tip="EXPERIMENTAL. Replaces the classic screen-space ambient occlusion with a more accurate horizon-based method. Needs Ambient Occlusion enabled. Costs more GPU time."
-                     top="743"
+                     top="836"
                      width="475" />
                     <text
                      follows="left|top"
@@ -2835,7 +3658,7 @@
                      left="35"
                      name="fs_fsrendergtaoradius_label"
                      tool_tip="EXPERIMENTAL. How far around each point GTAO looks for occluders, in metres."
-                     top="771"
+                     top="864"
                      width="285">
                         GTAO radius (m)
                     </text>
@@ -2852,7 +3675,7 @@
                      min_val="0.1"
                      name="fs_fsrendergtaoradius"
                      tool_tip="EXPERIMENTAL. How far around each point GTAO looks for occluders, in metres."
-                     top="769"
+                     top="862"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2861,7 +3684,7 @@
                      left="35"
                      name="fs_fsrendergtaointensity_label"
                      tool_tip="EXPERIMENTAL. Darkens (higher) or lightens (lower) the occlusion. 1 is the physically based amount."
-                     top="799"
+                     top="892"
                      width="285">
                         GTAO intensity
                     </text>
@@ -2878,7 +3701,7 @@
                      min_val="0.5"
                      name="fs_fsrendergtaointensity"
                      tool_tip="EXPERIMENTAL. Darkens (higher) or lightens (lower) the occlusion. 1 is the physically based amount."
-                     top="797"
+                     top="890"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2887,7 +3710,7 @@
                      left="35"
                      name="fs_fsrendergtaoslices_label"
                      tool_tip="EXPERIMENTAL. Directions sampled per pixel, 1 to 4. More is smoother and slower. Changing it rebuilds the lighting shader."
-                     top="827"
+                     top="920"
                      width="285">
                         GTAO quality (slices)
                     </text>
@@ -2904,7 +3727,7 @@
                      min_val="1"
                      name="fs_fsrendergtaoslices"
                      tool_tip="EXPERIMENTAL. Directions sampled per pixel, 1 to 4. More is smoother and slower. Changing it rebuilds the lighting shader."
-                     top="825"
+                     top="918"
                      width="100" />
                     <check_box
                      control_name="FSRenderGTAOHalfRes"
@@ -2916,7 +3739,7 @@
                      left="35"
                      name="fs_fsrendergtaohalfres"
                      tool_tip="EXPERIMENTAL. Computes GTAO once per 2x2 pixels and upsamples it along depth and normal edges, so it does not bleed across silhouettes. Saves most of the GTAO cost; very fine creases get slightly softer."
-                     top="857"
+                     top="950"
                      width="455" />
                     <text
                      follows="left|top"
@@ -2925,10 +3748,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_dynamic_resolution"
-                     top="893"
-                     width="475">
+                     top="986"
+                     width="340">
                         Dynamic resolution
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_dynamic_resolution"
+                     tool_tip="Set every option in &quot;Dynamic resolution&quot; back to its default value."
+                     top="985"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderDynamicResolution,FSRenderDynamicResolutionTargetFPS,FSRenderDynamicResolutionMinScale,FSRenderDynamicResolutionSharpness,FSRenderDynamicResolutionInterval,FSRenderUpscaler" />
+                    </button>
                     <check_box
                      control_name="FSRenderDynamicResolution"
                      follows="left|top"
@@ -2938,7 +3775,7 @@
                      left="15"
                      name="fs_fsrenderdynamicresolution"
                      tool_tip="EXPERIMENTAL. When the frame rate drops below the target because the graphics card is the bottleneck, render the 3D scene at a lower resolution and upscale it with sharpening. The UI stays sharp. Has no effect while a resolution divisor or multiplier is set."
-                     top="919"
+                     top="1012"
                      width="475" />
                     <text
                      follows="left|top"
@@ -2947,7 +3784,7 @@
                      left="35"
                      name="fs_fsrenderdynamicresolutiontargetfps_label"
                      tool_tip="EXPERIMENTAL. Frame rate to keep. 0 uses your frame rate limit if one is set, else 60."
-                     top="947"
+                     top="1040"
                      width="285">
                         Target frame rate
                     </text>
@@ -2964,7 +3801,7 @@
                      min_val="0"
                      name="fs_fsrenderdynamicresolutiontargetfps"
                      tool_tip="EXPERIMENTAL. Frame rate to keep. 0 uses your frame rate limit if one is set, else 60."
-                     top="945"
+                     top="1038"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2973,7 +3810,7 @@
                      left="35"
                      name="fs_fsrenderdynamicresolutionminscale_label"
                      tool_tip="EXPERIMENTAL. Lowest scene resolution allowed, as a fraction of the window size. Lower is faster but softer."
-                     top="975"
+                     top="1068"
                      width="285">
                         Minimum resolution scale
                     </text>
@@ -2990,7 +3827,7 @@
                      min_val="0.5"
                      name="fs_fsrenderdynamicresolutionminscale"
                      tool_tip="EXPERIMENTAL. Lowest scene resolution allowed, as a fraction of the window size. Lower is faster but softer."
-                     top="973"
+                     top="1066"
                      width="100" />
                     <text
                      follows="left|top"
@@ -2999,7 +3836,7 @@
                      left="35"
                      name="fs_fsrenderdynamicresolutionsharpness_label"
                      tool_tip="EXPERIMENTAL. Extra sharpening when the scene is upscaled. 0 keeps the plain bicubic filter."
-                     top="1003"
+                     top="1096"
                      width="285">
                         Upscale sharpness
                     </text>
@@ -3015,7 +3852,7 @@
                      min_val="0"
                      name="fs_fsrenderdynamicresolutionsharpness"
                      tool_tip="EXPERIMENTAL. Extra sharpening when the scene is upscaled. 0 keeps the plain bicubic filter."
-                     top="1001"
+                     top="1094"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3024,7 +3861,7 @@
                      left="35"
                      name="fs_fsrenderdynamicresolutioninterval_label"
                      tool_tip="EXPERIMENTAL. Minimum time between resolution changes. Each change causes a brief hitch."
-                     top="1031"
+                     top="1124"
                      width="285">
                         Seconds between changes
                     </text>
@@ -3041,7 +3878,7 @@
                      min_val="1"
                      name="fs_fsrenderdynamicresolutioninterval"
                      tool_tip="EXPERIMENTAL. Minimum time between resolution changes. Each change causes a brief hitch."
-                     top="1029"
+                     top="1122"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3050,7 +3887,7 @@
                      left="35"
                      name="fs_fsrenderupscaler_label"
                      tool_tip="EXPERIMENTAL. How the scene is enlarged to the window when it renders below window size (dynamic resolution, or a resolution multiplier below 1). Standard: the built-in sharpened filter. NVIDIA Image Scaling: edge-directed scaling with adaptive sharpening, works on any graphics card; its strength follows the Sharpness setting and it replaces the CAS sharpening on those frames. Reloads shaders."
-                     top="1063"
+                     top="1156"
                      width="285">
                         Upscaler
                     </text>
@@ -3062,7 +3899,7 @@
                      left="330"
                      name="fs_fsrenderupscaler"
                      tool_tip="EXPERIMENTAL. How the scene is enlarged to the window when it renders below window size (dynamic resolution, or a resolution multiplier below 1). Standard: the built-in sharpened filter. NVIDIA Image Scaling: edge-directed scaling with adaptive sharpening, works on any graphics card; its strength follows the Sharpness setting and it replaces the CAS sharpening on those frames. Reloads shaders."
-                     top="1061"
+                     top="1154"
                      width="160">
                         <combo_box.item
                          label="Standard"
@@ -3080,10 +3917,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_skin"
-                     top="1099"
-                     width="475">
+                     top="1192"
+                     width="340">
                         Skin
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_skin"
+                     tool_tip="Set every option in &quot;Skin&quot; back to its default value."
+                     top="1191"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderSkinSSS,FSRenderSkinSSSStrength,FSRenderSkinSSSRadius,FSRenderSkinSSSTint,FSRenderSkinSSSToneMatch,FSRenderSkinSSSTranslucency" />
+                    </button>
                     <check_box
                      control_name="FSRenderSkinSSS"
                      follows="left|top"
@@ -3093,7 +3944,7 @@
                      left="15"
                      name="fs_fsrenderskinsss"
                      tool_tip="EXPERIMENTAL. Softer, more lifelike skin under strong light: light bleeds slightly through and around the skin, with a reddish falloff at shadow edges and around ears and fingers. Applies to avatar surfaces weighted by how skin-like their colour is. Needs HDR. Turning it on or off rebuilds shaders."
-                     top="1125"
+                     top="1218"
                      width="475" />
                     <text
                      follows="left|top"
@@ -3102,7 +3953,7 @@
                      left="35"
                      name="fs_fsrenderskinsssstrength_label"
                      tool_tip="EXPERIMENTAL. How much of the diffused light replaces the lit skin. Only the light is diffused: skin texture and highlights stay sharp, so 1 (the physical look) does not blur the face. 0 turns the scattering off."
-                     top="1153"
+                     top="1246"
                      width="285">
                         Scattering strength
                     </text>
@@ -3119,7 +3970,7 @@
                      min_val="0"
                      name="fs_fsrenderskinsssstrength"
                      tool_tip="EXPERIMENTAL. How much of the diffused light replaces the lit skin. Only the light is diffused: skin texture and highlights stay sharp, so 1 (the physical look) does not blur the face. 0 turns the scattering off."
-                     top="1151"
+                     top="1244"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3128,7 +3979,7 @@
                      left="35"
                      name="fs_fsrenderskinsssradius_label"
                      tool_tip="EXPERIMENTAL. Scale of the skin diffusion profile. 1 is measured human skin (red light spreads about 6 mm, green and blue stay sharp); 1.5 reads well at portrait distance; larger looks softer and waxier."
-                     top="1181"
+                     top="1274"
                      width="285">
                         Scattering radius (x human skin)
                     </text>
@@ -3145,7 +3996,7 @@
                      min_val="0.25"
                      name="fs_fsrenderskinsssradius"
                      tool_tip="EXPERIMENTAL. Scale of the skin diffusion profile. 1 is measured human skin (red light spreads about 6 mm, green and blue stay sharp); 1.5 reads well at portrait distance; larger looks softer and waxier."
-                     top="1179"
+                     top="1272"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3154,7 +4005,7 @@
                      left="35"
                      name="fs_fsrenderskinssstint_label"
                      tool_tip="EXPERIMENTAL. How much further red light scatters than green and blue. 1 gives the reddish glow of human skin at shadow edges, 0 a neutral soft blur."
-                     top="1209"
+                     top="1302"
                      width="285">
                         Red falloff
                     </text>
@@ -3171,7 +4022,7 @@
                      min_val="0"
                      name="fs_fsrenderskinssstint"
                      tool_tip="EXPERIMENTAL. How much further red light scatters than green and blue. 1 gives the reddish glow of human skin at shadow edges, 0 a neutral soft blur."
-                     top="1207"
+                     top="1300"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3180,7 +4031,7 @@
                      left="35"
                      name="fs_fsrenderskinssstonematch_label"
                      tool_tip="EXPERIMENTAL. 0 applies scattering to every avatar surface (rigged mesh and the system body), 1 only to surfaces whose colour looks like skin, which keeps it off most clothing. Lower it for non-human or unusually coloured skins."
-                     top="1237"
+                     top="1330"
                      width="285">
                         Skin colour matching
                     </text>
@@ -3197,7 +4048,7 @@
                      min_val="0"
                      name="fs_fsrenderskinssstonematch"
                      tool_tip="EXPERIMENTAL. 0 applies scattering to every avatar surface (rigged mesh and the system body), 1 only to surfaces whose colour looks like skin, which keeps it off most clothing. Lower it for non-human or unusually coloured skins."
-                     top="1235"
+                     top="1328"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3206,7 +4057,7 @@
                      left="35"
                      name="fs_fsrenderskinssstranslucency_label"
                      tool_tip="EXPERIMENTAL. Sunlight shining through thin skin lit from behind: ears, fingers and nostrils glow red when the sun is behind the avatar. 1 is the physical amount, 0 is off. Needs sun shadows (thickness is measured in the sun shadow map); the radius above also scales how thick skin can be and still glow."
-                     top="1265"
+                     top="1358"
                      width="285">
                         Backlit translucency
                     </text>
@@ -3223,7 +4074,7 @@
                      min_val="0"
                      name="fs_fsrenderskinssstranslucency"
                      tool_tip="EXPERIMENTAL. Sunlight shining through thin skin lit from behind: ears, fingers and nostrils glow red when the sun is behind the avatar. 1 is the physical amount, 0 is off. Needs sun shadows (thickness is measured in the sun shadow map); the radius above also scales how thick skin can be and still glow."
-                     top="1263"
+                     top="1356"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3232,10 +4083,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_hair_and_transparency"
-                     top="1305"
-                     width="475">
+                     top="1398"
+                     width="340">
                         Hair and transparency
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_hair_and_transparency"
+                     tool_tip="Set every option in &quot;Hair and transparency&quot; back to its default value."
+                     top="1397"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderHairTwoPass,FSRenderHairAlphaThreshold" />
+                    </button>
                     <check_box
                      control_name="FSRenderHairTwoPass"
                      follows="left|top"
@@ -3245,7 +4110,7 @@
                      left="15"
                      name="fs_fsrenderhairtwopass"
                      tool_tip="EXPERIMENTAL. Draws alpha-blended rigged mesh (hair, layered clothing) as a depth-sorted solid core and a blended soft fringe, so inner layers stop showing through outer ones. Costs roughly two extra draws of rigged alpha. Rebuilds shaders when changed."
-                     top="1331"
+                     top="1424"
                      width="475" />
                     <text
                      follows="left|top"
@@ -3254,7 +4119,7 @@
                      left="35"
                      name="fs_fsrenderhairalphathreshold_label"
                      tool_tip="EXPERIMENTAL. Alpha at or above which hair counts as solid and is depth sorted. Lower sorts more of each strand but hardens soft edges; higher keeps edges soft but sorts less."
-                     top="1359"
+                     top="1452"
                      width="285">
                         Hair solid alpha threshold
                     </text>
@@ -3271,7 +4136,7 @@
                      min_val="0.5"
                      name="fs_fsrenderhairalphathreshold"
                      tool_tip="EXPERIMENTAL. Alpha at or above which hair counts as solid and is depth sorted. Lower sorts more of each strand but hardens soft edges; higher keeps edges soft but sorts less."
-                     top="1357"
+                     top="1450"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3280,10 +4145,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_reflection_probes"
-                     top="1399"
-                     width="475">
+                     top="1492"
+                     width="340">
                         Reflection probes
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_reflection_probes"
+                     tool_tip="Set every option in &quot;Reflection probes&quot; back to its default value."
+                     top="1491"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfProbeUpdatePriority,FSPerfProbeSkipUnchanged,FSPerfProbeMaxStaleSeconds,FSPerfProbeSunAngleThreshold,FSPerfProbeRealtimeFacesPerFrame,FSRenderProbeFilterQuality,FSRenderProbeBlendSmooth" />
+                    </button>
                     <check_box
                      control_name="FSPerfProbeUpdatePriority"
                      follows="left|top"
@@ -3293,7 +4172,7 @@
                      left="15"
                      name="fs_fsperfprobeupdatepriority"
                      tool_tip="EXPERIMENTAL. Refreshes the reflection probes you can see, and the ones near you, before the ones off screen or far away. Probes that are out of sight still get refreshed, just less often. Off: the standard order."
-                     top="1425"
+                     top="1518"
                      width="475" />
                     <check_box
                      control_name="FSPerfProbeSkipUnchanged"
@@ -3304,7 +4183,7 @@
                      left="15"
                      name="fs_fsperfprobeskipunchanged"
                      tool_tip="EXPERIMENTAL. Does not re-render a reflection probe while nothing around it has changed: same sun position and sky light, no objects or terrain near it built or changed. Saves the GPU time of re-rendering the scene for probes in a static scene. Each probe is still refreshed at least every 'Longest time between refreshes', and every probe refreshes when the sky changes."
-                     top="1451"
+                     top="1544"
                      width="475" />
                     <text
                      follows="left|top"
@@ -3313,7 +4192,7 @@
                      left="35"
                      name="fs_fsperfprobemaxstaleseconds_label"
                      tool_tip="EXPERIMENTAL. With 'Skip refreshing unchanged probes', the longest a probe is left alone even when nothing seems to have changed. Lower catches changes the check misses sooner; higher saves more."
-                     top="1479"
+                     top="1572"
                      width="285">
                         Longest time between refreshes (s)
                     </text>
@@ -3330,7 +4209,7 @@
                      min_val="10"
                      name="fs_fsperfprobemaxstaleseconds"
                      tool_tip="EXPERIMENTAL. With 'Skip refreshing unchanged probes', the longest a probe is left alone even when nothing seems to have changed. Lower catches changes the check misses sooner; higher saves more."
-                     top="1477"
+                     top="1570"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3339,7 +4218,7 @@
                      left="35"
                      name="fs_fsperfprobesunanglethreshold_label"
                      tool_tip="EXPERIMENTAL. With 'Skip refreshing unchanged probes', how far the sun or moon may move before probes are refreshed. The default day cycle moves the sun about 1.5 degrees a minute."
-                     top="1507"
+                     top="1600"
                      width="285">
                         Sun movement before refresh (degrees)
                     </text>
@@ -3356,7 +4235,7 @@
                      min_val="0.5"
                      name="fs_fsperfprobesunanglethreshold"
                      tool_tip="EXPERIMENTAL. With 'Skip refreshing unchanged probes', how far the sun or moon may move before probes are refreshed. The default day cycle moves the sun about 1.5 degrees a minute."
-                     top="1505"
+                     top="1598"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3365,7 +4244,7 @@
                      left="35"
                      name="fs_fsperfproberealtimefacesperframe_label"
                      tool_tip="EXPERIMENTAL. With reflection detail set to Real-time, how many of the six sides of the real-time probe are rendered each frame. 6 is standard. 1 or 2 spreads the work over several frames for a large frame-time saving; the probe updates a little less often but never shows a half-finished cube."
-                     top="1535"
+                     top="1628"
                      width="285">
                         Real-time probe faces per frame
                     </text>
@@ -3381,7 +4260,7 @@
                      min_val="1"
                      name="fs_fsperfproberealtimefacesperframe"
                      tool_tip="EXPERIMENTAL. With reflection detail set to Real-time, how many of the six sides of the real-time probe are rendered each frame. 6 is standard. 1 or 2 spreads the work over several frames for a large frame-time saving; the probe updates a little less often but never shows a half-finished cube."
-                     top="1533"
+                     top="1626"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3390,7 +4269,7 @@
                      left="35"
                      name="fs_fsrenderprobefilterquality_label"
                      tool_tip="EXPERIMENTAL. How many samples are used to blur probe reflections for rough surfaces. 1 is standard. Higher removes faint ghost copies of bright objects in semi-rough reflections; lower is slightly cheaper and blurrier. Only costs time when a probe finishes updating."
-                     top="1563"
+                     top="1656"
                      width="285">
                         Rough reflection filter quality
                     </text>
@@ -3406,7 +4285,7 @@
                      min_val="0.25"
                      name="fs_fsrenderprobefilterquality"
                      tool_tip="EXPERIMENTAL. How many samples are used to blur probe reflections for rough surfaces. 1 is standard. Higher removes faint ghost copies of bright objects in semi-rough reflections; lower is slightly cheaper and blurrier. Only costs time when a probe finishes updating."
-                     top="1561"
+                     top="1654"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3415,7 +4294,7 @@
                      left="35"
                      name="fs_fsrenderprobeblendsmooth_label"
                      tool_tip="EXPERIMENTAL. How softly reflections fade between overlapping reflection probes. 0 is standard (a straight fade); 1 is the smoothest, hiding the visible seam where one probe's area ends and another's begins."
-                     top="1591"
+                     top="1684"
                      width="285">
                         Probe edge blending smoothness
                     </text>
@@ -3431,7 +4310,7 @@
                      min_val="0"
                      name="fs_fsrenderprobeblendsmooth"
                      tool_tip="EXPERIMENTAL. How softly reflections fade between overlapping reflection probes. 0 is standard (a straight fade); 1 is the smoothest, hiding the visible seam where one probe's area ends and another's begins."
-                     top="1589"
+                     top="1682"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3440,10 +4319,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_shading"
-                     top="1631"
-                     width="475">
+                     top="1724"
+                     width="340">
                         Shading
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_shading"
+                     tool_tip="Set every option in &quot;Shading&quot; back to its default value."
+                     top="1723"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderSpecularOcclusion,FSRenderMicroShadows,FSRenderSpecularOcclusionStrength,FSRenderMicroShadowsStrength" />
+                    </button>
                     <check_box
                      control_name="FSRenderSpecularOcclusion"
                      follows="left|top"
@@ -3453,7 +4346,7 @@
                      left="15"
                      name="fs_fsrenderspecularocclusion"
                      tool_tip="EXPERIMENTAL. Makes reflections respect ambient occlusion the way a glossy surface really would: reflections inside creases, corners and under objects fade at grazing views, while a reflection looking straight out of an opening stays bright. Works best with Ambient Occlusion enabled or PBR materials that have an occlusion map. Almost no GPU cost."
-                     top="1657"
+                     top="1750"
                      width="475" />
                     <check_box
                      control_name="FSRenderMicroShadows"
@@ -3464,7 +4357,7 @@
                      left="15"
                      name="fs_fsrendermicroshadows"
                      tool_tip="EXPERIMENTAL. Lets the fine detail of normal maps (brick, fabric, bark) shadow itself when the sun or a local light comes in at a low angle, for more depth. Needs ambient occlusion: from Ambient Occlusion or a PBR material's occlusion map. Almost no GPU cost."
-                     top="1683"
+                     top="1776"
                      width="475" />
                     <text
                      follows="left|top"
@@ -3473,7 +4366,7 @@
                      left="35"
                      name="fs_fsrenderspecularocclusionstrength_label"
                      tool_tip="EXPERIMENTAL. 0 keeps the old, plain occlusion of reflections, 1 is the full view-dependent specular occlusion."
-                     top="1711"
+                     top="1804"
                      width="285">
                         Specular occlusion strength
                     </text>
@@ -3490,7 +4383,7 @@
                      min_val="0"
                      name="fs_fsrenderspecularocclusionstrength"
                      tool_tip="EXPERIMENTAL. 0 keeps the old, plain occlusion of reflections, 1 is the full view-dependent specular occlusion."
-                     top="1709"
+                     top="1802"
                      width="100" />
                     <text
                      follows="left|top"
@@ -3499,7 +4392,7 @@
                      left="35"
                      name="fs_fsrendermicroshadowsstrength_label"
                      tool_tip="EXPERIMENTAL. How strongly normal-map detail shadows itself at low light angles. 0 is none."
-                     top="1739"
+                     top="1832"
                      width="285">
                         Micro-shadow strength
                     </text>
@@ -3516,7 +4409,7 @@
                      min_val="0"
                      name="fs_fsrendermicroshadowsstrength"
                      tool_tip="EXPERIMENTAL. How strongly normal-map detail shadows itself at low light angles. 0 is none."
-                     top="1737"
+                     top="1830"
                      width="100" />
                 </panel>
             </scroll_container>
@@ -3541,7 +4434,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="376"
+                 height="501"
                  layout="topleft"
                  left="0"
                  name="experimental_shadows_settings"
@@ -3555,9 +4448,23 @@
                      left="15"
                      name="fs_heading_cloud_shadows"
                      top="10"
-                     width="475">
+                     width="340">
                         Cloud shadows
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_cloud_shadows"
+                     tool_tip="Set every option in &quot;Cloud shadows&quot; back to its default value."
+                     top="9"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderCloudShadows,FSRenderCloudShadowStrength,FSRenderCloudShadowSoftness" />
+                    </button>
                     <check_box
                      control_name="FSRenderCloudShadows"
                      follows="left|top"
@@ -3629,9 +4536,23 @@
                      left="15"
                      name="fs_heading_contact_shadows"
                      top="130"
-                     width="475">
+                     width="340">
                         Contact shadows
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_contact_shadows"
+                     tool_tip="Set every option in &quot;Contact shadows&quot; back to its default value."
+                     top="129"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderContactShadows,FSRenderContactShadowLength,FSRenderContactShadowStrength" />
+                    </button>
                     <check_box
                      control_name="FSRenderContactShadows"
                      follows="left|top"
@@ -3701,11 +4622,87 @@
                      height="18"
                      layout="topleft"
                      left="15"
-                     name="fs_heading_coloured_shadows"
+                     name="fs_heading_shadow_fade"
                      top="250"
-                     width="475">
+                     width="340">
+                        Shadow fade
+                    </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_shadow_fade"
+                     tool_tip="Set every option in &quot;Shadow fade&quot; back to its default value."
+                     top="249"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderShadowSmoothFade,FSRenderShadowFadeLength" />
+                    </button>
+                    <check_box
+                     control_name="FSRenderShadowSmoothFade"
+                     follows="left|top"
+                     height="20"
+                     label="Smooth shadow fade"
+                     layout="topleft"
+                     left="15"
+                     name="fs_fsrendershadowsmoothfade"
+                     tool_tip="EXPERIMENTAL. Sun shadows fade out smoothly towards the shadow distance, and the change between shadow cascades is dithered so there is no visible line where shadow quality changes."
+                     top="276"
+                     width="475" />
+                    <text
+                     follows="left|top"
+                     height="18"
+                     layout="topleft"
+                     left="35"
+                     name="fs_fsrendershadowfadelength_label"
+                     tool_tip="EXPERIMENTAL. Part of the shadow distance over which shadows fade out at its far end."
+                     top="304"
+                     width="285">
+                        Fade length (fraction of distance)
+                    </text>
+                    <spinner
+                     control_name="FSRenderShadowFadeLength"
+                     decimal_digits="2"
+                     enabled_control="FSRenderShadowSmoothFade"
+                     follows="left|top"
+                     height="20"
+                     increment="0.01"
+                     layout="topleft"
+                     left="330"
+                     max_val="0.5"
+                     min_val="0.02"
+                     name="fs_fsrendershadowfadelength"
+                     tool_tip="EXPERIMENTAL. Part of the shadow distance over which shadows fade out at its far end."
+                     top="302"
+                     width="100" />
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="18"
+                     layout="topleft"
+                     left="15"
+                     name="fs_heading_coloured_shadows"
+                     top="342"
+                     width="340">
                         Coloured shadows
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_coloured_shadows"
+                     tool_tip="Set every option in &quot;Coloured shadows&quot; back to its default value."
+                     top="341"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderColoredShadows,FSRenderColoredShadowAbsorption,FSRenderColoredShadowsProjectors" />
+                    </button>
                     <check_box
                      control_name="FSRenderColoredShadows"
                      enabled_control="RenderShadowDetail"
@@ -3716,7 +4713,7 @@
                      left="15"
                      name="fs_fsrendercoloredshadows"
                      tool_tip="EXPERIMENTAL. Sunlight passing through stained glass, tinted windows and other alpha-blended surfaces takes on their colour, in proportion to their opacity. Works up to the second sun shadow split (the nearest few tens of metres). Uses two extra textures the size of the shadow maps (about 8 MB each at 1920x1080 with shadow resolution 1) and redraws transparent objects into the two nearest shadow maps. Needs sun shadows."
-                     top="276"
+                     top="368"
                      width="475" />
                     <text
                      follows="left|top"
@@ -3725,7 +4722,7 @@
                      left="35"
                      name="fs_fsrendercoloredshadowabsorption_label"
                      tool_tip="EXPERIMENTAL. How much light an opaque-looking transparent surface also blocks. 0 only tints the light; 1 lets a fully opaque surface block it completely. Clear glass is unaffected either way."
-                     top="304"
+                     top="396"
                      width="285">
                         Absorption
                     </text>
@@ -3742,7 +4739,7 @@
                      min_val="0.0"
                      name="fs_fsrendercoloredshadowabsorption"
                      tool_tip="EXPERIMENTAL. How much light an opaque-looking transparent surface also blocks. 0 only tints the light; 1 lets a fully opaque surface block it completely. Clear glass is unaffected either way."
-                     top="302"
+                     top="394"
                      width="100" />
                     <check_box
                      control_name="FSRenderColoredShadowsProjectors"
@@ -3754,7 +4751,7 @@
                      left="35"
                      name="fs_fsrendercoloredshadowsprojectors"
                      tool_tip="EXPERIMENTAL. Light from shadowed projectors passing through stained glass, tinted windows and other alpha-blended surfaces takes on their colour too. Uses one extra texture per shadowed projector, the size of its shadow map (up to 16 MB each), and redraws transparent objects into each projector shadow map. Needs coloured shadows and projector shadows (Sun/Moon + Projectors)."
-                     top="334"
+                     top="426"
                      width="455" />
                 </panel>
             </scroll_container>
@@ -4143,7 +5140,7 @@
              bottom="-1">
                 <panel
                  follows="left|top"
-                 height="860"
+                 height="1938"
                  layout="topleft"
                  left="0"
                  name="experimental_performance_settings"
@@ -4157,9 +5154,23 @@
                      left="15"
                      name="perf_heading_avatars"
                      top="10"
-                     width="475">
+                     width="340">
                         Avatars
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_perf_heading_avatars"
+                     tool_tip="Set every option in &quot;Avatars&quot; back to its default value."
+                     top="9"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfRiggedPaletteCache,FSPerfAttachmentExtentsCache,FSPerfSkinOncePerFrame" />
+                    </button>
                     <check_box
                      control_name="FSPerfRiggedPaletteCache"
                      follows="left|top"
@@ -4201,9 +5212,23 @@
                      left="15"
                      name="perf_heading_scene"
                      top="111"
-                     width="475">
+                     width="340">
                         Scene
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_perf_heading_scene"
+                     tool_tip="Set every option in &quot;Scene&quot; back to its default value."
+                     top="110"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfAlphaResortOnly,FSPerfRebuildTimeBudget,FSPerfShadowPointCloudFromCull,FSPerfRepresentativeFragmentTest,FSPerfAlphaGlowSkip" />
+                    </button>
                     <check_box
                      control_name="FSPerfAlphaResortOnly"
                      follows="left|top"
@@ -4246,7 +5271,7 @@
                      left="15"
                      name="fs_fsperfrepresentativefragmenttest"
                      tool_tip="EXPERIMENTAL. Lets NVIDIA Turing and newer graphics cards stop drawing an occlusion test box as soon as one pixel of it is found visible, which makes the hidden-object checks cheaper. Visibility results stay the same. Has no effect on other graphics cards."
-                     top="200"
+                     top="208"
                      width="475" />
                     <check_box
                      control_name="FSPerfAlphaGlowSkip"
@@ -4257,7 +5282,7 @@
                      left="15"
                      name="fs_fsperfalphaglowskip"
                      tool_tip="EXPERIMENTAL. Transparent faces get drawn a second time for glow whenever any face near them has glow, even when they have none themselves. Skip that second draw for faces without glow; it adds nothing to the picture."
-                     top="260"
+                     top="238"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4266,10 +5291,24 @@
                      layout="topleft"
                      left="15"
                      name="perf_heading_lightingandreflections"
-                     top="230"
-                     width="475">
+                     top="260"
+                     width="340">
                         Lighting and reflections
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_perf_heading_lightingandreflections"
+                     tool_tip="Set every option in &quot;Lighting and reflections&quot; back to its default value."
+                     top="259"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfLightRescanThrottle,FSPerfHeroProbeSkipHiddenFaces,FSPerfProbeUniformCache,FSPerfBatchedLocalLights" />
+                    </button>
                     <check_box
                      control_name="FSPerfLightRescanThrottle"
                      follows="left|top"
@@ -4279,7 +5318,7 @@
                      left="15"
                      name="perf_lightrescanthrottle"
                      tool_tip="EXPERIMENTAL. Rescan the scene for the nearest local lights 10 times a second, or when the camera moves, instead of every frame."
-                     top="253"
+                     top="283"
                      width="475" />
                     <check_box
                      control_name="FSPerfHeroProbeSkipHiddenFaces"
@@ -4290,7 +5329,7 @@
                      left="15"
                      name="perf_heroprobeskiphiddenfaces"
                      tool_tip="EXPERIMENTAL. Do not render the sides of a mirror's reflection cube that face away from the mirror surface."
-                     top="275"
+                     top="305"
                      width="475" />
                     <check_box
                      control_name="FSPerfProbeUniformCache"
@@ -4301,7 +5340,7 @@
                      left="15"
                      name="perf_probeuniformcache"
                      tool_tip="EXPERIMENTAL. Do not update the mirror (hero) probe data a second time in each render pass; the reflection probe update already includes it."
-                     top="297"
+                     top="327"
                      width="475" />
                     <check_box
                      control_name="FSPerfBatchedLocalLights"
@@ -4312,7 +5351,7 @@
                      left="15"
                      name="fs_fsperfbatchedlocallights"
                      tool_tip="EXPERIMENTAL. Draws point lights in a few instanced calls instead of one call per light, cutting CPU time where hundreds of lights are visible (clubs, cities). Lighting should look the same. Spotlights and projectors are unchanged. Rebuilds shaders when changed."
-                     top="327"
+                     top="357"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4321,10 +5360,24 @@
                      layout="topleft"
                      left="15"
                      name="perf_heading_other"
-                     top="353"
-                     width="475">
+                     top="383"
+                     width="340">
                         Other
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_perf_heading_other"
+                     tool_tip="Set every option in &quot;Other&quot; back to its default value."
+                     top="382"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfAudioThrottleChecks,FSPerfInventoryIdleThrottle,FSPerfHoverPickThrottle" />
+                    </button>
                     <check_box
                      control_name="FSPerfAudioThrottleChecks"
                      follows="left|top"
@@ -4334,7 +5387,7 @@
                      left="15"
                      name="perf_audiothrottlechecks"
                      tool_tip="EXPERIMENTAL. Re-check whether each sound source is muted or allowed by parcel rules 4 times a second, or right away when the mute list, parcel or your position changes, instead of every frame."
-                     top="376"
+                     top="406"
                      width="475" />
                     <check_box
                      control_name="FSPerfInventoryIdleThrottle"
@@ -4345,7 +5398,7 @@
                      left="15"
                      name="perf_inventoryidlethrottle"
                      tool_tip="EXPERIMENTAL. Inventory panels that are not on screen update their folder views twice a second instead of every frame."
-                     top="398"
+                     top="428"
                      width="475" />
                     <check_box
                      control_name="FSPerfHoverPickThrottle"
@@ -4356,7 +5409,7 @@
                      left="15"
                      name="fs_fsperfhoverpickthrottle"
                      tool_tip="EXPERIMENTAL. While the mouse, its buttons and the camera stay still, the viewer reuses what it found under the mouse for up to a tenth of a second instead of casting a ray through the scene every frame. Something moving under a still mouse is noticed within that time."
-                     top="480"
+                     top="458"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4365,10 +5418,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_shadows"
-                     top="432"
-                     width="475">
+                     top="488"
+                     width="340">
                         Shadows
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_shadows"
+                     tool_tip="Set every option in &quot;Shadows&quot; back to its default value."
+                     top="487"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfShadowMergedBatches,FSPerfShadowStaticCache,FSPerfShadowStaticCacheSunAngle,FSPerfShadowSinglePass,FSPerfSpotShadowCache" />
+                    </button>
                     <check_box
                      control_name="FSPerfShadowMergedBatches"
                      enabled_control="RenderShadowDetail"
@@ -4379,7 +5446,7 @@
                      left="15"
                      name="fs_fsperfshadowmergedbatches"
                      tool_tip="EXPERIMENTAL. Sends the opaque shadow casters of each shadow pass as fewer, larger draw calls. Shadows look the same; saves CPU time in scenes with many objects."
-                     top="458"
+                     top="514"
                      width="475" />
                     <check_box
                      control_name="FSPerfShadowStaticCache"
@@ -4391,7 +5458,7 @@
                      left="15"
                      name="fs_fsperfshadowstaticcache"
                      tool_tip="EXPERIMENTAL. Keeps the shadows of buildings and terrain in the two far sun shadow maps between frames and only redraws moving things into them. Needs 'Snap sun shadows to texels' (FSRenderShadowTexelSnap). Uses one extra depth buffer per far shadow map."
-                     top="484"
+                     top="540"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4400,7 +5467,7 @@
                      left="35"
                      name="fs_fsperfshadowstaticcachesunangle_label"
                      tool_tip="EXPERIMENTAL. With the static far shadow cache, the far shadows follow the sun in steps of this many degrees, 0 to 2. Larger steps redraw the cache less often under a moving sun."
-                     top="512"
+                     top="568"
                      width="285">
                         Far shadow sun step (degrees)
                     </text>
@@ -4417,7 +5484,7 @@
                      min_val="0"
                      name="fs_fsperfshadowstaticcachesunangle"
                      tool_tip="EXPERIMENTAL. With the static far shadow cache, the far shadows follow the sun in steps of this many degrees, 0 to 2. Larger steps redraw the cache less often under a moving sun."
-                     top="510"
+                     top="566"
                      width="100" />
                     <check_box
                      control_name="FSPerfShadowSinglePass"
@@ -4429,7 +5496,7 @@
                      left="15"
                      name="fs_fsperfshadowsinglepass"
                      tool_tip="EXPERIMENTAL. Sends buildings, objects, rigged mesh and alpha masked surfaces to the sun shadow maps once instead of once per shadow cascade; the graphics card copies each to every cascade it reaches. Shadows look the same; saves CPU time in busy scenes. Needs a graphics card and driver that can pick the viewport in the vertex shader (most NVIDIA and AMD cards with current drivers); otherwise nothing changes. Uses one extra depth buffer the size of the four sun shadow maps."
-                     top="542"
+                     top="598"
                      width="475" />
                     <check_box
                      control_name="FSPerfSpotShadowCache"
@@ -4440,7 +5507,7 @@
                      left="15"
                      name="fs_fsperfspotshadowcache"
                      tool_tip="EXPERIMENTAL. A projector's shadow is only redrawn when something it shows can have changed: the light moved or changed, objects in its cone were added, removed or changed detail, or an avatar or moving object is inside its cone. Otherwise the last shadow is kept, and it is redrawn at least once a second anyway. Saves the culling and drawing of every shadowed projector that only lights static scenery."
-                     top="650"
+                     top="628"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4449,10 +5516,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_shaders"
-                     top="578"
-                     width="475">
+                     top="660"
+                     width="340">
                         Shaders
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_shaders"
+                     tool_tip="Set every option in &quot;Shaders&quot; back to its default value."
+                     top="659"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfParallelShaderCompile" />
+                    </button>
                     <check_box
                      control_name="FSPerfParallelShaderCompile"
                      follows="left|top"
@@ -4462,7 +5543,7 @@
                      left="15"
                      name="fs_fsperfparallelshadercompile"
                      tool_tip="EXPERIMENTAL. Shorter pauses when graphics settings change and shaders are rebuilt, because the graphics driver compiles them on several threads at once. Needs a driver that supports parallel shader compile (current NVIDIA and AMD drivers, Mesa). Without that support nothing changes. Applies from the next shader rebuild."
-                     top="604"
+                     top="686"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4471,10 +5552,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_textures"
-                     top="644"
-                     width="475">
+                     top="726"
+                     width="340">
                         Textures
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_textures"
+                     tool_tip="Set every option in &quot;Textures&quot; back to its default value."
+                     top="725"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSPerfTextureUploadPBO,FSPerfTextureUploadBudgetMB" />
+                    </button>
                     <check_box
                      control_name="FSPerfTextureUploadPBO"
                      follows="left|top"
@@ -4484,7 +5579,7 @@
                      left="15"
                      name="fs_fsperftextureuploadpbo"
                      tool_tip="EXPERIMENTAL. Copies newly loaded textures to the graphics card asynchronously, which can reduce stutter when many textures arrive at once. Only has an effect when textures are not already created on a background thread (usually AMD and Intel graphics). Needs OpenGL 4.4."
-                     top="670"
+                     top="752"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4493,7 +5588,7 @@
                      left="35"
                      name="fs_fsperftextureuploadbudgetmb_label"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="698"
+                     top="780"
                      width="285">
                         Texture upload budget per frame (MB)
                     </text>
@@ -4509,7 +5604,7 @@
                      min_val="0"
                      name="fs_fsperftextureuploadbudgetmb"
                      tool_tip="EXPERIMENTAL. Spreads bursts of newly loaded textures over several frames so they don't all land in one frame, uploading the most important ones first. Lower is smoother but textures appear more slowly. 0 = no limit. 16 is a good start."
-                     top="696"
+                     top="778"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4518,10 +5613,24 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_variable_rate_shading"
-                     top="738"
-                     width="475">
+                     top="820"
+                     width="340">
                         Variable rate shading
                     </text>
+                    <button
+                     follows="left|top"
+                     height="19"
+                     label="Reset to default"
+                     layout="topleft"
+                     left="370"
+                     name="reset_fs_heading_variable_rate_shading"
+                     tool_tip="Set every option in &quot;Variable rate shading&quot; back to its default value."
+                     top="819"
+                     width="120">
+                        <button.commit_callback
+                         function="FSExperimental.ResetSection"
+                         parameter="FSRenderVRS,FSRenderVRSQuality,FSRenderVRSPeriphery" />
+                    </button>
                     <check_box
                      control_name="FSRenderVRS"
                      follows="left|top"
@@ -4531,7 +5640,7 @@
                      left="15"
                      name="fs_fsrendervrs"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / GTX 16xx (Turing) or newer only; does nothing on other graphics cards. Shades low-detail parts of the scene (flat or low-contrast surfaces, the sky, areas blurred by depth of field) at a coarser rate to save GPU time in the opaque geometry pass. Edges and fine detail stay at full rate. Snapshots are always rendered at full rate."
-                     top="764"
+                     top="846"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4540,7 +5649,7 @@
                      left="35"
                      name="fs_fsrendervrsquality_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="792"
+                     top="874"
                      width="285">
                         Quality
                     </text>
@@ -4557,7 +5666,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsquality"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. Higher keeps more of the scene at full shading rate (better quality, smaller saving); lower saves more but can soften textures on low-contrast surfaces."
-                     top="790"
+                     top="872"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4566,7 +5675,7 @@
                      left="35"
                      name="fs_fsrendervrsperiphery_label"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="820"
+                     top="902"
                      width="285">
                         Coarser at screen edges
                     </text>
@@ -4583,7 +5692,7 @@
                      min_val="0.0"
                      name="fs_fsrendervrsperiphery"
                      tool_tip="EXPERIMENTAL. NVIDIA RTX / Turing or newer only. 0 treats the whole screen alike; higher values shade the edges and corners of the screen more coarsely than the centre. Strong edges always stay sharp."
-                     top="818"
+                     top="900"
                      width="100" />
                     <text
                      follows="left|top"
@@ -4592,7 +5701,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_threading"
-                     top="964"
+                     top="942"
                      width="340">
                         Threading
                     </text>
@@ -4604,7 +5713,7 @@
                      left="370"
                      name="reset_fs_heading_threading"
                      tool_tip="Set every option in &quot;Threading&quot; back to its default value."
-                     top="963"
+                     top="941"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -4620,7 +5729,7 @@
                      left="15"
                      name="fs_fsperfparallelshadowcull"
                      tool_tip="EXPERIMENTAL. Works out which objects fall into each sun shadow map on several CPU cores at once instead of one map after another on the main thread. Shadows look the same; saves main thread time in busy scenes."
-                     top="990"
+                     top="968"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelShadowCullVerify"
@@ -4632,7 +5741,7 @@
                      left="35"
                      name="fs_fsperfparallelshadowcullverify"
                      tool_tip="Debug. Also runs the old shadow cull and writes any difference to the log. Slower; only for testing."
-                     top="1016"
+                     top="994"
                      width="455" />
                     <check_box
                      control_name="FSPerfParallelGeometry"
@@ -4643,7 +5752,7 @@
                      left="15"
                      name="fs_fsperfparallelgeometry"
                      tool_tip="EXPERIMENTAL. Fills the vertex data of rezzing and changing objects on several CPU cores instead of only the main thread. Reduces hitches on region arrival, teleports and heavy rezzing. Looks exactly the same as when off."
-                     top="1046"
+                     top="1024"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelGeometryVerify"
@@ -4655,7 +5764,7 @@
                      left="35"
                      name="fs_fsperfparallelgeometryverify"
                      tool_tip="EXPERIMENTAL. Debug aid: builds the geometry a second time on the main thread and logs any difference to the threaded result. Costs more than it saves; for testing only."
-                     top="1072"
+                     top="1050"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4664,7 +5773,7 @@
                      left="35"
                      name="fs_fsperfparallelgeometryminverts_label"
                      tool_tip="EXPERIMENTAL. A geometry rebuild uses the worker threads only when it has at least this many vertices; smaller ones are built on the main thread, where waking the workers would cost more than it saves."
-                     top="1100"
+                     top="1078"
                      width="285">
                         Min. vertices for threaded geometry
                     </text>
@@ -4681,7 +5790,7 @@
                      min_val="0"
                      name="fs_fsperfparallelgeometryminverts"
                      tool_tip="EXPERIMENTAL. A geometry rebuild uses the worker threads only when it has at least this many vertices; smaller ones are built on the main thread, where waking the workers would cost more than it saves."
-                     top="1098"
+                     top="1076"
                      width="100" />
                     <check_box
                      control_name="FSPerfParallelAvatarUpdate"
@@ -4692,7 +5801,7 @@
                      left="15"
                      name="fs_fsperfparallelavatarupdate"
                      tool_tip="EXPERIMENTAL. Evaluates the animations of all visible avatars of a frame in parallel on worker threads instead of one after another on the main thread. Helps most in crowded places. Your own avatar stays on the main thread."
-                     top="1130"
+                     top="1108"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelAvatarUpdateVerify"
@@ -4704,7 +5813,7 @@
                      left="35"
                      name="fs_fsperfparallelavatarupdateverify"
                      tool_tip="EXPERIMENTAL. Debug check: recomputes the avatar joints serially after the worker threads and logs any difference. Costs extra CPU time, only for testing."
-                     top="1156"
+                     top="1134"
                      width="455" />
                     <check_box
                      control_name="FSPerfParallelMainCull"
@@ -4715,7 +5824,7 @@
                      left="15"
                      name="fs_fsperfparallelmaincull"
                      tool_tip="EXPERIMENTAL. Works out which objects are in view (main camera and reflection probe updates) on several CPU cores at once instead of only on the main thread. The scene looks the same; saves main thread time in busy scenes."
-                     top="1186"
+                     top="1164"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelMainCullVerify"
@@ -4727,7 +5836,7 @@
                      left="35"
                      name="fs_fsperfparallelmaincullverify"
                      tool_tip="Debug. Also runs the old view cull and writes any difference to the log. Slower; only for testing."
-                     top="1212"
+                     top="1190"
                      width="455" />
                     <check_box
                      control_name="FSPerfParallelPostSort"
@@ -4738,7 +5847,7 @@
                      left="15"
                      name="fs_fsperfparallelpostsort"
                      tool_tip="EXPERIMENTAL. Collects the draw lists of each camera (main view, shadow cascades, probes) on worker threads in postSort. Same result as before, less main thread time in busy places."
-                     top="1242"
+                     top="1220"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelPostSortVerify"
@@ -4750,7 +5859,7 @@
                      left="35"
                      name="fs_fsperfparallelpostsortverify"
                      tool_tip="EXPERIMENTAL. Debug: also builds the render lists serially and logs any difference. Slower; for testing only."
-                     top="1268"
+                     top="1246"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4759,7 +5868,7 @@
                      left="35"
                      name="fs_fsperfparallelpostsortmingroups_label"
                      tool_tip="EXPERIMENTAL. Views with fewer visible groups than this build their render lists on the main thread, where the worker hand-off would cost more than it saves."
-                     top="1296"
+                     top="1274"
                      width="285">
                         Parallel render lists min groups
                     </text>
@@ -4776,7 +5885,7 @@
                      min_val="2"
                      name="fs_fsperfparallelpostsortmingroups"
                      tool_tip="EXPERIMENTAL. Views with fewer visible groups than this build their render lists on the main thread, where the worker hand-off would cost more than it saves."
-                     top="1294"
+                     top="1272"
                      width="100" />
                     <check_box
                      control_name="FSPerfParallelTexturePriority"
@@ -4787,7 +5896,7 @@
                      left="15"
                      name="fs_fsperfparalleltexturepriority"
                      tool_tip="EXPERIMENTAL. Computes how sharp each texture needs to be (face screen areas and texture virtual sizes) on worker threads instead of the main thread. Helps in busy places with many textures loaded."
-                     top="1326"
+                     top="1304"
                      width="475" />
                     <check_box
                      control_name="FSPerfParallelTexturePriorityVerify"
@@ -4799,7 +5908,7 @@
                      left="35"
                      name="fs_fsperfparalleltexturepriorityverify"
                      tool_tip="EXPERIMENTAL. Debug: also computes texture priorities the old way and logs any difference. Costs more than either alone."
-                     top="1352"
+                     top="1330"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4808,7 +5917,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_gpu_driven_draws"
-                     top="1380"
+                     top="1358"
                      width="340">
                         GPU-driven draws
                     </text>
@@ -4820,7 +5929,7 @@
                      left="370"
                      name="reset_fs_heading_gpu_driven_draws"
                      tool_tip="Set every option in &quot;GPU-driven draws&quot; back to its default value."
-                     top="1379"
+                     top="1357"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -4836,7 +5945,7 @@
                      left="15"
                      name="fs_fsperfgpudrivendraws"
                      tool_tip="EXPERIMENTAL. Sends the opaque buildings and objects of each shadow map to the graphics card as one multi-draw call instead of one call per object batch, from a copy of their positions kept in video memory. Shadows look the same; saves CPU time in busy scenes. Works together with 'Draw sun shadow cascades in one pass'. Needs OpenGL 4.3 (most NVIDIA, AMD and Intel cards with current drivers; not macOS); otherwise nothing changes."
-                     top="1406"
+                     top="1384"
                      width="475" />
                     <check_box
                      control_name="FSPerfGPUDrivenDrawsVerify"
@@ -4848,7 +5957,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsverify"
                      tool_tip="Debug. Draws the shadow casters a second time the old way and logs any place where the result would differ, plus draw statistics every 10 seconds. Slows rendering down; for testing only."
-                     top="1432"
+                     top="1410"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4857,7 +5966,7 @@
                      left="35"
                      name="fs_fsperfgpudrivendrawsarenamb_label"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1460"
+                     top="1438"
                      width="285">
                         Shadow caster memory (MB)
                     </text>
@@ -4874,7 +5983,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivendrawsarenamb"
                      tool_tip="Most video memory the copy of the shadow casters' positions may use. Casters that don't fit are drawn the old way."
-                     top="1458"
+                     top="1436"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenPBR"
@@ -4885,7 +5994,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenpbr"
                      tool_tip="EXPERIMENTAL. Draws static opaque PBR (GLTF material) surfaces with a few large multi-draw calls out of a shared vertex arena instead of one draw call each. Looks the same; saves CPU time in busy scenes. Needs OpenGL 4.3. Uses up to the arena size below of video memory. Rebuilds shaders."
-                     top="1490"
+                     top="1468"
                      width="475" />
                     <check_box
                      control_name="FSPerfGPUDrivenPBRBindless"
@@ -4897,7 +6006,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenpbrbindless"
                      tool_tip="EXPERIMENTAL. With GPU-driven PBR surfaces: uses bindless textures (GL_ARB_bindless_texture) so surfaces with different materials share one draw call. Looks the same; saves more CPU time. Not used where the driver doesn't support it properly. Rebuilds shaders."
-                     top="1516"
+                     top="1494"
                      width="455" />
                     <text
                      follows="left|top"
@@ -4906,7 +6015,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenpbrarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven PBR surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1544"
+                     top="1522"
                      width="285">
                         PBR vertex arena (MB)
                     </text>
@@ -4923,7 +6032,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenpbrarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven PBR surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1542"
+                     top="1520"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenLegacy"
@@ -4934,7 +6043,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenlegacy"
                      tool_tip="EXPERIMENTAL. Draws static opaque non-PBR surfaces (simple, alpha masked and fullbright) with a few large multi-draw calls out of a shared vertex arena, with bindless textures, instead of one draw call and several texture binds each. Looks the same; saves CPU time in busy scenes. Needs OpenGL 4.3 and bindless textures (NVIDIA GPUs only). Uses up to the arena size below of video memory. Rebuilds shaders."
-                     top="1574"
+                     top="1552"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4943,7 +6052,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenlegacyarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1602"
+                     top="1580"
                      width="285">
                         Legacy vertex arena (MB)
                     </text>
@@ -4960,7 +6069,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenlegacyarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1600"
+                     top="1578"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenPBRGroupRuns"
@@ -4971,7 +6080,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenpbrgroupruns"
                      tool_tip="EXPERIMENTAL. Applies to GPU-driven PBR surfaces and GPU-driven legacy material surfaces: draws them grouped instead of in the stock order. PBR: every surface with bindless textures in one multi-draw, the others one run per material. Legacy materials: every GPU-driven surface in one multi-draw. The surfaces drawn the old way follow. Far fewer draw calls and texture binds in busy scenes. Only where two surfaces lie at exactly the same depth can the other one show."
-                     top="1632"
+                     top="1610"
                      width="455" />
                     <check_box
                      control_name="FSPerfGPUDrivenMaterials"
@@ -4982,7 +6091,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenmaterials"
                      tool_tip="EXPERIMENTAL. Draws static opaque surfaces with legacy normal or specular maps (or shine on a material) with a few large multi-draw calls out of a shared vertex arena, with bindless textures, instead of one draw call, several texture binds and material settings each. Looks the same; saves CPU time in busy scenes. Needs OpenGL 4.3 and bindless textures (NVIDIA GPUs only). Uses up to the arena size below of video memory. Rebuilds shaders."
-                     top="1662"
+                     top="1640"
                      width="475" />
                     <text
                      follows="left|top"
@@ -4991,7 +6100,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenmaterialsarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy material surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1690"
+                     top="1668"
                      width="285">
                         Material vertex arena (MB)
                     </text>
@@ -5008,7 +6117,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenmaterialsarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the GPU-driven legacy material surfaces may use for their copy of the vertex data, 16 to 2048 MB. Surfaces that don't fit are drawn the old way."
-                     top="1688"
+                     top="1666"
                      width="100" />
                     <check_box
                      control_name="FSPerfGPUDrivenShadowAlpha"
@@ -5020,7 +6129,7 @@
                      left="15"
                      name="fs_fsperfgpudrivenshadowalpha"
                      tool_tip="EXPERIMENTAL. Sends the alpha tested shadow casters (leaves, fences, grass, cut-out textures, alpha masked PBR materials) of each shadow map to the graphics card as one multi-draw call with bindless textures, instead of one call and several texture binds per object batch. Shadows look the same; saves CPU time in busy scenes. Works together with 'Draw sun shadow cascades in one pass'; checked by 'Verify multi-draw shadows'. Needs OpenGL 4.3 and bindless textures (NVIDIA GPUs only); otherwise nothing changes. Rebuilds shaders."
-                     top="1720"
+                     top="1698"
                      width="475" />
                     <text
                      follows="left|top"
@@ -5029,7 +6138,7 @@
                      left="35"
                      name="fs_fsperfgpudrivenshadowalphaarenamb_label"
                      tool_tip="EXPERIMENTAL. Most video memory the copy of the alpha tested shadow casters' vertex data may use, 16 to 2048 MB. Casters that don't fit are drawn the old way."
-                     top="1748"
+                     top="1726"
                      width="285">
                         Alpha shadow caster memory (MB)
                     </text>
@@ -5046,7 +6155,7 @@
                      min_val="16"
                      name="fs_fsperfgpudrivenshadowalphaarenamb"
                      tool_tip="EXPERIMENTAL. Most video memory the copy of the alpha tested shadow casters' vertex data may use, 16 to 2048 MB. Casters that don't fit are drawn the old way."
-                     top="1746"
+                     top="1724"
                      width="100" />
                     <text
                      follows="left|top"
@@ -5055,7 +6164,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_render_thread"
-                     top="1772"
+                     top="1750"
                      width="340">
                         Render thread
                     </text>
@@ -5067,7 +6176,7 @@
                      left="370"
                      name="reset_fs_heading_render_thread"
                      tool_tip="Set every option in &quot;Render thread&quot; back to its default value."
-                     top="1771"
+                     top="1749"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5082,7 +6191,7 @@
                      left="15"
                      name="fs_fsrenderthread"
                      tool_tip="EXPERIMENTAL. Windows only, takes effect after a restart. The main thread hands its OpenGL work to a render thread, which talks to the graphics driver while the main thread already prepares the next frame. Can raise the frame rate when the main thread is the bottleneck. The picture is the same; if something renders wrongly or the viewer stalls, turn it off."
-                     top="1798"
+                     top="1776"
                      width="475" />
                     <check_box
                      control_name="FSRenderThreadCheck"
@@ -5094,7 +6203,7 @@
                      left="35"
                      name="fs_fsrenderthreadcheck"
                      tool_tip="Debug. Writes OpenGL calls made from the wrong thread, and calls that make the main thread wait for the render thread, to the log. Only for testing."
-                     top="1824"
+                     top="1802"
                      width="455" />
                     <text
                      follows="left|top"
@@ -5103,7 +6212,7 @@
                      layout="topleft"
                      left="15"
                      name="fs_heading_user_interface"
-                     top="1864"
+                     top="1842"
                      width="340">
                         User interface
                     </text>
@@ -5115,7 +6224,7 @@
                      left="370"
                      name="reset_fs_heading_user_interface"
                      tool_tip="Set every option in &quot;User interface&quot; back to its default value."
-                     top="1863"
+                     top="1841"
                      width="120">
                         <button.commit_callback
                          function="FSExperimental.ResetSection"
@@ -5128,7 +6237,7 @@
                      left="35"
                      name="fs_fsrenderuicap_label"
                      tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
-                     top="1892"
+                     top="1870"
                      width="285">
                         UI redraw cap (per second, 0 = every frame)
                     </text>
@@ -5144,7 +6253,7 @@
                      min_val="0"
                      name="fs_fsrenderuicap"
                      tool_tip="EXPERIMENTAL. Draws the interface into its own image and redraws it only when needed: every frame while you use it (mouse over it, typing into it, dragging a window), at most this many times a second when something in it changes, otherwise a few times a second. Saves a large part of the main thread's frame when windows and chat are open. 0 draws the interface every frame as before."
-                     top="1890"
+                     top="1868"
                      width="100" />
                     <text
                      follows="left|top"
@@ -5153,7 +6262,7 @@
                      left="35"
                      name="fs_fsrenderuiidlerate_label"
                      tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
-                     top="1920"
+                     top="1898"
                      width="285">
                         UI idle refresh (per second)
                     </text>
@@ -5170,7 +6279,7 @@
                      min_val="0.5"
                      name="fs_fsrenderuiidlerate"
                      tool_tip="EXPERIMENTAL. With the redraw cap on, how often the interface is redrawn while nothing uses it. Most changes (text, counters, chat) show up at this rate."
-                     top="1918"
+                     top="1896"
                      width="100" />
                 </panel>
             </scroll_container>

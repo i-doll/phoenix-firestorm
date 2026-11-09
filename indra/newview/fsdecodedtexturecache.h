@@ -168,6 +168,8 @@ class LLButton;
 class LLComboBox;
 class LLControlVariable;
 class LLTextBox;
+class LLUICtrl;
+class LLView;
 
 class FSPanelPreferenceExperimental : public LLPanelPreference
 {
@@ -175,14 +177,78 @@ class FSPanelPreferenceExperimental : public LLPanelPreference
 public:
     FSPanelPreferenceExperimental();
     bool postBuild() override;
+    void saveSettings() override;
+    void cancel(const std::vector<std::string> settings_to_skip = {}) override;
+    void onVisibilityChange(bool new_visibility) override;
     void draw() override;
 
 private:
-    std::string formatStats() const;
+    static const char* unsupportedReason(const std::string& setting);
+    void findUnsupportedControls(LLView* view);
+    void applyUnsupported();
 
-    // <FS:Trish> Presets of the rendering tabs' settings
+    std::vector<LLHandle<LLUICtrl>> mUnsupported;
+
+    void onResetSection(const std::string& names);
+
+    struct VectorComponent
+    {
+        LLUICtrl* mCtrl;
+        std::string mSetting;
+        S32 mIndex;
+    };
+
+    void bindVectorComponent(const std::string& ctrl_name, const std::string& setting, S32 index);
+    void refreshVectorComponents();
+
+    std::vector<VectorComponent> mVectorComponents;
+
+    // Sun rays quality presets set samples per ray and resolution. The combo has no setting of
+    // its own: it shows whichever preset the two values match, else Custom, so editing either
+    // spinner, debug settings or a cancelled preferences change all show up in it.
+    struct SunRaysPreset
+    {
+        S32 mSteps;
+        F32 mResolution;
+    };
+    static constexpr SunRaysPreset SUN_RAYS_PRESETS[] = { { 12, 0.5f }, { 24, 0.5f }, { 32, 0.75f } }; // Low, Medium, High
+    static constexpr S32 SUN_RAYS_PRESET_COUNT = 3;
+    static constexpr S32 SUN_RAYS_CUSTOM = 3;
+
+    void bindSunRaysQuality();
+    void refreshSunRaysQuality();
+
+    LLUICtrl* mSunRaysQuality = nullptr;
+
+    //------------------------------------------------------------------------
+    // Presets of the rendering tabs' settings.
+    //
+    // A preset file is an LLSD map { Version: 1, Settings: { name: value, ... } }. A preset covers
+    // every setting a control on the Photo, Effects, Rendering, Shadows and Performance tabs is
+    // bound to, found by walking those tabs whenever a preset is saved or loaded, so settings added
+    // to the tabs later are covered without listing them anywhere. Loading sets the settings in the
+    // file and resets every other covered setting to its default, so a preset fully defines the
+    // state. "Stock Firestorm" is the empty preset, all defaults. Built-in presets ship in
+    // app_settings/experimental_presets and are read-only; user presets are saved in
+    // user_settings/experimental_presets, one file per preset named after the escaped name.
+
+    static constexpr const char* PRESET_DIR = "experimental_presets";
+    static constexpr const char* PRESET_STOCK = "stock";
+    static constexpr const char* PRESET_BUILTIN_PREFIX = "builtin:";
+    static constexpr const char* PRESET_USER_PREFIX = "user:";
+    static constexpr S32 PRESET_VERSION = 1;
+    static constexpr size_t PRESET_NAME_MAX_LENGTH = 64;
+
     typedef std::map<std::string, LLControlVariable*> preset_controls_t;
+
     preset_controls_t collectPresetControls();
+    static std::string userPresetDir();
+    static std::string builtinPresetDir();
+    static std::string presetPath(const std::string& dir, const std::string& name);
+    static std::vector<std::string> listPresets(const std::string& dir);
+    static bool readPresetFile(const std::string& path, LLSD& settings);
+    static bool writePresetFile(const std::string& path, const LLSD& settings);
+    static bool presetValueForControl(LLControlVariable* control, const LLSD& value, LLSD& result);
     void applyPreset(const LLSD& settings);
     void refreshPresetList(const std::string& select_value);
     std::string selectedPreset() const;
@@ -196,7 +262,8 @@ private:
     LLComboBox* mPresetCombo = nullptr;
     LLButton* mPresetLoadBtn = nullptr;
     LLButton* mPresetDeleteBtn = nullptr;
-    // </FS:Trish>
+
+    std::string formatStats() const;
 
     LLTextBox* mCacheStats = nullptr;
     LLFrameTimer mStatsTimer;

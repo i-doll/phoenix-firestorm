@@ -828,6 +828,8 @@ void FSDecodedTextureCache::evictIfNeeded()
 #include "llsdserialize.h"
 #include "lltextbox.h"
 #include "lluri.h"
+#include "llgl.h"
+#include "lluictrl.h"
 
 #include <boost/algorithm/string.hpp>
 #include <list>
@@ -835,26 +837,71 @@ void FSDecodedTextureCache::evictIfNeeded()
 
 FSPanelPreferenceExperimental::FSPanelPreferenceExperimental()
 {
-    // <FS:Trish> Preset bar above the tabs
+    // Each section heading's "Reset to default" button lists the settings of that section
+    mCommitCallbackRegistrar.add("FSExperimental.ResetSection",
+        [this](LLUICtrl*, const LLSD& param) { onResetSection(param.asString()); });
+
+    // Preset bar above the tabs
     mCommitCallbackRegistrar.add("FSExperimental.PresetSelect", [this](LLUICtrl*, const LLSD&) { updatePresetButtons(); });
     mCommitCallbackRegistrar.add("FSExperimental.PresetLoad", [this](LLUICtrl*, const LLSD&) { onPresetLoad(); });
     mCommitCallbackRegistrar.add("FSExperimental.PresetSaveAs", [this](LLUICtrl*, const LLSD&) { onPresetSaveAs(); });
     mCommitCallbackRegistrar.add("FSExperimental.PresetDelete", [this](LLUICtrl*, const LLSD&) { onPresetDelete(); });
-    // </FS:Trish>
 }
 
 bool FSPanelPreferenceExperimental::postBuild()
 {
     mCacheStats = findChild<LLTextBox>("decoded_texture_cache_stats");
 
-    // <FS:Trish> Presets
+    // RenderShadowSplitExponent is a Vector3, which no control binds to directly: one
+    // spinner per component, written back to the setting on commit
+    bindVectorComponent("shadow_split_persp", "RenderShadowSplitExponent", VX);
+    bindVectorComponent("shadow_split_ortho", "RenderShadowSplitExponent", VY);
+    bindVectorComponent("shadow_split_transition", "RenderShadowSplitExponent", VZ);
+
+    bindSunRaysQuality();
+
     mPresetCombo = findChild<LLComboBox>("experimental_preset_combo");
     mPresetLoadBtn = findChild<LLButton>("experimental_preset_load");
     mPresetDeleteBtn = findChild<LLButton>("experimental_preset_delete");
     refreshPresetList(LLStringUtil::null);
-    // </FS:Trish>
+
+    findUnsupportedControls(this);
+    applyUnsupported();
 
     return LLPanelPreference::postBuild();
+}
+
+// The base class saves the setting of every control so Cancel can restore it. Settings edited
+// per component (RenderShadowSplitExponent) have no control of their own, but loading a preset
+// or resetting a section changes them too, so save them as well.
+void FSPanelPreferenceExperimental::saveSettings()
+{
+    LLPanelPreference::saveSettings();
+    for (const VectorComponent& component : mVectorComponents)
+    {
+        if (LLControlVariable* control = gSavedSettings.getControl(component.mSetting))
+        {
+            mSavedValues[control] = control->getValue();
+        }
+    }
+}
+
+void FSPanelPreferenceExperimental::cancel(const std::vector<std::string> settings_to_skip)
+{
+    LLPanelPreference::cancel(settings_to_skip);
+    refreshVectorComponents();
+    refreshSunRaysQuality();
+}
+
+// Phototools and quick prefs edit the same setting, so pick up its current value whenever
+// the tab is shown
+void FSPanelPreferenceExperimental::onVisibilityChange(bool new_visibility)
+{
+    LLPanelPreference::onVisibilityChange(new_visibility);
+    if (new_visibility)
+    {
+        refreshVectorComponents();
+    }
 }
 
 void FSPanelPreferenceExperimental::draw()
@@ -865,160 +912,209 @@ void FSPanelPreferenceExperimental::draw()
         mStatsTimer.reset();
         mCacheStats->setText(formatStats());
     }
+    refreshSunRaysQuality();
+    applyUnsupported();
     LLPanelPreference::draw();
 }
 
-std::string FSPanelPreferenceExperimental::formatStats() const
+// Options the graphics driver can't run (most need NVIDIA-only OpenGL extensions) are greyed
+// out, with the reason in front of their tooltip. The code paths already switch themselves
+// off without the extension; this only makes that visible. Re-applied every draw, as rows
+// enabled by another setting (enabled_control) turn themselves back on when it changes.
+// static
+const char* FSPanelPreferenceExperimental::unsupportedReason(const std::string& setting)
 {
-    const FSDecodedTextureCache::Stats stats = FSDecodedTextureCache::instance().getStats();
-    if (!stats.mEnabled)
+    const bool gdd = gGLManager.mFSHasGPUDrivenDraws;
+    const bool bindless = gdd && gGLManager.mFSBindlessProcs[0] != nullptr;
+    if (gGLManager.mIsAMD && !gGLManager.mFSAllowGPUDrivenOnAMD && setting.rfind("FSPerfGPUDriven", 0) == 0 &&
+        setting != "FSPerfGPUDrivenAllowAMD")
     {
-        return getString("decoded_cache_stats_off");
+        return "Off on AMD graphics: the GPU-driven draws render incorrectly with AMD's OpenGL driver "
+               "(black artefacts).";
     }
-    if (!stats.mReady)
+    static const std::string bindless_settings[] = {
+        "FSPerfGPUDrivenPBRBindless", "FSPerfGPUDrivenLegacy", "FSPerfGPUDrivenLegacyArenaMB",
+        "FSPerfGPUDrivenMaterials", "FSPerfGPUDrivenMaterialsArenaMB",
+        "FSPerfGPUDrivenShadowAlpha", "FSPerfGPUDrivenShadowAlphaArenaMB" };
+    static const std::string gdd_settings[] = {
+        "FSPerfGPUDrivenDraws", "FSPerfGPUDrivenDrawsArenaMB", "FSPerfGPUDrivenDrawsVerify",
+        "FSPerfGPUDrivenPBR", "FSPerfGPUDrivenPBRArenaMB", "FSPerfGPUDrivenPBRGroupRuns" };
+    for (const std::string& name : bindless_settings)
     {
-        return getString("decoded_cache_stats_indexing");
+        if (setting == name && !bindless)
+        {
+            return gdd ? "Not available on this graphics card or driver: needs bindless textures "
+                         "(GL_ARB_bindless_texture, NVIDIA GPUs)."
+                       : "Not available on this graphics card or driver: needs OpenGL 4.3 multi-draw "
+                         "indirect and bindless textures (NVIDIA GPUs).";
+        }
     }
-    LLStringUtil::format_map_t args;
-    args["[ENTRIES]"] = llformat("%u", stats.mEntries);
-    args["[USED]"] = llformat("%.1f", (F64)stats.mBytes / (1024.0 * 1024.0 * 1024.0));
-    args["[MAX]"] = llformat("%.1f", (F64)stats.mMaxBytes / (1024.0 * 1024.0 * 1024.0));
-    args["[LOADS]"] = llformat("%u", stats.mLoads);
-    args["[FAILURES]"] = llformat("%u", stats.mLoadFailures);
-    args["[STORES]"] = llformat("%u", stats.mStores);
-    args["[REMOVED]"] = llformat("%u", stats.mRemoved);
-    return getString("decoded_cache_stats", args);
+    for (const std::string& name : gdd_settings)
+    {
+        if (setting == name && !gdd)
+        {
+            return "Not available on this graphics card or driver: needs OpenGL 4.3 multi-draw "
+                   "indirect and shader storage buffers.";
+        }
+    }
+    if ((setting == "FSRenderVRS" || setting == "FSRenderVRSPeriphery" || setting == "FSRenderVRSQuality") &&
+        !gGLManager.mHasNVShadingRateImage)
+    {
+        return "Not available on this graphics card or driver: needs GL_NV_shading_rate_image (NVIDIA GPUs).";
+    }
+    if (setting == "FSPerfRepresentativeFragmentTest" && !gGLManager.mHasNVRepresentativeFragmentTest)
+    {
+        return "Not available on this graphics card or driver: needs GL_NV_representative_fragment_test "
+               "(NVIDIA GPUs).";
+    }
+    if (setting == "FSPerfShadowSinglePass" && gGLManager.mFSVertexViewportIndex <= 0)
+    {
+        return "Not available on this graphics card or driver: needs the viewport index in the vertex "
+               "shader (GL_ARB_shader_viewport_layer_array, GL_NV_viewport_array2 or "
+               "GL_AMD_vertex_shader_viewport_index).";
+    }
+    if (setting == "FSPerfParallelShaderCompile" && !gGLManager.mHasParallelShaderCompile)
+    {
+        return "Not available on this graphics card or driver: needs GL_KHR_parallel_shader_compile.";
+    }
+    if (setting == "FSTextureUseLiveVRAM" && !gGLManager.mHasNVXGpuMemoryInfo && !gGLManager.mHasATIMemInfo)
+    {
+        return "Not available on this graphics card or driver: it doesn't report its free video memory.";
+    }
+!LL_WINDOWS
+    if (setting == "FSRenderThread" || setting == "FSRenderThreadCheck")
+    {
+        return "Not available on this operating system: the render thread is Windows only.";
+    }
+if
+    return nullptr;
 }
 
-//------------------------------------------------------------------------
-// <FS:Trish> Presets of the rendering tabs' settings.
-//
-// A preset file is an LLSD map { Version: 1, Settings: { name: value, ... } }. A preset covers
-// every setting a control on the Photo, Effects, Rendering, Shadows and Performance tabs is
-// bound to, found by walking those tabs whenever a preset is saved or loaded, so settings added
-// to the tabs later are covered without listing them anywhere. Loading sets the settings in the
-// file and resets every other covered setting to its default, so a preset fully defines the
-// state. "Stock Firestorm" is the empty preset, all defaults. Built-in presets ship in
-// app_settings/experimental_presets and are read-only; user presets are saved in
-// user_settings/experimental_presets, one file per preset named after the escaped name.
-
-namespace
+void FSPanelPreferenceExperimental::findUnsupportedControls(LLView* view)
 {
-    constexpr const char* PRESET_DIR = "experimental_presets";
-    constexpr const char* PRESET_STOCK = "stock";
-    constexpr const char* PRESET_BUILTIN_PREFIX = "builtin:";
-    constexpr const char* PRESET_USER_PREFIX = "user:";
-    constexpr S32 PRESET_VERSION = 1;
-    constexpr size_t PRESET_NAME_MAX_LENGTH = 64;
-
-    std::string userPresetDir()
+    for (LLView* child : *view->getChildList())
     {
-        const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESET_DIR);
-        if (!gDirUtilp->fileExists(dir))
+        if (LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(child))
         {
-            LLFile::mkdir(dir);
+            LLControlVariable* control = ctrl->getControlVariable();
+            const char* reason = control ? unsupportedReason(control->getName()) : nullptr;
+            if (reason)
+            {
+                const std::string tip = ctrl->getToolTip();
+                ctrl->setToolTip(tip.empty() ? std::string(reason) : std::string(reason) + "\n\n" + tip);
+                mUnsupported.push_back(ctrl->getHandle());
+            }
         }
-        return dir;
+        findUnsupportedControls(child);
     }
+}
 
-    std::string builtinPresetDir()
+void FSPanelPreferenceExperimental::applyUnsupported()
+{
+    for (const LLHandle<LLUICtrl>& handle : mUnsupported)
     {
-        return gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESET_DIR);
+        if (LLUICtrl* ctrl = handle.get(); ctrl && ctrl->getEnabled())
+        {
+            ctrl->setEnabled(false);
+        }
     }
+}
 
-    std::string presetPath(const std::string& dir, const std::string& name)
+// Sets the listed settings (comma separated) back to their defaults. Settings that rebuild
+// shaders when changed do so through their own listeners, and Cancel still restores the values
+// the floater was opened with.
+void FSPanelPreferenceExperimental::onResetSection(const std::string& names)
+{
+    std::vector<std::string> list;
+    boost::split(list, names, boost::is_any_of(","));
+    for (std::string name : list)
     {
-        return gDirUtilp->add(dir, LLURI::escape(name) + ".xml");
+        LLStringUtil::trim(name);
+        if (name.empty())
+        {
+            continue;
+        }
+        LLControlVariable* control = gSavedSettings.getControl(name);
+        if (!control)
+        {
+            LL_WARNS("Preferences") << "Reset to default: no setting " << name << LL_ENDL;
+            continue;
+        }
+        if (!control->isDefault())
+        {
+            control->resetToDefault(true);
+        }
     }
+    refreshVectorComponents();
+    refreshSunRaysQuality();
+}
 
-    // Names of the presets in a directory, sorted
-    std::vector<std::string> listPresets(const std::string& dir)
+void FSPanelPreferenceExperimental::bindVectorComponent(const std::string& ctrl_name, const std::string& setting, S32 index)
+{
+    LLUICtrl* ctrl = findChild<LLUICtrl>(ctrl_name);
+    if (!ctrl || !gSavedSettings.controlExists(setting))
     {
-        std::vector<std::string> names;
-        if (!gDirUtilp->fileExists(dir))
-        {
-            return names;
-        }
-        LLDirIterator iter(dir, "*.xml");
-        std::string file;
-        while (iter.next(file))
-        {
-            names.push_back(LLURI::unescape(gDirUtilp->getBaseFileName(file, true)));
-        }
-        std::sort(names.begin(), names.end(), [](const std::string& a, const std::string& b)
-        {
-            return LLStringUtil::compareDict(a, b) < 0;
-        });
-        return names;
+        return;
     }
-
-    // Reads the settings map of a preset file
-    bool readPresetFile(const std::string& path, LLSD& settings)
+    ctrl->setCommitCallback([setting, index](LLUICtrl* ctrl, const LLSD&)
     {
-        llifstream file(path.c_str());
-        if (!file.is_open())
-        {
-            LL_WARNS("Preferences") << "Cannot open experimental preset " << path << LL_ENDL;
-            return false;
-        }
-        LLSD preset;
-        if (LLSDSerialize::fromXML(preset, file) == LLSDParser::PARSE_FAILURE || !preset.isMap()
-            || !preset.has("Settings") || !preset["Settings"].isMap())
-        {
-            LL_WARNS("Preferences") << "Experimental preset " << path << " is not a valid preset file" << LL_ENDL;
-            return false;
-        }
-        settings = preset["Settings"];
-        return true;
+        LLVector3 value = gSavedSettings.getVector3(setting);
+        value.mV[index] = (F32)ctrl->getValue().asReal();
+        gSavedSettings.setVector3(setting, value);
+    });
+    mVectorComponents.push_back({ ctrl, setting, index });
+    ctrl->setValue(gSavedSettings.getVector3(setting).mV[index]);
+}
+
+void FSPanelPreferenceExperimental::refreshVectorComponents()
+{
+    for (const VectorComponent& component : mVectorComponents)
+    {
+        component.mCtrl->setValue(gSavedSettings.getVector3(component.mSetting).mV[component.mIndex]);
     }
+}
 
-    bool writePresetFile(const std::string& path, const LLSD& settings)
+void FSPanelPreferenceExperimental::bindSunRaysQuality()
+{
+    mSunRaysQuality = findChild<LLUICtrl>("sun_rays_quality");
+    if (!mSunRaysQuality)
     {
-        LLSD preset;
-        preset["Version"] = PRESET_VERSION;
-        preset["Settings"] = settings;
-        llofstream file(path.c_str());
-        if (!file.is_open())
-        {
-            LL_WARNS("Preferences") << "Cannot write experimental preset " << path << LL_ENDL;
-            return false;
-        }
-        LLSDSerialize::toPrettyXML(preset, file);
-        file.close();
-        return !file.fail();
+        return;
     }
-
-    // Converts a value read from a preset file to the type of the setting, false if it can't be
-    bool presetValueForControl(LLControlVariable* control, const LLSD& value, LLSD& result)
+    mSunRaysQuality->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
     {
-        if (value.isUndefined())
+        const S32 preset = ctrl->getValue().asInteger();
+        if (preset >= 0 && preset < SUN_RAYS_PRESET_COUNT)
         {
-            return false;
+            gSavedSettings.setS32("FSRenderSunRaysSteps", SUN_RAYS_PRESETS[preset].mSteps);
+            gSavedSettings.setF32("FSRenderSunRaysResolution", SUN_RAYS_PRESETS[preset].mResolution);
         }
-        switch (control->type())
+    });
+    refreshSunRaysQuality();
+}
+
+void FSPanelPreferenceExperimental::refreshSunRaysQuality()
+{
+    if (!mSunRaysQuality)
+    {
+        return;
+    }
+    static LLCachedControl<S32> steps_setting(gSavedSettings, "FSRenderSunRaysSteps", 24);
+    static LLCachedControl<F32> resolution_setting(gSavedSettings, "FSRenderSunRaysResolution", 0.5f);
+    const S32 steps = steps_setting;
+    const F32 resolution = resolution_setting;
+    S32 preset = SUN_RAYS_CUSTOM;
+    for (S32 i = 0; i < SUN_RAYS_PRESET_COUNT; ++i)
+    {
+        if (steps == SUN_RAYS_PRESETS[i].mSteps && fabsf(resolution - SUN_RAYS_PRESETS[i].mResolution) < 0.01f)
         {
-            case TYPE_LLSD:
-                result = value;
-                return true;
-            case TYPE_BOOLEAN:
-                // The setting itself parses "true", "false" and the like
-                result = value.isString() ? value : LLSD(value.asBoolean());
-                return !value.isArray() && !value.isMap();
-            case TYPE_U32:
-            case TYPE_S32:
-                result = value.asInteger();
-                return !value.isArray() && !value.isMap();
-            case TYPE_F32:
-                result = value.asReal();
-                return !value.isArray() && !value.isMap();
-            case TYPE_STRING:
-                result = value.asString();
-                return !value.isArray() && !value.isMap();
-            default:
-                // Vectors, colours, rectangles: an array as long as the default value
-                result = value;
-                return value.isArray() && value.size() == control->getDefault().size();
+            preset = i;
+            break;
         }
+    }
+    if (mSunRaysQuality->getValue().asInteger() != preset || mSunRaysQuality->getValue().isUndefined())
+    {
+        mSunRaysQuality->setValue(LLSD(preset));
     }
 }
 
@@ -1049,6 +1145,14 @@ FSPanelPreferenceExperimental::preset_controls_t FSPanelPreferenceExperimental::
     }
 
     preset_controls_t controls;
+    auto add = [&controls, &excluded](LLControlVariable* control)
+    {
+        if (control && !excluded.count(control->getName()))
+        {
+            controls.emplace(control->getName(), control);
+        }
+    };
+
     for (const char* tab_name : PRESET_TABS)
     {
         LLView* tab = findChild<LLView>(tab_name);
@@ -1063,11 +1167,7 @@ FSPanelPreferenceExperimental::preset_controls_t FSPanelPreferenceExperimental::
             view_stack.pop_front();
             if (LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view))
             {
-                LLControlVariable* control = ctrl->getControlVariable();
-                if (control && !excluded.count(control->getName()))
-                {
-                    controls.emplace(control->getName(), control);
-                }
+                add(ctrl->getControlVariable());
             }
             for (LLView* child : *view->getChildList())
             {
@@ -1075,7 +1175,130 @@ FSPanelPreferenceExperimental::preset_controls_t FSPanelPreferenceExperimental::
             }
         }
     }
+
+    // Settings edited per component, which no control is bound to
+    for (const VectorComponent& component : mVectorComponents)
+    {
+        add(gSavedSettings.getControl(component.mSetting));
+    }
     return controls;
+}
+
+// static
+std::string FSPanelPreferenceExperimental::userPresetDir()
+{
+    const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESET_DIR);
+    if (!gDirUtilp->fileExists(dir))
+    {
+        LLFile::mkdir(dir);
+    }
+    return dir;
+}
+
+// static
+std::string FSPanelPreferenceExperimental::builtinPresetDir()
+{
+    return gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESET_DIR);
+}
+
+// static
+std::string FSPanelPreferenceExperimental::presetPath(const std::string& dir, const std::string& name)
+{
+    return gDirUtilp->add(dir, LLURI::escape(name) + ".xml");
+}
+
+// Names of the presets in a directory, sorted
+// static
+std::vector<std::string> FSPanelPreferenceExperimental::listPresets(const std::string& dir)
+{
+    std::vector<std::string> names;
+    if (!gDirUtilp->fileExists(dir))
+    {
+        return names;
+    }
+    LLDirIterator iter(dir, "*.xml");
+    std::string file;
+    while (iter.next(file))
+    {
+        names.push_back(LLURI::unescape(gDirUtilp->getBaseFileName(file, true)));
+    }
+    std::sort(names.begin(), names.end(), [](const std::string& a, const std::string& b)
+    {
+        return LLStringUtil::compareDict(a, b) < 0;
+    });
+    return names;
+}
+
+// Reads the settings map of a preset file
+// static
+bool FSPanelPreferenceExperimental::readPresetFile(const std::string& path, LLSD& settings)
+{
+    llifstream file(path.c_str());
+    if (!file.is_open())
+    {
+        LL_WARNS("Preferences") << "Cannot open experimental preset " << path << LL_ENDL;
+        return false;
+    }
+    LLSD preset;
+    if (LLSDSerialize::fromXML(preset, file) == LLSDParser::PARSE_FAILURE || !preset.isMap()
+        || !preset.has("Settings") || !preset["Settings"].isMap())
+    {
+        LL_WARNS("Preferences") << "Experimental preset " << path << " is not a valid preset file" << LL_ENDL;
+        return false;
+    }
+    settings = preset["Settings"];
+    return true;
+}
+
+// static
+bool FSPanelPreferenceExperimental::writePresetFile(const std::string& path, const LLSD& settings)
+{
+    LLSD preset;
+    preset["Version"] = PRESET_VERSION;
+    preset["Settings"] = settings;
+    llofstream file(path.c_str());
+    if (!file.is_open())
+    {
+        LL_WARNS("Preferences") << "Cannot write experimental preset " << path << LL_ENDL;
+        return false;
+    }
+    LLSDSerialize::toPrettyXML(preset, file);
+    file.close();
+    return !file.fail();
+}
+
+// Converts a value read from a preset file to the type of the setting, false if it can't be
+// static
+bool FSPanelPreferenceExperimental::presetValueForControl(LLControlVariable* control, const LLSD& value, LLSD& result)
+{
+    if (value.isUndefined())
+    {
+        return false;
+    }
+    switch (control->type())
+    {
+        case TYPE_LLSD:
+            result = value;
+            return true;
+        case TYPE_BOOLEAN:
+            // The setting itself parses "true", "false" and the like
+            result = value.isString() ? value : LLSD(value.asBoolean());
+            return !value.isArray() && !value.isMap();
+        case TYPE_U32:
+        case TYPE_S32:
+            result = value.asInteger();
+            return !value.isArray() && !value.isMap();
+        case TYPE_F32:
+            result = value.asReal();
+            return !value.isArray() && !value.isMap();
+        case TYPE_STRING:
+            result = value.asString();
+            return !value.isArray() && !value.isMap();
+        default:
+            // Vectors, colours, rectangles: an array as long as the default value
+            result = value;
+            return value.isArray() && value.size() == control->getDefault().size();
+    }
 }
 
 // Sets every covered setting from the preset, or to its default when the preset doesn't have
@@ -1102,6 +1325,8 @@ void FSPanelPreferenceExperimental::applyPreset(const LLSD& settings)
             }
         }
     }
+    refreshVectorComponents();
+    refreshSunRaysQuality();
 }
 
 // Fills the preset combo: Stock Firestorm, the built-in presets, then the user's own. Selects
@@ -1278,17 +1503,39 @@ void FSPanelPreferenceExperimental::onPresetDelete()
     LLNotificationsUtil::add("FSExperimentalPresetDelete", LLSD().with("NAME", name), LLSD(),
         [handle, name](const LLSD& notification, const LLSD& response)
         {
+            FSPanelPreferenceExperimental* self = handle.get();
             if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
             {
                 return;
             }
             LLFile::remove(presetPath(userPresetDir(), name));
-            if (FSPanelPreferenceExperimental* self = handle.get())
+            if (self)
             {
                 self->refreshPresetList(PRESET_STOCK);
             }
         });
 }
-// </FS:Trish>
+
+std::string FSPanelPreferenceExperimental::formatStats() const
+{
+    const FSDecodedTextureCache::Stats stats = FSDecodedTextureCache::instance().getStats();
+    if (!stats.mEnabled)
+    {
+        return getString("decoded_cache_stats_off");
+    }
+    if (!stats.mReady)
+    {
+        return getString("decoded_cache_stats_indexing");
+    }
+    LLStringUtil::format_map_t args;
+    args["[ENTRIES]"] = llformat("%u", stats.mEntries);
+    args["[USED]"] = llformat("%.1f", (F64)stats.mBytes / (1024.0 * 1024.0 * 1024.0));
+    args["[MAX]"] = llformat("%.1f", (F64)stats.mMaxBytes / (1024.0 * 1024.0 * 1024.0));
+    args["[LOADS]"] = llformat("%u", stats.mLoads);
+    args["[FAILURES]"] = llformat("%u", stats.mLoadFailures);
+    args["[STORES]"] = llformat("%u", stats.mStores);
+    args["[REMOVED]"] = llformat("%u", stats.mRemoved);
+    return getString("decoded_cache_stats", args);
+}
 
 static LLPanelInjector<FSPanelPreferenceExperimental> t_pref_experimental("panel_preference_experimental");

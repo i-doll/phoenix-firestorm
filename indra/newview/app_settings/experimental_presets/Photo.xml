@@ -54,6 +54,8 @@
     <real>1.0</real>
     <key>FSRenderGTAOSlices</key>
     <integer>4</integer>
+    <key>FSRenderShadowSmoothFade</key>
+    <boolean>1</boolean>
     <key>FSRenderShadowTexelSnap</key>
     <boolean>1</boolean>
     <key>FSRenderSpecularAA</key>

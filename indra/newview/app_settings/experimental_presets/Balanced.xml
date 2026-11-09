@@ -40,7 +40,11 @@
     <real>0.8</real>
     <key>FSRenderContactShadows</key>
     <boolean>1</boolean>
+    <key>FSRenderShadowFadeLength</key>
+    <real>0.2</real>
     <key>FSRenderShadowFastFilter</key>
+    <boolean>1</boolean>
+    <key>FSRenderShadowSmoothFade</key>
     <boolean>1</boolean>
     <key>FSRenderShadowTexelSnap</key>
     <boolean>1</boolean>
