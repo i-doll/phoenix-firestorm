@@ -1398,6 +1398,40 @@ bool LLShaderMgr::fsRunBatched(const std::function<bool()>& load_phase)
         // Put the phase back to where it started and run it the classic way, so shader level
         // fallback, optional-program handling and the error logs are exactly the original ones
         LL_WARNS("ShaderLoading") << "Parallel shader compile: a shader in this phase failed; loading the phase again without batching" << LL_ENDL;
+        // unload() deletes every shader object attached to the program. The shared objects of
+        // earlier phases (objects/indexedTextureV.glsl, lighting/..., the basic shaders) stay in
+        // mVertexShaderObjects/mFragmentShaderObjects and are attached again by the retry, so
+        // detach them first: deleting them left dead handles behind, and the retry then failed
+        // to link with "No function definition found" (seen on AMD).
+        std::set<GLuint> shared_objects;
+        for (const auto& entry : mVertexShaderObjects)
+        {
+            shared_objects.insert(entry.second);
+        }
+        for (const auto& entry : mFragmentShaderObjects)
+        {
+            shared_objects.insert(entry.second);
+        }
+        for (GLuint object : mFSPendingObjects)
+        {
+            shared_objects.erase(object); // compiled in this phase: deleted below, compiled again
+        }
+        for (LLGLSLShader* shader : mFSBatchPrograms)
+        {
+            if (shader->mProgramObject)
+            {
+                GLuint attached[1024];
+                GLsizei count = 0;
+                glGetAttachedShaders(shader->mProgramObject, 1024, &count, attached);
+                for (GLsizei i = 0; i < count; ++i)
+                {
+                    if (shared_objects.count(attached[i]))
+                    {
+                        glDetachShader(shader->mProgramObject, attached[i]);
+                    }
+                }
+            }
+        }
         for (GLuint object : mFSPendingObjects)
         {
             glDeleteShader(object);

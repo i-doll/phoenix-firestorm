@@ -196,6 +196,14 @@ void FSPointLightBatch::setupProgram(LLGLSLShader& shader)
     {
         return;
     }
+    // With parallel shader compile the program may still be linking: binding it finishes the link
+    // (a query on an unlinked program finds no block on AMD, and the binding was never set)
+    shader.bind();
+    shader.unbind();
+    if (!shader.mProgramObject)
+    {
+        return; // the link failed; its phase is loaded again the classic way
+    }
     GLuint index = glGetUniformBlockIndex(shader.mProgramObject, "FSPointLights");
     if (index != GL_INVALID_INDEX)
     {
