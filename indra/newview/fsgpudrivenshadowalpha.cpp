@@ -756,8 +756,7 @@ namespace
         glVertexAttribDivisor(record, 0);
         glDisableVertexAttribArray(record);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, FS_GDD_SA_MATRIX_BINDING, 0);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, FS_GDD_SA_TEXTURE_BINDING, 0);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, FS_GDD_SA_TEXTURE_BINDING, 0);  // also unbinds the generic binding
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
         LLVertexBuffer::unbind();   // the next setBuffer() binds and sets up its own attributes again
     }
