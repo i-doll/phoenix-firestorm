@@ -32,6 +32,7 @@
 #include "pipeline.h"
 #include "llglcommonfunc.h"
 #include "llvoavatar.h"
+#include "fsgpudrivenmaterials.h" // <FS:Trish/> FSPerfGPUDrivenMaterials
 
 LLDrawPoolMaterials::LLDrawPoolMaterials()
 :  LLRenderPass(LLDrawPool::POOL_MATERIALS)
@@ -164,6 +165,14 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     {
         type += 1;
     }
+
+    // <FS:Trish> FSPerfGPUDrivenMaterials: the static batches as multi-draws out of a vertex arena, in the same
+    // order; false with nothing drawn when it can't, then the loop below draws the pass
+    if (!rigged && fsGDDDrawMaterials(type, *mShader))
+    {
+        return;
+    }
+    // </FS:Trish>
 
     LLCullResult::drawinfo_iterator begin = gPipeline.beginRenderMap(type);
     LLCullResult::drawinfo_iterator end = gPipeline.endRenderMap(type);

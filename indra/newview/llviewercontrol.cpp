@@ -1523,6 +1523,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "FSPerfGPUDrivenPBR", handleSetShaderChanged); // <FS:Trish/> builds the multi-draw PBR program
     setting_setup_signal_listener(gSavedSettings, "FSPerfGPUDrivenPBRBindless", handleSetShaderChanged); // <FS:Trish/> builds the bindless PBR program
     setting_setup_signal_listener(gSavedSettings, "FSPerfGPUDrivenLegacy", handleSetShaderChanged); // <FS:Trish/> builds the multi-draw legacy programs
+    setting_setup_signal_listener(gSavedSettings, "FSPerfGPUDrivenMaterials", handleSetShaderChanged); // <FS:Trish/> builds the multi-draw material programs
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatConsoleFontSize", handleChatFontSizeChanged);

@@ -206,7 +206,8 @@ namespace
     U32 sLastModelIndex = U32_MAX;              // U32_MAX: none yet this pass
     const LLMatrix4* sLastTexMatrix = nullptr;
     U32 sLastTexMatrixIndex = U32_MAX;
-    U32 sPassSerial = 1;    // the pass being built; textures remember their handle by it (mFSGDDPass)
+    U32 sPassSerial = 1;    // the pass being built; textures remember their handle by it (mFSGDDPass), also
+                            // for FSPerfGPUDrivenMaterials (fsGDDBeginTexturePass)
 
     // stats, every 10 seconds with FSPerfGPUDrivenLegacyVerify or FSPerfGPUDrivenLegacyStats
     U64 sStatBatches = 0;
@@ -367,6 +368,31 @@ void fsGDDLegacyReleaseGL()
 }
 
 //-----------------------------------------------------------------------------
+// The per pass texture handle cache
+
+void fsGDDBeginTexturePass()
+{
+    if (++sPassSerial == 0)
+    {
+        sPassSerial = 1; // 0 is what a texture starts with
+    }
+}
+
+U64 fsGDDPassTextureHandle(LLViewerTexture* tex, U32 frame)
+{
+    if (tex->mFSGDDPass != sPassSerial)
+    {
+        tex->mFSGDDPass = sPassSerial;
+        tex->mFSGDDHandle = fsGDDTextureHandle(tex, frame);
+        if (tex->mFSGDDHandle)
+        {
+            tex->setActive();
+        }
+    }
+    return tex->mFSGDDHandle;
+}
+
+//-----------------------------------------------------------------------------
 // The pass
 
 namespace
@@ -423,19 +449,9 @@ namespace
         return index;
     }
 
-    // The texture's handle, looked up once per pass. A texture with a handle is set active as bindFast would.
     U64 handle_of(LLViewerTexture* tex, U32 frame)
     {
-        if (tex->mFSGDDPass != sPassSerial)
-        {
-            tex->mFSGDDPass = sPassSerial;
-            tex->mFSGDDHandle = fsGDDTextureHandle(tex, frame);
-            if (tex->mFSGDDHandle)
-            {
-                tex->setActive();
-            }
-        }
-        return tex->mFSGDDHandle;
+        return fsGDDPassTextureHandle(tex, frame);
     }
 
     void push_handle(U64 handle)
@@ -456,10 +472,7 @@ namespace
         sTexMatrixIndex.clear();
         sLastModelIndex = U32_MAX;
         sLastTexMatrixIndex = U32_MAX;
-        if (++sPassSerial == 0)
-        {
-            sPassSerial = 1; // 0 is what a texture starts with
-        }
+        fsGDDBeginTexturePass();
 
         const U32 frame = LLFrameTimer::getFrameCount();
         sArena.beginFrame(frame);

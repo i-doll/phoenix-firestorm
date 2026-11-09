@@ -58,6 +58,7 @@
 
 #include "fsgddarena.h"
 #include "fsgpudrivenlegacy.h"
+#include "fsgpudrivenmaterials.h"
 #include "fsgpudrivenpbr.h"
 
 #include "fsshadowsinglepass.h"
@@ -154,6 +155,7 @@ namespace
 void fsGDDReleaseGL()
 {
     fsGDDLegacyReleaseGL();
+    fsGDDMaterialsReleaseGL();
     fsGDDPBRReleaseGL();
     release_shadow_gl();
 }
@@ -162,6 +164,7 @@ void fsGDDUnloadShaders()
 {
     unload_shadow_shaders();
     fsGDDLegacyUnloadShaders(); // releases the legacy GL objects too
+    fsGDDMaterialsUnloadShaders();  // and the material pass's
     fsGDDPBRUnloadShaders();    // releases the PBR GL objects too
 }
 
@@ -205,6 +208,8 @@ bool fsGDDLoadShaders(S32 shader_level, bool use_shadow)
     fsGDDPBRLoadShaders();
     // so do the legacy passes (FSPerfGPUDrivenLegacy); after the PBR load, which tests bindless textures again
     fsGDDLegacyLoadShaders();
+    // and the legacy material passes (FSPerfGPUDrivenMaterials)
+    fsGDDMaterialsLoadShaders();
 
     static LLCachedControl<bool> enabled(gSavedSettings, "FSPerfGPUDrivenDraws", false);
     if (!enabled || !use_shadow)

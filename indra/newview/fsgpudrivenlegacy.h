@@ -32,6 +32,7 @@
 
 class LLGLSLShader;
 class LLRenderPass;
+class LLViewerTexture;
 
 // gDeferredDiffuseProgram, gDeferredDiffuseAlphaMaskProgram, gDeferredFullbrightProgram and
 // gDeferredFullbrightAlphaMaskProgram built with FS_GDD_LEGACY: matrices from a storage buffer, the diffuse
@@ -54,5 +55,12 @@ void fsGDDLegacyReleaseGL();
 // False, with nothing drawn, when the feature is off or can't run here; the caller then draws the pass the
 // stock way. The stock program is bound again on return.
 bool fsGDDDrawLegacy(LLRenderPass& pool, U32 type);
+
+// The per pass handle cache of the bindless textures (LLViewerTexture::mFSGDDPass), shared by the passes that
+// look textures up per batch (also FSPerfGPUDrivenMaterials, fsgpudrivenmaterials.cpp). fsGDDBeginTexturePass
+// starts a pass; fsGDDPassTextureHandle is fsGDDTextureHandle looked up once per texture per pass, and sets a
+// texture with a handle active, as bindFast would.
+void fsGDDBeginTexturePass();
+U64 fsGDDPassTextureHandle(LLViewerTexture* tex, U32 frame);
 
 #endif // FS_GPUDRIVENLEGACY_H

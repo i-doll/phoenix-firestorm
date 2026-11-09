@@ -25,6 +25,10 @@
 
 /*[EXTRA_CODE_HERE]*/
 
+#ifdef FS_GDD_MATERIAL
+#extension GL_ARB_bindless_texture : require
+#endif
+
 //class1/deferred/materialF.glsl
 
 // This shader is used for both writing opaque/masked content to the gbuffer and writing blended content to the framebuffer during the alpha pass.
@@ -34,7 +38,23 @@
 #define DIFFUSE_ALPHA_MODE_MASK     2
 #define DIFFUSE_ALPHA_MODE_EMISSIVE 3
 
+#ifdef FS_GDD_MATERIAL
+// FSPerfGPUDrivenMaterials (class1 materialV.glsl): the batch's material arrives as flat inputs holding what
+// the stock path puts in these uniforms, its textures as bindless handles. Only for the G-buffer modes.
+flat in vec4 fs_gdd_specular_color;
+flat in vec3 fs_gdd_params;
+flat in uvec4 fs_gdd_tex01;
+flat in uvec2 fs_gdd_tex2;
+#define env_intensity fs_gdd_params.x
+#define minimum_alpha fs_gdd_params.y
+#define emissive_brightness fs_gdd_params.z
+#define specular_color fs_gdd_specular_color
+#define diffuseMap sampler2D(fs_gdd_tex01.xy)
+#define bumpMap sampler2D(fs_gdd_tex01.zw)
+#define specularMap sampler2D(fs_gdd_tex2)
+#else
 uniform float emissive_brightness;  // fullbright flag, 1.0 == fullbright, 0.0 otherwise
+#endif
 uniform int sun_up_factor;
 uniform int classic_mode;
 uniform int uOITPass;
@@ -216,23 +236,29 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 npos, vec3 diffuse, vec4 spe
 out vec4 frag_data[4];
 #endif
 
+#ifndef FS_GDD_MATERIAL
 uniform sampler2D diffuseMap;  //always in sRGB space
+#endif
 
-#ifdef HAS_NORMAL_MAP
+#if defined(HAS_NORMAL_MAP) && !defined(FS_GDD_MATERIAL)
 uniform sampler2D bumpMap;
 #endif
 
 #ifdef HAS_SPECULAR_MAP
+#ifndef FS_GDD_MATERIAL
 uniform sampler2D specularMap;
+#endif
 
 in vec2 vary_texcoord2;
 #endif
 
+#ifndef FS_GDD_MATERIAL
 uniform float env_intensity;
 uniform vec4 specular_color;  // specular color RGB and specular exponent (glossiness) in alpha
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_MASK)
 uniform float minimum_alpha;
+#endif
 #endif
 
 #ifdef HAS_NORMAL_MAP
