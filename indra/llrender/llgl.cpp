@@ -1612,7 +1612,7 @@ void LLGLManager::initExtensions()
     }
     // AMD's OpenGL driver renders the multi-draws wrongly (black artefacts on avatars from the shadow
     // and PBR passes): not used there until that is understood
-    if (mFSHasGPUDrivenDraws && mIsAMD)
+    if (mFSHasGPUDrivenDraws && mIsAMD && !mFSAllowGPUDrivenOnAMD)
     {
         mFSHasGPUDrivenDraws = false;
         LL_INFOS("RenderInit") << "GPU-driven draws: off on AMD graphics (they render incorrectly with its driver)" << LL_ENDL;
