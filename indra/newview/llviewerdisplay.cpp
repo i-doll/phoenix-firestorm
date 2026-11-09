@@ -1990,20 +1990,27 @@ namespace
         return false;
     }
 
+    // The UI is redrawn every frame anyway: input aimed at it just now, a UI element holding the
+    // mouse (a floater, scroll bar or colour picker being dragged), or something animating in it.
+    // Flying, walking and orbiting the camera don't count.
+    bool fs_ui_in_use()
+    {
+        constexpr F64 INPUT_HOLD = 0.25;    // seconds of every frame redraws after an input event
+
+        const F64 now = LLFrameTimer::getElapsedSeconds();
+        LLMouseHandler* captor = gFocusMgr.getMouseCapture();
+        const bool interacting = now - gViewerWindow->getFSLastUIInput() < INPUT_HOLD ||
+                                 (captor && dynamic_cast<LLView*>(captor) != nullptr);
+        return interacting || fs_ui_animating(captor);
+    }
+
     bool fs_ui_redraw_due(bool resized)
     {
         static LLCachedControl<U32> cap(gSavedSettings, "FSRenderUICap", 0);
         static LLCachedControl<F32> idle_rate(gSavedSettings, "FSRenderUIIdleRate", 10.f);
-        constexpr F64 INPUT_HOLD = 0.25;    // seconds of every frame redraws after an input event
 
-        const F64 now = LLFrameTimer::getElapsedSeconds();
-        const F64 since = now - sFSUILastDraw;
-        // In use: input aimed at the UI just now, or a UI element holding the mouse (a floater or
-        // scroll bar being dragged). Flying, walking and orbiting the camera don't count.
-        LLMouseHandler* captor = gFocusMgr.getMouseCapture();
-        const bool interacting = now - gViewerWindow->getFSLastUIInput() < INPUT_HOLD ||
-                                 (captor && dynamic_cast<LLView*>(captor) != nullptr);
-        if (resized || sFSUILastDraw < 0.0 || interacting || fs_ui_animating(captor))
+        const F64 since = LLFrameTimer::getElapsedSeconds() - sFSUILastDraw;
+        if (resized || sFSUILastDraw < 0.0)
         {
             return true;
         }
@@ -2017,6 +2024,15 @@ namespace
     void fs_render_ui_cached()
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+        // Redrawn every frame anyway: the buffer saves nothing then, so draw straight to the frame
+        // as with the cap off (going through the buffer made the whole UI blink while the colour
+        // picker was dragged). The buffer is stale afterwards: redraw it once the UI is idle.
+        if (fs_ui_in_use())
+        {
+            sFSUILastDraw = -1.0;
+            gViewerWindow->draw();
+            return;
+        }
         const U32 width = (U32)gViewerWindow->getWindowWidthRaw();
         const U32 height = (U32)gViewerWindow->getWindowHeightRaw();
         if (!sFSUIBuffer)
